@@ -9,6 +9,6 @@ The type soundness statement and proof can be found in WebAssembly/Wasm_Soundnes
 
 TODO: update the executable type checker and interpreter for extraction to OCaml.
 
-# Building
+## Building
 
 Currently this repository contains only free-standing Isabelle/HOL files, which have been updated for use with Isabelle2020. A build process for the interpreter will be provided once OCaml extraction is re-implemented.
