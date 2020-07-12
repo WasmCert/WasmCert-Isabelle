@@ -3,7 +3,7 @@ A mechanisation of Wasm in Isabelle.
 
 (C) C. Watt 2020 - see LICENSE
 
-An updated version of the mechanisation from "Mechanising and Verifying the WebAssembly Specification".
+An updated version of the mechanisation from "Mechanising and Verifying the WebAssembly Specification" (C. Watt, CPP 2018).
 
 The type soundness statement and proof can be found in WebAssembly/Wasm_Soundness.thy.
 
