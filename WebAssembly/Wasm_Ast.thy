@@ -19,15 +19,22 @@ setup_lifting type_definition_i32
 declare Quotient_i32[transfer_rule]
 
 \<comment> \<open>memory\<close>
-type_synonym byte = "8 word"
+(* type_synonym byte = "8 word" *)
+typedef byte = "UNIV :: (8 word) set" ..
+setup_lifting type_definition_byte
+declare Quotient_byte[transfer_rule]
+
+lift_definition msb_byte :: "byte \<Rightarrow> bool" is msb .
+lift_definition zero_byte :: "byte" is 0 .
+lift_definition negone_byte :: "byte" is "-1" .
 
 type_synonym bytes = "byte list"
 
 definition bytes_takefill :: "byte \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> bytes" where
-  "bytes_takefill = (\<lambda>(a::8 word) n as. takefill a n as)"
+  "bytes_takefill = (\<lambda>(a::byte) n as. takefill a n as)"
 
 definition bytes_replicate :: "nat \<Rightarrow> byte \<Rightarrow> bytes" where
-  "bytes_replicate = (\<lambda>n (b::8 word). replicate n b)"
+  "bytes_replicate = (\<lambda>n (b::byte). replicate n b)"
 
 definition msbyte :: "bytes \<Rightarrow> byte" where
   "msbyte bs = last (bs)"
@@ -49,20 +56,38 @@ type_synonym mem_t = \<comment> \<open>memory type\<close>
 definition Ki64 :: "nat" where
   "Ki64 = 65536"
 
-(* data, max? *)
-typedef mem = "UNIV :: ((byte list) \<times> nat option) set" ..
-setup_lifting type_definition_mem
-declare Quotient_mem[transfer_rule]
+typedef mem_rep = "UNIV :: (byte list) set" ..
+setup_lifting type_definition_mem_rep
+declare Quotient_mem_rep[transfer_rule]
 
-lift_definition mem_mk :: "limit_t \<Rightarrow> mem" is "(\<lambda>lim. ((bytes_replicate ((l_min lim) * Ki64) 0), l_max lim))" .
+type_synonym mem = "(mem_rep \<times> nat option)"
 
-lift_definition byte_at :: "mem \<Rightarrow> nat \<Rightarrow> byte" is "(\<lambda>(m,max) n. m!n)::((byte list) \<times> nat option) \<Rightarrow> nat \<Rightarrow> byte" .
-lift_definition mem_length :: "mem \<Rightarrow> nat" is "(\<lambda>(m,max). length m)" .
-lift_definition mem_max :: "mem \<Rightarrow> nat option" is "(\<lambda>(m,max). max)" .
+lift_definition mem_rep_mk :: "nat \<Rightarrow> mem_rep" is "(\<lambda>n. (bytes_replicate (n * Ki64) zero_byte))" .
+definition mem_mk :: "limit_t \<Rightarrow> mem" where
+  "mem_mk lim = (mem_rep_mk (l_min lim), l_max lim)"
 
-lift_definition read_bytes :: "mem \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes" is "(\<lambda>(m,max) n l. (take l (drop n m))::(byte list))" .
-lift_definition write_bytes :: "mem \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> mem" is "(\<lambda>(m,max) n bs. (((take n m) @ bs @ (drop (n + length bs) m)),max)::(byte list \<times> nat option))" .
-lift_definition mem_append :: "mem \<Rightarrow> bytes \<Rightarrow> mem" is "(\<lambda>(m,max) bs. (append m bs, max)::(byte list \<times> nat option))" .
+lift_definition mem_rep_byte_at :: "mem_rep \<Rightarrow> nat \<Rightarrow> byte" is "(\<lambda>m n. m!n)::(byte list) \<Rightarrow> nat \<Rightarrow> byte" .
+definition byte_at :: "mem \<Rightarrow> nat \<Rightarrow> byte" where
+  "byte_at m n = mem_rep_byte_at (fst m) n"
+
+lift_definition mem_rep_length :: "mem_rep \<Rightarrow> nat" is "(\<lambda>m. length m)" .
+definition mem_length :: "mem \<Rightarrow> nat" where
+  "mem_length m = mem_rep_length (fst m)"
+
+definition mem_max :: "mem \<Rightarrow> nat option" where
+  "mem_max m = snd m"
+
+lift_definition mem_rep_read_bytes :: "mem_rep \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes" is "(\<lambda>m n l. (take l (drop n m))::(byte list))" .
+definition read_bytes :: "mem \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes" where
+  "read_bytes m n l = mem_rep_read_bytes (fst m) n l"
+
+lift_definition mem_rep_write_bytes :: "mem_rep \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> mem_rep" is "(\<lambda>m n bs. ((take n m) @ bs @ (drop (n + length bs) m)) :: byte list)" .
+definition write_bytes :: "mem \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> mem" where
+  "write_bytes m n bs = (mem_rep_write_bytes (fst m) n bs, snd m)"
+
+lift_definition mem_rep_append :: "mem_rep \<Rightarrow> nat \<Rightarrow> byte \<Rightarrow> mem_rep" is "(\<lambda>m n b. (append m (replicate n b))::byte list)" .
+definition mem_append :: "mem \<Rightarrow> nat \<Rightarrow> byte \<Rightarrow> mem" where
+  "mem_append m n b = (mem_rep_append (fst m) n b, snd m)"
 
 lemma take_drop_map:
   assumes "ind+n \<le> length bs"
@@ -79,7 +104,8 @@ lemma read_bytes_map:
   assumes "ind+n \<le> mem_length m"
   shows "read_bytes m ind n = (map (\<lambda>k. byte_at m k) [ind..<ind+n])"
   using assms
-  unfolding read_bytes_def byte_at_def mem_length_def
+  unfolding read_bytes_def mem_rep_read_bytes_def mem_rep_byte_at_def
+            byte_at_def mem_length_def mem_rep_length_def
   by (simp add: take_drop_map split: prod.splits)
 
 \<comment> \<open>host\<close>
@@ -225,14 +251,14 @@ record f = \<comment> \<open>frame\<close>
 datatype e = \<comment> \<open>administrative instruction\<close>
   Basic b_e ("$_" 60)
   | Trap
-  | Invoke cl
+  | Invoke i
   | Label nat "e list" "e list"
-  | Local nat f "e list"
+  | Frame nat f "e list"
 
 datatype Lholed =
     \<comment> \<open>L0 = v* [<hole>] e*\<close>
-    LBase "e list" "e list"
+    LBase "v list" "e list"
     \<comment> \<open>L(i+1) = v* (label n {e* } Li) e*\<close>
-    | LRec "e list" nat "e list" Lholed "e list"
+    | LRec "v list" nat "e list" Lholed "e list"
 
 end

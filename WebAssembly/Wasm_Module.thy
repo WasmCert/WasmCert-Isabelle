@@ -32,12 +32,12 @@ datatype v_ext =
 type_synonym exp_desc = v_ext
 
 record module_import =
-  I_module :: string
-  I_name :: string
+  I_module :: String.literal
+  I_name :: String.literal
   I_desc :: imp_desc
 
 record module_export =
-  E_name :: string
+  E_name :: String.literal
   E_desc :: exp_desc
 
 datatype extern_t =
@@ -79,7 +79,7 @@ inductive limit_typing :: "limit_t \<Rightarrow> nat \<Rightarrow> bool" where
 inductive module_func_typing :: "t_context \<Rightarrow> module_func \<Rightarrow> tf \<Rightarrow> bool" where
   "\<lbrakk>i < length (types_t \<C>);
     (types_t \<C>)!i = (tn _> tm);
-    \<C>\<lparr>local := (local \<C>) @ tn @ t_locs, label := ([tm] @ (label \<C>)), return := Some tm\<rparr> \<turnstile> b_es : (tn _> tm)\<rbrakk>
+    \<C>\<lparr>local := tn @ t_locs, label := ([tm] @ (label \<C>)), return := Some tm\<rparr> \<turnstile> b_es : ([] _> tm)\<rbrakk>
      \<Longrightarrow> module_func_typing \<C> (i, t_locs, b_es) (tn _> tm)"
 
 abbreviation "module_tab_typing t \<equiv> limit_typing t (2^32)"
@@ -101,6 +101,8 @@ inductive module_data_typing :: "t_context \<Rightarrow> module_data \<Rightarro
 
 inductive module_start_typing :: "t_context \<Rightarrow> i \<Rightarrow> bool" where
   "\<lbrakk>i < length (func_t \<C>); (func_t \<C>)!i = ([] _> [])\<rbrakk> \<Longrightarrow> module_start_typing \<C> i"
+
+abbreviation "module_exports_distinct exps \<equiv> List.distinct (List.map E_name exps)"
 
 inductive module_import_typing :: "t_context \<Rightarrow> imp_desc \<Rightarrow> extern_t \<Rightarrow> bool" where
   "\<lbrakk>i < length (types_t \<C>); (types_t \<C>)!i = tf\<rbrakk> \<Longrightarrow> module_import_typing \<C> (Imp_func i) (Te_func tf)"
@@ -133,19 +135,23 @@ record m = \<comment> \<open>module\<close>
   m_exports :: "module_export list"
 
 inductive module_typing :: "m \<Rightarrow> extern_t list \<Rightarrow> extern_t list \<Rightarrow> bool" where
-"\<lbrakk>list_all2 (module_func_typing \<C>) fs fts;
+"\<lbrakk>list_all (\<lambda>tf. case tf of (tn _> tm) \<Rightarrow> length tm \<le> 1) tfs; \<comment> \<open>\<open>MVP restriction\<close>\<close>
+  list_all2 (module_func_typing \<C>) fs fts;
   list_all (module_tab_typing) ts;
   list_all (module_mem_typing) ms;
   list_all2 (module_glob_typing \<C>') gs gts;
   list_all (module_elem_typing \<C>) els;
   list_all (module_data_typing \<C>) ds;
   pred_option (module_start_typing \<C>) i_opt;
+  module_exports_distinct exps;
   list_all2 (\<lambda>imp. module_import_typing \<C> (I_desc imp)) imps impts;
   list_all2 (\<lambda>exp. module_export_typing \<C> (E_desc exp)) exps expts;
   ifts = ext_t_funcs impts;
   its = ext_t_tabs impts;
   ims = ext_t_mems impts;
   igs = ext_t_globs impts;
+  length (its@ts) \<le> 1; \<comment> \<open>\<open>MVP restriction\<close>\<close>
+  length (ims@ms) \<le> 1; \<comment> \<open>\<open>MVP restriction\<close>\<close>
   \<C> = \<lparr>types_t=tfs, func_t=ifts@fts, global=igs@gts, table=its@ts, memory=ims@ms, local=[], label=[], return=None\<rparr>;
   \<C>' = \<lparr>types_t=[], func_t=[], global=igs, table=[], memory=[], local=[], label=[], return=None\<rparr>\<rbrakk>
   \<Longrightarrow> module_typing \<lparr>m_types = tfs,

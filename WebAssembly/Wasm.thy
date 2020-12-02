@@ -64,12 +64,18 @@ definition "glob_typing g tg = (tg_mut tg = g_mut g \<and> tg_t tg = typeof (g_v
 
 definition "globi_agree gs n g = (n < length gs \<and> glob_typing (gs!n) g)"
 
-definition "tab_typing t tt = ((l_min tt) \<le> (tab_size (t)) \<and> (tab_max (t)) = l_max tt)"
+definition "limits_compat lt1 lt2 =
+  ((l_min lt1) \<ge> (l_min lt2) \<and>
+  pred_option (\<lambda>lt2_the. (case (l_max lt1) of
+                            Some lt1_the \<Rightarrow> (lt1_the \<le> lt2_the)
+                          | None \<Rightarrow> False)) (l_max lt2))"
+
+definition "tab_typing t tt = (limits_compat \<lparr>l_min=(tab_size t),l_max=(tab_max t)\<rparr> tt)"
 
 definition "tabi_agree ts n tab_t =
   ((n < length ts) \<and> (tab_typing (ts!n) tab_t))"
 
-definition "mem_typing m mt = ((l_min mt) \<le> (mem_size m) \<and> mem_max m = l_max mt)"
+definition "mem_typing m mt = (limits_compat \<lparr>l_min=(mem_size m),l_max=(mem_max m)\<rparr> mt)"
 
 definition "memi_agree ms n mem_t =
   ((n < length ms) \<and> mem_typing (ms!n) mem_t)"
@@ -84,13 +90,16 @@ inductive inst_typing :: "[s, inst, t_context] \<Rightarrow> bool" where
       \<Longrightarrow> inst_typing s \<lparr>types = ts, funcs = fs, tabs = tbs, mems = ms, globs = gs\<rparr>
                         \<lparr>types_t = ts, func_t = tfs, global = tgs, table = tabs_t, memory = mems_t, local = [], label = [], return = None\<rparr>"
 
+inductive frame_typing :: "[s, f, t_context] \<Rightarrow> bool" where
+"\<lbrakk>tvs = map typeof (f_locs f); inst_typing s (f_inst f) \<C>\<rbrakk> \<Longrightarrow> frame_typing s f (\<C>\<lparr>local := tvs\<rparr>)"
+
 inductive cl_typing :: "[s, cl, tf] \<Rightarrow> bool" where
-   "\<lbrakk>inst_typing s i \<C>; tf = (t1s _> t2s); \<C>\<lparr>local := (local \<C>) @ t1s @ ts, label := ([t2s] @ (label \<C>)), return := Some t2s\<rparr> \<turnstile> es : ([] _> t2s)\<rbrakk> \<Longrightarrow> cl_typing s (Func_native i tf ts es) (t1s _> t2s)"
+   "\<lbrakk>inst_typing s i \<C>; tf = (t1s _> t2s); \<C>\<lparr>local := t1s @ ts, label := ([t2s] @ (label \<C>)), return := Some t2s\<rparr> \<turnstile> es : ([] _> t2s)\<rbrakk> \<Longrightarrow> cl_typing s (Func_native i tf ts es) (t1s _> t2s)"
  |  "cl_typing s (Func_host tf h) tf"
 
 (* lifting the b_e_typing relation to the administrative operators *)
 inductive e_typing :: "[s, t_context, e list, tf] \<Rightarrow> bool" ("_\<bullet>_ \<turnstile> _ : _" 60)
-and       s_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> bool" ("_\<bullet>_ \<tturnstile>' _;_ : _" 60) where
+and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> bool" ("_\<bullet>_ \<tturnstile>' _;_ : _" 60) where
 (* section: e_typing *)
   (* lifting *)
   "\<C> \<turnstile> b_es : tf \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> $*b_es : tf"
@@ -100,14 +109,14 @@ and       s_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> boo
 | "\<S>\<bullet>\<C> \<turnstile> es : (t1s _> t2s) \<Longrightarrow>\<S>\<bullet>\<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"
   (* trap *)
 | "\<S>\<bullet>\<C> \<turnstile> [Trap] : tf"
-  (* local *)
-| "\<lbrakk>\<S>\<bullet>Some ts \<tturnstile> f;es : ts; length ts = n\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Local n f es] : ([] _> ts)"
+  (* frame *)
+| "\<lbrakk>\<S>\<bullet>Some ts \<tturnstile> f;es : ts; length ts = n\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Frame n f es] : ([] _> ts)"
   (* invoke *)
-| "\<lbrakk>cl_typing \<S> cl tf\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Invoke cl] : tf"
+| "\<lbrakk>i < length (funcs \<S>); cl_type ((funcs \<S>)!i) = tf\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Invoke i] : tf"
   (* label *)
 | "\<lbrakk>\<S>\<bullet>\<C> \<turnstile> e0s : (ts _> t2s); \<S>\<bullet>\<C>\<lparr>label := ([ts] @ (label \<C>))\<rparr> \<turnstile> es : ([] _> t2s); length ts = n\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Label n e0s es] : ([] _> t2s)"
-(* section: s_typing *)
-| "\<lbrakk>tvs = map typeof vs; inst_typing \<S> i \<C>i; \<C> = \<C>i\<lparr>local := (local \<C>i @ tvs), return := rs\<rparr>; \<S>\<bullet>\<C> \<turnstile> es : ([] _> ts); (rs = Some ts) \<or> rs = None\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile> \<lparr> f_locs=vs,f_inst=i\<rparr>;es : ts"
+(* section: l_typing *)
+| "\<lbrakk>frame_typing \<S> f \<C>; \<S>\<bullet>\<C>\<lparr>return := rs\<rparr> \<turnstile> es : ([] _> ts)\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile> f;es : ts"
 
 definition "tab_agree s tab =
   ((list_all (\<lambda>i_opt. (case i_opt of None \<Rightarrow> True | Some i \<Rightarrow> i < length (funcs s))) (fst tab)) \<and>
@@ -149,17 +158,17 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
 | select_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$(C v1), $(C v2), $C (ConstInt32 n), ($ Select)]\<rparr> \<leadsto> \<lparr>[$(C v2)]\<rparr>"
 | select_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$(C v1), $(C v2), $C (ConstInt32 n), ($ Select)]\<rparr> \<leadsto> \<lparr>[$(C v1)]\<rparr>"
   \<comment> \<open>\<open>block\<close>\<close>
-| block:"\<lbrakk>const_list vs; length vs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>vs @ [$(Block (t1s _> t2s) es)]\<rparr> \<leadsto> \<lparr>[Label m [] (vs @ ($* es))]\<rparr>"
+| block:"\<lbrakk>length vs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>($C* vs) @ [$(Block (t1s _> t2s) es)]\<rparr> \<leadsto> \<lparr>[Label m [] (($C* vs) @ ($* es))]\<rparr>"
   \<comment> \<open>\<open>loop\<close>\<close>
-| loop:"\<lbrakk>const_list vs; length vs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>vs @ [$(Loop (t1s _> t2s) es)]\<rparr> \<leadsto> \<lparr>[Label n [$(Loop (t1s _> t2s) es)] (vs @ ($* es))]\<rparr>"
+| loop:"\<lbrakk>length vs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>($C* vs) @ [$(Loop (t1s _> t2s) es)]\<rparr> \<leadsto> \<lparr>[Label n [$(Loop (t1s _> t2s) es)] (($C* vs) @ ($* es))]\<rparr>"
   \<comment> \<open>\<open>if\<close>\<close>
 | if_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$C (ConstInt32 n), $(If tf e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tf e2s)]\<rparr>"
 | if_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$C (ConstInt32 n), $(If tf e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tf e1s)]\<rparr>"
   \<comment> \<open>\<open>label\<close>\<close>
-| label_const:"const_list vs \<Longrightarrow> \<lparr>[Label n es vs]\<rparr> \<leadsto> \<lparr>vs\<rparr>"
+| label_const:"\<lparr>[Label n es ($C* vs)]\<rparr> \<leadsto> \<lparr>($C* vs)\<rparr>"
 | label_trap:"\<lparr>[Label n es [Trap]]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
   \<comment> \<open>\<open>br\<close>\<close>
-| br:"\<lbrakk>const_list vs; length vs = n; Lfilled i lholed (vs @ [$(Br i)]) LI\<rbrakk> \<Longrightarrow> \<lparr>[Label n es LI]\<rparr> \<leadsto> \<lparr>vs @ es\<rparr>"
+| br:"\<lbrakk>length vs = n; Lfilled i lholed (($C* vs) @ [$(Br i)]) LI\<rbrakk> \<Longrightarrow> \<lparr>[Label n es LI]\<rparr> \<leadsto> \<lparr>($C* vs) @ es\<rparr>"
   \<comment> \<open>\<open>br_if\<close>\<close>
 | br_if_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$C (ConstInt32 n), $(Br_if i)]\<rparr> \<leadsto> \<lparr>[]\<rparr>"
 | br_if_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$C (ConstInt32 n), $(Br_if i)]\<rparr> \<leadsto> \<lparr>[$(Br i)]\<rparr>"
@@ -167,12 +176,12 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
 | br_table:"\<lbrakk>length is > (nat_of_int c)\<rbrakk> \<Longrightarrow> \<lparr>[$C (ConstInt32 c), $(Br_table is i)]\<rparr> \<leadsto> \<lparr>[$(Br (is!(nat_of_int c)))]\<rparr>"
 | br_table_length:"\<lbrakk>length is \<le> (nat_of_int c)\<rbrakk> \<Longrightarrow> \<lparr>[$C (ConstInt32 c), $(Br_table is i)]\<rparr> \<leadsto> \<lparr>[$(Br i)]\<rparr>"
   \<comment> \<open>\<open>local\<close>\<close>
-| local_const:"\<lbrakk>const_list es\<rbrakk> \<Longrightarrow> \<lparr>[Local n f es]\<rparr> \<leadsto> \<lparr>es\<rparr>"
-| local_trap:"\<lparr>[Local n f [Trap]]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
+| local_const:"\<lparr>[Frame n f ($C* vs)]\<rparr> \<leadsto> \<lparr>($C* vs)\<rparr>"
+| local_trap:"\<lparr>[Frame n f [Trap]]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
   \<comment> \<open>\<open>return\<close>\<close>
-| return:"\<lbrakk>const_list vs; length vs = n; Lfilled j lholed (vs @ [$Return]) es\<rbrakk>  \<Longrightarrow> \<lparr>[Local n f es]\<rparr> \<leadsto> \<lparr>vs\<rparr>"
+| return:"\<lbrakk>length vs = n; Lfilled j lholed (($C* vs) @ [$Return]) es\<rbrakk>  \<Longrightarrow> \<lparr>[Frame n f es]\<rparr> \<leadsto> \<lparr>($C* vs)\<rparr>"
   \<comment> \<open>\<open>tee_local\<close>\<close>
-| tee_local:"is_const v \<Longrightarrow> \<lparr>[v, $(Tee_local i)]\<rparr> \<leadsto> \<lparr>[v, v, $(Set_local i)]\<rparr>"
+| tee_local:"\<lparr>[$C v, $(Tee_local i)]\<rparr> \<leadsto> \<lparr>[$C v, $C v, $(Set_local i)]\<rparr>"
 | trap:"\<lbrakk>es \<noteq> [Trap]; Lfilled 0 lholed [Trap] es\<rbrakk> \<Longrightarrow> \<lparr>es\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
 
 (* full reduction rule *)
@@ -180,14 +189,14 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
   \<comment> \<open>\<open>lifting basic reduction\<close>\<close>
   basic:"\<lparr>e\<rparr> \<leadsto> \<lparr>e'\<rparr> \<Longrightarrow> \<lparr>s;f;e\<rparr> \<leadsto> \<lparr>s;f;e'\<rparr>"
   \<comment> \<open>\<open>call\<close>\<close>
-| call:"\<lparr>s;f;[$(Call j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke (sfunc s (f_inst f) j)]\<rparr>"
+| call:"\<lparr>s;f;[$(Call j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke (sfunc_ind (f_inst f) j)]\<rparr>"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
-| call_indirect_Some:"\<lbrakk>(f_inst f) = i; stab s i (nat_of_int c) = Some cl; stypes s i j = tf; cl_type cl = tf\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke cl]\<rparr>"
-| call_indirect_None:"\<lbrakk>(f_inst f) = i; (stab s i (nat_of_int c) = Some cl \<and> stypes s i j \<noteq> cl_type cl) \<or> stab s i (nat_of_int c) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| call_indirect_Some:"\<lbrakk>(f_inst f) = i; stab s i (nat_of_int c) = Some i_cl; stypes s i j = tf; cl_type (funcs s!i_cl) = tf\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke i_cl]\<rparr>"
+| call_indirect_None:"\<lbrakk>(f_inst f) = i; (stab s i (nat_of_int c) = Some i_cl \<and> stypes s i j \<noteq> cl_type (funcs s!i_cl)) \<or> stab s i (nat_of_int c) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>invoke\<close>\<close>
-| invoke_native:"\<lbrakk>cl = Func_native j (t1s _> t2s) ts es; ves = ($$* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs) \<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke cl]\<rparr> \<leadsto> \<lparr>s;f;[Local m \<lparr> f_locs = vcs@zs, f_inst = j \<rparr> [$(Block ([] _> t2s) es)]]\<rparr>"
-| invoke_host_Some:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs = Some (s', vcs')\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke cl]\<rparr> \<leadsto> \<lparr>s';f;($$* vcs')\<rparr>"
-| invoke_host_None:"\<lbrakk>cl = Func_host (t1s _> t2s) h; ves = ($$* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke cl]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| invoke_native:"\<lbrakk>(funcs s!i_cl) = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs) \<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;[Frame m \<lparr> f_locs = vcs@zs, f_inst = j \<rparr> [$(Block ([] _> t2s) es)]]\<rparr>"
+| invoke_host_Some:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs (Some (s', vcs'))\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f;($C* vcs')\<rparr>"
+| invoke_host_None:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>get_local\<close>\<close>
 | get_local:"\<lbrakk>length vi = j; f_locs f = (vi @ [v] @ vs)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(Get_local j)]\<rparr> \<leadsto> \<lparr>s;f;[$(C v)]\<rparr>"
   \<comment> \<open>\<open>set_local\<close>\<close>
@@ -218,7 +227,7 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
   \<comment> \<open>\<open>inductive label reduction\<close>\<close>
 | label:"\<lbrakk>\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>; Lfilled k lholed es les; Lfilled k lholed es' les'\<rbrakk> \<Longrightarrow> \<lparr>s;f;les\<rparr> \<leadsto> \<lparr>s';f';les'\<rparr>"
   \<comment> \<open>\<open>inductive local reduction\<close>\<close>
-| local:"\<lbrakk>\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>\<rbrakk> \<Longrightarrow> \<lparr>s;f0;[Local n f es]\<rparr> \<leadsto> \<lparr>s';f0;[Local n f' es']\<rparr>"
+| local:"\<lbrakk>\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>\<rbrakk> \<Longrightarrow> \<lparr>s;f0;[Frame n f es]\<rparr> \<leadsto> \<lparr>s';f0;[Frame n f' es']\<rparr>"
 
 definition reduce_trans where
   "reduce_trans \<equiv> (\<lambda>(s,f,es) (s',f',es'). \<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>)^**"

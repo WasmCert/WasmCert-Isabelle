@@ -7,7 +7,7 @@ fun module_func_type_checker :: "t_context \<Rightarrow> module_func \<Rightarro
   ((i < length (types_t \<C>)) \<and>
      (case (types_t \<C>)!i of
        (tn _> tm) \<Rightarrow>
-         b_e_type_checker (\<C>\<lparr>local := (local \<C>) @ tn @ t_locs, label := ([tm] @ (label \<C>)), return := Some tm\<rparr>) b_es (tn _> tm)))"
+         b_e_type_checker (\<C>\<lparr>local := tn @ t_locs, label := ([tm] @ (label \<C>)), return := Some tm\<rparr>) b_es ([] _> tm)))"
 
 lemma module_func_typing_equiv_module_func_type_checker:
   "module_func_typing \<C> m_f tf = (module_func_type_checker \<C> m_f \<and>
@@ -225,13 +225,17 @@ fun module_type_checker :: "m \<Rightarrow> (extern_t list \<times> extern_t lis
        let gts = gather_m_g_types gs in
        let \<C> = \<lparr>types_t=tfs, func_t=ifts@fts, global=igs@gts, table=its@ts, memory=ims@ms, local=[], label=[], return=None\<rparr> in
        let \<C>' = \<lparr>types_t=[], func_t=[], global=igs, table=[], memory=[], local=[], label=[], return=None\<rparr> in
-       if (list_all (module_func_type_checker \<C>) fs \<and>
+       if (list_all (\<lambda>tf. case tf of (tn _> tm) \<Rightarrow> length tm \<le> 1) tfs \<and> \<comment> \<open>\<open>MVP restriction\<close>\<close>
+           list_all (module_func_type_checker \<C>) fs \<and>
            list_all (module_tab_type_checker) ts \<and>
            list_all (module_mem_type_checker) ms \<and>
            list_all (module_glob_type_checker \<C>') gs \<and>
            list_all (module_elem_type_checker \<C>) els \<and>
            list_all (module_data_type_checker \<C>) ds \<and>
-           pred_option (module_start_type_checker \<C>) i_opt) then
+           pred_option (module_start_type_checker \<C>) i_opt \<and>
+           module_exports_distinct exps \<and>
+         length (its@ts) \<le> 1 \<and> \<comment> \<open>\<open>MVP restriction\<close>\<close>
+         length (ims@ms) \<le> 1   \<comment> \<open>\<open>MVP restriction\<close>\<close>) then
          case (module_exports_typer \<C> exps) of
            Some expts \<Rightarrow> Some (impts, expts)
          | _ \<Rightarrow> None
@@ -257,6 +261,7 @@ proof -
     using module_type_checker.cases
     by blast
   obtain \<C> \<C>' fts gts ifts its ims igs where module_typing_is:
+    "list_all (\<lambda>tf. case tf of (tn _> tm) \<Rightarrow> length tm \<le> 1) tfs"
     "list_all2 (module_func_typing \<C>) fs fts"
     "list_all (module_tab_typing) ts"
     "list_all (module_mem_typing) ms"
@@ -270,6 +275,9 @@ proof -
     "its = ext_t_tabs impts"
     "ims = ext_t_mems impts"
     "igs = ext_t_globs impts"
+    "module_exports_distinct exps"
+    "length (its@ts) \<le> 1"
+    "length (ims@ms) \<le> 1"
     "\<C> = \<lparr>types_t=tfs, func_t=ifts@fts, global=igs@gts, table=its@ts, memory=ims@ms, local=[], label=[], return=None\<rparr>"
     "\<C>' = \<lparr>types_t=[], func_t=[], global=igs, table=[], memory=[], local=[], label=[], return=None\<rparr>"
     using assms
@@ -279,21 +287,21 @@ proof -
     done
 
   have "gather_m_f_types tfs fs = Some fts"
-    using module_typing_is(1,14) module_func_typing_imp_gather_m_f_types
+    using module_typing_is(2,18) module_func_typing_imp_gather_m_f_types
     by fastforce
   moreover
   have "gather_m_g_types gs = gts"
-    using module_typing_is(4)
+    using module_typing_is(5)
     unfolding list_all2_conv_all_nth module_glob_typing.simps
     by (metis length_map module_glob.select_convs(1) nth_equalityI nth_map)
   moreover
   have "module_imports_typer tfs imps = Some impts"
-    using module_typing_is(8)
-    by (simp add: list_all2_module_imports_typer module_typing_is(14))
+    using module_typing_is(9)
+    by (simp add: list_all2_module_imports_typer module_typing_is(18))
   moreover
   have "module_exports_typer \<C> exps = Some expts"
-    using module_typing_is(9)
-    by (simp add: list_all2_module_exports_typer module_typing_is(14))
+    using module_typing_is(10)
+    by (simp add: list_all2_module_exports_typer)
   moreover
   have "list_all (module_func_type_checker \<C>) fs"
        "list_all (module_tab_type_checker) ts"
@@ -302,7 +310,8 @@ proof -
        "list_all (module_elem_type_checker \<C>) els"
        "list_all (module_data_type_checker \<C>) ds"
        "pred_option (module_start_type_checker \<C>) i_opt"
-    using module_typing_is(1,2,3,4,5,6,7,14)
+       "module_exports_distinct exps"
+    using module_typing_is(2-8,15)
           module_func_typing_equiv_module_func_type_checker
           module_glob_typing_equiv_module_glob_type_checker
           module_elem_typing_equiv_module_elem_type_checker
@@ -342,6 +351,7 @@ proof -
     "gts = gather_m_g_types gs"
     "\<C> = \<lparr>types_t=tfs, func_t=ifts@fts, global=igs@gts, table=its@ts, memory=ims@ms, local=[], label=[], return=None\<rparr>"
     "\<C>' = \<lparr>types_t=[], func_t=[], global=igs, table=[], memory=[], local=[], label=[], return=None\<rparr>"
+    "list_all (\<lambda>tf. case tf of (tn _> tm) \<Rightarrow> length tm \<le> 1) tfs"
     "list_all (module_func_type_checker \<C>) fs"
     "list_all (module_tab_type_checker) ts"
     "list_all (module_mem_type_checker) ms"
@@ -349,12 +359,15 @@ proof -
     "list_all (module_elem_type_checker \<C>) els"
     "list_all (module_data_type_checker \<C>) ds"
     "pred_option (module_start_type_checker \<C>) i_opt"
+    "module_exports_distinct exps"
+    "length (its@ts) \<le> 1"
+    "length (ims@ms) \<le> 1"
     "module_exports_typer \<C> exps = Some expts"
     using assms m_def
     by (simp add: Let_def split: option.splits if_splits)
   have "list_all2 (module_func_typing \<C>) fs fts"
     using gather_m_f_types_imp_module_func_typing
-          module_type_checker_is(1,8,10)
+          module_type_checker_is(1,8,11)
     by fastforce
   moreover
   have "list_all (module_tab_typing) ts"
@@ -376,7 +389,7 @@ proof -
   moreover
   have "list_all2 (\<lambda>exp. module_export_typing \<C> (E_desc exp)) exps expts"
     using list_all2_module_exports_typer[symmetric]
-          module_type_checker_is(17,8)
+          module_type_checker_is(21,8)
     by fastforce
   ultimately
   show ?thesis

@@ -42,7 +42,7 @@ proof (cases ts)
     using assms(1,2,3)
     by fastforce
   thus ?thesis
-    using TopType ct_suffix_ct_list_eq_exists ct_suffix_ts_conv_suffix
+    using TopType ct_suffix_ct_list_compat_exists ct_suffix_ts_conv_suffix
     unfolding consume.simps
     by (metis append_Nil c_types_agree.simps(2) ct_suffix_def)
 next
@@ -313,12 +313,12 @@ proof -
               by (metis Suc_leI add_diff_cancel_right' append_eq_conv_conj consume.simps(2)
                         ct_suffix_def length_Cons length_append list.size(3) trans_le_add2
                         zero_less_Suc)
-            obtain t where "ct_list_eq [y] (to_ct_list [t])"
-              using ct_list_eq_exists
-              unfolding ct_list_eq_def to_ct_list_def list_all2_map2
+            obtain t where "ct_list_compat [y] (to_ct_list [t])"
+              using ct_list_compat_exists
+              unfolding ct_list_compat_def to_ct_list_def list_all2_map2
               by (metis list_all2_Cons1 list_all2_Nil)
             hence "c_types_agree ts (tm@[t])"
-              using temp2 ct_suffix_extend_ct_list_eq snoc TopType
+              using temp2 ct_suffix_extend_ct_list_compat snoc TopType
               by (simp add: to_ct_list_def)
             thus ?thesis
               using b_e_typing.intros(10,32)
@@ -333,7 +333,7 @@ proof -
           using 12 Type type_update_empty
           by fastforce
         thus ?thesis
-          using 12(4) ct_list_eq_def ct_suffix_def to_ct_list_def
+          using 12(4) ct_list_compat_def ct_suffix_def to_ct_list_def
           by simp
       next
         case (snoc ys y)
@@ -344,13 +344,13 @@ proof -
               using 12(2,3,4) ct_suffix_def
               by (simp, metis One_nat_def butlast_conv_take butlast_snoc c_types_agree.simps(1)
                               length_Cons list.size(3))
-            obtain t where "ct_list_eq [TSome y] (to_ct_list [t])"
-              using ct_list_eq_exists
-              unfolding ct_list_eq_def to_ct_list_def list_all2_map2
+            obtain t where "ct_list_compat [TSome y] (to_ct_list [t])"
+              using ct_list_compat_exists
+              unfolding ct_list_compat_def to_ct_list_def list_all2_map2
               by (metis list_all2_Cons1 list_all2_Nil)
             hence "c_types_agree ts (tm@[t])"
-              using temp2 ct_suffix_extend_ct_list_eq snoc Type
-              by (simp add: ct_list_eq_def to_ct_list_def)
+              using temp2 ct_suffix_extend_ct_list_compat snoc Type
+              by (simp add: ct_list_compat_def to_ct_list_def)
             thus ?thesis
               using b_e_typing.intros(10,32)
               by fastforce
@@ -389,7 +389,7 @@ proof -
           using 13 TopType
           unfolding check_single.simps
           by simp
-        hence x1_def:"ct_list_eq x1 [TSome T_i32]" "tm' = TopType [TAny]"
+        hence x1_def:"ct_list_compat x1 [TSome T_i32]" "tm' = TopType [TAny]"
           using type_update_select_length1[OF _ 2 13(4)]
           by simp_all
         then obtain t'' tm'' where tm_def:"tm = tm''@[t'']"
@@ -409,19 +409,19 @@ proof -
           unfolding check_single.simps
           by simp
         then obtain ct1 ct2 where x1_def:"x1 = [ct1, ct2]"
-                                         "ct_eq ct2 (TSome T_i32)"
+                                         "ct_compat ct2 (TSome T_i32)"
                                          "tm' = TopType [ct1]"
           using type_update_select_length2[OF _ 3 13(4)]
           by blast
         then obtain t'' tm'' where tm_def:"tm = tm''@[t'']"
-                                          "ct_list_eq [ct1] [(TSome t'')]"
-          using 13(2) c_types_agree_imp_ct_list_eq[of "[ct1]" tm]
+                                          "ct_list_compat [ct1] [(TSome t'')]"
+          using 13(2) c_types_agree_imp_ct_list_compat[of "[ct1]" tm]
           by (metis append_Nil2 append_butlast_last_id append_eq_append_conv_if append_eq_conv_conj
-                    ct_list_eq_length diff_Suc_1 length_Cons length_butlast length_map
+                    ct_list_compat_length diff_Suc_1 length_Cons length_butlast length_map
                     list.simps(8,9) list.size(3) nat.distinct(2) to_ct_list_def)
-        hence "ct_list_eq x1 (to_ct_list [ t'', T_i32])"
+        hence "ct_list_compat x1 (to_ct_list [ t'', T_i32])"
           using x1_def(1,2)
-          unfolding ct_list_eq_def to_ct_list_def
+          unfolding ct_list_compat_def to_ct_list_def
           by fastforce
         hence "c_types_agree (TopType x1) ((tm''@[t''])@[t'',T_i32])"
           using c_types_agree_top2
@@ -455,29 +455,29 @@ proof -
           using tm'_def nat_def 13(4) x2_def
           by force
         then obtain cts' ct1 ct2 ct3 where cts'_def:"x1 = cts'@[ct1, ct2, ct3]"
-                                                    "ct_eq ct3 (TSome T_i32)"
+                                                    "ct_compat ct3 (TSome T_i32)"
           using type_update_select_length3 tm'_def 4
           by blast
         then obtain c' cm' where tm_def:"tm = cm'@[c']"
                                         "ct_suffix cts' (to_ct_list cm')"
-                                        "ct_eq (x1 ! (length x1 - 2)) (TSome c')"
-                                        "ct_eq (x1 ! (length x1 - 3)) (TSome c')"
-          using select_return_top_ct_eq[OF x2_def 4] tm'_eq 4 13(2)
+                                        "ct_compat (x1 ! (length x1 - 2)) (TSome c')"
+                                        "ct_compat (x1 ! (length x1 - 3)) (TSome c')"
+          using select_return_top_ct_compat[OF x2_def 4] tm'_eq 4 13(2)
           by fastforce
         then obtain as bs where cm'_def:"cm' = as@bs"
-                                        "ct_list_eq (to_ct_list bs) cts'"
-          using ct_list_eq_cons_ct_list1 ct_list_eq_ts_conv_eq
+                                        "ct_list_compat (to_ct_list bs) cts'"
+          using ct_list_compat_cons_ct_list1 ct_list_compat_ts_conv_eq
           by (metis ct_suffix_def to_ct_list_append(2))
-        hence "ct_eq ct1 (TSome c')"
-              "ct_eq ct2 (TSome c')"
+        hence "ct_compat ct1 (TSome c')"
+              "ct_compat ct2 (TSome c')"
           using cts'_def tm_def
           apply simp_all
           apply (metis append.assoc append_Cons append_Nil length_append_singleton nth_append_length)
           done
         hence "c_types_agree ts (cm'@[c',c',T_i32])"
           using c_types_agree_top2[of _ _ as] cm'_def(1) TopType
-                ct_list_eq_concat[OF ct_list_eq_commute[OF cm'_def(2)]] cts'_def
-          unfolding to_ct_list_def ct_list_eq_def
+                ct_list_compat_concat[OF ct_list_compat_commute[OF cm'_def(2)]] cts'_def
+          unfolding to_ct_list_def ct_list_compat_def
           by fastforce
         thus ?thesis
           using b_e_typing.intros(11,32) tm_def
@@ -511,13 +511,13 @@ proof -
         using tm'_def 13(4) cts_def2
         by simp
       obtain as bs where "(to_ct_list (ts' @ [t1])) @ (to_ct_list ([t2, t3])) = as@bs"
-                         "ct_list_eq bs [TAny, TSome T_i32]"
+                         "ct_list_compat bs [TAny, TSome T_i32]"
         using ts'_suffix
         unfolding ct_suffix_def to_ct_list_def
         by fastforce
       hence "t3 = T_i32"
-        unfolding to_ct_list_def ct_list_eq_def
-        by (metis (no_types, lifting) Nil_is_map_conv append_eq_append_conv ct_eq.simps(1)
+        unfolding to_ct_list_def ct_list_compat_def
+        by (metis (no_types, lifting) Nil_is_map_conv append_eq_append_conv ct_compat.simps(1)
                   length_Cons list.sel(1,3) list.simps(9) list_all2_Cons2 list_all2_lengthD)
       moreover
       have "t1 = t2"
@@ -1115,8 +1115,8 @@ proof -
       next
         case 2
         hence "ct_suffix [TSome T_i32] x1"
-          using assms(3) TopType ct_suffix_imp_ct_list_eq ct_suffix_shared t1s_suffix
-          by (metis One_nat_def append_Nil c_types_agree.simps(2) ct_list_eq_commute ct_suffix_def
+          using assms(3) TopType ct_suffix_imp_ct_list_compat ct_suffix_shared t1s_suffix
+          by (metis One_nat_def append_Nil c_types_agree.simps(2) ct_list_compat_commute ct_suffix_def
                     diff_self_eq_0 drop_0 length_Cons list.size(3))
         hence "check_single \<C> e ctn = TopType [TAny]"
           using outer_2 TopType 2
@@ -1126,9 +1126,9 @@ proof -
           by (simp add: to_ct_list_def)
       next
         case 3
-        have "ct_list_eq (to_ct_list t1s) (to_ct_list (t1s' @ [t, t, T_i32]))"
+        have "ct_list_compat (to_ct_list t1s) (to_ct_list (t1s' @ [t, t, T_i32]))"
           using t1s_suffix2
-          by (simp add: ct_list_eq_ts_conv_eq)
+          by (simp add: ct_list_compat_ts_conv_eq)
         hence temp1:"to_ct_list t1s = (to_ct_list (t1s' @ [t])) @ (to_ct_list [t, T_i32])"
           using t1s_suffix2 to_ct_list_def
           by simp
@@ -1139,20 +1139,20 @@ proof -
           using assms(3) TopType 3
           by (simp, metis temp1 append_Nil ct_suffix_cons2 ct_suffix_def length_Cons length_map
                           list.size(3) numeral_2_eq_2 to_ct_list_def)
-        hence temp3:"ct_list_eq (to_ct_list [t, T_i32]) x1"
-          using 3 ct_suffix_imp_ct_list_eq
+        hence temp3:"ct_list_compat (to_ct_list [t, T_i32]) x1"
+          using 3 ct_suffix_imp_ct_list_compat
           unfolding to_ct_list_def
-          by (metis Suc_leI ct_list_eq_commute diff_is_0_eq drop_0 length_Cons length_map lessI
+          by (metis Suc_leI ct_list_compat_commute diff_is_0_eq drop_0 length_Cons length_map lessI
                     list.size(3) numeral_2_eq_2)
         hence temp4:"ct_suffix [TSome T_i32] x1" 
           using ct_suffix_less[of "[TSome t]" "[TSome T_i32]" x1]
-                ct_suffix_extend_ct_list_eq[of "[]" "[]"] ct_suffix_nil
+                ct_suffix_extend_ct_list_compat[of "[]" "[]"] ct_suffix_nil
           unfolding to_ct_list_def
           by fastforce
         hence "ct_suffix (take 1 x1) (to_ct_list [t])"
-          using temp3 ct_suffix_nil ct_list_eq_commute ct_suffix_extend_ct_list_eq[of "[]" "[]" "(take 1 x1)" "(to_ct_list [t])"]
+          using temp3 ct_suffix_nil ct_list_compat_commute ct_suffix_extend_ct_list_compat[of "[]" "[]" "(take 1 x1)" "(to_ct_list [t])"]
           unfolding to_ct_list_def
-          by (simp, metis butlast.simps(2) butlast_conv_take ct_list_eq_take diff_Suc_1 length_Cons
+          by (simp, metis butlast.simps(2) butlast_conv_take ct_list_compat_take diff_Suc_1 length_Cons
                           list.distinct(1) list.size(3))
         thus ?thesis
           using TopType 2 3 ct_suffix_nil temp3 temp4 t2s_def to_ct_list_def
@@ -1182,13 +1182,13 @@ proof -
         hence a:"ct_suffix (x1'@[x,x',x'']) (to_ct_list (t1s' @ [t, t, T_i32]))"
           using t1s_suffix2 assms(3) TopType
           by simp
-        hence b:"ct_suffix (x1'@[x,x']) (to_ct_list (t1s' @ [t, t])) \<and> (ct_eq x'' (TSome T_i32))"
+        hence b:"ct_suffix (x1'@[x,x']) (to_ct_list (t1s' @ [t, t])) \<and> (ct_compat x'' (TSome T_i32))"
           using to_ct_list_def ct_suffix_unfold_one[of "(x1'@[x,x'])" "x''" "to_ct_list (t1s' @ [t, t])"]
           by fastforce
-        hence c:"ct_suffix (x1'@[x]) (to_ct_list (t1s' @ [t])) \<and> (ct_eq x' (TSome t))"
+        hence c:"ct_suffix (x1'@[x]) (to_ct_list (t1s' @ [t])) \<and> (ct_compat x' (TSome t))"
           using to_ct_list_def ct_suffix_unfold_one[of "(x1'@[x])" "x'" "to_ct_list (t1s' @ [t])"]
           by fastforce
-        hence d:"ct_suffix x1' (to_ct_list t1s') \<and> (ct_eq x (TSome t))"
+        hence d:"ct_suffix x1' (to_ct_list t1s') \<and> (ct_compat x (TSome t))"
           using to_ct_list_def ct_suffix_unfold_one[of "(x1')" "x" "to_ct_list (t1s')"]
           by fastforce
         have "(take (length x1 - 3) x1) = x1'"
@@ -1201,7 +1201,7 @@ proof -
           using x1_split
           by simp
         have "ct_suffix [TSome T_i32] x1"
-          using b x1_split ct_suffix_def ct_list_eq_def ct_suffixI[of x1 "x1' @ [x, x']"]
+          using b x1_split ct_suffix_def ct_list_compat_def ct_suffixI[of x1 "x1' @ [x, x']"]
           by simp
         hence "check_single \<C> e (TopType x1) = (select_return_top x1 (x1!(length x1-2)) (x1!(length x1-3)))"
           using type_update_select_conv_select_return_top[OF _ 4]
@@ -1273,7 +1273,7 @@ proof -
             using c_s_def TopType Type
             by simp
           thus ?thesis
-            using TopType ctm_def3 assms(4) c_types_agree_top2 ct_list_eq_refl
+            using TopType ctm_def3 assms(4) c_types_agree_top2 ct_list_compat_refl
             by auto
         next
           assume "ct_suffix cons x1"
@@ -1290,7 +1290,7 @@ proof -
             by simp
           hence "c_types_agree (TopType (take (length x1 - length cons ) x1 @ to_ct_list x2)) (take (length t1s - length cons) t1s @ x2)"
             unfolding c_types_agree.simps to_ct_list_def
-            by (simp add: ct_suffix_cons2 ct_suffix_cons_it ct_suffix_extend_ct_list_eq)
+            by (simp add: ct_suffix_cons2 ct_suffix_cons_it ct_suffix_extend_ct_list_compat)
           thus ?thesis
             using ctm_def3 assms 3
             by simp
@@ -1579,7 +1579,7 @@ proof -
     case (TopType x1)
     thus ?thesis
       using ctn_def(1,2) b_e_check_weaken_top[of \<C> es t1s x1 ts]
-      by (metis append_assoc b_e_type_checker.simps c_types_agree_imp_ct_list_eq c_types_agree_top2)
+      by (metis append_assoc b_e_type_checker.simps c_types_agree_imp_ct_list_compat c_types_agree_top2)
   next
     case (Type x2)
     thus ?thesis
@@ -1599,10 +1599,10 @@ lemma b_e_type_checker_complete:
   using assms
 proof (induction es "(tn _> tm)" arbitrary: tn tm rule: b_e_typing.induct)
   case (select \<C> t)
-  have "ct_list_eq [TAny, TSome T_i32] [TSome t, TSome T_i32]"
-    by (simp add: to_ct_list_def ct_list_eq_def)
+  have "ct_list_compat [TAny, TSome T_i32] [TSome t, TSome T_i32]"
+    by (simp add: to_ct_list_def ct_list_compat_def)
   thus ?case
-    using ct_suffix_extend_ct_list_eq[OF ct_suffix_nil[of "[TSome t]"]] to_ct_list_def
+    using ct_suffix_extend_ct_list_compat[OF ct_suffix_nil[of "[TSome t]"]] to_ct_list_def
     by auto
 next
   case (br_table \<C> ts "is" i t1s t2s)

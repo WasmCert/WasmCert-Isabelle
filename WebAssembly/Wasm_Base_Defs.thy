@@ -2,9 +2,9 @@ section {* WebAssembly Base Definitions *}
 
 theory Wasm_Base_Defs imports Wasm_Ast Wasm_Type_Abs begin
 
-instantiation i32 :: wasm_int begin
-  lift_definition nat_of_int :: "i32 \<Rightarrow> nat" is "unat" .
-  lift_definition int_of_nat :: "nat \<Rightarrow> i32" is "of_nat" .
+instantiation i32 :: wasm_int begin                 
+  lift_definition nat_of_int_i32 :: "i32 \<Rightarrow> nat" is "unat" .
+  lift_definition int_of_nat_i32 :: "nat \<Rightarrow> i32" is "of_nat" .
 instance ..
 
 end
@@ -45,6 +45,10 @@ consts
   serialise_i64 :: "i64 \<Rightarrow> bytes"
   serialise_f32 :: "f32 \<Rightarrow> bytes"
   serialise_f64 :: "f64 \<Rightarrow> bytes"
+  deserialise_i32 :: "bytes \<Rightarrow> i32"
+  deserialise_i64 :: "bytes \<Rightarrow> i64"
+  deserialise_f32 :: "bytes \<Rightarrow> f32"
+  deserialise_f64 :: "bytes \<Rightarrow> f64"
   wasm_bool :: "bool \<Rightarrow> i32"
   int32_minus_one :: i32
 
@@ -57,7 +61,7 @@ abbreviation "mem_agree m \<equiv> pred_option ((\<le>) (mem_size m)) (mem_max m
 definition mem_grow :: "mem \<Rightarrow> nat \<Rightarrow> mem option" where
   "mem_grow m n = (let len = (mem_size m) + n in
                    if (len \<le> 2^16 \<and> pred_option (\<lambda>max. len \<le> max) (mem_max m))
-                    then Some (mem_append m (bytes_replicate (n * Ki64) 0))
+                    then Some (mem_append m (n * Ki64) zero_byte)
                     else None)"
 
 definition load :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> nat \<Rightarrow> bytes option" where
@@ -66,8 +70,8 @@ definition load :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> nat \<
                        else None)"
 
 definition sign_extend :: "sx \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> bytes" where
-  "sign_extend sx l bytes = (let msb = msb (msbyte bytes) in
-                          let byte = (case sx of U \<Rightarrow> 0 | S \<Rightarrow> if msb then -1 else 0) in
+  "sign_extend sx l bytes = (let msb = msb_byte (msbyte bytes) in
+                          let byte = (case sx of U \<Rightarrow> zero_byte | S \<Rightarrow> if msb then negone_byte else zero_byte) in
                           bytes_takefill byte l bytes)"
 
 definition load_packed :: "sx \<Rightarrow> mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes option" where
@@ -75,16 +79,22 @@ definition load_packed :: "sx \<Rightarrow> mem \<Rightarrow> nat \<Rightarrow> 
 
 definition store :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes \<Rightarrow> nat \<Rightarrow> mem option" where
   "store m n off bs l = (if (mem_length m \<ge> (n+off+l))
-                          then Some (write_bytes m (n+off) (bytes_takefill 0 l bs))
+                          then Some (write_bytes m (n+off) (bytes_takefill zero_byte l bs))
                           else None)"
 
 definition store_packed :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes \<Rightarrow> nat \<Rightarrow> mem option" where
   "store_packed = store"
 
 consts
-  wasm_deserialise :: "bytes \<Rightarrow> t \<Rightarrow> v"
   (* host *)
-  host_apply :: "s \<Rightarrow> tf \<Rightarrow> host \<Rightarrow> v list \<Rightarrow> host_state \<Rightarrow> (s \<times> v list) option"
+  host_apply :: "s \<Rightarrow> tf \<Rightarrow> host \<Rightarrow> v list \<Rightarrow> host_state \<Rightarrow> (s \<times> v list) option \<Rightarrow> bool"
+
+definition wasm_deserialise :: "bytes \<Rightarrow> t \<Rightarrow> v" where
+  "wasm_deserialise bs t = (case t of
+                              T_i32 \<Rightarrow> ConstInt32 (deserialise_i32 bs)
+                            | T_i64 \<Rightarrow> ConstInt64 (deserialise_i64 bs)
+                            | T_f32 \<Rightarrow> ConstFloat32 (deserialise_f32 bs)
+                            | T_f64 \<Rightarrow> ConstFloat64 (deserialise_f64 bs))"
 
 definition typeof :: " v \<Rightarrow> t" where
   "typeof v = (case v of
@@ -298,11 +308,11 @@ definition rglob_is_mut :: "global \<Rightarrow> bool" where
 definition stypes :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> tf" where
   "stypes s i j = ((types i)!j)"
   
-definition sfunc_ind :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> nat" where
-  "sfunc_ind s i j = ((inst.funcs i)!j)"
+definition sfunc_ind :: "inst \<Rightarrow> nat \<Rightarrow> nat" where
+  "sfunc_ind i j = ((inst.funcs i)!j)"
 
 definition sfunc :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> cl" where
-  "sfunc s i j = (funcs s)!(sfunc_ind s i j)"
+  "sfunc s i j = (funcs s)!(sfunc_ind i j)"
 
 definition sglob_ind :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> nat" where
   "sglob_ind s i j = ((inst.globs i)!j)"
@@ -316,18 +326,13 @@ definition sglob_val :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v"
 definition smem_ind :: "s \<Rightarrow> inst \<Rightarrow> nat option" where
   "smem_ind s i = (case (inst.mems i) of (n#_) \<Rightarrow> Some n | [] \<Rightarrow> None)"
 
-definition stab_s :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> cl option" where
-  "stab_s s i j = (let stabinst = fst ((tabs s)!i) in
-                   (if ((length stabinst) > j) then
-                      case (stabinst!j) of
-                        Some i_cl \<Rightarrow> if ((length (funcs s)) > i_cl) then
-                                       Some ((funcs s)!i_cl)
-                                     else None
-                      | None \<Rightarrow> None
+definition stab_cl_ind :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> i option" where
+  "stab_cl_ind s i j = (let stabinst = fst ((tabs s)!i) in
+                   (if ((length stabinst) > j) then (stabinst!j)
                     else None))"
 
-definition stab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> cl option" where
-  "stab s i j = (case (inst.tabs i) of (k#_) => stab_s s k j | [] => None)"
+definition stab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> i option" where
+  "stab s i j = (case (inst.tabs i) of (k#_) => stab_cl_ind s k j | [] => None)"
 
 definition supdate_glob_s :: "s \<Rightarrow> nat \<Rightarrow> v \<Rightarrow> s" where
   "supdate_glob_s s k v = s\<lparr>globs := (globs s)[k:=((globs s)!k)\<lparr>g_val := v\<rparr>]\<rparr>"
@@ -360,22 +365,22 @@ inductive store_extension :: "s \<Rightarrow> s \<Rightarrow> bool" where
 abbreviation to_e_list :: "b_e list \<Rightarrow> e list" ("$* _" 60) where
   "to_e_list b_es \<equiv> map Basic b_es"
 
-abbreviation v_to_e_list :: "v list \<Rightarrow> e list" ("$$* _" 60) where
+abbreviation v_to_e_list :: "v list \<Rightarrow> e list" ("$C* _" 60) where
   "v_to_e_list ves \<equiv> map (\<lambda>v. $C v) ves"
 
   (* Lfilled depth thing-to-fill fill-with result *)
 inductive Lfilled :: "nat \<Rightarrow> Lholed \<Rightarrow> e list \<Rightarrow> e list \<Rightarrow> bool" where
   (* "Lfill (LBase vs es') es = vs @ es @ es'" *)
-  L0:"\<lbrakk>const_list vs; lholed = (LBase vs es')\<rbrakk> \<Longrightarrow> Lfilled 0 lholed es (vs @ es @ es')"
+  L0:"\<lbrakk>lholed = (LBase vs es')\<rbrakk> \<Longrightarrow> Lfilled 0 lholed es (($C* vs) @ es @ es')"
   (* "Lfill (LRec vs ts es' l es'') es = vs @ [Label ts es' (Lfill l es)] @ es''" *)
-| LN:"\<lbrakk>const_list vs; lholed = (LRec vs n es' l es''); Lfilled k l es lfilledk\<rbrakk> \<Longrightarrow> Lfilled (k+1) lholed es (vs @ [Label n es' lfilledk] @ es'')"
+| LN:"\<lbrakk>lholed = (LRec vs n es' l es''); Lfilled k l es lfilledk\<rbrakk> \<Longrightarrow> Lfilled (k+1) lholed es (($C* vs) @ [Label n es' lfilledk] @ es'')"
 
   (* Lfilled depth thing-to-fill fill-with result *)
 inductive Lfilled_exact :: "nat \<Rightarrow> Lholed \<Rightarrow> e list \<Rightarrow> e list \<Rightarrow> bool" where
   (* "Lfill (LBase vs es') es = vs @ es @ es'" *)
   L0:"\<lbrakk>lholed = (LBase [] [])\<rbrakk> \<Longrightarrow> Lfilled_exact 0 lholed es es"
   (* "Lfill (LRec vs ts es' l es'') es = vs @ [Label ts es' (Lfill l es)] @ es''" *)
-| LN:"\<lbrakk>const_list vs; lholed = (LRec vs n es' l es''); Lfilled_exact k l es lfilledk\<rbrakk> \<Longrightarrow> Lfilled_exact (k+1) lholed es (vs @ [Label n es' lfilledk] @ es'')"
+| LN:"\<lbrakk>lholed = (LRec vs n es' l es''); Lfilled_exact k l es lfilledk\<rbrakk> \<Longrightarrow> Lfilled_exact (k+1) lholed es (($C* vs) @ [Label n es' lfilledk] @ es'')"
 
 definition load_store_t_bounds :: "a \<Rightarrow> tp option \<Rightarrow> t \<Rightarrow> bool" where
   "load_store_t_bounds a tp t = (case tp of
@@ -478,14 +483,12 @@ lemma int_float_disjoint: "is_int_t t = -(is_float_t t)"
   by simp (metis is_float_t_def is_int_t_def t.exhaust t.simps(13-16))
 
 lemma stab_unfold:
-  assumes "stab s i j = Some cl"
-  shows "\<exists>k ks i_cl. inst.tabs i = k#ks \<and>
+  assumes "stab s i j = Some i_cl"
+  shows "\<exists>k ks. inst.tabs i = k#ks \<and>
                      length (fst ((tabs s)!k)) > j \<and>
-                     (fst ((tabs s)!k))!j = Some i_cl \<and>
-                     length (funcs s) > i_cl \<and>
-                     (funcs s)!i_cl = cl"
+                     (fst ((tabs s)!k))!j = Some i_cl"
   using assms
-  unfolding stab_def stab_s_def
+  unfolding stab_def stab_cl_ind_def
   by (simp add: Let_def split: list.splits if_splits option.splits)
 
 lemma inj_basic: "inj Basic"
@@ -503,7 +506,7 @@ lemma to_e_list_2:"[$ a, $ b] = $* [a, b]"
 lemma to_e_list_3:"[$ a, $ b, $ c] = $* [a, b, c]"
   by simp
 
-lemma v_exists_b_e:"\<exists>ves. ($$*vs) = ($*ves)"
+lemma v_exists_b_e:"\<exists>ves. ($C*vs) = ($*ves)"
 proof (induction vs)
   case (Cons a vs)
   thus ?case
@@ -527,15 +530,14 @@ next
 qed
 
 lemma Lfilled_exact_app_imp_exists_Lfilled:
-  assumes "const_list ves"
-          "Lfilled_exact n lholed (ves@es) LI"
+  assumes "Lfilled_exact n lholed (($C* vs)@es) LI"
   shows "\<exists>lholed'. Lfilled n lholed' es LI"
-  using assms(2,1)
-proof (induction "(ves@es)" LI rule: Lfilled_exact.induct)
+  using assms
+proof (induction "(($C* vs)@es)" LI rule: Lfilled_exact.induct)
   case (L0 lholed)
-  show ?case
-    using Lfilled.intros(1)[OF L0(2), of _ "[]"]
-    by fastforce
+  thus ?case
+    using Lfilled.intros(1)
+    by force
 next
   case (LN vs lholed n es' l es'' k lfilledk)
   thus ?case
@@ -545,7 +547,7 @@ qed
 
 lemma Lfilled_imp_exists_Lfilled_exact:
   assumes "Lfilled n lholed es LI"
-  shows "\<exists>lholed' ves es_c. const_list ves \<and> Lfilled_exact n lholed' (ves@es@es_c) LI"
+  shows "\<exists>lholed' vs es_c. Lfilled_exact n lholed' (($C* vs)@es@es_c) LI"
   using assms Lfilled_exact.intros
   by (induction rule: Lfilled.induct) fastforce+
 

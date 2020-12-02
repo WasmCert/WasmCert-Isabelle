@@ -363,7 +363,7 @@ definition init_tab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> mod
                                let (tab_e,max) = (tabs s)!t_ind in
                                let e_pay = map (\<lambda>i. Some ((inst.funcs inst)!i)) (e_init e) in
                                let tab'_e = ((take e_ind tab_e) @ e_pay @ (drop (e_ind + length e_pay) tab_e)) in
-                               s\<lparr>tabs := (tabs s)[e_ind := (tab'_e,max)]\<rparr>)"
+                               s\<lparr>tabs := (tabs s)[t_ind := (tab'_e,max)]\<rparr>)"
 
 definition init_tabs :: "s \<Rightarrow> inst \<Rightarrow> nat list \<Rightarrow> module_elem list \<Rightarrow> s" where
   "init_tabs s inst e_inds es = foldl (\<lambda>s' (e_ind,e). init_tab s' inst e_ind e) s (zip e_inds es)"
@@ -385,11 +385,11 @@ inductive instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarro
     list_all2 (\<lambda>g v. reduce_trans (s',f,$*(g_init g)) (s',f,[$C v])) (m_globs m) g_inits;
     list_all2 (\<lambda>e c. reduce_trans (s',f,$*(e_off e)) (s',f,[$C ConstInt32 c])) (m_elem m) e_offs;
     list_all2 (\<lambda>d c. reduce_trans (s',f,$*(d_off d)) (s',f,[$C ConstInt32 c])) (m_data m) d_offs;
-    list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s)!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m);
-    list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s)!((inst.mems inst)!(d_data d)))) d_offs (m_data m);
+    list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m);
+    list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs (m_data m);
     map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) (m_start m) = start;
     init_tabs s' inst (map nat_of_int e_offs) (m_elem m) = s'';
-    init_mems s' inst (map nat_of_int d_offs) (m_data m) = s_end
+    init_mems s'' inst (map nat_of_int d_offs) (m_data m) = s_end
     \<rbrakk> \<Longrightarrow> instantiate s m v_imps ((s_end, inst, v_exps), start)"
 
 definition interp_get_v :: "s \<Rightarrow> inst \<Rightarrow> b_e list \<Rightarrow> v" where
@@ -413,11 +413,11 @@ fun interp_instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarr
             let (s', inst, v_exps) = interp_alloc_module s m v_imps g_inits in
             let e_offs = map (\<lambda>e. interp_get_i32 s' inst (e_off e)) (m_elem m) in
             let d_offs = map (\<lambda>d. interp_get_i32 s' inst (d_off d)) (m_data m) in
-            if (list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s)!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m) \<and>
-                list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s)!((inst.mems inst)!(d_data d)))) d_offs (m_data m)) then
+            if (list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m) \<and>
+                list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs (m_data m)) then
               let start = map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) (m_start m) in
               let s'' = init_tabs s' inst (map nat_of_int e_offs) (m_elem m) in
-              let s_end = init_mems s' inst (map nat_of_int d_offs) (m_data m) in
+              let s_end = init_mems s'' inst (map nat_of_int d_offs) (m_data m) in
               Some ((s_end, inst, v_exps), start)
             else None
           else None
@@ -781,11 +781,11 @@ proof -
     "(s', inst, v_exps) = interp_alloc_module s m v_imps g_inits"
     "e_offs = map (\<lambda>e. interp_get_i32 s' inst (e_off e)) (m_elem m)"
     "d_offs = map (\<lambda>d. interp_get_i32 s' inst (d_off d)) (m_data m)"
-    "list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s)!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m)"
-    "list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s)!((inst.mems inst)!(d_data d)))) d_offs (m_data m)"
+    "list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m)"
+    "list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs (m_data m)"
     "start = map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) (m_start m)"
     "s'' = init_tabs s' inst (map nat_of_int e_offs) (m_elem m)"
-    "s_end = init_mems s' inst (map nat_of_int d_offs) (m_data m)"
+    "s_end = init_mems s'' inst (map nat_of_int d_offs) (m_data m)"
     "inst' = \<lparr>types=[],funcs=[],tabs=[],mems=[],globs=ext_globs v_imps\<rparr>"
     using assms
     by (fastforce simp add: Let_def split: if_splits option.splits prod.splits)
@@ -889,7 +889,7 @@ proof -
         using s_end_is(3) local_assms
         by (simp add: interp_get_v_def split: v.splits)
       obtain f_temp where f_temp_is:
-        "reduce_trans (s, \<lparr>f_locs = [], f_inst = inst'\<rparr>, $* g_init (m_globs m ! i)) (s, f_temp, $$* [g_inits ! i])"
+        "reduce_trans (s, \<lparr>f_locs = [], f_inst = inst'\<rparr>, $* g_init (m_globs m ! i)) (s, f_temp, $C* [g_inits ! i])"
         using run_v_sound[OF a_runv]
         by blast
       hence l3:"reduce_trans (s,\<lparr> f_locs=[], f_inst=inst' \<rparr>,$*(g_init ((m_globs m)!i))) (s,\<lparr> f_locs=[], f_inst=inst' \<rparr>,[$C (g_inits!i)])"
@@ -1014,11 +1014,11 @@ proof -
     "list_all2 (\<lambda>g v. reduce_trans (s',f,$*(g_init g)) (s',f,[$C v])) gs g_inits"
     "list_all2 (\<lambda>e c. reduce_trans (s',f,$*(e_off e)) (s',f,[$C ConstInt32 c])) els e_offs"
     "list_all2 (\<lambda>d c. reduce_trans (s',f,$*(d_off d)) (s',f,[$C ConstInt32 c])) ds d_offs"
-    "list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s)!((inst.tabs inst)!(e_tab e))))) e_offs els"
-    "list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s)!((inst.mems inst)!(d_data d)))) d_offs ds"
+    "list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs els"
+    "list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs ds"
     "map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) i_opt = start"
     "init_tabs s' inst (map nat_of_int e_offs) els = s''"
-    "init_mems s' inst (map nat_of_int d_offs) ds = s_end"
+    "init_mems s'' inst (map nat_of_int d_offs) ds = s_end"
     "f = \<lparr> f_locs=[], f_inst=inst \<rparr>"
     using assms m_is
     unfolding instantiate.simps
@@ -1131,7 +1131,7 @@ proof -
         using const_exprs_reduce_trans[OF l2(2,1) l1 _ 12, of _ s "[]" _ inst' "[]"]
               alloc_module_ext_arb[OF s_end_is(3)] s_end_is(3)
         unfolding alloc_module.simps s_end_is(12)
-        apply simp
+        apply (simp split: prod.splits del: run_v.simps)
         apply (metis (mono_tags, lifting) inst'_is inst.select_convs(5))
         done
       hence "interp_get_v s inst' (g_init (gs!i)) = g_inits!i"

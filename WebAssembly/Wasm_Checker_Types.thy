@@ -14,165 +14,165 @@ datatype checker_type =
 definition to_ct_list :: "t list \<Rightarrow> ct list" where
   "to_ct_list ts = map TSome ts"
 
-fun ct_eq :: "ct \<Rightarrow> ct \<Rightarrow> bool" where
-  "ct_eq (TSome t) (TSome t') = (t = t')" 
-| "ct_eq TAny _ = True"
-| "ct_eq _ TAny = True"
+fun ct_compat :: "ct \<Rightarrow> ct \<Rightarrow> bool" where
+  "ct_compat (TSome t) (TSome t') = (t = t')" 
+| "ct_compat TAny _ = True"
+| "ct_compat _ TAny = True"
 
-definition ct_list_eq :: "ct list \<Rightarrow> ct list \<Rightarrow> bool" where
-  "ct_list_eq ct1s ct2s = list_all2 ct_eq ct1s ct2s"
+definition ct_list_compat :: "ct list \<Rightarrow> ct list \<Rightarrow> bool" where
+  "ct_list_compat ct1s ct2s = list_all2 ct_compat ct1s ct2s"
 
 definition ct_prefix :: "ct list \<Rightarrow> ct list \<Rightarrow> bool" where
-  "ct_prefix xs ys = (\<exists>as bs. ys = as@bs \<and> ct_list_eq as xs)"
+  "ct_prefix xs ys = (\<exists>as bs. ys = as@bs \<and> ct_list_compat as xs)"
 
 definition ct_suffix :: "ct list \<Rightarrow> ct list \<Rightarrow> bool" where
-  "ct_suffix xs ys = (\<exists>as bs. ys = as@bs \<and> ct_list_eq bs xs)"
+  "ct_suffix xs ys = (\<exists>as bs. ys = as@bs \<and> ct_list_compat bs xs)"
 
-lemma ct_eq_commute:
-  assumes "ct_eq x y"
-  shows "ct_eq y x"
+lemma ct_compat_commute:
+  assumes "ct_compat x y"
+  shows "ct_compat y x"
   using assms
-  by (metis ct_eq.elims(3) ct_eq.simps(1))
+  by (metis ct_compat.elims(3) ct_compat.simps(1))
 
-lemma ct_eq_flip: "ct_eq\<inverse>\<inverse> = ct_eq"
-  using ct_eq_commute
+lemma ct_compat_flip: "ct_compat\<inverse>\<inverse> = ct_compat"
+  using ct_compat_commute
   by fastforce
 
-lemma ct_eq_common_tsome: "ct_eq x y = (\<exists>t. ct_eq x (TSome t) \<and> ct_eq (TSome t) y)"
-  by (metis ct_eq.elims(3) ct_eq.simps(1))
+lemma ct_compat_common_tsome: "ct_compat x y = (\<exists>t. ct_compat x (TSome t) \<and> ct_compat (TSome t) y)"
+  by (metis ct_compat.elims(3) ct_compat.simps(1))
 
-lemma ct_list_eq_commute:
-  assumes "ct_list_eq xs ys"
-  shows "ct_list_eq ys xs"
-  using assms ct_eq_commute List.List.list.rel_flip ct_eq_flip
-  unfolding ct_list_eq_def
+lemma ct_list_compat_commute:
+  assumes "ct_list_compat xs ys"
+  shows "ct_list_compat ys xs"
+  using assms ct_compat_commute List.List.list.rel_flip ct_compat_flip
+  unfolding ct_list_compat_def
   by fastforce
 
-lemma ct_list_eq_refl: "ct_list_eq xs xs"
-  unfolding ct_list_eq_def
-  by (metis ct_eq.elims(3) ct_eq.simps(1) list_all2_refl)
+lemma ct_list_compat_refl: "ct_list_compat xs xs"
+  unfolding ct_list_compat_def
+  by (metis ct_compat.elims(3) ct_compat.simps(1) list_all2_refl)
 
-lemma ct_list_eq_length:
-  assumes "ct_list_eq xs ys"
+lemma ct_list_compat_length:
+  assumes "ct_list_compat xs ys"
   shows "length xs = length ys"
   using assms list_all2_lengthD
-  unfolding ct_list_eq_def
+  unfolding ct_list_compat_def
   by blast
 
-lemma ct_list_eq_concat:
-  assumes "ct_list_eq xs ys"
-          "ct_list_eq xs' ys'"
-  shows "ct_list_eq (xs@xs') (ys@ys')"
+lemma ct_list_compat_concat:
+  assumes "ct_list_compat xs ys"
+          "ct_list_compat xs' ys'"
+  shows "ct_list_compat (xs@xs') (ys@ys')"
   using assms
-  unfolding ct_list_eq_def
+  unfolding ct_list_compat_def
   by (simp add: list_all2_appendI)
 
-lemma ct_list_eq_ts_conv_eq:
-  "ct_list_eq (to_ct_list ts) (to_ct_list ts') = (ts = ts')"
-  unfolding ct_list_eq_def to_ct_list_def
+lemma ct_list_compat_ts_conv_eq:
+  "ct_list_compat (to_ct_list ts) (to_ct_list ts') = (ts = ts')"
+  unfolding ct_list_compat_def to_ct_list_def
             list_all2_map1 list_all2_map2
-            ct_eq.simps(1)
+            ct_compat.simps(1)
   by (simp add: list_all2_eq)
 
-lemma ct_list_eq_exists: "\<exists>ys. ct_list_eq xs (to_ct_list ys)"
+lemma ct_list_compat_exists: "\<exists>ys. ct_list_compat xs (to_ct_list ys)"
 proof (induction xs)
   case Nil
   thus ?case
-    unfolding ct_list_eq_def to_ct_list_def
+    unfolding ct_list_compat_def to_ct_list_def
     by (simp)
 next
   case (Cons a xs)
   thus ?case
-    unfolding ct_list_eq_def to_ct_list_def
+    unfolding ct_list_compat_def to_ct_list_def
     apply (cases a)
-     apply (metis ct_eq.simps(3) ct_eq_commute list.rel_intros(2) list.simps(9))
-    apply (metis ct_eq.simps(1) list.rel_intros(2) list.simps(9))
+     apply (metis ct_compat.simps(3) ct_compat_commute list.rel_intros(2) list.simps(9))
+    apply (metis ct_compat.simps(1) list.rel_intros(2) list.simps(9))
     done
 qed
 
-lemma ct_list_eq_common_tsome_list:
-  "ct_list_eq xs ys = (\<exists>zs. ct_list_eq xs (to_ct_list zs) \<and> ct_list_eq (to_ct_list zs) ys)"
+lemma ct_list_compat_common_tsome_list:
+  "ct_list_compat xs ys = (\<exists>zs. ct_list_compat xs (to_ct_list zs) \<and> ct_list_compat (to_ct_list zs) ys)"
 proof (induction ys arbitrary: xs)
   case Nil
   thus ?case
-    unfolding ct_list_eq_def to_ct_list_def
+    unfolding ct_list_compat_def to_ct_list_def
     by simp
 next
   case (Cons a ys)
   show ?case
   proof (safe)
-    assume assms:"ct_list_eq xs (a # ys)"
+    assume assms:"ct_list_compat xs (a # ys)"
     then obtain x' xs' where xs_def:"xs = x'#xs'"
-      by (meson ct_list_eq_def list_all2_Cons2)
-    then obtain zs where zs_def:"ct_eq x' a"
-                                "ct_list_eq xs' (to_ct_list zs) \<and> ct_list_eq (to_ct_list zs) ys"
+      by (meson ct_list_compat_def list_all2_Cons2)
+    then obtain zs where zs_def:"ct_compat x' a"
+                                "ct_list_compat xs' (to_ct_list zs) \<and> ct_list_compat (to_ct_list zs) ys"
       using Cons[of xs'] assms list_all2_Cons
-      unfolding ct_list_eq_def
+      unfolding ct_list_compat_def
       by fastforce
-    obtain z where "ct_eq x' (TSome z)" "ct_eq (TSome z) a"
-      using ct_eq_common_tsome[of x' a] zs_def(1)
+    obtain z where "ct_compat x' (TSome z)" "ct_compat (TSome z) a"
+      using ct_compat_common_tsome[of x' a] zs_def(1)
       by fastforce
-    hence "ct_list_eq (x'#xs') (to_ct_list (z#zs)) \<and> ct_list_eq (to_ct_list (z#zs)) (a # ys)"
+    hence "ct_list_compat (x'#xs') (to_ct_list (z#zs)) \<and> ct_list_compat (to_ct_list (z#zs)) (a # ys)"
       using zs_def(2) list_all2_Cons
-      unfolding ct_list_eq_def to_ct_list_def
+      unfolding ct_list_compat_def to_ct_list_def
       by simp
-    thus "\<exists>zs. ct_list_eq xs (to_ct_list zs) \<and> ct_list_eq (to_ct_list zs) (a # ys)"
+    thus "\<exists>zs. ct_list_compat xs (to_ct_list zs) \<and> ct_list_compat (to_ct_list zs) (a # ys)"
       using xs_def
       by fastforce
   next
     fix zs
-    assume assms:"ct_list_eq xs (to_ct_list zs)" "ct_list_eq (to_ct_list zs) (a # ys)"
+    assume assms:"ct_list_compat xs (to_ct_list zs)" "ct_list_compat (to_ct_list zs) (a # ys)"
     then obtain x' xs' z' zs' where "xs = x'#xs'"
                                     "zs = z'#zs'"
-                                    "ct_list_eq xs' (to_ct_list zs')"
-                                    "ct_list_eq (to_ct_list zs') (ys)"
+                                    "ct_list_compat xs' (to_ct_list zs')"
+                                    "ct_list_compat (to_ct_list zs') (ys)"
       using list_all2_Cons2
-      unfolding ct_list_eq_def to_ct_list_def list_all2_map1 list_all2_map2
+      unfolding ct_list_compat_def to_ct_list_def list_all2_map1 list_all2_map2
       by (metis (no_types, lifting))
-    thus "ct_list_eq xs (a # ys)"
-      using assms Cons ct_list_eq_def to_ct_list_def ct_eq_common_tsome
+    thus "ct_list_compat xs (a # ys)"
+      using assms Cons ct_list_compat_def to_ct_list_def ct_compat_common_tsome
       by (metis list.simps(9) list_all2_Cons)
   qed
 qed
 
-lemma ct_list_eq_cons_ct_list:
-  assumes "ct_list_eq (to_ct_list as) (xs @ ys)"
-  shows "\<exists>bs bs'. as = bs @ bs' \<and> ct_list_eq (to_ct_list bs) xs \<and> ct_list_eq (to_ct_list bs') ys"
+lemma ct_list_compat_cons_ct_list:
+  assumes "ct_list_compat (to_ct_list as) (xs @ ys)"
+  shows "\<exists>bs bs'. as = bs @ bs' \<and> ct_list_compat (to_ct_list bs) xs \<and> ct_list_compat (to_ct_list bs') ys"
   using assms
 proof (induction xs arbitrary: as)
   case Nil
   thus ?case
-    by (metis append_Nil ct_list_eq_ts_conv_eq list.simps(8) to_ct_list_def)
+    by (metis append_Nil ct_list_compat_ts_conv_eq list.simps(8) to_ct_list_def)
 next
   case (Cons a xs)
   thus ?case
-    unfolding ct_list_eq_def to_ct_list_def list_all2_map1
+    unfolding ct_list_compat_def to_ct_list_def list_all2_map1
     by (meson list_all2_append2)
 qed
 
-lemma ct_list_eq_cons_ct_list1:
-  assumes "ct_list_eq (to_ct_list as) (xs @ (to_ct_list ys))"
-  shows "\<exists>bs. as = bs @ ys \<and> ct_list_eq (to_ct_list bs) xs"
-  using ct_list_eq_cons_ct_list[OF assms] ct_list_eq_ts_conv_eq
+lemma ct_list_compat_cons_ct_list1:
+  assumes "ct_list_compat (to_ct_list as) (xs @ (to_ct_list ys))"
+  shows "\<exists>bs. as = bs @ ys \<and> ct_list_compat (to_ct_list bs) xs"
+  using ct_list_compat_cons_ct_list[OF assms] ct_list_compat_ts_conv_eq
   by fastforce
 
-lemma ct_list_eq_shared:
-  assumes "ct_list_eq xs (to_ct_list as)"
-          "ct_list_eq ys (to_ct_list as)"
-  shows "ct_list_eq xs ys"
-  using assms ct_list_eq_def
-  by (meson ct_list_eq_common_tsome_list ct_list_eq_commute)
+lemma ct_list_compat_shared:
+  assumes "ct_list_compat xs (to_ct_list as)"
+          "ct_list_compat ys (to_ct_list as)"
+  shows "ct_list_compat xs ys"
+  using assms ct_list_compat_def
+  by (meson ct_list_compat_common_tsome_list ct_list_compat_commute)
 
-lemma ct_list_eq_take:
-  assumes "ct_list_eq xs ys"
-  shows "ct_list_eq (take n xs) (take n ys)"
+lemma ct_list_compat_take:
+  assumes "ct_list_compat xs ys"
+  shows "ct_list_compat (take n xs) (take n ys)"
   using assms list_all2_takeI
-  unfolding ct_list_eq_def
+  unfolding ct_list_compat_def
   by blast
 
 lemma ct_prefixI [intro?]: 
   assumes "ys = as @ zs"
-          "ct_list_eq as xs"
+          "ct_list_compat as xs"
   shows "ct_prefix xs ys"
   using assms
   unfolding ct_prefix_def
@@ -180,21 +180,21 @@ lemma ct_prefixI [intro?]:
 
 lemma ct_prefixE [elim?]:
   assumes "ct_prefix xs ys"
-  obtains as zs where "ys = as @ zs" "ct_list_eq as xs"
+  obtains as zs where "ys = as @ zs" "ct_list_compat as xs"
   using assms
   unfolding ct_prefix_def
   by blast
 
-lemma ct_prefix_snoc [simp]: "ct_prefix xs (ys @ [y]) = (ct_list_eq xs (ys@[y]) \<or> ct_prefix xs ys)"
+lemma ct_prefix_snoc [simp]: "ct_prefix xs (ys @ [y]) = (ct_list_compat xs (ys@[y]) \<or> ct_prefix xs ys)"
 proof (safe)
   assume "ct_prefix xs (ys @ [y])" "\<not> ct_prefix xs ys"
-  thus "ct_list_eq xs (ys @ [y])"
-    unfolding ct_prefix_def ct_list_eq_def
-    by (metis butlast_append butlast_snoc ct_eq_flip list.rel_flip)
+  thus "ct_list_compat xs (ys @ [y])"
+    unfolding ct_prefix_def ct_list_compat_def
+    by (metis butlast_append butlast_snoc ct_compat_flip list.rel_flip)
 next
-  assume "ct_list_eq xs (ys @ [y])"
+  assume "ct_list_compat xs (ys @ [y])"
   thus "ct_prefix xs (ys @ [y])"
-    using ct_list_eq_commute ct_prefixI
+    using ct_list_compat_commute ct_prefixI
     by fastforce
 next
   assume "ct_prefix xs ys"
@@ -206,34 +206,34 @@ qed
 
 lemma ct_prefix_nil:"ct_prefix [] xs"
                     "\<not>ct_prefix (x # xs) []"
-  by (simp_all add: ct_prefix_def ct_list_eq_def)
+  by (simp_all add: ct_prefix_def ct_list_compat_def)
 
-lemma Cons_ct_prefix_Cons[simp]: "ct_prefix (x # xs) (y # ys) = ((ct_eq x y) \<and> ct_prefix xs ys)"
+lemma Cons_ct_prefix_Cons[simp]: "ct_prefix (x # xs) (y # ys) = ((ct_compat x y) \<and> ct_prefix xs ys)"
 proof (safe)
   assume "ct_prefix (x # xs) (y # ys)"
-  thus "ct_eq x y"
-    unfolding ct_prefix_def ct_list_eq_def
-    by (metis ct_eq_commute hd_append2 list.sel(1) list.simps(3) list_all2_Cons2)
+  thus "ct_compat x y"
+    unfolding ct_prefix_def ct_list_compat_def
+    by (metis ct_compat_commute hd_append2 list.sel(1) list.simps(3) list_all2_Cons2)
 next
   assume "ct_prefix (x # xs) (y # ys)"
   thus "ct_prefix xs ys"
-    unfolding ct_prefix_def ct_list_eq_def
+    unfolding ct_prefix_def ct_list_compat_def
     by (metis list.rel_distinct(1) list.sel(3) list_all2_Cons2 tl_append2)
 next
-  assume "ct_eq x y" "ct_prefix xs ys"
+  assume "ct_compat x y" "ct_prefix xs ys"
   thus "ct_prefix (x # xs) (y # ys)"
-    unfolding ct_prefix_def ct_list_eq_def
-    by (metis (full_types) append_Cons ct_list_eq_commute ct_list_eq_def list.rel_inject(2))
+    unfolding ct_prefix_def ct_list_compat_def
+    by (metis (full_types) append_Cons ct_list_compat_commute ct_list_compat_def list.rel_inject(2))
 qed
 
 lemma ct_prefix_code [code]:
   "ct_prefix [] xs = True"
   "ct_prefix (x # xs) [] = False"
-  "ct_prefix (x # xs) (y # ys) = ((ct_eq x y) \<and> ct_prefix xs ys)"
+  "ct_prefix (x # xs) (y # ys) = ((ct_compat x y) \<and> ct_prefix xs ys)"
   by (simp_all add: ct_prefix_nil)
 
 lemma ct_suffix_to_ct_prefix [code]: "ct_suffix xs ys = ct_prefix (rev xs) (rev ys)"
-  unfolding ct_suffix_def ct_prefix_def ct_list_eq_def
+  unfolding ct_suffix_def ct_prefix_def ct_list_compat_def
   by (metis list_all2_rev1 rev_append rev_rev_ident)
 
 lemma inj_TSome: "inj TSome"
@@ -270,7 +270,7 @@ qed
 
 lemma ct_suffixI [intro?]: 
   assumes "ys = as @ zs"
-          "ct_list_eq zs xs"
+          "ct_list_compat zs xs"
   shows "ct_suffix xs ys"
   using assms
   unfolding ct_suffix_def
@@ -278,43 +278,43 @@ lemma ct_suffixI [intro?]:
 
 lemma ct_suffixE [elim?]:
   assumes "ct_suffix xs ys"
-  obtains as zs where "ys = as @ zs" "ct_list_eq zs xs"
+  obtains as zs where "ys = as @ zs" "ct_list_compat zs xs"
   using assms
   unfolding ct_suffix_def
   by blast
 
 lemma ct_suffix_nil: "ct_suffix [] ts"
   unfolding ct_suffix_def
-  using ct_list_eq_refl
+  using ct_list_compat_refl
   by auto
 
 lemma ct_suffix_refl: "ct_suffix ts ts"
   unfolding ct_suffix_def
-  using ct_list_eq_refl
+  using ct_list_compat_refl
   by auto
 
 lemma ct_suffix_length:
   assumes "ct_suffix ts ts'"
   shows "length ts \<le> length ts'"
   using assms list_all2_lengthD
-  unfolding ct_suffix_def ct_list_eq_def
+  unfolding ct_suffix_def ct_list_compat_def
   by fastforce
 
 lemma ct_suffix_take:
   assumes "ct_suffix ts ts'"
   shows "ct_suffix ((take (length ts - n) ts)) ((take (length ts' - n) ts'))"
-  using assms ct_list_eq_take append_eq_conv_conj
+  using assms ct_list_compat_take append_eq_conv_conj
   unfolding ct_suffix_def
 proof -
-  assume "\<exists>as bs. ts' = as @ bs \<and> ct_list_eq bs ts"
+  assume "\<exists>as bs. ts' = as @ bs \<and> ct_list_compat bs ts"
   then obtain ccs :: "ct list" and ccsa :: "ct list" where
-    f1: "ts' = ccs @ ccsa \<and> ct_list_eq ccsa ts"
+    f1: "ts' = ccs @ ccsa \<and> ct_list_compat ccsa ts"
     by moura
   then have f2: "length ccsa = length ts"
-    by (meson ct_list_eq_length)
-  have "\<And>n. ct_list_eq (take n ccsa) (take n ts)"
-    using f1 by (meson ct_list_eq_take)
-  then show "\<exists>cs csa. take (length ts' - n) ts' = cs @ csa \<and> ct_list_eq csa (take (length ts - n) ts)"
+    by (meson ct_list_compat_length)
+  have "\<And>n. ct_list_compat (take n ccsa) (take n ts)"
+    using f1 by (meson ct_list_compat_take)
+  then show "\<exists>cs csa. take (length ts' - n) ts' = cs @ csa \<and> ct_list_compat csa (take (length ts - n) ts)"
     using f2 f1 by auto
 qed
 
@@ -323,87 +323,87 @@ lemma ct_suffix_ts_conv_suffix:
 proof safe
   assume "ct_suffix (to_ct_list ts) (to_ct_list ts')"
   then obtain as bs where "to_ct_list ts' = (to_ct_list as) @ (to_ct_list bs)"
-                          "ct_list_eq (to_ct_list bs) (to_ct_list ts)"
+                          "ct_list_compat (to_ct_list bs) (to_ct_list ts)"
     using to_ct_list_append
     unfolding ct_suffix_def
     by metis
   thus "suffix ts ts'"
-    using ct_list_eq_ts_conv_eq
+    using ct_list_compat_ts_conv_eq
     unfolding ct_suffix_def to_ct_list_def suffix_def
     by (metis map_append)
 next
   assume "suffix ts ts'"
   thus "ct_suffix (to_ct_list ts) (to_ct_list ts')"
-    using ct_list_eq_ts_conv_eq
+    using ct_list_compat_ts_conv_eq
     unfolding ct_suffix_def to_ct_list_def suffix_def
     by (metis map_append)
 qed
 
 lemma ct_suffix_exists: "\<exists>ts_c. ct_suffix x1 (to_ct_list ts_c)"
-  using ct_list_eq_commute ct_list_eq_exists ct_suffix_def
+  using ct_list_compat_commute ct_list_compat_exists ct_suffix_def
   by fastforce
 
-lemma ct_suffix_ct_list_eq_exists:
+lemma ct_suffix_ct_list_compat_exists:
   assumes "ct_suffix x1 x2"
-  shows "\<exists>ts_c. ct_suffix x1 (to_ct_list ts_c) \<and> ct_list_eq (to_ct_list ts_c) x2"
+  shows "\<exists>ts_c. ct_suffix x1 (to_ct_list ts_c) \<and> ct_list_compat (to_ct_list ts_c) x2"
 proof -
-  obtain as bs where x2_def:"x2 = as @ bs" "ct_list_eq x1 bs"
-    using assms ct_list_eq_commute
+  obtain as bs where x2_def:"x2 = as @ bs" "ct_list_compat x1 bs"
+    using assms ct_list_compat_commute
     unfolding ct_suffix_def
     by blast
-  then obtain ts_as ts_bs where "ct_list_eq as (to_ct_list ts_as)"
-                                "ct_list_eq x1 (to_ct_list ts_bs)"
-                                "ct_list_eq (to_ct_list ts_bs) bs"
-    using ct_list_eq_common_tsome_list[of x1 bs] ct_list_eq_exists
+  then obtain ts_as ts_bs where "ct_list_compat as (to_ct_list ts_as)"
+                                "ct_list_compat x1 (to_ct_list ts_bs)"
+                                "ct_list_compat (to_ct_list ts_bs) bs"
+    using ct_list_compat_common_tsome_list[of x1 bs] ct_list_compat_exists
     by fastforce
   thus ?thesis
-    using x2_def ct_list_eq_commute
+    using x2_def ct_list_compat_commute
     unfolding ct_suffix_def to_ct_list_def
-    by (metis ct_list_eq_def list_all2_appendI map_append)
+    by (metis ct_list_compat_def list_all2_appendI map_append)
 qed
 
 lemma ct_suffix_cons_ct_list:
   assumes "ct_suffix (xs@ys) (to_ct_list zs)"
-  shows "\<exists>as bs. zs = as@bs \<and> ct_list_eq ys (to_ct_list bs) \<and> ct_suffix xs (to_ct_list as)"
+  shows "\<exists>as bs. zs = as@bs \<and> ct_list_compat ys (to_ct_list bs) \<and> ct_suffix xs (to_ct_list as)"
 proof -
   obtain as bs where "to_ct_list zs = (to_ct_list as) @ (to_ct_list bs)"
-                     "ct_list_eq (to_ct_list bs) (xs @ ys)"
+                     "ct_list_compat (to_ct_list bs) (xs @ ys)"
     using assms to_ct_list_append[of zs]
     unfolding ct_suffix_def
     by blast
   thus ?thesis
-    using assms ct_list_eq_cons_ct_list[of bs xs ys]
+    using assms ct_list_compat_cons_ct_list[of bs xs ys]
     unfolding ct_suffix_def
-  by (metis append.assoc ct_list_eq_commute ct_list_eq_ts_conv_eq map_append to_ct_list_def)
+  by (metis append.assoc ct_list_compat_commute ct_list_compat_ts_conv_eq map_append to_ct_list_def)
 qed
 
 lemma ct_suffix_cons_ct_list1:
   assumes "ct_suffix (xs@(to_ct_list ys)) (to_ct_list zs)"
   shows "\<exists>as. zs = as@ys \<and> ct_suffix xs (to_ct_list as)"
-  using ct_suffix_cons_ct_list[OF assms] ct_list_eq_ts_conv_eq
+  using ct_suffix_cons_ct_list[OF assms] ct_list_compat_ts_conv_eq
   by fastforce
 
 lemma ct_suffix_cons2:
   assumes "ct_suffix (xs) (ys@zs)"
           "length xs = length zs"
-  shows "ct_list_eq xs zs"
+  shows "ct_list_compat xs zs"
   using assms
-  by (metis append_eq_append_conv ct_list_eq_commute ct_list_eq_def ct_suffix_def list_all2_lengthD)
+  by (metis append_eq_append_conv ct_list_compat_commute ct_list_compat_def ct_suffix_def list_all2_lengthD)
     
-lemma ct_suffix_imp_ct_list_eq:
+lemma ct_suffix_imp_ct_list_compat:
   assumes "ct_suffix xs ys"
-  shows "ct_list_eq (drop (length ys - length xs) ys) xs"
-  using assms ct_list_eq_def list_all2_lengthD
+  shows "ct_list_compat (drop (length ys - length xs) ys) xs"
+  using assms ct_list_compat_def list_all2_lengthD
   unfolding ct_suffix_def
   by fastforce
   
-lemma ct_suffix_extend_ct_list_eq:
+lemma ct_suffix_extend_ct_list_compat:
   assumes "ct_suffix xs ys"
-          "ct_list_eq xs' ys'"
+          "ct_list_compat xs' ys'"
   shows "ct_suffix (xs@xs') (ys@ys')"
   using assms
-  unfolding ct_suffix_def ct_list_eq_def
-  by (meson append.assoc ct_list_eq_commute ct_list_eq_def list_all2_appendI)
+  unfolding ct_suffix_def ct_list_compat_def
+  by (meson append.assoc ct_list_compat_commute ct_list_compat_def list_all2_appendI)
 
 lemma ct_suffix_extend_any1:
   assumes "ct_suffix xs ys"
@@ -411,29 +411,29 @@ lemma ct_suffix_extend_any1:
   shows "ct_suffix (TAny#xs) ys"
 proof -
   obtain as bs where ys_def:"ys = as@bs"
-                            "ct_list_eq bs xs"
+                            "ct_list_compat bs xs"
     using assms(1) ct_suffix_def
     by fastforce
   hence "length as > 0"
     using list_all2_lengthD assms(2)
-    unfolding ct_list_eq_def
+    unfolding ct_list_compat_def
     by fastforce
   then obtain as' a where as_def:"as = as'@[a]"
     by (metis append_butlast_last_id length_greater_0_conv)
-  hence "ct_list_eq (a#bs) (TAny#xs)"
+  hence "ct_list_compat (a#bs) (TAny#xs)"
     using ys_def
-    by (meson ct_eq.simps(2) ct_list_eq_commute ct_list_eq_def list.rel_intros(2))
+    by (meson ct_compat.simps(2) ct_list_compat_commute ct_list_compat_def list.rel_intros(2))
   thus ?thesis
     using as_def ys_def ct_suffix_def
     by fastforce
 qed
 
 lemma ct_suffix_singleton_any: "ct_suffix [TAny] [t]"
-  using ct_suffix_extend_ct_list_eq[of "[]" "[]" "[TAny]" "[t]"] ct_suffix_nil
-  by (simp add: ct_list_eq_def)
+  using ct_suffix_extend_ct_list_compat[of "[]" "[]" "[TAny]" "[t]"] ct_suffix_nil
+  by (simp add: ct_list_compat_def)
 
 lemma ct_suffix_cons_it: "ct_suffix xs (xs'@xs)"
-  using ct_list_eq_refl ct_suffix_def
+  using ct_list_compat_refl ct_suffix_def
   by blast
 
 lemma ct_suffix_singleton:
@@ -443,7 +443,7 @@ proof -
   have "\<And>c. ct_prefix [TAny] [c]"
     using ct_suffix_singleton_any ct_suffix_to_ct_prefix by force
   then show ?thesis
-    by (metis (no_types) Suc_leI append_butlast_last_id assms butlast.simps(2) ct_list_eq_commute
+    by (metis (no_types) Suc_leI append_butlast_last_id assms butlast.simps(2) ct_list_compat_commute
                          ct_prefix_nil(2) ct_prefix_snoc ct_suffix_def impossible_Cons length_Cons
                          list.size(3))
 qed
@@ -453,9 +453,9 @@ lemma ct_suffix_less:
   shows "ct_suffix xs' ys"
   using assms
   unfolding ct_suffix_def
-  by (metis append_eq_appendI ct_list_eq_def list_all2_append2)
+  by (metis append_eq_appendI ct_list_compat_def list_all2_append2)
 
-lemma ct_suffix_unfold_one: "ct_suffix (xs@[x]) (ys@[y]) = ((ct_eq x y) \<and> ct_suffix xs ys)"
+lemma ct_suffix_unfold_one: "ct_suffix (xs@[x]) (ys@[y]) = ((ct_compat x y) \<and> ct_suffix xs ys)"
   using ct_prefix_code(3)
   by (simp add: ct_suffix_to_ct_prefix)
 
@@ -466,11 +466,11 @@ lemma ct_suffix_shared:
 proof (cases "length cts > length cts'")
   case True
   obtain as bs where cts_def:"ts = as@bs"
-                             "ct_list_eq cts (to_ct_list bs)"
+                             "ct_list_compat cts (to_ct_list bs)"
     using assms(1) ct_suffix_def to_ct_list_def
     by (metis append_Nil ct_suffix_cons_ct_list)
   obtain as' bs' where cts'_def:"ts = as'@bs'"
-                                "ct_list_eq cts' (to_ct_list bs')"
+                                "ct_list_compat cts' (to_ct_list bs')"
     using assms(2) ct_suffix_def to_ct_list_def
     by (metis append_Nil ct_suffix_cons_ct_list)
   obtain ct1s ct2s where "cts = ct1s@ct2s"
@@ -480,25 +480,25 @@ proof (cases "length cts > length cts'")
   show ?thesis
   proof -
     obtain tts :: "t list \<Rightarrow> ct list \<Rightarrow> ct list \<Rightarrow> t list" and ttsa :: "t list \<Rightarrow> ct list \<Rightarrow> ct list \<Rightarrow> t list" where
-      "\<forall>x0 x1 x2. (\<exists>v3 v4. x0 = v3 @ v4 \<and> ct_list_eq x1 (to_ct_list v4) \<and> ct_suffix x2 (to_ct_list v3)) = (x0 = tts x0 x1 x2 @ ttsa x0 x1 x2 \<and> ct_list_eq x1 (to_ct_list (ttsa x0 x1 x2)) \<and> ct_suffix x2 (to_ct_list (tts x0 x1 x2)))"
+      "\<forall>x0 x1 x2. (\<exists>v3 v4. x0 = v3 @ v4 \<and> ct_list_compat x1 (to_ct_list v4) \<and> ct_suffix x2 (to_ct_list v3)) = (x0 = tts x0 x1 x2 @ ttsa x0 x1 x2 \<and> ct_list_compat x1 (to_ct_list (ttsa x0 x1 x2)) \<and> ct_suffix x2 (to_ct_list (tts x0 x1 x2)))"
       by moura
-    then have f1: "as' @ bs' = tts (as' @ bs') ct2s ct1s @ ttsa (as' @ bs') ct2s ct1s \<and> ct_list_eq ct2s (to_ct_list (ttsa (as' @ bs') ct2s ct1s)) \<and> ct_suffix ct1s (to_ct_list (tts (as' @ bs') ct2s ct1s))"
+    then have f1: "as' @ bs' = tts (as' @ bs') ct2s ct1s @ ttsa (as' @ bs') ct2s ct1s \<and> ct_list_compat ct2s (to_ct_list (ttsa (as' @ bs') ct2s ct1s)) \<and> ct_suffix ct1s (to_ct_list (tts (as' @ bs') ct2s ct1s))"
       using assms(1) \<open>cts = ct1s @ ct2s\<close> cts'_def(1) ct_suffix_cons_ct_list by force
-    then have "ct_list_eq cts' (to_ct_list (ttsa (as' @ bs') ct2s ct1s))"
-      by (metis \<open>ct_suffix cts' (to_ct_list ts)\<close> \<open>length ct2s = length cts'\<close> cts'_def(1) ct_list_eq_length ct_suffix_cons2 map_append to_ct_list_def)
+    then have "ct_list_compat cts' (to_ct_list (ttsa (as' @ bs') ct2s ct1s))"
+      by (metis \<open>ct_suffix cts' (to_ct_list ts)\<close> \<open>length ct2s = length cts'\<close> cts'_def(1) ct_list_compat_length ct_suffix_cons2 map_append to_ct_list_def)
     then show ?thesis
-      using f1 by (metis \<open>cts = ct1s @ ct2s\<close> ct_list_eq_shared ct_suffix_def)
+      using f1 by (metis \<open>cts = ct1s @ ct2s\<close> ct_list_compat_shared ct_suffix_def)
   qed
 next
   case False
   hence len:"length cts' \<ge> length cts"
     by linarith
   obtain as bs where cts_def:"ts = as@bs"
-                             "ct_list_eq cts (to_ct_list bs)"
+                             "ct_list_compat cts (to_ct_list bs)"
     using assms(1) ct_suffix_def to_ct_list_def
     by (metis append_Nil ct_suffix_cons_ct_list)
   obtain as' bs' where cts'_def:"ts = as'@bs'"
-                                "ct_list_eq cts' (to_ct_list bs')"
+                                "ct_list_compat cts' (to_ct_list bs')"
     using assms(2) ct_suffix_def to_ct_list_def
     by (metis append_Nil ct_suffix_cons_ct_list)
   obtain ct1s ct2s where "cts' = ct1s@ct2s"
@@ -508,14 +508,14 @@ next
   show ?thesis
   proof -
     obtain tts :: "t list \<Rightarrow> ct list \<Rightarrow> ct list \<Rightarrow> t list" and ttsa :: "t list \<Rightarrow> ct list \<Rightarrow> ct list \<Rightarrow> t list" where
-      "\<forall>x0 x1 x2. (\<exists>v3 v4. x0 = v3 @ v4 \<and> ct_list_eq x1 (to_ct_list v4) \<and> ct_suffix x2 (to_ct_list v3)) = (x0 = tts x0 x1 x2 @ ttsa x0 x1 x2 \<and> ct_list_eq x1 (to_ct_list (ttsa x0 x1 x2)) \<and> ct_suffix x2 (to_ct_list (tts x0 x1 x2)))"
+      "\<forall>x0 x1 x2. (\<exists>v3 v4. x0 = v3 @ v4 \<and> ct_list_compat x1 (to_ct_list v4) \<and> ct_suffix x2 (to_ct_list v3)) = (x0 = tts x0 x1 x2 @ ttsa x0 x1 x2 \<and> ct_list_compat x1 (to_ct_list (ttsa x0 x1 x2)) \<and> ct_suffix x2 (to_ct_list (tts x0 x1 x2)))"
       by moura
-    then have f1: "as @ bs = tts (as @ bs) ct2s ct1s @ ttsa (as @ bs) ct2s ct1s \<and> ct_list_eq ct2s (to_ct_list (ttsa (as @ bs) ct2s ct1s)) \<and> ct_suffix ct1s (to_ct_list (tts (as @ bs) ct2s ct1s))"
+    then have f1: "as @ bs = tts (as @ bs) ct2s ct1s @ ttsa (as @ bs) ct2s ct1s \<and> ct_list_compat ct2s (to_ct_list (ttsa (as @ bs) ct2s ct1s)) \<and> ct_suffix ct1s (to_ct_list (tts (as @ bs) ct2s ct1s))"
       using assms(2) \<open>cts' = ct1s @ ct2s\<close> cts_def(1) ct_suffix_cons_ct_list by force
-    then have "ct_list_eq cts (to_ct_list (ttsa (as @ bs) ct2s ct1s))"
-      by (metis \<open>ct_suffix cts (to_ct_list ts)\<close> \<open>length ct2s = length cts\<close> cts_def(1) ct_list_eq_length ct_suffix_cons2 map_append to_ct_list_def)
+    then have "ct_list_compat cts (to_ct_list (ttsa (as @ bs) ct2s ct1s))"
+      by (metis \<open>ct_suffix cts (to_ct_list ts)\<close> \<open>length ct2s = length cts\<close> cts_def(1) ct_list_compat_length ct_suffix_cons2 map_append to_ct_list_def)
     then show ?thesis
-      using f1 by (metis \<open>cts' = ct1s @ ct2s\<close> ct_list_eq_shared ct_suffix_def)
+      using f1 by (metis \<open>cts' = ct1s @ ct2s\<close> ct_list_compat_shared ct_suffix_def)
   qed
 qed
 
@@ -573,24 +573,24 @@ fun c_types_agree :: "checker_type \<Rightarrow> t list \<Rightarrow> bool" wher
 lemma consume_type:
   assumes "consume (Type ts) ts' = c_t"
           "c_t \<noteq> Bot"
-  shows "\<exists>ts''. ct_list_eq (to_ct_list ts) ((to_ct_list ts'')@ts') \<and> c_t = Type ts''"
+  shows "\<exists>ts''. ct_list_compat (to_ct_list ts) ((to_ct_list ts'')@ts') \<and> c_t = Type ts''"
 proof -
   {
     assume a1: "(if ct_suffix ts' (map TSome ts) then Type (take (length ts - length ts') ts) else Bot) = c_t"
     assume a2: "c_t \<noteq> Bot"
     obtain ccs :: "ct list \<Rightarrow> ct list \<Rightarrow> ct list" and ccsa :: "ct list \<Rightarrow> ct list \<Rightarrow> ct list" where
-      f3: "\<forall>cs csa. \<not> ct_suffix cs csa \<or> csa = ccs cs csa @ ccsa cs csa \<and> ct_list_eq (ccsa cs csa) cs"
+      f3: "\<forall>cs csa. \<not> ct_suffix cs csa \<or> csa = ccs cs csa @ ccsa cs csa \<and> ct_list_compat (ccsa cs csa) cs"
       using ct_suffixE by moura
     have f4: "ct_suffix ts' (map TSome ts)"
       using a2 a1 by metis
-    then have f5: "ct_list_eq (ccsa ts' (map TSome ts)) ts'"
+    then have f5: "ct_list_compat (ccsa ts' (map TSome ts)) ts'"
       using f3 by blast
     have f6: "take (length (map TSome ts) - length (ccsa ts' (map TSome ts))) (map TSome ts) @ ccsa ts' (map TSome ts) = map TSome ts"
       using f4 f3 by (metis (full_types) suffixI suffix_take)
-    have "\<And>cs. ct_list_eq (cs @ ccsa ts' (map TSome ts)) (cs @ ts')"
-      using f5 ct_list_eq_concat ct_list_eq_refl by blast
-    then have "\<exists>tsa. ct_list_eq (map TSome ts) (map TSome tsa @ ts') \<and> c_t = Type tsa"
-      using f6 f5 f4 a1 by (metis (no_types) ct_list_eq_length length_map take_map)
+    have "\<And>cs. ct_list_compat (cs @ ccsa ts' (map TSome ts)) (cs @ ts')"
+      using f5 ct_list_compat_concat ct_list_compat_refl by blast
+    then have "\<exists>tsa. ct_list_compat (map TSome ts) (map TSome tsa @ ts') \<and> c_t = Type tsa"
+      using f6 f5 f4 a1 by (metis (no_types) ct_list_compat_length length_map take_map)
   }
   thus ?thesis
     using assms to_ct_list_def
@@ -601,7 +601,7 @@ lemma consume_top_geq:
   assumes "consume (TopType ts) ts' = c_t"
           "length ts \<ge> length ts'"
           "c_t \<noteq> Bot"
-  shows "(\<exists>as bs. ts = as@bs \<and> ct_list_eq bs ts' \<and> c_t = TopType as)"
+  shows "(\<exists>as bs. ts = as@bs \<and> ct_list_compat bs ts' \<and> c_t = TopType as)"
 proof -
   consider (1) "ct_suffix ts' ts"
          | (2) "\<not>ct_suffix ts' ts" "ct_suffix ts ts'"
@@ -614,13 +614,13 @@ proof -
       using assms
       by simp
     thus ?thesis
-      using assms(2) 1 ct_list_eq_def
+      using assms(2) 1 ct_list_compat_def
       unfolding ct_suffix_def
       by (metis (no_types, lifting) append_eq_append_conv append_take_drop_id diff_diff_cancel length_drop list_all2_lengthD)
   next
     case 2
     thus ?thesis
-      using assms append_eq_append_conv ct_list_eq_commute
+      using assms append_eq_append_conv ct_list_compat_commute
       unfolding ct_suffix_def
       by (metis append.left_neutral ct_suffix_def ct_suffix_length le_antisym)
   next
@@ -660,7 +660,7 @@ lemma consume_weaken_type:
   assumes "consume (Type tn) cons = (Type t_int)"
   shows "consume (Type (ts@tn)) cons = (Type (ts@t_int))"
 proof -
-  obtain ts' where "ct_list_eq (to_ct_list tn) (to_ct_list ts' @ cons) \<and> Type t_int = Type ts'"
+  obtain ts' where "ct_list_compat (to_ct_list tn) (to_ct_list ts' @ cons) \<and> Type t_int = Type ts'"
     using consume_type[OF assms]
     by blast
   have cond:"ct_suffix cons (to_ct_list tn)"
@@ -700,16 +700,16 @@ lemma c_types_agree_top1: "c_types_agree (TopType []) ts"
   by (simp add: ct_suffix_nil)
 
 lemma c_types_agree_top2:
-  assumes "ct_list_eq ts (to_ct_list ts'')"
+  assumes "ct_list_compat ts (to_ct_list ts'')"
   shows "c_types_agree (TopType ts) (ts'@ts'')"
-  using assms ct_list_eq_commute ct_suffix_def to_ct_list_def
+  using assms ct_list_compat_commute ct_suffix_def to_ct_list_def
   by auto
 
-lemma c_types_agree_imp_ct_list_eq:
+lemma c_types_agree_imp_ct_list_compat:
   assumes "c_types_agree (TopType cts) ts"
-  shows "\<exists>ts' ts''. (ts = ts'@ts'') \<and> ct_list_eq cts (to_ct_list ts'')"
+  shows "\<exists>ts' ts''. (ts = ts'@ts'') \<and> ct_list_compat cts (to_ct_list ts'')"
   using assms ct_suffix_def to_ct_list_def
-  by (simp, metis ct_list_eq_commute ct_list_eq_ts_conv_eq ct_suffix_ts_conv_suffix suffixE
+  by (simp, metis ct_list_compat_commute ct_list_compat_ts_conv_eq ct_suffix_ts_conv_suffix suffixE
                   to_ct_list_append(2))
 
 lemma c_types_agree_not_bot_exists:
@@ -797,18 +797,18 @@ proof -
       by blast
     moreover
     hence "ct_suffix ts (to_ct_list (t_ag'@cons))"
-      using 1 ct_suffix_imp_ct_list_eq ct_suffix_extend_ct_list_eq to_ct_list_def
+      using 1 ct_suffix_imp_ct_list_compat ct_suffix_extend_ct_list_compat to_ct_list_def
       by fastforce
     ultimately
     show ?thesis
-      using c_types_agree.simps(2) ct_list_eq_ts_conv_eq ct_suffix_def
+      using c_types_agree.simps(2) ct_list_compat_ts_conv_eq ct_suffix_def
       by auto
   next
     case 2
     thus ?thesis
       using assms
       by (metis append.assoc c_types_agree.simps(2) checker_type.inject(1) consume.simps(2)
-                ct_list_eq_ts_conv_eq ct_suffix_cons_ct_list ct_suffix_def map_append
+                ct_list_compat_ts_conv_eq ct_suffix_cons_ct_list ct_suffix_def map_append
                 produce.simps(1) to_ct_list_def type_update.simps)
   next
     case 3
@@ -833,7 +833,7 @@ lemma type_update_select_length1:
   assumes "type_update_select (TopType cts) = tm"
           "length cts = 1"
           "tm \<noteq> Bot"
-  shows "ct_list_eq cts [TSome T_i32]"
+  shows "ct_list_compat cts [TSome T_i32]"
         "tm = TopType [TAny]"
 proof -
   have 1:"type_update (TopType cts) [TSome T_i32] (TopType [TAny]) = tm"
@@ -842,9 +842,9 @@ proof -
   hence "ct_suffix cts [TSome T_i32] \<or> ct_suffix [TSome T_i32] cts"
     using assms(3)
     by (metis consume.simps(2) produce.simps(7) type_update.simps)
-  thus "ct_list_eq cts [TSome T_i32]"
-    using assms(2,3) ct_suffix_imp_ct_list_eq
-    by (metis One_nat_def Suc_length_conv ct_list_eq_commute diff_Suc_1 drop_0 list.size(3))
+  thus "ct_list_compat cts [TSome T_i32]"
+    using assms(2,3) ct_suffix_imp_ct_list_compat
+    by (metis One_nat_def Suc_length_conv ct_list_compat_commute diff_Suc_1 drop_0 list.size(3))
   show "tm = TopType [TAny]"
     using 1 assms(3) consume_top_leq
     by (metis One_nat_def assms(2) diff_Suc_1 diff_is_0_eq length_Cons list.size(3)
@@ -856,7 +856,7 @@ lemma type_update_select_length2:
   assumes "type_update_select (TopType cts) = tm"
           "length cts = 2"
           "tm \<noteq> Bot"
-  shows "\<exists>t1 t2. cts = [t1, t2] \<and> ct_eq t2 (TSome T_i32) \<and> tm = TopType [t1]"
+  shows "\<exists>t1 t2. cts = [t1, t2] \<and> ct_compat t2 (TSome T_i32) \<and> tm = TopType [t1]"
 proof -
   obtain x y where cts_def:"cts = [x,y]"
     using assms(2) List.length_Suc_conv[of cts "Suc 0"]
@@ -873,8 +873,8 @@ proof -
     using assms(2) ct_suffix_length
     by fastforce
   moreover
-  hence "ct_eq y (TSome T_i32)"
-    by (metis ct_eq_commute ct_list_eq_def ct_suffix_cons2 list.rel_sel list.sel(1) list.simps(3)
+  hence "ct_compat y (TSome T_i32)"
+    by (metis ct_compat_commute ct_list_compat_def ct_suffix_cons2 list.rel_sel list.sel(1) list.simps(3)
               list.size(4))
   ultimately
   show ?thesis
@@ -884,7 +884,7 @@ qed
 lemma type_update_select_length3:
   assumes "type_update_select (TopType cts) = (TopType ctm)"
           "length cts \<ge> 3"
-  shows "\<exists>cts' ct1 ct2 ct3. cts = cts'@[ct1, ct2, ct3] \<and> ct_eq ct3 (TSome T_i32)"
+  shows "\<exists>cts' ct1 ct2 ct3. cts = cts'@[ct1, ct2, ct3] \<and> ct_compat ct3 (TSome T_i32)"
 proof -
   obtain cts' cts'' where cts_def:"cts = cts'@ cts''" "length cts'' = 3"
     using assms(2)
@@ -909,8 +909,8 @@ proof -
   hence "ct_suffix [TAny, TAny, TSome T_i32] (cts'@ [ct1,ct2,ct3])"
     using assms(2) consume_top_geq cts_def2
     by (metis checker_type.distinct(3) ct_suffix_def length_Cons list.size(3) numeral_3_eq_3)
-  hence "ct_eq ct3 (TSome T_i32)"
-    using ct_suffix_def ct_list_eq_def
+  hence "ct_compat ct3 (TSome T_i32)"
+    using ct_suffix_def ct_list_compat_def
     by (simp, metis append_eq_append_conv length_Cons list_all2_Cons list_all2_lengthD)
   thus ?thesis
     using cts_def2
@@ -951,7 +951,7 @@ proof -
     by (simp, metis checker_type.distinct(5))
   hence "t3 = T_i32"
     using ct_suffix_unfold_one[of "[TAny]" "TSome T_i32" "to_ct_list (tn' @ [t1, t2])" "TSome t3"]
-          ct_eq.simps(1)
+          ct_compat.simps(1)
     unfolding to_ct_list_def
     by simp
   thus ?thesis
@@ -998,14 +998,14 @@ proof -
     done
 qed
 
-lemma select_return_top_ct_eq:
+lemma select_return_top_ct_compat:
   assumes "select_return_top cts c1 c2 = TopType ctm"
           "length cts \<ge> 3"
           "c_types_agree (TopType ctm) cm"
   shows "\<exists>c' cm'. cm = cm'@[c']
                   \<and> ct_suffix (take (length cts - 3) cts) (to_ct_list cm')
-                  \<and> ct_eq c1 (TSome c')
-                  \<and> ct_eq c2 (TSome c')"
+                  \<and> ct_compat c1 (TSome c')
+                  \<and> ct_compat c2 (TSome c')"
 proof (cases c1)
   case TAny
   note outer_TAny = TAny
@@ -1019,11 +1019,11 @@ proof (cases c1)
                             "ct_suffix (take (length cts - 3) cts) (to_ct_list cm')"
       using ct_suffix_cons_ct_list[of "take (length cts - 3) cts" "[TAny]"]
             assms(3) c_types_agree.simps(2)[of ctm cm]
-      unfolding ct_list_eq_def to_ct_list_def
+      unfolding ct_list_compat_def to_ct_list_def
       by (metis Suc_leI impossible_Cons length_Cons length_map list.exhaust list.size(3)
                 list_all2_conv_all_nth zero_less_Suc)
     thus ?thesis
-      using TAny outer_TAny ct_eq.simps(2)
+      using TAny outer_TAny ct_compat.simps(2)
       by blast
   next
     case (TSome x2)
@@ -1033,8 +1033,8 @@ proof (cases c1)
     then obtain cm' where "cm = cm' @ [x2]"
                           "ct_suffix (take (length cts - 3) cts) (to_ct_list cm')"
       using ct_suffix_cons_ct_list[of "take (length cts - 3) cts" "[TSome x2]"]
-            assms(3) c_types_agree.simps(2)[of ctm cm] ct_list_eq_ts_conv_eq
-      unfolding ct_list_eq_def to_ct_list_def
+            assms(3) c_types_agree.simps(2)[of ctm cm] ct_list_compat_ts_conv_eq
+      unfolding ct_list_compat_def to_ct_list_def
       by (metis (no_types, hide_lams) list.simps(8,9))
     thus ?thesis
       using TSome outer_TAny
@@ -1052,8 +1052,8 @@ next
     then obtain cm' where "cm = cm' @ [x2]"
                           "ct_suffix (take (length cts - 3) cts) (to_ct_list cm')"
       using ct_suffix_cons_ct_list[of "take (length cts - 3) cts" "[TSome x2]"]
-            assms(3) c_types_agree.simps(2)[of ctm cm] ct_list_eq_ts_conv_eq
-      unfolding ct_list_eq_def to_ct_list_def
+            assms(3) c_types_agree.simps(2)[of ctm cm] ct_list_compat_ts_conv_eq
+      unfolding ct_list_compat_def to_ct_list_def
       by (metis (no_types, hide_lams) list.simps(8,9))
     thus ?thesis
       using TSome TAny
@@ -1069,8 +1069,8 @@ next
     then obtain cm' where "cm = cm' @ [x2]"
                           "ct_suffix (take (length cts - 3) cts) (to_ct_list cm')"
       using ct_suffix_cons_ct_list[of "take (length cts - 3) cts" "[TSome x2]"]
-            assms(3) c_types_agree.simps(2)[of ctm cm] ct_list_eq_ts_conv_eq
-      unfolding ct_list_eq_def to_ct_list_def
+            assms(3) c_types_agree.simps(2)[of ctm cm] ct_list_compat_ts_conv_eq
+      unfolding ct_list_compat_def to_ct_list_def
       by (metis (no_types, hide_lams) list.simps(8,9))
     thus ?thesis
       using TSome outer_TSome x_eq

@@ -2,17 +2,17 @@ section \<open>Soundness of Interpreter\<close>
 
 theory Wasm_Interpreter_Properties imports Wasm_Interpreter Wasm_Properties begin
 
-lemma is_const_list_vs_to_es_list: "const_list ($$* vs)"
+lemma is_const_list_vs_to_es_list: "const_list ($C* vs)"
   using is_const_list
   by auto
 
 lemma not_const_vs_to_es_list:
   assumes "~(is_const e)"
-  shows "vs1 @ [e] @ vs2 \<noteq> $$* vs"
+  shows "vs1 @ [e] @ vs2 \<noteq> $C* vs"
 proof -
   fix vs
   {
-    assume "vs1 @ [e] @ vs2 = $$* vs"
+    assume "vs1 @ [e] @ vs2 = $C* vs"
     hence "(\<forall>y\<in>set (vs1 @ [e] @ vs2). \<exists>x. y = $C x)"
       by simp
     hence False
@@ -20,8 +20,45 @@ proof -
       unfolding is_const_def
       by fastforce
   }
-  thus "vs1 @ [e] @ vs2 \<noteq> $$* vs"
+  thus "vs1 @ [e] @ vs2 \<noteq> $C* vs"
     by fastforce
+qed
+
+
+lemma split_vals_e_not_const_list:
+  assumes "\<not>const_list xs"
+  shows "\<exists>as b bs. split_vals_e xs = (as, b#bs)"
+  using assms
+proof (induction xs)
+  case Nil
+  thus ?case
+    by (simp add: const_list_def)
+next
+  case (Cons a xs)
+  show ?case
+  proof (cases "is_const a")
+    case True
+    hence 1:"\<not> const_list xs"
+      using Cons(2)
+      by (simp add: const_list_def)
+    obtain ac where "a = $C ac"
+      using e_type_const_unwrap[OF True]
+      by blast
+    thus ?thesis
+      using Cons(1)[OF 1]
+      by auto
+  next
+    case False
+    hence "split_vals_e (a#xs) = ([],a#xs)"
+    proof (cases a)
+      case (Basic x1)
+      thus ?thesis
+        using False
+        by (cases x1) (auto simp add: is_const_def)
+    qed (auto simp add: is_const_def)
+    thus ?thesis
+      by blast
+  qed
 qed
 
 lemma neq_label_nested:"[Label n les es] \<noteq> es"
@@ -32,15 +69,15 @@ proof -
     by fastforce
 qed
 
-lemma neq_local_nested:"[Local n f es] \<noteq> es"
+lemma neq_local_nested:"[Frame n f es] \<noteq> es"
 proof -
-  have "size_list size [Local n f es] > size_list size es"
+  have "size_list size [Frame n f es] > size_list size es"
     by simp
   thus ?thesis
     by fastforce
 qed
 
-lemma trap_not_value:"[Trap] \<noteq> $$*es"
+lemma trap_not_value:"[Trap] \<noteq> $C*es"
   by fastforce
 
 thm Lfilled.simps[of _ _ _ "[e]", simplified]
@@ -53,7 +90,7 @@ lemma lfilled_single:
 proof (cases rule: Lfilled.cases)
   case (L0 vs es')
   thus ?thesis
-    by (metis Nil_is_append_conv append_self_conv2 butlast_append butlast_snoc)
+    by (metis (no_types, lifting) Cons_eq_append_conv append_is_Nil_conv list.map_disc_iff)
 next
   case (LN vs n es' l es'' k lfilledk)
   assume "(\<And>a b c. e \<noteq> Label a b c)"
@@ -74,9 +111,9 @@ proof (induction arbitrary: es' rule: Lfilled.induct)
     using Lfilled.simps[of 0, simplified]
     by auto
 next
-  case (LN vs lholed n les' l les'' k les lfilledk)
+  case (LN lholed vs n les' l les'' k les lfilledk)
   thus ?case
-    using Lfilled.simps[of "(k+1)" "LRec vs n les' l les''" es' "(vs @ [Label n les' lfilledk] @ les'')", simplified]
+    using Lfilled.simps[of "(k+1)" "LRec vs n les' l les''" es' "(($C*vs) @ [Label n les' lfilledk] @ les'')", simplified]
     by auto
 qed
 
@@ -99,8 +136,8 @@ proof (induction es' rule: reduce_simple.induct)
     by auto
 next
   case (br vs n i lholed LI es)
-  have "size_list size [Label n es LI] > size_list size (vs @ es)"
-    using lfilled_size[OF br(3)]
+  have "size_list size [Label n es LI] > size_list size (($C*vs) @ es)"
+    using lfilled_size[OF br(2)]
     by simp
   thus ?case
     by fastforce
@@ -111,8 +148,8 @@ next
     by auto
 next
   case (return vs n j lholed es f)
-  hence "size_list size [Local n f es] > size_list size vs"
-        using lfilled_size[OF return(3)]
+  hence "size_list size [Frame n f es] > size_list size ($C*vs)"
+        using lfilled_size[OF return(2)]
     by simp
   thus ?case
     by auto
@@ -140,7 +177,7 @@ qed auto
 
 lemma reduce_simple_not_value:
   assumes "\<lparr>es\<rparr> \<leadsto> \<lparr>es'\<rparr>"
-  shows "es \<noteq> $$* vs"
+  shows "es \<noteq> $C* vs"
   using assms
 proof (induction rule: reduce_simple.induct)
   case (block vs n t1s t2s m es)
@@ -175,7 +212,7 @@ qed auto
 
 lemma reduce_not_value:
   assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
-  shows "es \<noteq> $$* ves"
+  shows "es \<noteq> $C* ves"
   using assms
 proof (induction es' arbitrary: ves rule: reduce.induct)
   case (basic e e' s vs i)
@@ -183,24 +220,24 @@ proof (induction es' arbitrary: ves rule: reduce.induct)
     using reduce_simple_not_value
     by fastforce
 next
-  case (invoke_native cl i' j ts es s t1s t2s ves vcs n k m zs vs)
-  have "\<not>(is_const (Invoke cl))"
+  case (invoke_native s i_cl j t1s t2s ts es ves vcs n k m zs f)
+  have "\<not>(is_const (Invoke i_cl))"
     unfolding is_const_def
     by simp
   thus ?case
     using not_const_vs_to_es_list
     by (metis append.right_neutral)
 next
-  case (invoke_host_Some cl t1s t2s f ves vcs n m s i s' vcs' vs)
-  have "\<not>(is_const (Invoke cl))"
+  case (invoke_host_Some s i_cl t1s t2s h ves vcs n m hs s' vcs' f)
+  have "\<not>(is_const (Invoke i_cl))"
     unfolding is_const_def
     by simp
   thus ?case
     using not_const_vs_to_es_list
     by (metis append.right_neutral)
 next
-  case (invoke_host_None cl t1s t2s f ves vcs n m s vs i)
-  have "\<not>(is_const (Invoke cl))"
+  case (invoke_host_None s i_cl t1s t2s f ves vcs n m vs i)
+  have "\<not>(is_const (Invoke i_cl))"
     unfolding is_const_def
     by simp
   thus ?case
@@ -211,18 +248,18 @@ next
   show ?case
     using label(2,4)
   proof (induction rule: Lfilled.induct)
-    case (L0 lvs lholed les' les)
+    case (L0 lholed lvs les' les)
     {
-      assume "lvs @ les @ les' = $$* ves"
-      hence "(\<forall>y\<in>set (lvs @ les @ les'). \<exists>x. y = $C x)"
+      assume "($C*lvs) @ les @ les' = $C* ves"
+      hence "(\<forall>y\<in>set (($C*lvs) @ les @ les'). \<exists>x. y = $C x)"
         by simp
       hence "(\<forall>y\<in>set les. \<exists>x. y = $C x)"
         by simp
-      hence "\<exists>vs1. les = $$* vs1"
+      hence "\<exists>vs1. les = $C* vs1"
         unfolding ex_map_conv.
     }
     thus ?case
-      using L0(3)
+      using L0(2)
       by (metis consts_app_ex(1) consts_app_ex(2))
   next
     case (LN lvs lholed ln les' l les'' k les lfilledk)
@@ -300,7 +337,7 @@ lemma reduce_call:
   assumes "\<lparr>s;f;[$Call j]\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
   shows "s = s'"
         "f = f'"
-        "es' = [Invoke (sfunc s (f_inst f) j)]"
+        "es' = [Invoke (sfunc_ind (f_inst f) j)]"
   using assms
 proof (induction "[$Call j]:: e list" s' f' es' rule: reduce.induct)
   case (label s f es s' f' es' k lholed les')
@@ -310,32 +347,32 @@ proof (induction "[$Call j]:: e list" s' f' es' rule: reduce.induct)
     by auto
   thus "s = s'"
        "f = f'"
-       "les' = [Invoke (sfunc s (f_inst f) j)]"
-    using label(2,3,4,6) Lfilled.simps[of k "LBase [] []" "[Invoke (sfunc s (f_inst f) j)]" les']
+       "les' = [Invoke (sfunc_ind (f_inst f) j)]"
+    using label(2,3,4,6) Lfilled.simps[of k "LBase [] []" "[Invoke (sfunc_ind (f_inst f) j)]" les']
     by auto
 qed (auto simp add: reduce_simple_call)
 
-lemma run_one_step_basic_unreachable_result:
-  assumes "run_one_step d (s,f,ves,$Unreachable) = (s', f', res)"
-  shows "\<exists>r. res = RSNormal r"
+lemma run_step_basic_unreachable_result:
+  assumes "run_step d (s,f,ves,($Unreachable) # es') = (s', f', res)"
+  shows "\<exists>rv re. res = RSNormal rv re"
   using assms
   by auto
 
-lemma run_one_step_basic_nop_result:
-  assumes "run_one_step d (s,f,ves,$Nop) = (s', f', res)"
-  shows "\<exists>r. res = RSNormal r"
+lemma run_step_basic_nop_result:
+  assumes "run_step d (s,f,ves,($Nop) # es') = (s', f', res)"
+  shows "\<exists>rv re. res = RSNormal rv re"
   using assms
   by auto
 
-lemma run_one_step_basic_drop_result:
-  assumes "run_one_step d (s,f,ves,$Drop) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_drop_result:
+  assumes "run_step d (s,f,ves,($Drop) # es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
   by (cases ves) auto
 
-lemma run_one_step_basic_select_result:
-  assumes "run_one_step d (s,f,ves,$Select) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_select_result:
+  assumes "run_step d (s,f,ves,($Select) # es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
 proof (cases ves)
   case (Cons a list)
@@ -350,9 +387,9 @@ proof (cases ves)
   qed auto
 qed auto
 
-lemma run_one_step_basic_block_result:
-  assumes "run_one_step d (s,f,ves,$(Block x51 x52)) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_block_result:
+  assumes "run_step d (s,f,ves,($(Block x51 x52)) # es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
 proof -
   obtain t1s t2s where "x51 = (t1s _> t2s)"
@@ -366,9 +403,9 @@ proof -
     by (cases "length t1s \<le> length ves") auto
 qed
 
-lemma run_one_step_basic_loop_result:
-  assumes "run_one_step d (s,f,ves,$(Loop x61 x62)) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_loop_result:
+  assumes "run_step d (s,f,ves,($(Loop x61 x62)) # es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
 proof -
   obtain t1s t2s where "x61 = (t1s _> t2s)"
@@ -382,9 +419,9 @@ proof -
     by (cases "length t1s \<le> length ves") auto
 qed
 
-lemma run_one_step_basic_if_result:
-  assumes "run_one_step d (s,f,ves,$(If x71 x72 x73)) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_if_result:
+  assumes "run_step d (s,f,ves,($(If x71 x72 x73)) # es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
 proof (cases ves)
   case (Cons a list)
@@ -399,15 +436,15 @@ proof (cases ves)
   qed auto
 qed auto
 
-lemma run_one_step_basic_br_result:
-  assumes "run_one_step d (s,f,ves,$Br x8) = (s', f', res)"
+lemma run_step_basic_br_result:
+  assumes "run_step d (s,f,ves,($Br x8)#es') = (s', f', res)"
   shows "\<exists>r vrs. res = RSBreak r vrs"
   using assms
   by (cases ves) auto
 
-lemma run_one_step_basic_br_if_result:
-  assumes "run_one_step d (s,f,ves,$Br_if x9) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_br_if_result:
+  assumes "run_step d (s,f,ves,($Br_if x9)#es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
 proof (cases ves)
   case (Cons a list)
@@ -421,9 +458,9 @@ proof (cases ves)
   qed auto
 qed auto
 
-lemma run_one_step_basic_br_table_result:
-  assumes "run_one_step d (s,f,ves,$Br_table js j) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_br_table_result:
+  assumes "run_step d (s,f,ves,($Br_table js j)#es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
 proof (cases ves)
   case (Cons a list)
@@ -437,21 +474,21 @@ proof (cases ves)
   qed auto
 qed auto
 
-lemma run_one_step_basic_return_result:
-  assumes "run_one_step d (s,f,ves,$Return) = (s', f', res)"
+lemma run_step_basic_return_result:
+  assumes "run_step d (s,f,ves,($Return)#es') = (s', f', res)"
   shows "\<exists>vrs. res = RSReturn vrs"
   using assms
   by (cases ves) auto
 
-lemma run_one_step_basic_call_result:
-  assumes "run_one_step d (s,f,ves,$Call x12) = (s', f', res)"
-  shows "\<exists>r. res = RSNormal r"
+lemma run_step_basic_call_result:
+  assumes "run_step d (s,f,ves,($Call x12)#es') = (s', f', res)"
+  shows "\<exists>rv re. res = RSNormal rv re"
   using assms
   by (cases ves) auto
 
-lemma run_one_step_basic_call_indirect_result:
-  assumes "run_one_step d (s,f,ves,$Call_indirect x13) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_call_indirect_result:
+  assumes "run_step d (s,f,ves,($Call_indirect x13)#es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
 proof (cases ves)
   case (Cons a list)
@@ -465,44 +502,44 @@ proof (cases ves)
       case (Some cl)
       thus ?thesis
         using Cons assms ConstInt32
-        by (cases cl; cases "stypes s (f_inst f) x13 = cl_type cl") auto
+        by (cases cl; cases "stypes s (f_inst f) x13 = cl_type (funcs s!cl)") auto
     qed auto
   qed auto
 qed auto
 
-lemma run_one_step_basic_get_local_result:
-  assumes "run_one_step d (s,f,ves,$Get_local x14) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_get_local_result:
+  assumes "run_step d (s,f,ves,($Get_local x14) # es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
   by (cases "x14 < length (f_locs f)") auto
 
-lemma run_one_step_basic_set_local_result:
-  assumes "run_one_step d (s,f,ves,$Set_local x15) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_set_local_result:
+  assumes "run_step d (s,f,ves,($Set_local x15) # es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
   by (cases ves; cases "x15 < length (f_locs f)") auto
 
-lemma run_one_step_basic_tee_local_result:
-  assumes "run_one_step d (s,f,ves,$Tee_local x16) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_tee_local_result:
+  assumes "run_step d (s,f,ves,($Tee_local x16) # es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
   by (cases ves) auto
 
-lemma run_one_step_basic_get_global_result:
-  assumes "run_one_step d (s,f,ves,$Get_global x17) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_get_global_result:
+  assumes "run_step d (s,f,ves,($Get_global x17) # es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
   by auto
 
-lemma run_one_step_basic_set_global_result:
-  assumes "run_one_step d (s,f,ves,$Set_global x18) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_set_global_result:
+  assumes "run_step d (s,f,ves,($Set_global x18)#es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
   by (cases ves) auto
 
-lemma run_one_step_basic_load_result:
-  assumes "run_one_step d (s,f,ves,$Load x191 x192 x193 x194) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_load_result:
+  assumes "run_step d (s,f,ves,($Load x191 x192 x193 x194)#es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
 proof (cases x192)
   case None
   thus ?thesis
@@ -537,9 +574,9 @@ next
   qed auto
 qed
 
-lemma run_one_step_basic_store_result:
-  assumes "run_one_step d (s,f,ves,$Store x201 x202 x203 x204) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_store_result:
+  assumes "run_step d (s,f,ves,($Store x201 x202 x203 x204)#es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
 proof (cases x202)
   case None
   thus ?thesis
@@ -586,15 +623,15 @@ next
   qed auto
 qed
 
-lemma run_one_step_basic_current_memory_result:
-  assumes "run_one_step d (s,f,ves,$Current_memory) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_current_memory_result:
+  assumes "run_step d (s,f,ves,($Current_memory)#es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
   by (cases "smem_ind s (f_inst f)") auto
 
-lemma run_one_step_basic_grow_memory_result:
-  assumes "run_one_step d (s,f,ves,$Grow_memory) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_grow_memory_result:
+  assumes "run_step d (s,f,ves,($Grow_memory)#es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
 proof (cases ves)
   case (Cons a list)
@@ -609,15 +646,15 @@ proof (cases ves)
   qed auto
 qed auto
 
-lemma run_one_step_basic_const_result:
-  assumes "run_one_step d (s,f,ves,$EConst x23) = (s', f', res)"
+lemma run_step_basic_const_result:
+  assumes "run_step d (s,f,ves,($EConst x23)#es') = (s', f', res)"
   shows "\<exists>e. res = RSCrash e"
   using assms
   by auto
 
-lemma run_one_step_basic_unop_result:
-  assumes "run_one_step d (s,f,ves,$Unop x241 x242) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_unop_result:
+  assumes "run_step d (s,f,ves,($Unop x241 x242)#es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
 proof (cases ves)
   case (Cons a list)
@@ -626,9 +663,9 @@ proof (cases ves)
     by (cases x241; cases a) auto
 qed (cases x241; auto)
 
-lemma run_one_step_basic_binop_result:
-  assumes "run_one_step d (s,f,ves,$Binop x261 x262) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_binop_result:
+  assumes "run_step d (s,f,ves,($Binop x261 x262)#es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
 proof (cases ves)
   case (Cons a list)
@@ -643,9 +680,9 @@ proof (cases ves)
   qed (cases x261; cases a; auto)
 qed (cases x261; auto)
 
-lemma run_one_step_basic_testop_result:
-  assumes "run_one_step d (s,f,ves,$Testop x281 x282) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_testop_result:
+  assumes "run_step d (s,f,ves,($Testop x281 x282)#es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
 proof (cases ves)
   case (Cons a list)
@@ -654,15 +691,15 @@ proof (cases ves)
     by (cases x281; cases a) auto
 qed (cases x281; auto)
 
-lemma run_one_step_basic_relop_result:
-  assumes "run_one_step d (s,f,ves,$Relop x291 x292) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_relop_result:
+  assumes "run_step d (s,f,ves,($Relop x291 x292)#es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
   by (auto split: list.splits)
 
-lemma run_one_step_basic_cvtop_result:
-  assumes "run_one_step d (s,f,ves,$Cvtop t2 x312 t1 sx) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_basic_cvtop_result:
+  assumes "run_step d (s,f,ves,($Cvtop t2 x312 t1 sx)#es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
 proof (cases ves; cases x312)
   fix a ves'
@@ -678,23 +715,23 @@ next
     by (cases sx; cases "types_agree t1 a") auto
 qed auto
 
-lemma run_one_step_trap_result:
-  assumes "run_one_step d (s,f,ves,Trap) = (s', f', res)"
-  shows "\<exists>e. res = RSCrash e"
+lemma run_step_trap_result:
+  assumes "run_step d (s,f,ves,Trap#es') = (s', f', res)"
+  shows "(res = res_trap [] []) \<or> (\<exists>e. res = RSCrash e)"
   using assms
-  by auto
+  by (auto split: if_splits)
 
-lemma run_one_step_invoke_result:
-  assumes "run_one_step d (s,f,ves,Invoke cl) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_invoke_result:
+  assumes "run_step d (s,f,ves,(Invoke i_cl)#es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
 proof -
-  obtain t1s t2s where cl_type_is:"cl_type cl = (t1s _> t2s)"
+  obtain t1s t2s where cl_type_is:"cl_type (funcs s!i_cl) = (t1s _> t2s)"
     using tf.exhaust
     by blast
   obtain ves' ves'' where split_n_is:"split_n ves (length t1s) = (ves', ves'')"
     by fastforce
   show ?thesis
-  proof (cases cl)
+  proof (cases "(funcs s!i_cl)")
     case (Func_native x11 x12 x13 x14)
     thus ?thesis
       using assms cl_type_is split_n_is
@@ -723,47 +760,20 @@ proof -
   qed
 qed
 
-lemma run_one_step_label_result:
-  assumes "run_one_step d (s,f,ves,Label x41 x42 x43) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>r rvs. res = RSBreak r rvs) \<or> (\<exists>rvs. res = RSReturn rvs) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_label_result:
+  assumes "run_step d (s,f,ves,(Label x41 x42 x43)#es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>r rvs. res = RSBreak r rvs) \<or> (\<exists>rvs. res = RSReturn rvs) \<or> (\<exists>e. res = RSCrash e)"
   using assms
   by (cases res) auto
 
-lemma run_one_step_local_result:
-  assumes "run_one_step d (s,f,ves,Local x51 fl x54) = (s', f', res)"
-  shows "(\<exists>r. res = RSNormal r) \<or> (\<exists>e. res = RSCrash e)"
+lemma run_step_local_result:
+  assumes "run_step d (s,f,ves,(Frame x51 fl x54)#es') = (s', f', res)"
+  shows "(\<exists>rv re. res = RSNormal rv re) \<or> (\<exists>e. res = RSCrash e)"
   using assms
-proof (cases "x54 = [Trap]")
-  case False
-  note outer_False = False
-  thus ?thesis
-  proof (cases "const_list x54")
-    case True
-    thus ?thesis
-      using assms outer_False
-      by (cases "length x54 = x51") auto
-  next
-    case False
-    thus ?thesis
-      using assms outer_False
-    proof (cases d)
-      case (Suc d')
-      obtain s' vs' res where rs_def:"run_step d' (s, fl, x54) = (s', vs', res)"
-      by (metis surj_pair)
-      thus ?thesis
-        using assms outer_False False Suc
-      proof (cases res)
-        case (RSReturn x3)
-        thus ?thesis
-          using assms outer_False False rs_def Suc
-          by (cases "x51 \<le> length x3") auto
-      qed auto
-    qed auto
-  qed
-qed auto
+  by (auto split: if_splits prod.splits list.splits nat.splits res_step.splits)
 
-lemma run_one_step_break:
-  assumes "run_one_step d (s,f,ves,e) = (s', f', RSBreak n res)"
+lemma run_step_break:
+  assumes "run_step d (s,f,ves,e#es') = (s', f', RSBreak n res)"
   shows "(e = $Br n) \<or> (\<exists>n les es. e = Label n les es)"
 proof (cases e)
   case (Basic x1)
@@ -771,7 +781,7 @@ proof (cases e)
   proof (cases x1)
     case Unreachable
     thus ?thesis
-      using run_one_step_basic_unreachable_result assms Basic
+      using run_step_basic_unreachable_result assms Basic
       by fastforce
   next
     case Nop
@@ -781,72 +791,72 @@ proof (cases e)
   next
     case Drop
     thus ?thesis
-      using run_one_step_basic_drop_result assms Basic
+      using run_step_basic_drop_result assms Basic
       by fastforce
   next
     case Select
     thus ?thesis
-      using run_one_step_basic_select_result assms Basic
+      using run_step_basic_select_result assms Basic
       by fastforce
   next
     case (Block x51 x52)
     thus ?thesis
-      using run_one_step_basic_block_result assms Basic
+      using run_step_basic_block_result assms Basic
       by fastforce
   next
     case (Loop x61 x62)
     thus ?thesis
-      using run_one_step_basic_loop_result assms Basic
+      using run_step_basic_loop_result assms Basic
       by fastforce
   next
     case (If x71 x72 x73)
     thus ?thesis
-      using run_one_step_basic_if_result assms Basic
+      using run_step_basic_if_result assms Basic
       by fastforce
   next
     case (Br x8)
     thus ?thesis
-      using run_one_step_basic_br_result assms Basic
+      using run_step_basic_br_result assms Basic
       by fastforce
   next
     case (Br_if x9)
     thus ?thesis
-      using run_one_step_basic_br_if_result assms Basic
+      using run_step_basic_br_if_result assms Basic
       by fastforce
   next
     case (Br_table x10)
     thus ?thesis
-      using run_one_step_basic_br_table_result assms Basic
+      using run_step_basic_br_table_result assms Basic
       by fastforce
   next
     case Return
     thus ?thesis
-      using run_one_step_basic_return_result assms Basic
+      using run_step_basic_return_result assms Basic
       by fastforce
   next
     case (Call x12)
     thus ?thesis
-      using run_one_step_basic_call_result assms Basic
+      using run_step_basic_call_result assms Basic
       by fastforce
   next
     case (Call_indirect x13)
     thus ?thesis
-      using run_one_step_basic_call_indirect_result assms Basic
+      using run_step_basic_call_indirect_result assms Basic
       by fastforce
   next
     case (Get_local x14)
     thus ?thesis
-      using run_one_step_basic_get_local_result assms Basic
+      using run_step_basic_get_local_result assms Basic
       by fastforce
   next
     case (Set_local x15)
     thus ?thesis
-      using run_one_step_basic_set_local_result assms Basic
+      using run_step_basic_set_local_result assms Basic
       by fastforce
   next
     case (Tee_local x16)
     thus ?thesis
-      using run_one_step_basic_tee_local_result assms Basic
+      using run_step_basic_tee_local_result assms Basic
       by fastforce
   next
     case (Get_global x17)
@@ -856,27 +866,27 @@ proof (cases e)
   next
     case (Set_global x18)
     thus ?thesis
-      using run_one_step_basic_set_global_result assms Basic
+      using run_step_basic_set_global_result assms Basic
       by fastforce
   next
     case (Load x191 x192 x193 x194)
     thus ?thesis
-      using run_one_step_basic_load_result assms Basic
+      using run_step_basic_load_result assms Basic
       by fastforce
   next
     case (Store x201 x202 x203 x204)
     thus ?thesis
-      using run_one_step_basic_store_result assms Basic
+      using run_step_basic_store_result assms Basic
       by fastforce
   next
     case Current_memory
     thus ?thesis
-      using run_one_step_basic_current_memory_result assms Basic
+      using run_step_basic_current_memory_result assms Basic
       by fastforce
   next
     case Grow_memory
     thus ?thesis
-      using run_one_step_basic_grow_memory_result assms Basic
+      using run_step_basic_grow_memory_result assms Basic
       by fastforce
   next
     case (EConst x23)
@@ -886,52 +896,52 @@ proof (cases e)
   next
     case (Unop x241 x242)
     thus ?thesis
-      using run_one_step_basic_unop_result assms Basic
+      using run_step_basic_unop_result assms Basic
       by fastforce
   next
     case (Binop x261 x262)
     thus ?thesis
-      using run_one_step_basic_binop_result assms Basic
+      using run_step_basic_binop_result assms Basic
       by fastforce
   next
     case (Testop x281 x282)
     thus ?thesis
-      using run_one_step_basic_testop_result assms Basic
+      using run_step_basic_testop_result assms Basic
       by fastforce
   next
     case (Relop x291 x292)
     thus ?thesis
-      using run_one_step_basic_relop_result assms Basic
+      using run_step_basic_relop_result assms Basic
       by fastforce
   next
     case (Cvtop x311 x312 x313 x314)
     thus ?thesis
-      using run_one_step_basic_cvtop_result assms Basic
+      using run_step_basic_cvtop_result assms Basic
       by fastforce
   qed
 next
   case Trap
   thus ?thesis
     using assms
-    by auto
+    by (auto split: if_splits)
 next
   case (Invoke x3)
   thus ?thesis
-    using assms run_one_step_invoke_result
+    using assms run_step_invoke_result
     by fastforce
 next
   case (Label x41 x42 x43)
   thus ?thesis
     by auto
 next
-  case (Local x51 fl x54)
+  case (Frame x51 fl x54)
   thus ?thesis
-    using assms run_one_step_local_result
+    using assms run_step_local_result
     by fastforce
 qed
 
-lemma run_one_step_return:
-  assumes "run_one_step d (s,f,ves,e) = (s', f', RSReturn res)"
+lemma run_step_return:
+  assumes "run_step d (s,f,ves,e#es') = (s', f', RSReturn res)"
   shows "(e = $Return) \<or> (\<exists>n les es. e = Label n les es)"
 proof (cases e)
   case (Basic x1)
@@ -939,7 +949,7 @@ proof (cases e)
   proof (cases x1)
     case Unreachable
     thus ?thesis
-      using run_one_step_basic_unreachable_result assms Basic
+      using run_step_basic_unreachable_result assms Basic
       by fastforce
   next
     case Nop
@@ -949,72 +959,72 @@ proof (cases e)
   next
     case Drop
     thus ?thesis
-      using run_one_step_basic_drop_result assms Basic
+      using run_step_basic_drop_result assms Basic
       by fastforce
   next
     case Select
     thus ?thesis
-      using run_one_step_basic_select_result assms Basic
+      using run_step_basic_select_result assms Basic
       by fastforce
   next
     case (Block x51 x52)
     thus ?thesis
-      using run_one_step_basic_block_result assms Basic
+      using run_step_basic_block_result assms Basic
       by fastforce
   next
     case (Loop x61 x62)
     thus ?thesis
-      using run_one_step_basic_loop_result assms Basic
+      using run_step_basic_loop_result assms Basic
       by fastforce
   next
     case (If x71 x72 x73)
     thus ?thesis
-      using run_one_step_basic_if_result assms Basic
+      using run_step_basic_if_result assms Basic
       by fastforce
   next
     case (Br x8)
     thus ?thesis
-      using run_one_step_basic_br_result assms Basic
+      using run_step_basic_br_result assms Basic
       by fastforce
   next
     case (Br_if x9)
     thus ?thesis
-      using run_one_step_basic_br_if_result assms Basic
+      using run_step_basic_br_if_result assms Basic
       by fastforce
   next
     case (Br_table x10)
     thus ?thesis
-      using run_one_step_basic_br_table_result assms Basic
+      using run_step_basic_br_table_result assms Basic
       by fastforce
   next
     case Return
     thus ?thesis
-      using run_one_step_basic_return_result assms Basic
+      using run_step_basic_return_result assms Basic
       by fastforce
   next
     case (Call x12)
     thus ?thesis
-      using run_one_step_basic_call_result assms Basic
+      using run_step_basic_call_result assms Basic
       by fastforce
   next
     case (Call_indirect x13)
     thus ?thesis
-      using run_one_step_basic_call_indirect_result assms Basic
+      using run_step_basic_call_indirect_result assms Basic
       by fastforce
   next
     case (Get_local x14)
     thus ?thesis
-      using run_one_step_basic_get_local_result assms Basic
+      using run_step_basic_get_local_result assms Basic
       by fastforce
   next
     case (Set_local x15)
     thus ?thesis
-      using run_one_step_basic_set_local_result assms Basic
+      using run_step_basic_set_local_result assms Basic
       by fastforce
   next
     case (Tee_local x16)
     thus ?thesis
-      using run_one_step_basic_tee_local_result assms Basic
+      using run_step_basic_tee_local_result assms Basic
       by fastforce
   next
     case (Get_global x17)
@@ -1024,27 +1034,27 @@ proof (cases e)
   next
     case (Set_global x18)
     thus ?thesis
-      using run_one_step_basic_set_global_result assms Basic
+      using run_step_basic_set_global_result assms Basic
       by fastforce
   next
     case (Load x191 x192 x193 x194)
     thus ?thesis
-      using run_one_step_basic_load_result assms Basic
+      using run_step_basic_load_result assms Basic
       by fastforce
   next
     case (Store x201 x202 x203 x204)
     thus ?thesis
-      using run_one_step_basic_store_result assms Basic
+      using run_step_basic_store_result assms Basic
       by fastforce
   next
     case Current_memory
     thus ?thesis
-      using run_one_step_basic_current_memory_result assms Basic
+      using run_step_basic_current_memory_result assms Basic
       by fastforce
   next
     case Grow_memory
     thus ?thesis
-      using run_one_step_basic_grow_memory_result assms Basic
+      using run_step_basic_grow_memory_result assms Basic
       by fastforce
   next
     case (EConst x23)
@@ -1054,339 +1064,181 @@ proof (cases e)
   next
     case (Unop x241 x242)
     thus ?thesis
-      using run_one_step_basic_unop_result assms Basic
+      using run_step_basic_unop_result assms Basic
       by fastforce
   next
     case (Binop x261 x262)
     thus ?thesis
-      using run_one_step_basic_binop_result assms Basic
+      using run_step_basic_binop_result assms Basic
       by fastforce
   next
     case (Testop x281 x282)
     thus ?thesis
-      using run_one_step_basic_testop_result assms Basic
+      using run_step_basic_testop_result assms Basic
       by fastforce
   next
     case (Relop x291 x292)
     thus ?thesis
-      using run_one_step_basic_relop_result assms Basic
+      using run_step_basic_relop_result assms Basic
       by fastforce
   next
     case (Cvtop x311 x312 x313 x314)
     thus ?thesis
-      using run_one_step_basic_cvtop_result assms Basic
+      using run_step_basic_cvtop_result assms Basic
       by fastforce
   qed
 next
   case Trap
   thus ?thesis
     using assms
-    by auto
+    by (auto split: if_splits)
 next
   case (Invoke x3)
   thus ?thesis
-    using assms run_one_step_invoke_result
+    using assms run_step_invoke_result
     by fastforce
 next
   case (Label x41 x42 x43)
   thus ?thesis
     by auto
 next
-  case (Local x51 f x54)
+  case (Frame x51 f x54)
   thus ?thesis
-    using assms run_one_step_local_result
+    using assms run_step_local_result
     by fastforce
 qed
 
-lemma run_step_break_imp_not_trap_const_list:
-  assumes "run_step d (s, f, es) = (s', f', RSBreak n res)"
-  shows "es \<noteq> [Trap]" "\<not>const_list es"
-proof -
-  {
-    assume "es = [Trap]"
-    hence False
-      using assms
-      by simp
-  }
-  thus "es \<noteq> [Trap]"
-    by blast
-  {
-    assume "const_list es"
-    then obtain vs where "split_vals_e es = (vs, [])"
-      using split_vals_e_const_list e_type_const_conv_vs
-      by fastforce
-    hence False
-      using assms
-      by simp
-  }
-  thus "\<not>const_list es"
-    by blast
-qed
-
-lemma run_step_return_imp_not_trap_const_list:
-  assumes "run_step d (s, f, es) = (s', f', RSReturn res)"
-  shows "es \<noteq> [Trap]" "\<not>const_list es"
-proof -
-  {
-    assume "es = [Trap]"
-    hence False
-      using assms
-      by simp
-  }
-  thus "es \<noteq> [Trap]"
-    by blast
-  {
-    assume "const_list es"
-    then obtain vs where "split_vals_e es = (vs, [])"
-      using split_vals_e_const_list e_type_const_conv_vs
-      by fastforce
-    hence False
-      using assms
-      by simp
-  }
-  thus "\<not>const_list es"
-    by blast
-qed
-
-lemma run_one_step_label_break_imp_break:
-  assumes "run_one_step d (s, f, ves, Label ln les es) = (s', f', RSBreak n res)"
-  shows "run_step d (s, f, es) = (s', f', RSBreak (Suc n) res)"
+lemma run_step_label_break_imp_break:
+  assumes "run_step d (s, f, ves, (Label ln les es)#es') = (s', f', RSBreak n res)"
+          "split_vals_e es = (lves, les)"
+  shows "run_step d (s, f, (rev lves, les)) = (s', f', RSBreak (Suc n) res)"
   using assms
-proof (cases "es = [Trap]"; cases "const_list es")
-  assume local_assms:"es \<noteq> [Trap]" "\<not>const_list es"
-  obtain s'' vs'' res'' where rs_def:"run_step d (s, f, es) = (s'', vs'', res'')"
-    by (metis surj_pair)
-  thus ?thesis
-    using assms local_assms
-  proof (cases res'')
-    case (RSBreak x21 x22)
-    thus ?thesis
-      using assms local_assms rs_def
-      by (cases x21; cases "ln \<le> length x22") auto
-  qed auto
-qed auto
+  by (auto split: if_splits prod.splits list.splits nat.splits res_step.splits)
 
-lemma run_one_step_label_return_imp_return:
-  assumes "run_one_step d (s, f, ves, Label n les es) = (s', f', RSReturn res)"
-  shows "run_step d (s, f, es) = (s', f', RSReturn res)"
+lemma run_step_label_return_imp_return:
+  assumes "run_step d (s, f, ves, (Label n les es)#es') = (s', f', RSReturn res)"
+          "split_vals_e es = (lves, les)"
+  shows "run_step d (s, f, (rev lves, les)) = (s', f', RSReturn res)"
   using assms
-proof (cases "es = [Trap]"; cases "const_list es")
-  assume local_assms:"es \<noteq> [Trap]" "\<not>const_list es"
-  obtain s'' vs'' res'' where rs_def:"run_step d (s, f, es) = (s'', vs'', res'')"
-    by (metis surj_pair)
-  thus ?thesis
-    using assms local_assms
-  proof (cases res'')
-    case (RSBreak x21 x22)
-    thus ?thesis
-      using assms local_assms rs_def
-      by (cases x21; cases "n \<le> length x22") auto
-  qed auto
-qed auto
-thm run_step_run_one_step.induct
+  by (auto split: if_splits prod.splits list.splits nat.splits res_step.splits)
 
 (* These definitions are needed because the automatic induction process hangs if they are unrolled *)
 definition run_step_break_imp_lfilled_prop where
   "run_step_break_imp_lfilled_prop s' f' n res =
-     (\<lambda>d (s,f,es). (run_step d (s,f,es) = (s', f', RSBreak n res)) \<longrightarrow>
+     (\<lambda>d (s,f,ves,es). (run_step d (s,f,ves,es) = (s', f', RSBreak n res)) \<longrightarrow>
        s = s' \<and> f = f' \<and>
        (\<exists>n' lfilled es_c. n' \<ge> n \<and> Lfilled_exact (n'-n) lfilled ((vs_to_es res) @ [$Br n'] @ es_c) es))"
 
-definition run_one_step_break_imp_lfilled_prop where
-  "run_one_step_break_imp_lfilled_prop s' f' n res =
-     (\<lambda>d (s,f,ves,e). run_one_step d (s,f,ves,e) = (s', f', RSBreak n res) \<longrightarrow>
-       s = s' \<and> f = f' \<and> ((res = ves \<and> e = $Br n) \<or> (\<exists>n' lfilled es_c es les' ln. n' > n \<and> Lfilled_exact (n'-(n+1)) lfilled ((vs_to_es res) @ [$Br n'] @ es_c) es \<and> e = Label ln les' es)))"
-
 lemma run_step_break_imp_lfilled:
-  assumes "run_step d (s,f,es) = (s', f', RSBreak n res)"
+  assumes "run_step d (s,f,ves,es) = (s', f', RSBreak n res)"
   shows "s = s' \<and>
          f = f' \<and>
          (\<exists>n' lfilled es_c. n' \<ge> n \<and>
-                            Lfilled_exact (n'-n) lfilled ((vs_to_es res) @ [$Br n'] @ es_c) es)"
-proof -
-  fix ves e
-  have "(run_step_break_imp_lfilled_prop s' f' n res) d (s,f,es)"
-  and  "(run_one_step_break_imp_lfilled_prop s' f' n res) d (s,f,ves,e)"
-  proof (induction d "(s,f,es)" and d "(s,f,ves,e)"  arbitrary: n es and n ves e rule: run_step_run_one_step.induct)
-    case (1 d es)
-    {
-      assume local_assms:"run_step d (s,f,es) = (s', f', RSBreak n res)"
-      obtain ves es' where split_vals_es:"split_vals_e es = (ves, es')"
-        by (metis surj_pair)
-      then obtain a as where es'_def:"es' = a#as"
-        using local_assms
-        by (cases es') auto
-      hence a_def:"a \<noteq> Trap"
-        using local_assms split_vals_es
-        by (cases "a = Trap"; cases "(as \<noteq> [] \<or> ves \<noteq> [])") simp_all
-      obtain s'' vs'' res'' where "run_one_step d (s,f,(rev ves),a) = (s'', vs'', res'')"
-        by (metis surj_pair)
-      hence ros_def:"run_one_step d (s,f,(rev ves),a) = (s', f', RSBreak n res)"
-        using local_assms split_vals_es es'_def a_def
-        by (cases "res''") (auto simp del: run_one_step.simps)
-      hence "run_one_step_break_imp_lfilled_prop  s' f' n res d (s, f, rev ves, a)"
-        using 1 split_vals_es a_def es'_def
-        by fastforce
-      then obtain n' lfilled es_c les les' ln where
-        "s = s'" "f = f'"
-        "((res = (rev ves) \<and> a = $Br n) \<or>
-           n' > n \<and> (Lfilled_exact (n'-(n+1)) lfilled ((vs_to_es res) @ [$Br n'] @ es_c) les \<and> a = Label ln les' les))"
-        using ros_def
-        unfolding run_one_step_break_imp_lfilled_prop_def
-        by fastforce
-      then consider
-        (1) "s = s'" "f = f'" "res = (rev ves)" "a = $Br n"
-      | (2) "s = s'" "f = f'" "n' > n" "Lfilled_exact (n'-(n+1)) lfilled ((vs_to_es res) @ [$Br n'] @ es_c) les" "a = Label ln les' les"
-        by blast
-      hence "s = s' \<and> f = f' \<and>
-             (\<exists>n' lfilled es_c.  n' \<ge> n \<and> Lfilled_exact (n'-n) lfilled ((vs_to_es res) @ [$Br n'] @ es_c) es)"
-      proof cases
-        case 1
-      thus ?thesis
-        using es'_def split_vals_e_conv_app[OF split_vals_es] Lfilled_exact.intros(1) is_const_list[of _ ves]
-        by fastforce
-      next
-        case 2
-      have test:"const_list ($$* ves)"
-        using is_const_list
-        by auto
-      have "(Suc (n' - Suc n)) = n' - n"
-        using 2(3)
-        by simp
-      thus ?thesis
-        using 2(1,2,3,5) Lfilled_exact.intros(2)[OF test _ 2(4), of _ ln les' as] es'_def split_vals_e_conv_app[OF split_vals_es]
-        by (metis Suc_eq_plus1 append_Cons append_Nil less_imp_le_nat)
-      qed
-  }
-  thus ?case
-    unfolding run_step_break_imp_lfilled_prop_def
-    by fastforce
+                            Lfilled_exact (n'-n) lfilled ((vs_to_es res) @ [$Br n'] @ es_c) ((vs_to_es ves)@es))"
+  using assms
+proof (induction d "(s,f,ves,es)" arbitrary: n ves es rule: run_step.induct)
+  case (1 d ves es)
+  show ?case
+  proof (cases es)
+    case Nil
+    thus ?thesis
+      using 1(3)
+      by simp
   next
-    case (2 d ves e)
-    {
-    assume local_assms:"run_one_step d (s,f,ves,e) = (s', f', RSBreak n res)"
-    consider (a) "e = $Br n" | (b) "(\<exists>n les es. e = Label n les es)"
-      using run_one_step_break[OF local_assms]
+    case (Cons e es')
+    consider (a) "e = $Br n" | (b) n' lles les where "e = Label n' lles les"
+      using run_step_break 1(3) Cons
       by blast
-    hence "s = s' \<and> f = f' \<and> ((res = ves \<and> e = $Br n) \<or> (\<exists>n' lfilled es_c es les' ln. n' > n \<and> Lfilled_exact (n'-(n+1)) lfilled ((vs_to_es res) @ [$Br n'] @ es_c) es \<and> e = Label ln les' es))"
+    thus ?thesis
     proof cases
       case a
       thus ?thesis
-        using local_assms
-        by simp
+        using 1(3) Cons Lfilled_exact.intros(1)
+        by fastforce
     next
       case b
-      then obtain ln les es where e_def:"e = Label ln les es"
-        by blast
-      hence "run_one_step d (s, f, ves,  Label ln les es) = (s', f', RSBreak n res)"
-        using local_assms by simp
-      hence rs_def:"run_step d (s, f, es) = (s', f', RSBreak (Suc n) res)"
-        using run_one_step_label_break_imp_break
-        by fastforce
-      hence "run_step_break_imp_lfilled_prop s' f' (Suc n) res d (s, f, es)"
-        using 2(1)[OF e_def _ run_step_break_imp_not_trap_const_list(2)]
+      then obtain x1 x21 x22 where les_is:
+       "es = Label n' lles les # es'"
+       "\<not> es_is_trap les"
+       "(x1, x21 # x22) = split_vals_e les"
+       "run_step d (s, f, rev x1, x21 # x22) = (s', f', RSBreak (Suc n) res)"
+        using 1(3) Cons
+        unfolding run_step.simps[of d s f ves es]
+        by (simp split: if_splits prod.splits res_step.splits nat.splits list.splits del: run_step.simps)
+      obtain n'' where "s = s' \<and>
+            f = f' \<and>
+            (\<exists>lfilled es_c.
+                Suc n \<le> n'' \<and>
+                Lfilled_exact (n'' - n - 1) lfilled
+                 (vs_to_es res @ [$Br n''] @ es_c)
+                 (vs_to_es (rev x1) @ x21 # x22))"
+        using 1(1)[OF les_is(1) _ _ les_is(2,3) _ les_is(4)]
         by fastforce
       thus ?thesis
-        using e_def rs_def
-        unfolding run_step_break_imp_lfilled_prop_def
-        by fastforce
+        using Lfilled_exact.intros(2)[of _ "rev ves" n' lles _ es' "n'' - Suc n"] les_is(1,3)
+        using split_vals_e_conv_app[OF les_is(3)[symmetric]]
+        apply simp
+        apply (metis Suc_diff_le Suc_leD diff_Suc_Suc)
+        done
     qed
-  }
-  thus ?case
-    unfolding run_one_step_break_imp_lfilled_prop_def
-    by fastforce
   qed
-  thus ?thesis
-    using assms
-    unfolding run_step_break_imp_lfilled_prop_def
-    by fastforce
 qed
 
 lemma run_step_return_imp_lfilled:
-  assumes "run_step d (s,f,es) = (s', f', RSReturn res)"
-  shows "s = s' \<and> f = f' \<and> (\<exists>n lfilled es_c. Lfilled_exact n lfilled ((vs_to_es res) @ [$Return] @ es_c) es)"
-proof -
-  fix ves e
-  have "(run_step d (s,f,es) = (s', f', RSReturn res)) \<Longrightarrow>
-           s = s' \<and> f = f' \<and> (\<exists>n lfilled es_c. Lfilled_exact n lfilled ((vs_to_es res) @ [$Return] @ es_c) es)"
-  and  "(run_one_step d (s,f,ves,e) = (s', f', RSReturn res)) \<Longrightarrow>
-          s = s' \<and> f = f' \<and>
-          ((res = ves \<and> e = $Return) \<or>
-           (\<exists>n lfilled ves es_c es n' les'. Lfilled_exact n lfilled ((vs_to_es res) @ [$Return] @ es_c) es \<and>
-              e = Label n' les' es))"
-  proof (induction d "(s,f,es)" and d "(s,f,ves,e)" arbitrary: s es s' res and s vs ves e s' vs' res rule: run_step_run_one_step.induct)
-    case (1 d s es)
-    obtain ves es' where split_vals_es:"split_vals_e es = (ves, es')"
-      by (metis surj_pair)
-    then obtain a as where es'_def:"es' = a#as"
-      using 1(2)
-      by (cases es') auto
-    hence a_def:"\<not> e_is_trap a"
-      using 1(2) split_vals_es
-      by (cases "a = Trap"; cases "(as \<noteq> [] \<or> ves \<noteq> [])") simp_all
-    obtain s'' f'' res'' where "run_one_step d (s,f,(rev ves),a) = (s'', f'', res'')"
-      by (metis surj_pair)
-    hence ros_def:"run_one_step d (s,f,(rev ves),a) = (s', f', RSReturn res)"
-      using 1(2) split_vals_es es'_def a_def
-      by (cases "res''") (auto simp del: run_one_step.simps)
-    obtain n lfilled les_c les n' les' where
-      "s = s'" "f = f'"
-      "(res = rev ves \<and> a = $Return) \<or> (Lfilled_exact n lfilled ((vs_to_es res) @ [$Return] @ les_c) les \<and> a = Label n' les' les)"
-      using 1(1)[OF split_vals_es[symmetric] _ es'_def a_def ros_def]
-      by fastforce
-    then consider
-      (1) "s = s'" "f = f'" "res = rev ves" "a = $Return"
-    | (2) "s = s'" "f = f'" "(Lfilled_exact n lfilled ((vs_to_es res) @ [$Return] @ les_c) les)" "(a = Label n' les' les)"
-      by blast
-    thus ?case
-    proof cases
-      case 1
-      thus ?thesis
-        using es'_def split_vals_e_conv_app[OF split_vals_es] Lfilled_exact.intros(1) is_const_list[of _ ves]
-        by fastforce
-    next
-      case 2
-      have "const_list ($$* ves)"
-        using is_const_list
-        by fastforce
-      thus ?thesis
-        using 2 Lfilled_exact.intros(2) es'_def split_vals_e_conv_app[OF split_vals_es]
-          by fastforce
-    qed
+  assumes "run_step d (s,f,ves,es) = (s', f', RSReturn res)"
+  shows "s = s' \<and> f = f' \<and> (\<exists>n lfilled es_c. Lfilled_exact n lfilled ((vs_to_es res) @ [$Return] @ es_c) ((vs_to_es ves)@es))"
+  using assms
+proof (induction d "(s,f,ves,es)" arbitrary: ves es rule: run_step.induct)
+  case (1 d ves es)
+  show ?case
+  proof (cases es)
+    case Nil
+    thus ?thesis
+      using 1(3)
+      by simp
   next
-    case (2 d s ves e)
-    consider (a) "e = $Return" | (b) "(\<exists>n les es. e = Label n les es)"
-      using run_one_step_return[OF 2(3)]
+    case (Cons e es')
+    consider (a) "e = $Return" | (b) n' lles les where "e = Label n' lles les"
+      using run_step_return 1(3) Cons
       by blast
-    thus ?case
+    thus ?thesis
     proof cases
       case a
       thus ?thesis
-        using 2(3)
-        by simp
+        using 1(3) Cons Lfilled_exact.intros(1)
+        by fastforce
     next
       case b
-      then obtain n les es where e_def:"e = Label n les es"
-        by blast
-      hence "run_one_step d (s, f, ves,  Label n les es) = (s', f', RSReturn res)"
-        using 2(3) by simp
-      hence "run_step d (s, f, es) = (s', f', RSReturn res)"
-        using run_one_step_label_return_imp_return
+      then obtain x1 x21 x22 where les_is:
+       "es = Label n' lles les # es'"
+       "\<not> es_is_trap les"
+       "(x1, x21 # x22) = split_vals_e les"
+       "run_step d (s, f, rev x1, x21 # x22) = (s', f', RSReturn res)"
+        using 1(3) Cons
+        unfolding run_step.simps[of d s f ves es]
+        by (simp split: if_splits prod.splits res_step.splits nat.splits list.splits del: run_step.simps)
+      obtain n'' where "s = s' \<and>
+            f = f' \<and>
+            (\<exists>lfilled es_c.
+                Lfilled_exact n'' lfilled
+                 (vs_to_es res @ [$Return] @ es_c)
+                 (vs_to_es (rev x1) @ x21 # x22))"
+        using 1(1)[OF les_is(1) _ _ les_is(2,3) _ les_is(4)]
         by fastforce
       thus ?thesis
-        using 2(3) 2(1)[OF e_def _ run_step_return_imp_not_trap_const_list(2)] e_def
-        by fastforce
+        using Lfilled_exact.intros(2)[of _ "rev ves" n' lles _ es'] les_is(1,3)
+        using split_vals_e_conv_app[OF les_is(3)[symmetric]]
+        apply simp
+        apply metis
+        done
     qed
   qed
-  thus ?thesis
-    using assms
-    by blast
 qed
 
 lemma run_step_basic_unop_testop_sound:
-  assumes "(run_one_step d (s,f,ves,$b_e) = (s', f', RSNormal es'))"
+  assumes "(run_step d (s,f,ves,($b_e)#es') = (s', f', RSNormal rvs res))"
           "b_e = Unop t op \<or> b_e = Testop t testop"
-  shows "\<lparr>s;f;(vs_to_es ves)@[$b_e]\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
+  shows "\<lparr>s;f;(vs_to_es ves)@($b_e)#es'\<rparr> \<leadsto> \<lparr>s';f';(vs_to_es rvs)@res\<rparr>"
 proof -
   consider (1) "b_e = Unop t op" | (3) "b_e = Testop t testop"
     using assms(2)
@@ -1399,16 +1251,16 @@ proof -
     thus ?thesis
     using assms Cons
        is_const_list_vs_to_es_list[of "rev list"]
-       progress_L0_left[OF reduce.intros(1)[OF reduce_simple.intros(1)]]
-       progress_L0_left[OF reduce.intros(1)[OF reduce_simple.intros(4)]]
+       progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(1)]]
+       progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(4)]]
     by fastforce
   qed (cases rule: b_e_cases; cases t; auto)
 qed
 
 lemma run_step_basic_binop_relop_sound:
-  assumes "(run_one_step d (s,f,ves,$b_e) = (s', f', RSNormal es'))"
+  assumes "(run_step d (s,f,ves,($b_e)#es') = (s', f', RSNormal rvs res))"
           "b_e = Binop t op \<or> b_e = Relop t rop"
-  shows "\<lparr>s;f;(vs_to_es ves)@[$b_e]\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
+  shows "\<lparr>s;f;(vs_to_es ves)@($b_e)#es'\<rparr> \<leadsto> \<lparr>s';f';(vs_to_es rvs)@res\<rparr>"
 proof -
   consider
     (1) "b_e = Binop t op"
@@ -1427,31 +1279,31 @@ proof -
       thus ?thesis
         using assms outer_Cons
              is_const_list_vs_to_es_list[of "rev list'"]
-             progress_L0_left[OF reduce.intros(1)[OF reduce_simple.intros(2)]]
-             progress_L0_left[OF reduce.intros(1)[OF reduce_simple.intros(3)]]
-             progress_L0_left[OF reduce.intros(1)[OF reduce_simple.intros(5)]]
+             progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(2)]]
+             progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(3)]]
+             progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(5)]]
         by (cases "app_binop op v2 v1"; fastforce)
     qed (cases rule: b_e_cases; cases t; cases v1; auto)
   qed (cases rule: b_e_cases; cases t; auto)
 qed
 
 lemma run_step_basic_sound:
-  assumes "(run_one_step d (s,f,ves,$b_e) = (s', f', RSNormal es'))"
-  shows "\<lparr>s;f;(vs_to_es ves)@[$b_e]\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
+  assumes "(run_step d (s,f,ves,($b_e)#es') = (s', f', RSNormal rvs res))"
+  shows "\<lparr>s;f;(vs_to_es ves)@($b_e)#es'\<rparr> \<leadsto> \<lparr>s';f';(vs_to_es rvs)@res\<rparr>"
 proof -
   show ?thesis
   proof (cases b_e)
     case Unreachable
     thus ?thesis
       using is_const_list_vs_to_es_list[of "rev ves"]
-            progress_L0_left[OF reduce.intros(1)[OF reduce_simple.intros(9)]]
+            progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(9)]]
             assms
       by fastforce
   next
     case Nop
     thus ?thesis
       using is_const_list_vs_to_es_list[of "rev ves"]
-            progress_L0_left[OF reduce.intros(1)[OF reduce_simple.intros(10)]]
+            progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(10)]]
             assms
       by fastforce
   next
@@ -1464,7 +1316,7 @@ proof -
         by fastforce
       thus ?thesis
         using is_const_list_vs_to_es_list[of "rev list"]
-              progress_L0_left[OF reduce.intros(1)[OF reduce_simple.intros(11)]]
+              progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(11)]]
               Drop assms Cons
         by auto
     qed auto
@@ -1488,10 +1340,10 @@ proof -
             by fastforce
           thus ?thesis
             using is_const_list_vs_to_es_list[of "rev list''"]
-                  progress_L0_left[OF reduce.intros(1)]
-                  reduce_simple.intros(12,13)
+                  progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(12)], of x1a s f "rev list''" a'' a' es']
+                  progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(13)], of x1a s f "rev list''" a'' a' es']
                   assms outer_outer_cons outer_cons Cons ConstInt32 Select
-            by (cases "int_eq x1a 0") auto
+            by (fastforce split: if_splits)
         qed auto
       qed auto
     qed auto
@@ -1509,14 +1361,15 @@ proof -
           using split_n_conv_app
           by fastforce
         moreover
-        have "s = s'" "f = f'" "es' = vs_to_es ves'' @ [Label (length t2s) [] (vs_to_es ves' @ ($* x52))]"
+        have "s = s'" "f = f'" "res = [Label (length t2s) [] (vs_to_es ves' @ ($* x52))] @ es'"
+             "rvs = ves''"
           using Block assms Tf True Pair
-          by auto
+          by simp_all
         moreover
-        have "\<lparr>s;f;(vs_to_es ves'')@(vs_to_es ves')@[$Block x51 x52]\<rparr> \<leadsto> \<lparr>s;f;(vs_to_es ves'')@[Label (length t2s) [] (vs_to_es ves' @ ($* x52))]\<rparr>"
-          using Tf reduce_simple.intros(14) split_n_length[OF Pair True] progress_L0_left[OF reduce.intros(1)]
+        have "\<lparr>s;f;(vs_to_es ves'')@(vs_to_es ves')@[$Block x51 x52]@es'\<rparr> \<leadsto> \<lparr>s;f;(vs_to_es ves'')@[Label (length t2s) [] (vs_to_es ves' @ ($* x52))]@es'\<rparr>"
+          using Tf split_n_length[OF Pair True] progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(14)]]
                 is_const_list_vs_to_es_list[of "rev ves'"] is_const_list_vs_to_es_list[of "rev ves''"]
-          by fastforce
+          by simp
         ultimately
         show ?thesis
           using Block
@@ -1537,14 +1390,15 @@ proof -
           using split_n_conv_app
           by fastforce
         moreover
-        have "s = s'" "f = f'" "es' = vs_to_es ves'' @ [Label (length t1s) [$Loop x61 x62] (vs_to_es ves' @ ($* x62))]"
+        have "s = s'" "f = f'" "res = [Label (length t1s) [$Loop x61 x62] (vs_to_es ves' @ ($* x62))] @ es'"
+             "rvs = ves''"
           using Loop assms Tf True Pair
           by auto
         moreover
-        have "\<lparr>s;f;(vs_to_es ves'')@(vs_to_es ves')@[$Loop x61 x62]\<rparr> \<leadsto> \<lparr>s;f;(vs_to_es ves'')@[Label (length t1s) [$Loop x61 x62] (vs_to_es ves' @ ($* x62))]\<rparr>"
-          using Tf reduce_simple.intros(15) split_n_length[OF Pair True] progress_L0_left[OF reduce.intros(1)]
+        have "\<lparr>s;f;(vs_to_es ves'')@(vs_to_es ves')@[$Loop x61 x62]@es'\<rparr> \<leadsto> \<lparr>s;f;(vs_to_es ves'')@[Label (length t1s) [$Loop x61 x62] (vs_to_es ves' @ ($* x62))]@es'\<rparr>"
+          using Tf split_n_length[OF Pair True] progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(15)]]
                 is_const_list_vs_to_es_list[of "rev ves'"] is_const_list_vs_to_es_list[of "rev ves''"]
-          by fastforce
+          by simp
         ultimately
         show ?thesis
           using Loop
@@ -1565,9 +1419,9 @@ proof -
         unfolding Cons
         by simp
       thus ?thesis
-        using progress_L0_left[OF reduce.intros(1)]
+        using progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(16)]]
+              progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(17)]]
               is_const_list_vs_to_es_list[of "rev list"]
-              reduce_simple.intros(16,17)
               assms Cons If ConstInt32
         by (cases "int_eq x1 0") auto
       qed auto
@@ -1591,8 +1445,8 @@ proof -
         unfolding Cons
         by simp
       thus ?thesis
-        using progress_L0_left[OF reduce.intros(1)[OF reduce_simple.intros(21)]]
-              progress_L0_left[OF reduce.intros(1)[OF reduce_simple.intros(22)]]
+        using progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(21)]]
+              progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(22)]]
               is_const_list_vs_to_es_list[of "rev list"]
               assms Cons Br_if ConstInt32
         by (cases "int_eq x1 0") auto
@@ -1609,8 +1463,8 @@ proof -
       proof (cases a)
         case (ConstInt32 x1)
         thus ?thesis
-          using progress_L0_left[OF reduce.intros(1)[OF reduce_simple.intros(23)]]
-                progress_L0_left[OF reduce.intros(1)[OF reduce_simple.intros(24)]]
+          using progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(23)]]
+                progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(24)]]
                 is_const_list_vs_to_es_list[of "rev list"]
                 assms Br_table Cons
           by (cases "(nat_of_int x1) < length x10") auto
@@ -1624,7 +1478,7 @@ proof -
   next
     case (Call x12)
     thus ?thesis
-      using assms progress_L0_left[OF reduce.intros(2)]
+      using assms progress_L0[OF reduce.intros(2)]
             is_const_list_vs_to_es_list[of "rev ves"]
       by auto
   next
@@ -1642,24 +1496,24 @@ proof -
           case None
           thus ?thesis
             using assms Call_indirect Cons ConstInt32
-                  progress_L0_left[OF reduce.intros(4)]
+                  progress_L0[OF reduce.intros(4)]
                   is_const_list_vs_to_es_list[of "rev list"]
             by auto
         next
           case (Some cl)
           thus ?thesis
-          proof (cases "stypes s (f_inst f) x13 = cl_type cl")
+          proof (cases "stypes s (f_inst f) x13 = cl_type (funcs s!cl)")
             case True
-            hence "\<lparr>s;f;(vs_to_es list) @ [$C ConstInt32 c, $Call_indirect x13]\<rparr> \<leadsto> \<lparr>s;f;(vs_to_es list) @ [Invoke cl]\<rparr>"
-              using progress_L0_left[OF reduce.intros(3)] True Some is_const_list_vs_to_es_list[of "rev list"]
+            hence "\<lparr>s;f;(vs_to_es list) @ [$C ConstInt32 c, $Call_indirect x13]@es'\<rparr> \<leadsto> \<lparr>s;f;(vs_to_es list) @ [Invoke cl]@es'\<rparr>"
+              using progress_L0[OF reduce.intros(3)] True Some is_const_list_vs_to_es_list[of "rev list"]
               by fastforce
             thus ?thesis
               using assms Call_indirect Cons ConstInt32 Some True
               by auto
           next
             case False
-            hence "\<lparr>s;f;(vs_to_es list)@[$C ConstInt32 c, $Call_indirect x13]\<rparr> \<leadsto> \<lparr>s;f;(vs_to_es list)@[Trap]\<rparr>"
-              using progress_L0_left[OF reduce.intros(4)] False Some is_const_list_vs_to_es_list[of "rev list"]
+            hence "\<lparr>s;f;(vs_to_es list)@[$C ConstInt32 c, $Call_indirect x13]@es'\<rparr> \<leadsto> \<lparr>s;f;(vs_to_es list)@[Trap]@es'\<rparr>"
+              using progress_L0[OF reduce.intros(4)] False Some is_const_list_vs_to_es_list[of "rev list"]
               by fastforce
             thus ?thesis
               using assms Call_indirect Cons ConstInt32 Some False
@@ -1679,7 +1533,7 @@ proof -
         by fastforce
       thus ?thesis
         using assms Get_local True
-              progress_L0_left[OF reduce.intros(8)]
+              progress_L0[OF reduce.intros(8)]
               is_const_list_vs_to_es_list[of "rev ves"]
         by auto
     qed auto
@@ -1696,16 +1550,19 @@ proof -
         obtain vs1 v vs2 where vs_def:"f_locs f = vs1@[v]@vs2" "length vs1 = j"
           using id_take_nth_drop True
           by fastforce
-        have "f = \<lparr>f_locs = vs1 @ [v] @ vs2, f_inst = f_inst f\<rparr>"
-             "f' = \<lparr>f_locs = vs1 @ [a] @ vs2, f_inst = f_inst f\<rparr>"
-             "es' = vs_to_es list"
-             "s = s'"
+        have f_is:"f = \<lparr>f_locs = vs1 @ [v] @ vs2, f_inst = f_inst f\<rparr>"
+                  "f' = \<lparr>f_locs = vs1 @ [a] @ vs2, f_inst = f_inst f\<rparr>"
+                  "rvs = list"
+                  "s = s'"
+                  "res = es'"
           using assms Set_local True Cons vs_def
           by auto
         thus ?thesis
-          using Set_local True Cons vs_def
-                progress_L0_left[OF reduce.intros(9)[OF vs_def(2), of s v vs2 "(f_inst f)" "a"] is_const_list_vs_to_es_list[of "rev list"]]
-          by (metis (no_types, lifting) append.right_neutral append_Cons list.simps(9) rev.simps(2) rev_append rev_map rev_rev_ident)
+          using Set_local True Cons vs_def(1)
+                progress_L0[OF reduce.intros(9)[OF vs_def(2)], of s v vs2 "f_inst f" "rev list" a es']
+          apply simp
+          apply (metis f_is(1) vs_def(1))
+          done
       qed auto
     qed auto
   next
@@ -1716,7 +1573,7 @@ proof -
       case (Cons a list)
       thus ?thesis
         using assms Tee_local
-              progress_L0_left[OF reduce.intros(1)[OF reduce_simple.intros(28)]]
+              progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(28)]]
                               is_const_list_vs_to_es_list[of "rev list"]
         by (auto simp add: is_const_def)
     qed auto
@@ -1724,7 +1581,7 @@ proof -
     case (Get_global x17)
     thus ?thesis
       using assms
-            progress_L0_left[OF reduce.intros(10)]
+            progress_L0[OF reduce.intros(10)]
             is_const_list_vs_to_es_list[of "rev ves"]
       by (auto simp add: is_const_def)
   next
@@ -1735,7 +1592,7 @@ proof -
       case (Cons a list)
       thus ?thesis
         using assms Set_global
-              progress_L0_left[OF reduce.intros(11)]
+              progress_L0[OF reduce.intros(11)]
               is_const_list_vs_to_es_list[of "rev list"]
         by (auto simp add: is_const_def)
     qed auto
@@ -1753,11 +1610,12 @@ proof -
         case (Some a)
         thus ?thesis
           using Load assms None Cons ConstInt32
-              progress_L0_left[OF reduce.intros(12)]
-              progress_L0_left[OF reduce.intros(13)]
+              progress_L0[OF reduce.intros(12)]
+              progress_L0[OF reduce.intros(13)]
               is_const_list_vs_to_es_list[of "rev list"]
-          by (cases "load (s.mems s ! a) (nat_of_int x1) x194 (t_length x191)" )
-             (auto simp add: is_const_def)
+          apply (cases "load (s.mems s ! a) (nat_of_int x1) x194 (t_length x191)" )
+          apply (fastforce simp add: is_const_def)+
+          done
       qed auto
     next
       case outer_some:(Some tp_sx)
@@ -1770,11 +1628,11 @@ proof -
           case (Some a)
           thus ?thesis
             using Load assms outer_some Cons ConstInt32 Pair
-                  progress_L0_left[OF reduce.intros(14)]
-                  progress_L0_left[OF reduce.intros(15)]
+                  progress_L0[OF reduce.intros(14)]
+                  progress_L0[OF reduce.intros(15)]
                   is_const_list_vs_to_es_list[of "rev list"]
             by (cases "load_packed sx (s.mems s ! a) (nat_of_int x1) x194 (tp_length tp) (t_length x191)")
-               (auto simp add: is_const_def)
+               (fastforce simp add: is_const_def)+
         qed auto
     qed auto
   next
@@ -1801,20 +1659,20 @@ proof -
               case None
               thus ?thesis
                 using Store outer_Cons Cons assms True outer_Some ConstInt32
-                      progress_L0_left[OF reduce.intros(16)]
-                      progress_L0_left[OF reduce.intros(17)]
+                      progress_L0[OF reduce.intros(16)]
+                      progress_L0[OF reduce.intros(17)]
                       is_const_list_vs_to_es_list[of "rev list'"]
                 by (cases "store (s.mems s ! j) (nat_of_int x1) off (bits a) (t_length t)")
-                   auto
+                   fastforce+
             next
               case (Some the_tp)
               thus ?thesis
                 using Store outer_Cons Cons assms True outer_Some ConstInt32
-                      progress_L0_left[OF reduce.intros(18)]
-                      progress_L0_left[OF reduce.intros(19)]
+                      progress_L0[OF reduce.intros(18)]
+                      progress_L0[OF reduce.intros(19)]
                       is_const_list_vs_to_es_list[of "rev list'"]
                 by (cases "store_packed (s.mems s ! j) (nat_of_int x1) off (bits a) (tp_length the_tp)")
-                   auto
+                   fastforce+
             qed
           qed (cases tp; auto)+
         qed (cases tp; auto)+
@@ -1828,9 +1686,9 @@ proof -
       case (Some a)
       thus ?thesis
         using assms Current_memory 
-              progress_L0_left[OF reduce.intros(20)]
+              progress_L0[OF reduce.intros(20)]
               is_const_list_vs_to_es_list[of "rev ves"]
-        by (auto simp add: is_const_def)
+        by (fastforce simp add: is_const_def)
     qed auto
   next
     case Grow_memory
@@ -1845,10 +1703,10 @@ proof -
         case (Some j)
         thus ?thesis
           using assms Grow_memory Cons ConstInt32
-                             progress_L0_left[OF reduce.intros(21)]
-                             progress_L0_left[OF reduce.intros(22)]
+                             progress_L0[OF reduce.intros(21)]
+                             progress_L0[OF reduce.intros(22)]
               is_const_list_vs_to_es_list[of "rev list"] 
-          by (cases "mem_grow (s.mems s ! j) (nat_of_int x1)") (auto simp add: is_const_def)
+          by (cases "mem_grow (s.mems s ! j) (nat_of_int x1)") (fastforce simp add: is_const_def)+
       qed auto
     qed auto
   next
@@ -1889,16 +1747,18 @@ proof -
         case True
         thus ?thesis
           using Convert assms Cvtop Cons
-                progress_L0_left[OF reduce.intros(1)[OF reduce_simple.intros(7)]]
-                progress_L0_left[OF reduce.intros(1)[OF reduce_simple.intros(6)]]
+                progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(7)[OF True]], of t2 sx s f "rev list" es']
+                progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(6)[OF True]], of t2 sx _ s f "rev list" es']
                 is_const_list_vs_to_es_list[of "rev list"]
-          by (cases "(cvt t2 sx a)") auto
+          apply (cases "(cvt t2 sx a)")
+          apply fastforce+
+          done
       next
         case Reinterpret
         case True
         thus ?thesis
           using Reinterpret assms Cvtop Cons
-                progress_L0_left[OF reduce.intros(1)[OF reduce_simple.intros(8)]]
+                progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(8)]]
                 is_const_list_vs_to_es_list[of "rev list"]
           by (cases sx) auto
       qed auto
@@ -1907,383 +1767,343 @@ proof -
 qed
 
 theorem run_step_sound:
-  assumes "run_step d (s,f,es) = (s', f', RSNormal es')"
-  shows "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
+  assumes "run_step d (s,f,ves,es) = (s', f', RSNormal rvs res)"
+  shows "\<lparr>s;f;(vs_to_es ves)@es\<rparr> \<leadsto> \<lparr>s';f';(vs_to_es rvs)@res\<rparr>"
   using assms
-proof -
-  fix ves e
-  have "(run_step d (s,f,es) = (s', f', RSNormal es')) \<Longrightarrow>
-           (\<lambda>(s, f, es). \<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>) (s, f, es)"
-  and  "(run_one_step d (s,f,ves,e) = (s', f', RSNormal es')) \<Longrightarrow>
-          (\<lambda>(s, f, ves, e). \<lparr>s;f;(vs_to_es ves)@[e]\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>) (s, f, ves, e)"
-  proof (induction d "(s, f, es)" and d "(s, f, ves, e)" arbitrary: s' f es f' es' ves e and s' f f' es es' ves e rule: run_step_run_one_step.induct)
-    case (1 d f es)
-    obtain ves ses where ves_def:"split_vals_e es = (ves, ses)"
-      by (metis surj_pair)
-    thus ?case
-    proof (cases ses)
+proof (induction d "(s, f, ves, es)" arbitrary: s' f es f' rvs res ves rule: run_step.induct)
+    case (1 d f ves es)
+    show ?case
+    proof (cases es)
       case Nil
       thus ?thesis
-        using 1(2) ves_def
+        using 1(3)
         by simp
     next
-      case (Cons a list)
+      case (Cons e es')
       thus ?thesis
-      proof (cases "a = Trap")
-        case True
-        have c_ves:"const_list ($$* ves)"
-          using is_const_list[of _ ves]
-          by simp
-        have "es' = [Trap] \<and> (list \<noteq> [] \<or> ves \<noteq> [])"
-          using Cons 1(2) ves_def True
-          by (cases "(list \<noteq> [] \<or> ves \<noteq> [])") auto
+      proof (cases e)
+        case (Basic x1)
         thus ?thesis
-          using Cons 1(2) ves_def split_vals_e_conv_app[OF ves_def] True progress_L0_trap[OF c_ves]
-          by auto
+          using run_step_basic_sound 1(3) Cons
+          by simp
       next
-        case False
-        obtain os ovs oes where ros_def:"run_one_step d (s, f, (rev ves), a) = (os, ovs, oes)"
-          by (metis surj_pair)
-        moreover
-        then obtain roes where "oes = RSNormal roes"
-          using 1(2) ves_def Cons False
-          by (cases "oes") auto
-        moreover
-        hence "os = s'" "ovs = f'" and es'_def:"es' = roes @ list"
-          using 1(2) ves_def Cons ros_def False
-          by (cases "roes = [Trap]", auto simp del: run_one_step.simps)+
-        ultimately
-        have ros_red:"\<lparr>s;f;($$* ves) @ [a]\<rparr> \<leadsto> \<lparr>s';f';roes\<rparr>"
-          using 1(1)[OF ves_def[symmetric]] ros_def False Cons
-          by (simp del: run_one_step.simps)
-        have "\<lparr>s;f;($$* ves)@[a]@list\<rparr> \<leadsto> \<lparr>s';f';roes@list\<rparr>"
-          using progress_L0[OF ros_red, of "[]" list]
-          unfolding const_list_def
-          by simp
+        case Trap
         thus ?thesis
-          using es'_def Cons split_vals_e_conv_app[OF ves_def]
-          by simp
-      qed
-    qed
-  next
-    case (2 d f ves e)
-    show ?case
-    proof (cases e)
-      case (Basic x1)
-      thus ?thesis
-        using run_step_basic_sound 2(3)
-        by simp
-    next
-      case Trap
-      thus ?thesis
-        using 2(3)
-        by simp
-    next
-      case (Invoke cl)
-      obtain t1s t2s where "cl_type cl = (t1s _> t2s)"
-        using tf.exhaust[of _ thesis]
-        by fastforce
-      moreover
-      obtain n where "length t1s = n"
-        by blast
-      moreover
-      obtain m where "length t2s = m"
-        by blast
-      moreover
-      note local_defs = calculation
-      show ?thesis
-      proof (cases "length ves \<ge> n")
-        case outer_True:True
-        obtain ves' ves'' where true_defs:"split_n ves n = (ves', ves'')"
-          by (metis surj_pair)
-        have ves'_length:"length (rev ves') = n"
-          using split_n_length[OF true_defs outer_True] inj_basic_econst length_rev map_injective
+          using 1(3) Cons reduce_simple.trap[of es "LBase (rev ves) es'"]
+                Lfilled.L0[of _ "rev ves" es' "[Trap]"]
+          apply (simp split: if_splits)
+          apply (metis Lholed.inject(1) Nil_is_rev_conv basic e.distinct(11) lfilled_single list.discI trap)
+          done
+      next
+        case (Invoke cl)
+        obtain t1s t2s where "cl_type (funcs s!cl) = (t1s _> t2s)"
+          using tf.exhaust[of _ thesis]
+          by fastforce
+        moreover
+        obtain n where "length t1s = n"
           by blast
+        moreover
+        obtain m where "length t2s = m"
+          by blast
+        moreover
+        note local_defs = calculation
         show ?thesis
-        proof (cases cl)
-          case (Func_native i' tf fts fes)
-          hence "s' = s" "f' = f" "es' = (vs_to_es ves'' @ [Local (length t2s) \<lparr> f_locs = (rev ves' @ (n_zeros fts)), f_inst = i'\<rparr> [$Block ([] _> t2s) fes]])"
-            using 2(3) Invoke local_defs outer_True true_defs
-            unfolding cl_type_def
-            by auto
-          moreover
-          have "\<lparr>s;f;(vs_to_es ves')@[Invoke cl]\<rparr> \<leadsto> \<lparr>s;f;([Local (length t2s) \<lparr> f_locs = (rev ves' @ (n_zeros fts)), f_inst = i'\<rparr> [$Block ([] _> t2s) fes]])\<rparr>"
-            using reduce.intros(5) local_defs(1,2) Func_native ves'_length
-            unfolding cl_type_def
-            by fastforce
-          ultimately
-          show ?thesis
-            using Invoke progress_L0_left is_const_list[of _ "(rev ves'')"]
-            unfolding split_n_conv_app[OF true_defs(1)]
-            by auto
-        next
-          case (Func_host x21 x22)
-          thus ?thesis
-          proof (cases "host_apply_impl s (t1s _> t2s) x22 (rev ves')")
-            case None
-            hence "s = s'"
-                  "f = f'"
-                  "es' = vs_to_es ves'' @ [Trap] "
-              using 2(3) Invoke local_defs outer_True true_defs Func_host
-              unfolding cl_type_def
-              by auto
-            thus ?thesis
-              using is_const_list[of _ "(rev ves'')"]
-                    reduce.intros(7)[OF _ _ ves'_length local_defs(2)]
-                    split_n_conv_app[OF true_defs]
-                    progress_L0_left Invoke Func_host local_defs(1)
-              unfolding cl_type_def
-              by fastforce
-          next
-            case (Some a)
-            show ?thesis
-            proof (cases a)
-            case (Pair rs rves)
-              thus ?thesis
-                using 2(3) Invoke local_defs outer_True true_defs Func_host Some
-                unfolding cl_type_def
-              proof (cases "list_all2 types_agree t2s rves")
-                case True
-                hence "rs = s'"
-                      "f = f'"
-                      "es' = vs_to_es ves'' @ ($$* rves) "
-                  using 2(3) Invoke local_defs outer_True true_defs Func_host Pair Some      
-                  unfolding cl_type_def
-                  by auto
-                thus ?thesis
-                  using progress_L0_left reduce.intros(6)[OF _ _ ves'_length local_defs(2)] Pair
-                        Invoke Func_host local_defs(1) True is_const_list[of _ "(rev ves'')"]
-                        split_n_conv_app[OF true_defs] host_apply_impl_correct[OF Some]
-                  unfolding cl_type_def
-                  by fastforce
-              qed auto
-            qed
-          qed
-        qed
-      next
-        case False
-        thus ?thesis
-          using 2(3) Invoke local_defs
-          unfolding cl_type_def
-          by (cases cl) auto
-      qed
-    next
-      case (Label ln les es)
-      thus ?thesis
-      proof (cases "es_is_trap es")
-        case True
-        thus ?thesis
-          using 2(3) is_const_list_vs_to_es_list
-                Label progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(19)]]
-            by fastforce
-      next
-        case False
-        note outer_outer_false = False
-        show ?thesis
-        proof (cases "(const_list es)")
-          case True
-          thus ?thesis
-            using 2(3) outer_outer_false Label reduce.intros(1)[OF reduce_simple.intros(18)]
-                  progress_L0[OF _ is_const_list_vs_to_es_list[of "rev ves"], where ?es_c="[]"]
-            by fastforce
-        next
-          case False
-          obtain s'' f'' es'' where run_step_is:"run_step d (s, f, es) = (s'', f'', es'')"
+        proof (cases "length ves \<ge> n")
+          case outer_True:True
+          obtain ves' ves'' where true_defs:"split_n ves n = (ves', ves'')"
             by (metis surj_pair)
+          have ves'_length:"length (rev ves') = n"
+            using split_n_length[OF true_defs outer_True] inj_basic_econst length_rev map_injective
+            by blast
           show ?thesis
-          proof (cases es'')
-            case RSCrash
-            thus ?thesis
-              using outer_outer_false False run_step_is Label 2(3)
-                by auto
-          next
-            case (RSBreak bn bvs)
-            thus ?thesis
-            proof (cases bn)
-              case 0
-              have run_step_is_break0:"run_step d (s, f, es) = (s'', f'', RSBreak 0 bvs)"
-                using run_step_is RSBreak 0
-                by simp
-              hence es'_def:"es' = ((vs_to_es ((take ln bvs)@ves))@les) \<and> s' = s'' \<and> f' = f'' \<and> ln \<le> length bvs"
-                using outer_outer_false False run_step_is Label 2(3) RSBreak
-                by (cases "ln \<le> length bvs") auto
-              then obtain n lfilled es_c where local_eqs:"s=s'" "f=f'" "ln \<le> length bvs" "Lfilled_exact n lfilled ((vs_to_es bvs) @ [$Br n] @ es_c) es"
-                using run_step_break_imp_lfilled[OF run_step_is_break0] RSBreak es'_def
-                by fastforce
-              then obtain lfilled' where lfilled_int:"Lfilled n lfilled' ((vs_to_es bvs) @ [$Br n]) es"
-                using lfilled_collapse2[OF Lfilled_exact_imp_Lfilled]
-                by fastforce
-              obtain lfilled'' where "Lfilled n lfilled'' ((drop (length bvs - ln) (vs_to_es bvs)) @ [$Br n]) es"
-                using lfilled_collapse1[OF lfilled_int] is_const_list_vs_to_es_list[of "rev bvs"] local_eqs(3)
-                by fastforce
-              hence "\<lparr>[Label ln les es]\<rparr> \<leadsto> \<lparr>(drop (length bvs - ln) (vs_to_es bvs))@les\<rparr>"
-                using reduce_simple.intros(20) local_eqs(3) is_const_list_vs_to_es_list
-                unfolding drop_map
-                by fastforce
-              hence 1:"\<lparr>s;f;[Label ln les es]\<rparr> \<leadsto> \<lparr>s';f';(drop (length bvs - ln) (vs_to_es bvs))@les\<rparr>"
-                using reduce.intros(1) local_eqs(1,2)
-                by fastforce
-              have "\<lparr>s;f;(vs_to_es ves)@[e]\<rparr> \<leadsto> \<lparr>s';f';(vs_to_es ves)@(drop (length bvs - ln) (vs_to_es bvs))@les\<rparr>"
-                using progress_L0[OF 1 is_const_list_vs_to_es_list[of "rev ves"], of "[]"] Label
-                by fastforce
-              thus ?thesis
-                using es'_def
-                unfolding drop_map rev_take[symmetric]
-                by auto
-            next
-              case (Suc nat)
-              thus ?thesis
-                using outer_outer_false False run_step_is Label 2(3) RSBreak
-                  by auto
-            qed
-          next
-            case (RSReturn x3)
-            thus ?thesis
-              using outer_outer_false False run_step_is Label 2(3)
-                by auto
-          next
-            case (RSNormal x4)
-            hence "es' = (vs_to_es ves)@[Label ln les x4]" "s' = s''" "f' = f''"
-              using outer_outer_false False run_step_is Label 2(3) run_step_is
-              by auto   (* v* label_n {e* } Li end e* *)
-            moreover
-            have "Lfilled 1 (LRec (vs_to_es ves) ln les (LBase [] []) []) es ((vs_to_es ves)@[Label ln les es])"
-              using Lfilled.intros(1)[of "[]" _ "[]" es]
-                    Lfilled.intros(2)
-                    is_const_list_vs_to_es_list[of "rev ves"]
-              unfolding const_list_def
-              by fastforce
-            moreover
-            have "Lfilled 1 (LRec (vs_to_es ves) ln les (LBase [] []) []) x4 ((vs_to_es ves)@[Label ln les x4])"
-              using Lfilled.intros(1)[of "[]" _ "[]" x4]
-                    Lfilled.intros(2)
-                    is_const_list_vs_to_es_list[of "rev ves"]
-              unfolding const_list_def
-              by fastforce
-            moreover
-            have inner_reduce:"\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s'';f'';x4\<rparr>"
-              using 2(1)[OF Label outer_outer_false False] run_step_is RSNormal
-              using calculation(3)
+          proof (cases "(funcs s!cl)")
+            case (Func_native i' tf fts fes)
+            hence "s' = s" "f' = f" "res = ([Frame (length t2s) \<lparr> f_locs = (rev ves' @ (n_zeros fts)), f_inst = i'\<rparr> [$Block ([] _> t2s) fes]] @ es')"
+                  "rvs = ves''"
+              using 1(3) Invoke local_defs outer_True true_defs Cons
+              unfolding cl_type_def
               by auto
+            moreover
+            have "\<lparr>s;f;(vs_to_es ves')@[Invoke cl]\<rparr> \<leadsto> \<lparr>s;f;([Frame (length t2s) \<lparr> f_locs = (rev ves' @ (n_zeros fts)), f_inst = i'\<rparr> [$Block ([] _> t2s) fes]])\<rparr>"
+              using reduce.intros(5) local_defs(1,2) Func_native ves'_length
+              unfolding cl_type_def
+              by fastforce
             ultimately
             show ?thesis
-              using Label 2(3) outer_outer_false False run_step_is
-                    reduce.intros(23)[OF inner_reduce]
+              using Invoke progress_L0 is_const_list[of _ "(rev ves'')"] Cons
+              unfolding split_n_conv_app[OF true_defs(1)]
               by fastforce
-          qed
-        qed
-      qed
-    next
-      case (Local ln fl es)
-      thus ?thesis
-      proof (cases "es_is_trap es")
-        case True
-        thus ?thesis
-          using 2(3) is_const_list_vs_to_es_list
-                Local progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(26)]]
-            by fastforce
-      next
-        case False
-        note outer_outer_false = False
-        show ?thesis
-        proof (cases "(const_list es)")
-          case True
-          note outer_true = True
-          thus ?thesis
-          proof (cases "length es = ln")
-            case True
-            hence "s = s'" "f = f'" "vs_to_es ves @ es = es'"
-              using 2(3) Local outer_true outer_outer_false
-              by simp_all
-            thus ?thesis
-              using 2(3) Local outer_true outer_outer_false is_const_list_vs_to_es_list[of "rev ves"]
-                  reduce.intros(1)[OF reduce_simple.intros(27)[OF outer_true True]]
-                  progress_L0[where ?es_c="[]"] basic local_const
-              by auto
           next
-            case False
+            case (Func_host x21 x22)
             thus ?thesis
-              using 2(3) Local outer_outer_false outer_true is_const_list_vs_to_es_list[of "rev ves"]
-              by auto
+            proof (cases "host_apply_impl s (t1s _> t2s) x22 (rev ves')")
+              case None
+              hence "s = s'"
+                    "f = f'"
+                    "res = [Trap] @ es'"
+                    "rvs = ves''"
+                using Cons 1(3) Invoke local_defs outer_True true_defs Func_host
+                unfolding cl_type_def
+                by auto
+              thus ?thesis
+                using is_const_list[of _ "(rev ves'')"]
+                      reduce.intros(7)[OF _ _ ves'_length local_defs(2)]
+                      split_n_conv_app[OF true_defs] Cons
+                      progress_L0 Invoke Func_host local_defs(1)
+                unfolding cl_type_def
+                by fastforce
+            next
+              case (Some a)
+              show ?thesis
+              proof (cases a)
+              case (Pair rs rves)
+                thus ?thesis
+                  using Cons 1(3) Invoke local_defs outer_True true_defs Func_host Some
+                  unfolding cl_type_def
+                proof (cases "list_all2 types_agree t2s rves")
+                  case True
+                  hence "rs = s'"
+                        "f = f'"
+                        "rvs = rev rves @ ves''"
+                        "res = es'"
+                    using 1(3) Cons Invoke local_defs outer_True true_defs Func_host Pair Some      
+                    unfolding cl_type_def
+                    by simp_all
+                  thus ?thesis
+                    using progress_L0 Cons reduce.intros(6)[OF _ _ ves'_length local_defs(2)] Pair
+                          Invoke Func_host local_defs(1) True is_const_list[of _ "(rev ves'')"]
+                          split_n_conv_app[OF true_defs] host_apply_impl_correct[OF Some]
+                    unfolding cl_type_def
+                    by fastforce
+                qed auto
+              qed
+            qed
           qed
         next
           case False
+          thus ?thesis
+            using 1(3) Cons Invoke local_defs
+            unfolding cl_type_def
+            by (cases "(funcs s!cl)") auto
+        qed
+      next
+        case (Label ln lles les)
+        thus ?thesis
+        proof (cases "es_is_trap les")
+          case True
+          thus ?thesis
+            using 1(3) Cons is_const_list_vs_to_es_list
+                  Label progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(19)]]
+              by fastforce
+        next
+          case False
+          note outer_outer_false = False
           show ?thesis
-          proof (cases d)
-            case 0
+          proof (cases "(const_list les)")
+            case True
             thus ?thesis
-              using 2(3) Local outer_outer_false False is_const_list_vs_to_es_list[of "rev ves"]
-              by auto
+              using 1(3) Cons split_vals_e_const_list outer_outer_false Label reduce.intros(1)[OF reduce_simple.intros(18)]
+                    progress_L0[OF _, where ?es_c="es'"] e_type_const_conv_vs[of les]
+              by fastforce
           next
-            case (Suc d')
-            obtain s'' fl' les' where run_step_is:"run_step d' (s, fl, es) = (s'', fl', les')"
-            by (metis surj_pair)
+            case False
+            then obtain levs lee lees where les_is:"split_vals_e les = (levs, lee#lees)"
+              using split_vals_e_not_const_list[OF False]
+              by blast
+            obtain s'' f'' es'' where run_step_is:"run_step d (s, f, (rev levs, lee#lees)) = (s'', f'', es'')"
+              by (metis surj_pair)
             show ?thesis
-            proof (cases les')
-              case RSCrash
+            proof (cases es'')
+              case (RSCrash rsc)
               thus ?thesis
-                using outer_outer_false False run_step_is Local 2(3) Suc
-                  by auto
+                using outer_outer_false False Cons Label 1(3) les_is
+                apply (simp only: run_step.simps[of d s f ves])
+                apply (simp add: run_step_is del: run_step.simps)
+                done
             next
-              case (RSBreak x21 x22)
+              case (RSBreak bn bvs)
               thus ?thesis
-                using outer_outer_false False run_step_is Local 2(3) Suc
+              proof (cases bn)
+                case 0
+                have run_step_is_break0:"run_step d (s, f, (rev levs, lee#lees)) = (s'', f'', RSBreak 0 bvs)"
+                  using run_step_is RSBreak 0
+                  by simp
+                hence es'_def:"take ln bvs @ ves = rvs \<and> lles @ es' = res \<and> s' = s'' \<and> f' = f'' \<and> ln \<le> length bvs"
+                  using les_is Cons outer_outer_false False run_step_is Label 1(3) RSBreak
+                  apply (cases "ln \<le> length bvs")
+                  apply (simp_all del: run_step.simps add: run_step.simps[of d s f ves])
+                  done
+                then obtain n lfilled es_c where local_eqs:"s=s'" "f=f'" "ln \<le> length bvs" "Lfilled_exact n lfilled ((vs_to_es bvs) @ [$Br n] @ es_c) les"
+                  using les_is run_step_break_imp_lfilled[OF run_step_is_break0] RSBreak es'_def
+                        split_vals_e_conv_app
                   by auto
+                then obtain lfilled' where lfilled_int:"Lfilled n lfilled' ((vs_to_es bvs) @ [$Br n]) les"
+                  using lfilled_collapse2[OF Lfilled_exact_imp_Lfilled]
+                  by fastforce
+                obtain lfilled'' where "Lfilled n lfilled'' ((drop (length bvs - ln) (vs_to_es bvs)) @ [$Br n]) les"
+                  using lfilled_collapse1[OF lfilled_int] is_const_list_vs_to_es_list[of "rev bvs"] local_eqs(3)
+                  by (metis drop_map length_rev)
+                hence "\<lparr>[Label ln lles les]\<rparr> \<leadsto> \<lparr>(drop (length bvs - ln) (vs_to_es bvs))@lles\<rparr>"
+                  using reduce_simple.intros(20) local_eqs(3) is_const_list_vs_to_es_list
+                  unfolding drop_map
+                  by fastforce
+                hence 1:"\<lparr>s;f;[Label ln lles les]\<rparr> \<leadsto> \<lparr>s';f';(drop (length bvs - ln) (vs_to_es bvs))@lles\<rparr>"
+                  using reduce.intros(1) local_eqs(1,2)
+                  by fastforce
+                have "\<lparr>s;f;(vs_to_es ves)@es\<rparr> \<leadsto> \<lparr>s';f';(vs_to_es ves)@(drop (length bvs - ln) (vs_to_es bvs))@lles@es'\<rparr>"
+                  using Label "1" progress_L0 Cons
+                  by fastforce
+                thus ?thesis
+                  using es'_def
+                  unfolding drop_map rev_take[symmetric]
+                  by auto
+              next
+                case (Suc nat)
+                thus ?thesis
+                  using les_is Cons outer_outer_false False run_step_is Label 1(3) RSBreak
+                  by (simp del: run_step.simps add: run_step.simps[of d s f ves])
+              qed
             next
               case (RSReturn x3)
-              hence es'_def:"es' = (vs_to_es ((take ln x3)@ves)) \<and> s' = s'' \<and> f = f' \<and> ln \<le> length x3"
-                using outer_outer_false False run_step_is Local 2(3) Suc
-                by (cases "ln \<le> length x3") auto
-              then obtain n lfilled es_c where local_eqs:"s=s'" "f=f'" "ln \<le> length x3" "Lfilled_exact n lfilled ((vs_to_es x3) @ [$Return] @ es_c) es"
-                using run_step_is run_step_return_imp_lfilled RSReturn
-                by fastforce
-              then obtain lfilled' where lfilled_int:"Lfilled n lfilled' ((vs_to_es x3) @ [$Return]) es"
-                using lfilled_collapse2[OF Lfilled_exact_imp_Lfilled]
-                by fastforce
-              obtain lfilled'' where "Lfilled n lfilled'' ((drop (length x3 - ln) (vs_to_es x3)) @ [$Return]) es"
-                using lfilled_collapse1[OF lfilled_int] is_const_list_vs_to_es_list[of "rev x3"] local_eqs(3)
-                by fastforce
-              hence "\<lparr>[Local ln fl es]\<rparr> \<leadsto> \<lparr>(drop (length x3 - ln) (vs_to_es x3))\<rparr>"
-                using reduce_simple.intros(27) local_eqs(3) is_const_list_vs_to_es_list
-                unfolding drop_map
-                by fastforce
-              hence 1:"\<lparr>s;f;[Local ln fl es]\<rparr> \<leadsto> \<lparr>s';f';(drop (length x3 - ln) (vs_to_es x3))\<rparr>"
-                using reduce.intros(1) local_eqs(1,2)
-                by fastforce
-              have "\<lparr>s;f;(vs_to_es ves)@[e]\<rparr> \<leadsto> \<lparr>s';f';(vs_to_es ves)@(drop (length x3 - ln) (vs_to_es x3))\<rparr>"
-                using progress_L0[OF 1 is_const_list_vs_to_es_list[of "rev ves"], of "[]"] Local
-                by fastforce
               thus ?thesis
-                using es'_def
-                unfolding drop_map rev_take[symmetric]
-                by auto
+                using les_is Cons outer_outer_false False run_step_is Label 1(3)
+                by (simp del: run_step.simps add: run_step.simps[of d s f ves])
             next
-              case (RSNormal x4)
-              hence inner_reduce:"\<lparr>s;fl;es\<rparr> \<leadsto> \<lparr>s'';fl';x4\<rparr>"
-                using 2(2)[OF Local outer_outer_false False] run_step_is Suc
-                by auto
+              case (RSNormal rrvs rres)
+              hence n3:"ves = rvs" "Label ln lles (vs_to_es rrvs @ rres) # es' = res" "s' = s''" "f' = f''"
+                using les_is Cons outer_outer_false False run_step_is Label 1(3) run_step_is
+                by (simp_all del: run_step.simps add: run_step.simps[of d s f ves])
+              have n1:"Lfilled 1 (LRec (rev ves) ln lles (LBase [] []) []) les ((vs_to_es ves)@[Label ln lles les])"
+                using Lfilled.intros(1)[of _ "[]" "[]" les]
+                      Lfilled.intros(2)
+                      is_const_list_vs_to_es_list[of "rev ves"]
+                unfolding const_list_def
+                by fastforce
+              have n2:"Lfilled 1 (LRec (rev ves) ln lles (LBase [] []) []) (vs_to_es rrvs @ rres) ((vs_to_es ves)@[Label ln lles (vs_to_es rrvs @ rres)])"
+                using Lfilled.intros(1)[of _ "[]" "[]" "(vs_to_es rrvs @ rres)"]
+                      Lfilled.intros(2)
+                      is_const_list_vs_to_es_list[of "rev ves"]
+                unfolding const_list_def
+                by fastforce
+              hence "($C* levs) @ lee # lees \<noteq> [Trap]"
+                using outer_outer_false split_vals_e_conv_app[OF les_is]
+                by (simp add: append_eq_Cons_conv)
+              hence inner_reduce:"\<lparr>s;f;les\<rparr> \<leadsto> \<lparr>s'';f'';(vs_to_es rrvs @ rres)\<rparr>"
+                using 1(1)[OF Cons _ Label(1) _ les_is[symmetric], of lee lees s'' f'' rrvs rres] n3 RSNormal
+                using  split_vals_e_conv_app[OF les_is] Label(1) run_step_is
+                by (simp del: run_step.simps)
+              show ?thesis
+                using Label 1(3) outer_outer_false False
+                      progress_L0[OF reduce.intros(23)[OF inner_reduce n1 n2], of "[]" es'] Cons n3
+                by simp
+            qed
+          qed
+        qed
+      next
+        case (Frame ln fl fes)
+        thus ?thesis
+        proof (cases "es_is_trap fes")
+          case True
+          thus ?thesis
+            using 1(3) is_const_list_vs_to_es_list Cons
+                  Frame progress_L0[OF reduce.intros(1)[OF reduce_simple.intros(26)]]
+            apply (simp_all del: run_step.simps add: run_step.simps[of d s f ves])
+            apply blast
+            done
+        next
+          case False
+          note outer_outer_false = False
+          show ?thesis
+          proof (cases "(const_list fes)")
+            case True
+            note outer_true = True
+            thus ?thesis
+              using 1(3) Frame split_vals_e_const_list  e_type_const_conv_vs[OF outer_true]
+                    Cons outer_outer_false outer_true is_const_list_vs_to_es_list[of "rev ves"]
+                    progress_L0[OF reduce.intros(1)[OF reduce_simple.local_const[of ln fl]]]
+              by (auto simp del: run_step.simps simp add: run_step.simps[of d s f ves])
+          next
+            case False
+            then obtain fevs fee fees where fes_is:"split_vals_e fes = (fevs, fee#fees)"
+              using split_vals_e_not_const_list[OF False]
+              by blast
+            show ?thesis
+            proof (cases d)
+              case 0
               thus ?thesis
-                using Local 2(3) Local outer_outer_false False run_step_is Suc
-                      reduce.intros(24)[OF inner_reduce] RSNormal
-                      progress_L0_left is_const_list_vs_to_es_list[of "rev ves"]
-                by (auto simp del: run_step.simps)
+                using 1(3) Cons fes_is Frame outer_outer_false False is_const_list_vs_to_es_list[of "rev ves"]
+                by (auto simp del: run_step.simps simp add: run_step.simps[of _ s f ves])
+            next
+              case (Suc d')
+              obtain s'' fl'' es'' where run_step_is:"run_step d' (s, fl, (rev fevs, fee#fees)) = (s'', fl'', es'')"
+                by (metis surj_pair)
+              show ?thesis
+              proof (cases es'')
+                case RSCrash
+                thus ?thesis
+                  using fes_is outer_outer_false False run_step_is Frame Cons 1(3) Suc
+                  by (auto simp del: run_step.simps simp add: run_step.simps[of _ s f ves])
+              next
+                case (RSBreak x21 x22)
+                thus ?thesis
+                  using fes_is Cons outer_outer_false False run_step_is Frame 1(3) Suc
+                  by (auto simp del: run_step.simps simp add: run_step.simps[of _ s f ves])
+              next
+                case (RSReturn x3)
+                hence es'_def:"es' = res \<and> rvs = take ln x3 @ ves \<and> s' = s'' \<and> f = f' \<and> ln \<le> length x3"
+                  using Cons fes_is outer_outer_false False run_step_is Frame 1(3) Suc
+                  apply (cases "ln \<le> length x3")
+                  apply (auto simp del: run_step.simps simp add: run_step.simps[of _ s f ves])
+                  done
+               then obtain n lfilled es_c where local_eqs:"s=s'" "f=f'" "ln \<le> length x3" "Lfilled_exact n lfilled ((vs_to_es x3) @ [$Return] @ es_c) (fes)"
+                 using run_step_is split_vals_e_conv_app[OF fes_is]
+                       run_step_return_imp_lfilled[of d' s fl "rev fevs" "fee#fees"] RSReturn
+                 by (fastforce simp del: run_step.simps)
+                then obtain lfilled' where lfilled_int:"Lfilled n lfilled' ((vs_to_es x3) @ [$Return]) fes"
+                  using lfilled_collapse2[OF Lfilled_exact_imp_Lfilled]
+                  by fastforce
+                obtain lfilled'' where "Lfilled n lfilled'' ((drop (length x3 - ln) (vs_to_es x3)) @ [$Return]) fes"
+                  using lfilled_collapse1[OF lfilled_int] is_const_list_vs_to_es_list[of "rev x3"] local_eqs(3)
+                  by (metis drop_map length_rev)
+                hence "\<lparr>[Frame ln fl fes]\<rparr> \<leadsto> \<lparr>(drop (length x3 - ln) (vs_to_es x3))\<rparr>"
+                  using reduce_simple.intros(27) local_eqs(3) is_const_list_vs_to_es_list
+                  unfolding drop_map
+                  by fastforce
+                hence 1:"\<lparr>s;f;[Frame ln fl fes]\<rparr> \<leadsto> \<lparr>s';f';(drop (length x3 - ln) (vs_to_es x3))\<rparr>"
+                  using reduce.intros(1) local_eqs(1,2)
+                  by fastforce
+                have "\<lparr>s;f;(vs_to_es ves)@es\<rparr> \<leadsto> \<lparr>s';f';(vs_to_es ves)@(drop (length x3 - ln) (vs_to_es x3))@es'\<rparr>"
+                  using Frame "1" progress_L0 Cons
+                  by fastforce
+                thus ?thesis
+                  using es'_def
+                  unfolding drop_map rev_take[symmetric]
+                  by auto
+              next
+                case (RSNormal ffves ffes)
+                hence inner_reduce:"\<lparr>s;fl;fes\<rparr> \<leadsto> \<lparr>s'';fl'';(vs_to_es ffves)@ffes\<rparr>"
+                  using 1(2)[OF Cons _ Frame outer_outer_false fes_is[symmetric] _ Suc] Frame outer_outer_false False run_step_is Suc
+                        split_vals_e_conv_app[OF fes_is]
+                  by auto
+                thus ?thesis
+                  using Frame 1(3) Frame outer_outer_false False run_step_is Suc Cons
+                        progress_L0[OF reduce.intros(24)[OF inner_reduce], of f "rev ves" ln es'] RSNormal
+                        is_const_list_vs_to_es_list[of "rev ves"] fes_is
+                  by (auto simp del: run_step.simps simp add: run_step.simps[of _ s f ves])
             qed
           qed
         qed
       qed
     qed
   qed
-  thus ?thesis
-    using assms
-    by blast
 qed
 
-theorem run_v_sound:
-  assumes "run_v c d (s,f,es) = (s', RValue ves)"
-  shows "\<exists>f'. reduce_trans (s,f,es) (s',f',$$*ves)"
+theorem run_vs_es_sound:
+  assumes "run_vs_es c d (s,f,ves,es) = (s', RValue rvs)"
+  shows "\<exists>f'. reduce_trans (s,f,(vs_to_es ves)@es) (s',f',$C* rvs)"
   using assms
-proof (induction c d "(s,f,es)" arbitrary: s f es rule: run_v.induct)
-  case (1 n d s f es)
+proof (induction c d "(s,f,ves,es)" arbitrary: s f ves es rule: run_vs_es.induct)
+  case (1 n d s f ves es)
   note outer_1 = 1
   consider (1) "es_is_trap es" | (2) "const_list es" | (3) "\<not>es_is_trap es" "\<not>const_list es"
     by blast
@@ -2295,31 +2115,46 @@ proof (induction c d "(s,f,es)" arbitrary: s f es rule: run_v.induct)
       by simp
   next
     case 2
-    hence s_is:"ves = (fst (split_vals_e es))" "s = s'"
-      using outer_1
-      by (simp_all split: if_splits)
-    hence "es = $$*ves"
-      using 2 e_type_const_conv_vs split_vals_e_const_list
-      by fastforce
-    thus ?thesis
-      using s_is
-      by (fastforce simp add: reduce_trans_def)
+    show ?thesis
+    proof (cases es)
+      case Nil
+      thus ?thesis
+        using 1(2)
+        by (auto simp add: reduce_trans_def)
+    next
+      case (Cons a list)
+      obtain c where "a = $C c"
+        using Cons 2 e_type_const_conv_vs
+        by blast
+      thus ?thesis
+        using 1(2) Cons
+        by simp
+    qed
   next
     case 3
-    then obtain s'' f' res where s''_is:
-      "(run_step d (s,f,es)) = (s'',f',RSNormal res)"
-      "run_v n d (s'',f',res) = (s', RValue ves)"
+    then obtain s'' f' rrvs rres where s''_is:
+      "(run_step d (s,f,ves,es)) = (s'',f',RSNormal rrvs rres)"
+      "run_vs_es n d (s'',f',rrvs, rres) = (s', RValue rvs)"
       using outer_1(2)
-      by (simp del: run_step.simps split: res_step.splits prod.splits)
+      by (simp add: is_const_list del: run_step.simps split: if_splits res_step.splits prod.splits)
     show ?thesis
-      using outer_1(1)[OF 3 s''_is(1)[symmetric] _ _ _ s''_is(2)]
+      using outer_1(1)[OF 3(1) _ s''_is(1)[symmetric]] s''_is(2)
             reduce_trans_app[OF run_step_sound[OF s''_is(1)]]
-      by fastforce
+      apply simp
+      apply (metis "3"(2) is_const_list list.simps(8))
+      done
   qed
 next
   case (2 d s f es)
   thus ?case
     by simp
 qed
+
+theorem run_v_sound:
+  assumes "run_v c d (s,f,es) = (s', RValue rvs)"
+  shows "\<exists>f'. reduce_trans (s,f,es) (s',f',$C* rvs)"
+  using assms run_vs_es_sound split_vals_e_conv_app
+  by (fastforce split: prod.splits)
+
 
 end
