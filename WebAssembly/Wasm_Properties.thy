@@ -102,15 +102,15 @@ qed (auto simp add: store_extension_refl store_extension.intros)
 lemma store_preserved:
   assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
           "store_typing s"
-          "s\<bullet>None \<tturnstile> f;es : ts"
+          "s\<bullet>r \<tturnstile> f;es : ts"
   shows "store_extension s s' \<and> store_typing s'"
 proof -
   obtain \<C>i where \<C>i_def:"inst_typing s (f_inst f) \<C>i"
-                         "s\<bullet>(\<C>i\<lparr>local := map typeof (f_locs f), return := None\<rparr>) \<turnstile> es : ([] _> ts)"
+                         "s\<bullet>(\<C>i\<lparr>local := map typeof (f_locs f), return := r\<rparr>) \<turnstile> es : ([] _> ts)"
     using s_type_unfold[OF assms(3)]
     by fastforce
   thus ?thesis
-    using reduce_store_extension[OF assms(1,2) \<C>i_def(1,2), of None "label \<C>i"]
+    using reduce_store_extension[OF assms(1,2) \<C>i_def(1,2), of r "label \<C>i"]
     by fastforce
 qed
 
@@ -1537,6 +1537,31 @@ next
   show ?case
     using e_typing_l_typing.intros(3) e_typing_l_typing.intros(5)[OF 1 es_def(2)] es_def(5) local(5)
     by (metis (full_types) append_Nil2)
+qed
+
+lemma types_preserved_e2:
+  assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
+          "store_typing s"
+          "frame_typing s f \<C>i"
+          "tvs = map typeof (f_locs f)"
+          "\<C> = \<C>i\<lparr>label := arb_labs, return := arb_return\<rparr>"
+          "s\<bullet>\<C> \<turnstile> es : (ts _> ts')"
+  shows "store_extension s s'"
+        "store_typing s'"
+        "frame_typing s' f' \<C>i"
+        "s'\<bullet>\<C> \<turnstile> es' : (ts _> ts')"
+proof -
+  show "store_extension s s'"
+       "store_typing s'"
+    using assms(3,5,6) reduce_store_extension[OF assms(1,2)]
+    unfolding frame_typing.simps
+    by blast+
+  then show "frame_typing s' f' \<C>i"
+            "s'\<bullet>\<C> \<turnstile> es' : (ts _> ts')"
+    using assms(3,5,6) types_preserved_e1[OF assms(1,2)]
+          inst_typing_store_extension_inv reduce_inst_is[OF assms(1)]
+    unfolding frame_typing.simps
+    by fastforce+
 qed
 
 lemma types_preserved_e:

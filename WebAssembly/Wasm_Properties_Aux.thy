@@ -1711,6 +1711,14 @@ proof -
     by auto
 qed
 
+lemma frame_typing_store_extension_inv:
+  assumes "frame_typing s f \<C>"
+          "store_extension s s'" 
+    shows "frame_typing s' f \<C>"
+  using assms inst_typing_store_extension_inv
+  unfolding frame_typing.simps
+  by fastforce
+
 lemma cl_typing_store_extension_inv:
   assumes "store_extension s s'"
           "cl_typing s cl tf"
@@ -1753,9 +1761,8 @@ proof (induction s \<C> es tf and s rs f es ts rule: e_typing_l_typing.inducts)
 next
   case (8 \<S> f \<C> rs es ts)
   thus ?case
-    using inst_typing_store_extension_inv
+    using frame_typing_store_extension_inv
           e_typing_l_typing.intros(8)
-    unfolding frame_typing.simps
     by blast
 qed (auto simp add: e_typing_l_typing.intros)
 
