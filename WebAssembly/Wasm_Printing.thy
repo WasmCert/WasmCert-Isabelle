@@ -1,4 +1,11 @@
-theory Wasm_Printing imports Wasm_Instantiation_Printing Wasm_Checker_Printing Wasm_Interpreter_Printing Wasm_Type_Printing "HOL-Library.Code_Target_Nat" begin
+theory Wasm_Printing
+imports
+  Wasm_Instantiation_Printing
+  Wasm_Checker_Printing
+  Wasm_Interpreter_Printing
+  Wasm_Type_Printing
+  "HOL-Library.Code_Target_Nat"
+begin
 
 (* OCaml-specific hacks follow... *)
 

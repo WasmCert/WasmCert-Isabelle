@@ -1,6 +1,10 @@
 section {* WebAssembly Core AST *}
 
-theory Wasm_Ast imports Main "HOL-Word.Word" begin
+theory Wasm_Ast
+  imports
+    Main
+    "Word_Lib.Reversed_Bit_Lists"
+begin
 
 type_synonym \<comment> \<open>immediate\<close>
   i = nat
@@ -163,20 +167,20 @@ datatype
 
 datatype
   binop = Binop_i binop_i | Binop_f binop_f
-  
+
 datatype
   testop = Eqz
-  
+
 datatype
   relop_i = Eq | Ne | Lt sx | Gt sx | Le sx | Ge sx
-  
+
 datatype
   relop_f = Eqf | Nef | Ltf | Gtf | Lef | Gef
 
 datatype
   relop = Relop_i relop_i | Relop_f relop_f
 
-  
+
 datatype
   cvtop = Convert | Reinterpret
 

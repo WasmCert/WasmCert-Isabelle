@@ -993,9 +993,9 @@ proof -
   thus ?thesis
     using nat_def select_return_top_exists
     apply (cases "select_return_top cts (cts ! Suc nat) (cts ! nat)")
-      apply simp_all
-    apply blast
-    done
+    subgoal by simp
+    subgoal by blast
+    by simp
 qed
 
 lemma select_return_top_ct_compat:
