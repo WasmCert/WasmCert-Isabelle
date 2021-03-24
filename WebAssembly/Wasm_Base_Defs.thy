@@ -7,12 +7,70 @@ theory Wasm_Base_Defs
     "Word_Lib.Most_significant_bit"
 begin
 
-instantiation i32 :: wasm_int begin                 
+(* https://webassembly.github.io/spec/core/exec/numerics.html *)
+
+instantiation i32 :: wasm_int begin
+  lift_definition int_clz_i32 :: "i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_ctz_i32 :: "i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_popcnt_i32 :: "i32 \<Rightarrow> i32" is undefined .
+  (* binops *)
+  lift_definition int_add_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "(+)" .
+  lift_definition int_sub_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_mul_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_div_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is undefined .
+  lift_definition int_div_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is undefined .
+  lift_definition int_rem_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is undefined .
+  lift_definition int_rem_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is undefined .
+  lift_definition int_and_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_or_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_xor_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_shl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_shr_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_shr_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_rotl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_rotr_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
+  (* testops *)
+  definition int_eqz_i32 :: "i32 \<Rightarrow> bool" where "int_eqz_i32 a \<equiv> undefined"
+  (* relops *)
+  definition int_eq_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_eq_i32 a b \<equiv> undefined"
+  definition int_lt_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_lt_u_i32 a b \<equiv> undefined"
+  definition int_lt_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_lt_s_i32 a b \<equiv> undefined"
+  definition int_gt_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_gt_u_i32 a b \<equiv> undefined"
+  definition int_gt_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_gt_s_i32 a b \<equiv> undefined"
+  definition int_le_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_le_u_i32 a b \<equiv> undefined"
+  definition int_le_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_le_s_i32 a b \<equiv> undefined"
+  definition int_ge_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_ge_u_i32 a b \<equiv> undefined"
+  definition int_ge_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_ge_s_i32 a b \<equiv> undefined"
+
   lift_definition nat_of_int_i32 :: "i32 \<Rightarrow> nat" is "unat" .
   lift_definition int_of_nat_i32 :: "nat \<Rightarrow> i32" is "of_nat" .
 instance ..
 
 end
+
+interpretation Wasm_Int "(THE x::32. True)" "Abs_i32 (of_nat 0)"
+proof (standard, goal_cases)
+  case (1 a b)
+  have "(x::32 word) + y = word_of_int ((uint x + uint y) mod (2^32))" for x y
+    apply (subst word_add_def)
+    apply (subst word_uint.norm_norm(1)[THEN sym])
+    by simp
+  then show ?case
+    unfolding int_add_i32_def abs_int_def rep_int_def int_of_nat_i32_def nat_of_int_i32_def by simp
+next
+  case (2 a b m)
+  then show ?case sorry
+next
+  case (3 a b)
+  then show ?case sorry
+next
+  case (4 b a)
+  then show ?case sorry
+next
+  case (5 b a rat)
+  then show ?case sorry
+qed
+
 instantiation i64 :: wasm_int begin instance .. end
 instantiation f32 :: wasm_float begin instance .. end
 instantiation f64 :: wasm_float begin instance .. end
