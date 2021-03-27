@@ -7,18 +7,18 @@ theory Wasm_Base_Defs
     "Word_Lib.Most_significant_bit"
 begin
 
-(* https://webassembly.github.io/spec/core/exec/numerics.html *)
-
 instantiation i32 :: wasm_int_ops begin
+  lift_definition zero_i32 :: i32 is "of_nat 0" .
   definition len_of_i32 :: "i32 itself \<Rightarrow> nat" where [simp]: "len_of_i32 _ = 32"
   lift_definition int_clz_i32 :: "i32 \<Rightarrow> i32" is undefined .
   lift_definition int_ctz_i32 :: "i32 \<Rightarrow> i32" is undefined .
   lift_definition int_popcnt_i32 :: "i32 \<Rightarrow> i32" is undefined .
   (* binops *)
   lift_definition int_add_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "(+)" .
-  lift_definition int_sub_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
-  lift_definition int_mul_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
-  lift_definition int_div_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is undefined .
+  lift_definition int_sub_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "(-)" .
+  lift_definition int_mul_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "(*)" .
+  lift_definition int_div_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is
+    "\<lambda>a b. if b = 0 then None else Some (a div b)" .
   lift_definition int_div_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is undefined .
   lift_definition int_rem_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is undefined .
   lift_definition int_rem_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is undefined .
@@ -48,27 +48,67 @@ instantiation i32 :: wasm_int_ops begin
 instance by standard simp
 end
 
+lemma nonzero_i32: "x \<noteq> 0 \<Longrightarrow> Rep_i32 x \<noteq> 0"
+  unfolding zero_i32.abs_eq Abs_fnat_hom_0[THEN sym]
+proof (rule ccontr)
+  assume "x \<noteq> Abs_i32 0" "\<not> Rep_i32 x \<noteq> 0"
+  hence "x \<noteq> Abs_i32 (Rep_i32 x)" by simp
+  thus False using Rep_i32_inverse by fastforce
+qed
+
+lemma nonneg_i32: "abs_int (x::i32) \<ge> 0"
+  unfolding nat_of_int_i32_def by fastforce
+
+lemma nonzero_i32_int: "(x::i32) \<noteq> 0 \<Longrightarrow> abs_int x > 0"
+proof -
+  assume x: "x \<noteq> 0"
+  have "abs_int x \<noteq> 0"
+    unfolding nat_of_int_i32.rep_eq using nonzero_i32[OF x]
+    by (simp add: unsigned_eq_0_iff)
+  thus ?thesis using nonneg_i32 by fastforce
+qed
+
 instantiation i32 :: wasm_int begin
 instance
 proof (standard, goal_cases)
-  case (1 a b)
-  have plus: "(x::32 word) + y = word_of_int ((uint x + uint y) mod (2^32))" for x y
+  case 1
+  show ?case unfolding nat_of_int_i32_def using zero_i32.rep_eq by simp
+next
+  case (2 a b)
+  have "(x::32 word) + y = word_of_int ((uint x + uint y) mod (2^32))" for x y
     apply (subst word_add_def)
     apply (subst word_uint.norm_norm(1)[THEN sym])
     by simp
   then show ?case unfolding int_add_i32_def int_of_nat_i32_def nat_of_int_i32_def by simp
 next
-  case (2 a b m)
-  then show ?case sorry
-next
   case (3 a b)
-  then show ?case sorry
+  have "(x::32 word) - y = word_of_int ((uint x - uint y) mod (2^32))" for x y
+    apply (subst word_sub_wi)
+    apply (subst word_uint.norm_norm(1)[THEN sym])
+    by simp
+  then show ?case unfolding int_sub_i32_def int_of_nat_i32_def nat_of_int_i32_def by simp
 next
-  case (4 b a)
-  then show ?case sorry
+  case (4 a b)
+  have "(x::32 word) * y = word_of_int ((uint x * uint y) mod (2^32))" for x y
+    apply (subst word_mult_def)
+    apply (subst word_uint.norm_norm(1)[THEN sym])
+    by simp
+  then show ?case unfolding int_mul_i32_def int_of_nat_i32_def nat_of_int_i32_def by simp
 next
-  case (5 b a rat)
-  then show ?case sorry
+  case (5 b a)
+  then show ?case unfolding int_div_u_i32_def using zero_i32.rep_eq by simp
+next
+  case (6 b a)
+  hence "abs_int b > 0" by (rule nonzero_i32_int)
+  hence "abs_int a div abs_int b = trunc (rat_of_int (abs_int a) / rat_of_int (abs_int b))"
+    apply (subst floor_divide_of_int_eq[THEN sym])
+    apply (subst trunc)
+    by simp
+  hence "Abs_i32 (Rep_i32 a div Rep_i32 b) =
+    rep_int (trunc ((rat_of_int \<circ> int \<circ> unat) (Rep_i32 a) / (rat_of_int \<circ> int \<circ> unat) (Rep_i32 b)))"
+    (* TODO: fix this ugliness *)
+    by (metis (mono_tags, hide_lams) int_of_nat_i32.abs_eq map_fun_apply map_fun_def nat_of_int_i32.rep_eq uint_div_distrib uint_nat unat_eq_nat_uint word_unat.Rep_inverse)
+  thus ?case unfolding int_div_u_i32_def nat_of_int_i32_def using nonzero_i32[OF 6] by simp
 qed
 
 end

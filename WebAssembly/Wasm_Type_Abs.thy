@@ -49,21 +49,27 @@ begin
   int_ne where
     "int_ne x y \<equiv> \<not> (int_eq x y)"
 
-  abbreviation rep_int :: "int \<Rightarrow> 'a"
-    where "rep_int a \<equiv> int_of_nat (nat a)"
-
+  text\<open>
+  Convert a concrete wasm_int (usually a word) to its "abstract" integer representation,
+  as used in the Wasm specs, where the whole integer domain is considered.
+  \<close>
   abbreviation abs_int :: "'a \<Rightarrow> int"
     where "abs_int a \<equiv> int (nat_of_int a)"
+
+  abbreviation rep_int :: "int \<Rightarrow> 'a"
+    where "rep_int a \<equiv> int_of_nat (nat a)"
 end
+
+(* https://webassembly.github.io/spec/core/exec/numerics.html *)
 
 definition trunc :: "rat \<Rightarrow> int" where
   "trunc q \<equiv>
-    if q \<ge> 0
+    if 0 \<le> q
     then int (THE i::nat. q - 1 < rat_of_nat i \<and> rat_of_nat i \<le> q)
     else - int (THE i::nat. \<bar>q\<bar> - 1 < rat_of_nat i \<and> rat_of_nat i \<le> \<bar>q\<bar>)"
 
 lemma trunc_exists1:
-  assumes "q \<ge> 0"
+  assumes "0 \<le> q"
   shows "\<exists>!i. q - 1 < rat_of_nat i \<and> rat_of_nat i \<le> q"
 proof -
   let ?F = "\<lambda>z. rat_of_int z \<le> q \<and> q < rat_of_int (z + 1)"
@@ -76,19 +82,28 @@ proof -
   thus ?thesis by blast
 qed
 
-lemma trunc: "trunc q = (if q \<ge> 0 then \<lfloor>q\<rfloor> else -\<lfloor>-q\<rfloor>)"
-  sorry
+lemma trunc: "trunc q = (if 0 \<le> q then \<lfloor>q\<rfloor> else -\<lfloor>-q\<rfloor>)"
+proof -
+  {
+    fix q :: rat assume q: "0 \<le> q"
+    have "(THE i::nat. q - 1 < rat_of_nat i \<and> rat_of_nat i \<le> q) = nat \<lfloor>q\<rfloor>"
+      apply (rule the1_equality[OF trunc_exists1[OF q]])
+      using q floor_less_cancel by force
+  }
+  thus ?thesis unfolding trunc_def by auto
+qed
 
 class wasm_int = wasm_int_ops +
+  assumes zero: "nat_of_int (0::'a) = 0"
   assumes add: "int_add (a::'a) b =
     rep_int ((abs_int a + abs_int b) mod (2^LENGTH('a)))"
   assumes sub: "int_sub (a::'a) b =
-    rep_int ((abs_int a - abs_int b + m) mod (2^LENGTH('a)))"
+    rep_int ((abs_int a - abs_int b + (2^LENGTH('a))) mod (2^LENGTH('a)))"
   assumes mul: "int_mul (a::'a) b =
     rep_int ((abs_int a * abs_int b) mod (2^LENGTH('a)))"
   assumes div_u_0: "b = 0 \<Longrightarrow> int_div_u (a::'a) b = None"
   assumes div_u_n0: "b \<noteq> 0 \<Longrightarrow> int_div_u (a::'a) b =
-    Some (rep_int (trunc (rat (abs_int a) / rat (abs_int b))))"
+    Some (rep_int (trunc (of_int (abs_int a) / of_int (abs_int b))))"
 
 class wasm_float = wasm_base +
   (* unops *)
