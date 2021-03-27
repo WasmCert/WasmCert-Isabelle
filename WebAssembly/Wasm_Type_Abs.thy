@@ -8,7 +8,7 @@ begin
 
 class wasm_base = zero
 
-class wasm_int = wasm_base +
+class wasm_int_ops = wasm_base + len +
   (* unops*)
   fixes int_clz :: "'a \<Rightarrow> 'a"
   fixes int_ctz :: "'a \<Rightarrow> 'a"
@@ -48,13 +48,13 @@ begin
   abbreviation (input)
   int_ne where
     "int_ne x y \<equiv> \<not> (int_eq x y)"
+
+  abbreviation rep_int :: "int \<Rightarrow> 'a"
+    where "rep_int a \<equiv> int_of_nat (nat a)"
+
+  abbreviation abs_int :: "'a \<Rightarrow> int"
+    where "abs_int a \<equiv> int (nat_of_int a)"
 end
-
-definition (in wasm_int) abs_int :: "int \<Rightarrow> 'a"
-  where "abs_int a = int_of_nat (nat a)"
-
-definition (in wasm_int) rep_int :: "'a \<Rightarrow> int"
-  where "rep_int a = int (nat_of_int a)"
 
 definition trunc :: "rat \<Rightarrow> int" where
   "trunc q \<equiv>
@@ -79,18 +79,16 @@ qed
 lemma trunc: "trunc q = (if q \<ge> 0 then \<lfloor>q\<rfloor> else -\<lfloor>-q\<rfloor>)"
   sorry
 
-locale Wasm_Int =
-  fixes n :: "'n :: len" \<comment>\<open>TODO: this should just be 'n\<close>
-    and x :: "'a :: wasm_int" \<comment>\<open>TODO: this should just be 'a\<close>
-    (*and N :: nat  \<comment>\<open>TODO\<close>
-    and m :: int
-  defines "N \<equiv> LENGTH('n)"
-    and "m \<equiv> 2^N" *)
-  assumes add: "int_add (a::'a) b = abs_int ((rep_int a + rep_int b) mod (2^LENGTH('n)))"
-    and sub: "int_sub (a::'a) b = abs_int ((rep_int a - rep_int b + m) mod (2^LENGTH('n)))"
-    and mul: "int_mul (a::'a) b = abs_int ((rep_int a * rep_int b) mod (2^LENGTH('n)))"
-    and div_u_0: "b = 0 \<Longrightarrow> int_div_u (a::'a) b = None"
-    and div_u_n0: "b \<noteq> 0 \<Longrightarrow> int_div_u (a::'a) b = Some (abs_int (trunc (rat (rep_int a) / rat (rep_int b))))"
+class wasm_int = wasm_int_ops +
+  assumes add: "int_add (a::'a) b =
+    rep_int ((abs_int a + abs_int b) mod (2^LENGTH('a)))"
+  assumes sub: "int_sub (a::'a) b =
+    rep_int ((abs_int a - abs_int b + m) mod (2^LENGTH('a)))"
+  assumes mul: "int_mul (a::'a) b =
+    rep_int ((abs_int a * abs_int b) mod (2^LENGTH('a)))"
+  assumes div_u_0: "b = 0 \<Longrightarrow> int_div_u (a::'a) b = None"
+  assumes div_u_n0: "b \<noteq> 0 \<Longrightarrow> int_div_u (a::'a) b =
+    Some (rep_int (trunc (rat (abs_int a) / rat (abs_int b))))"
 
 class wasm_float = wasm_base +
   (* unops *)

@@ -9,7 +9,8 @@ begin
 
 (* https://webassembly.github.io/spec/core/exec/numerics.html *)
 
-instantiation i32 :: wasm_int begin
+instantiation i32 :: wasm_int_ops begin
+  definition len_of_i32 :: "i32 itself \<Rightarrow> nat" where [simp]: "len_of_i32 _ = 32"
   lift_definition int_clz_i32 :: "i32 \<Rightarrow> i32" is undefined .
   lift_definition int_ctz_i32 :: "i32 \<Rightarrow> i32" is undefined .
   lift_definition int_popcnt_i32 :: "i32 \<Rightarrow> i32" is undefined .
@@ -44,19 +45,18 @@ instantiation i32 :: wasm_int begin
 
   lift_definition nat_of_int_i32 :: "i32 \<Rightarrow> nat" is "unat" .
   lift_definition int_of_nat_i32 :: "nat \<Rightarrow> i32" is "of_nat" .
-instance ..
-
+instance by standard simp
 end
 
-interpretation Wasm_Int "(THE x::32. True)" "Abs_i32 (of_nat 0)"
+instantiation i32 :: wasm_int begin
+instance
 proof (standard, goal_cases)
   case (1 a b)
-  have "(x::32 word) + y = word_of_int ((uint x + uint y) mod (2^32))" for x y
+  have plus: "(x::32 word) + y = word_of_int ((uint x + uint y) mod (2^32))" for x y
     apply (subst word_add_def)
     apply (subst word_uint.norm_norm(1)[THEN sym])
     by simp
-  then show ?case
-    unfolding int_add_i32_def abs_int_def rep_int_def int_of_nat_i32_def nat_of_int_i32_def by simp
+  then show ?case unfolding int_add_i32_def int_of_nat_i32_def nat_of_int_i32_def by simp
 next
   case (2 a b m)
   then show ?case sorry
@@ -71,7 +71,9 @@ next
   then show ?case sorry
 qed
 
-instantiation i64 :: wasm_int begin instance .. end
+end
+
+instantiation i64 :: wasm_int begin instance sorry end
 instantiation f32 :: wasm_float begin instance .. end
 instantiation f64 :: wasm_float begin instance .. end
 
