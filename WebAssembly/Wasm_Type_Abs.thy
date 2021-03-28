@@ -62,6 +62,20 @@ end
 
 (* https://webassembly.github.io/spec/core/exec/numerics.html *)
 
+definition signed :: "nat \<Rightarrow> int \<Rightarrow> int" where
+  "signed N i =
+    (if 0 \<le> i \<and> i < (2^(N-1)) then i
+    else if 2^(N-1) \<le> i \<and> i < 2^N then i - (2^N)
+    else undefined)"
+
+definition "signed_inv N \<equiv> the_inv (signed N)"
+
+abbreviation (in wasm_int_ops) abs_int_s :: "'a \<Rightarrow> int"
+  where "abs_int_s a \<equiv> signed LENGTH('a) (abs_int a)"
+
+abbreviation (in wasm_int_ops) rep_int_s :: "int \<Rightarrow> 'a"
+  where "rep_int_s a \<equiv> rep_int (signed_inv LENGTH('a) a)"
+
 definition trunc :: "rat \<Rightarrow> int" where
   "trunc q \<equiv>
     if 0 \<le> q
@@ -95,15 +109,25 @@ qed
 
 class wasm_int = wasm_int_ops +
   assumes zero: "nat_of_int (0::'a) = 0"
-  assumes add: "int_add (a::'a) b =
-    rep_int ((abs_int a + abs_int b) mod (2^LENGTH('a)))"
-  assumes sub: "int_sub (a::'a) b =
-    rep_int ((abs_int a - abs_int b + (2^LENGTH('a))) mod (2^LENGTH('a)))"
-  assumes mul: "int_mul (a::'a) b =
-    rep_int ((abs_int a * abs_int b) mod (2^LENGTH('a)))"
-  assumes div_u_0: "b = 0 \<Longrightarrow> int_div_u (a::'a) b = None"
-  assumes div_u_n0: "b \<noteq> 0 \<Longrightarrow> int_div_u (a::'a) b =
-    Some (rep_int (trunc (of_int (abs_int a) / of_int (abs_int b))))"
+  assumes add: "int_add (i\<^sub>1::'a) i\<^sub>2 =
+    rep_int ((abs_int i\<^sub>1 + abs_int i\<^sub>2) mod (2^LENGTH('a)))"
+  assumes sub: "int_sub (i\<^sub>1::'a) i\<^sub>2 =
+    rep_int ((abs_int i\<^sub>1 - abs_int i\<^sub>2 + (2^LENGTH('a))) mod (2^LENGTH('a)))"
+  assumes mul: "int_mul (i\<^sub>1::'a) i\<^sub>2 =
+    rep_int ((abs_int i\<^sub>1 * abs_int i\<^sub>2) mod (2^LENGTH('a)))"
+  assumes div_u_0: "i\<^sub>2 = 0 \<Longrightarrow> int_div_u (i\<^sub>1::'a) i\<^sub>2 = None"
+  assumes div_u: "i\<^sub>2 \<noteq> 0 \<Longrightarrow> int_div_u (i\<^sub>1::'a) i\<^sub>2 =
+    Some (rep_int (trunc (of_int (abs_int i\<^sub>1) / of_int (abs_int i\<^sub>2))))"
+  assumes div_s_0: "i\<^sub>2 = 0 \<Longrightarrow> int_div_s (i\<^sub>1::'a) i\<^sub>2 = None"
+  assumes div_s_nrep:
+    "i\<^sub>2 \<noteq> 0
+    \<Longrightarrow> rat_of_int (abs_int_s i\<^sub>1) / of_int (abs_int_s i\<^sub>2) = 2^(LENGTH('a)-1)
+    \<Longrightarrow> int_div_s (i\<^sub>1::'a) i\<^sub>2 = None"
+  assumes div_s:
+    "i\<^sub>2 \<noteq> 0
+    \<Longrightarrow> rat_of_int (abs_int_s i\<^sub>1) / of_int (abs_int_s i\<^sub>2) \<noteq> 2^(LENGTH('a)-1)
+    \<Longrightarrow> int_div_s (i\<^sub>1::'a) i\<^sub>2 =
+            Some (rep_int_s (trunc (of_int (abs_int_s i\<^sub>1) / of_int (abs_int_s i\<^sub>2))))"
 
 class wasm_float = wasm_base +
   (* unops *)
