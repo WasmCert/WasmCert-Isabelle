@@ -100,15 +100,21 @@ next
 next
   case (6 b a)
   hence "abs_int b > 0" by (rule nonzero_i32_int)
-  hence "abs_int a div abs_int b = trunc (rat_of_int (abs_int a) / rat_of_int (abs_int b))"
+  hence div: "trunc (rat_of_int (abs_int a) / rat_of_int (abs_int b)) = abs_int a div abs_int b"
     apply (subst floor_divide_of_int_eq[THEN sym])
     apply (subst trunc)
     by simp
+  have "Rep_i32 a div Rep_i32 b =
+      word_of_nat (nat (trunc (rat_of_int (abs_int a) / rat_of_int (abs_int b))))"
+    apply (subst div)
+    apply (rule word_eq_unatI)
+    unfolding nat_of_int_i32.rep_eq by (simp add: nat_div_as_int word_arith_nat_div)
   hence "Abs_i32 (Rep_i32 a div Rep_i32 b) =
-    rep_int (trunc ((rat_of_int \<circ> int \<circ> unat) (Rep_i32 a) / (rat_of_int \<circ> int \<circ> unat) (Rep_i32 b)))"
-    (* TODO: fix this ugliness *)
-    by (metis (mono_tags, hide_lams) int_of_nat_i32.abs_eq map_fun_apply map_fun_def nat_of_int_i32.rep_eq uint_div_distrib uint_nat unat_eq_nat_uint word_unat.Rep_inverse)
-  thus ?case unfolding int_div_u_i32_def nat_of_int_i32_def using nonzero_i32[OF 6] by simp
+    rep_int (trunc (rat_of_int (abs_int a) / rat_of_int (abs_int b)))"
+    apply (subst int_of_nat_i32_def)
+    apply (subst map_fun_def, subst o_id, subst comp_def)
+    by simp
+  thus ?case unfolding int_div_u_i32_def using nonzero_i32[OF 6] by simp
 qed
 
 end
