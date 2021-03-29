@@ -10,7 +10,12 @@ begin
 definition word_sdiv :: "('a::len) word \<Rightarrow> 'a word \<Rightarrow> 'a word" where
   "word_sdiv i\<^sub>1 i\<^sub>2 = of_int (sint i\<^sub>1 div sint i\<^sub>2)"
 
-lemma "(i\<^sub>1::'a::len word) = of_int (-(2^(LENGTH('a)-1))) \<and> i\<^sub>2 = of_int (-1)
+
+lemma mult_inv_le: "(a::int) < 0 \<Longrightarrow> b \<ge> 0 \<Longrightarrow> a * b \<le> -b"
+  by (metis add.inverse_inverse mult.commute mult.right_neutral
+      mult_minus_right neg_0_less_iff_less neg_le_iff_le pos_mult_pos_ge)
+
+lemma sdiv_nrep: "(i\<^sub>1::'a::len word) = of_int (-(2^(LENGTH('a)-1))) \<and> i\<^sub>2 = of_int (-1)
   \<longleftrightarrow> rat_of_int (sint i\<^sub>1) / of_int (sint i\<^sub>2) = 2^(LENGTH('a)-1)"
 proof (rule iffI, goal_cases)
   case 1
@@ -22,11 +27,44 @@ next
     hence nz: "rat_of_int (sint i\<^sub>1) \<noteq> 0" using signed_eq_0_iff 2 by force
     from 2 this i2 have "rat_of_int (sint i\<^sub>1) = rat_of_int (sint i\<^sub>2) * 2 ^ (LENGTH('a) - 1)"
       by (metis Word.of_int_sint nonzero_mult_div_cancel_left signed_eq_0_iff times_divide_eq_right)
-    hence "sint i\<^sub>1 = sint i\<^sub>2 * (2 ^ (LENGTH('a) - 1))"
+    hence mul: "sint i\<^sub>1 = sint i\<^sub>2 * (2 ^ (LENGTH('a) - 1))"
       by (subst of_int_eq_iff[THEN sym], subst of_int_mult) simp
-    (* ... *)
+    have "sint i\<^sub>1 = - (2 ^ (LENGTH('a) - 1))"
+    proof (rule ccontr)
+      assume "sint i\<^sub>1 \<noteq> - (2 ^ (LENGTH('a) - 1))"
+      hence gt: "sint i\<^sub>1 > - (2 ^ (LENGTH('a) - 1))" using sint_ge[of i\<^sub>1] by linarith
+      have "sint i\<^sub>1 \<ge> 0"
+      proof (rule ccontr)
+        assume "\<not>sint i\<^sub>1 \<ge> 0"
+        hence i1_lt_0: "sint i\<^sub>1 < 0" by simp
+        have "sint i\<^sub>2 \<noteq> 0" apply (rule ccontr) using mul i1_lt_0 by simp
+        {
+          assume "sint i\<^sub>2 > 0"
+          hence "sint i\<^sub>2 * (2 ^ (LENGTH('a) - 1)) \<ge> (2 ^ (LENGTH('a) - 1))"
+            by force
+          hence False using gt i1_lt_0 local.mul by linarith
+        }
+        {
+          assume "sint i\<^sub>2 < 0"
+          have "sint i\<^sub>2 * (2 ^ (LENGTH('a) - 1)) \<le> -(2 ^ (LENGTH('a) - 1))"
+            by (rule mult_inv_le) (simp_all add: \<open>sint i\<^sub>2 < 0\<close>)
+          hence False using mul gt by linarith
+        }
+        then show False using \<open>0 < sint i\<^sub>2 \<Longrightarrow> False\<close> \<open>sint i\<^sub>2 \<noteq> 0\<close> by fastforce
+      qed
+      hence "sint i\<^sub>1 \<ge> (2 ^ (LENGTH('a) - 1))" using mul
+        by (metis div_pos_pos_trivial i2 mult.commute nonzero_mult_div_cancel_left
+            of_int_0 sint_lt word_sint.Rep_inverse)
+      thus False by (smt (z3) sint_lt)
+    qed
+    hence "sint i\<^sub>1 = - (2 ^ (LENGTH('a) - 1)) \<and> sint i\<^sub>2 = - 1" using mul
+      by (smt (z3) mult_cancel_right1 mult_minus_left
+          semiring_1_no_zero_divisors_class.power_not_zero)
   }
-  show ?case sorry
+  thus ?case
+    apply (cases "i\<^sub>2 \<noteq> 0")
+      apply (subst word_sint.Rep_inverse[THEN sym])
+    using 2 by simp_all
 qed
 
 instantiation i32 :: wasm_int_ops begin
@@ -96,6 +134,26 @@ proof -
   thus ?thesis using nonneg_i32 by fastforce
 qed
 
+lemma length_i32: "LENGTH(i32) = LENGTH(32)" by simp
+
+lemma abs_int_s_i32: "abs_int_s x = sint (Rep_i32 x)"
+proof (cases "msb (Rep_i32 x)")
+  case True
+  hence sint: "sint (Rep_i32 x) = uint (Rep_i32 x) - 2 ^ LENGTH(i32)"
+    by (simp add: word_sint_msb_eq word_size)
+  moreover from this have "2^(LENGTH(i32)-1) \<le> (uint (Rep_i32 x))"
+    apply (subst length_i32)
+    by (metis True diff_less len_gt_0 less_one not_le not_msb_from_less size_word.rep_eq word_2p_lem)
+  ultimately show ?thesis unfolding abs_int_i32 signed_def length_i32
+    linorder_not_less[THEN sym] by (metis uint_lt2p)
+next
+  case False
+  have "sint (Rep_i32 x) < (2^(LENGTH(i32)-1))"
+    apply (subst length_i32)
+    using sint_lt by blast
+  thus ?thesis unfolding abs_int_i32 signed_def sint_eq_uint[OF False] by simp
+qed
+
 instantiation i32 :: wasm_int begin
 instance
 proof (standard, goal_cases)
@@ -148,10 +206,22 @@ next
   thus ?case unfolding int_div_s_i32_def using zero_i32.rep_eq by simp
 next
   case (8 i\<^sub>2 i\<^sub>1)
-  show ?case unfolding int_div_s_i32_def try0
+  hence "Rep_i32 i\<^sub>1 = word_of_int (- (2 ^ (LENGTH(32) - 1))) \<and> Rep_i32 i\<^sub>2 = word_of_int (- 1)"
+    using sdiv_nrep[THEN iffD2, of "Rep_i32 i\<^sub>1" "Rep_i32 i\<^sub>2"] 8(2)[unfolded abs_int_s_i32] by simp
+  thus ?case unfolding int_div_s_i32_def by simp
 next
   case (9 i\<^sub>2 i\<^sub>1)
-  show ?case sorry
+  have "\<not>((Rep_i32 i\<^sub>1) = of_int (-(2^31)) \<and> (Rep_i32 i\<^sub>2) = of_int (-1))"
+    using sdiv_nrep[THEN iffD2] 9(2)[unfolded abs_int_s_i32] by force
+  from 9(1) this have "int_div_s i\<^sub>1 i\<^sub>2 = Some (Abs_i32 (of_int (sint (Rep_i32 i\<^sub>1) div sint (Rep_i32 i\<^sub>2))))"
+    sorry (* works by sledgehammer *)
+  also have "\<dots> = Some (rep_int_s (trunc (rat_of_int (abs_int_s i\<^sub>1) / rat_of_int (abs_int_s i\<^sub>2))))"
+  proof -
+    have "Abs_i32 (of_int (sint (Rep_i32 i\<^sub>1) div sint (Rep_i32 i\<^sub>2))) =
+      rep_int_s (trunc (rat_of_int (abs_int_s i\<^sub>1) / rat_of_int (abs_int_s i\<^sub>2)))" sorry
+    thus ?thesis by simp
+  qed
+  finally show ?case .
 qed
 
 end
