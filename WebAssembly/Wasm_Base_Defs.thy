@@ -154,6 +154,16 @@ next
   thus ?thesis unfolding abs_int_i32 signed_def sint_eq_uint[OF False] by simp
 qed
 
+lemma abs_int_s_i32: "rep_int_s i = Abs_i32 (of_int i)"
+proof (cases "i \<ge> 0")
+  case True
+  then show ?thesis sorry
+next
+  case False
+  then show ?thesis sorry
+qed
+
+
 instantiation i32 :: wasm_int begin
 instance
 proof (standard, goal_cases)
@@ -211,10 +221,12 @@ next
   thus ?case unfolding int_div_s_i32_def by simp
 next
   case (9 i\<^sub>2 i\<^sub>1)
-  have "\<not>((Rep_i32 i\<^sub>1) = of_int (-(2^31)) \<and> (Rep_i32 i\<^sub>2) = of_int (-1))"
-    using sdiv_nrep[THEN iffD2] 9(2)[unfolded abs_int_s_i32] by force
-  from 9(1) this have "int_div_s i\<^sub>1 i\<^sub>2 = Some (Abs_i32 (of_int (sint (Rep_i32 i\<^sub>1) div sint (Rep_i32 i\<^sub>2))))"
-    sorry (* works by sledgehammer *)
+  have ncond: "\<not>(i\<^sub>2 = 0 \<or> ((Rep_i32 i\<^sub>1) = of_int (-(2^31)) \<and> (Rep_i32 i\<^sub>2) = of_int (-1)))"
+    using sdiv_nrep[THEN iffD2] 9(2)[unfolded abs_int_s_i32] 9(1) by force
+  have "int_div_s i\<^sub>1 i\<^sub>2 = int_div_s (Abs_i32 (Rep_i32 i\<^sub>1)) (Abs_i32 (Rep_i32 i\<^sub>2))"
+    unfolding Rep_i32_inverse[of i\<^sub>1] Rep_i32_inverse[of i\<^sub>2] ..
+  also have "\<dots> = Some (Abs_i32 (of_int (sint (Rep_i32 i\<^sub>1) div sint (Rep_i32 i\<^sub>2))))"
+    unfolding int_div_s_i32.abs_eq using ncond nonzero_i32 by simp
   also have "\<dots> = Some (rep_int_s (trunc (rat_of_int (abs_int_s i\<^sub>1) / rat_of_int (abs_int_s i\<^sub>2))))"
   proof -
     have "Abs_i32 (of_int (sint (Rep_i32 i\<^sub>1) div sint (Rep_i32 i\<^sub>2))) =
