@@ -168,7 +168,7 @@ lemma signed_bij:
   shows "bij_betw (signed N) {0 ..< 2^N} {-(2^(N-1)) ..< 2^(N-1)}"
   by (rule bij_betw_imageI[OF signed_inj[OF assms] signed_image[OF assms]])
 
-lemma 
+lemma signed_inv:
   assumes "0 < N" "- (2^(N-1)) \<le> i" "i < 2^(N-1)"
   shows "signed_inv N i = (if 0 \<le> i then i else i + (2^N))"
 proof (cases "0 \<le> i")

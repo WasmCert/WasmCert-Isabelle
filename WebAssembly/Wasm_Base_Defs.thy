@@ -154,13 +154,33 @@ next
   thus ?thesis unfolding abs_int_i32 signed_def sint_eq_uint[OF False] by simp
 qed
 
-lemma abs_int_s_i32: "rep_int_s i = Abs_i32 (of_int i)"
-proof (cases "i \<ge> 0")
-  case True
-  then show ?thesis sorry
-next
-  case False
-  then show ?thesis sorry
+lemma rep_int_s_i32:
+  assumes
+    "- (2^(LENGTH(i32) - 1)) \<le> i"
+    "i < 2^(LENGTH(i32) - 1)"
+  shows "rep_int_s i = Abs_i32 (of_int i)"
+proof -
+  have N: "0 < LENGTH(i32)" by simp
+  note inv = signed_inv[OF N assms]
+  {
+    assume "i < 0"
+    let ?x = "i + 2^LENGTH(i32)"
+    have nneg: "0 \<le> ?x" using half_power[of "LENGTH(i32)"] assms(1) by force
+    have "word_of_nat (nat ?x) = (word_of_int i::32 word)"
+      apply (subst word_of_int_nat[OF nneg, THEN sym])
+      apply (subst word_uint.Abs_norm[of i, where 'a=32, THEN sym])
+      apply (subst mod_add_self2[THEN sym])
+      apply (subst word_uint.Abs_norm[where 'a=32])
+      apply (subst length_i32)
+      ..
+    hence "Abs_i32 (word_of_nat (nat (i + 2^LENGTH(i32)))) = Abs_i32 (word_of_int i)"
+      by (rule arg_cong)
+  }
+  note negcase = this
+  show ?thesis
+    apply (cases "0 \<le> i")
+    subgoal unfolding inv int_of_nat_i32_def by simp
+    unfolding inv int_of_nat_i32_def using negcase by simp
 qed
 
 
