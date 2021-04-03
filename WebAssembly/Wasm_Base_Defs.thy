@@ -67,6 +67,13 @@ next
     using 2 by simp_all
 qed
 
+\<comment>\<open>div on int in HOL rounds towards -\<infinity> but we have to round towards 0.\<close>
+definition int_div_0 :: "int \<Rightarrow> int \<Rightarrow> int"
+  where "int_div_0 a b \<equiv>
+    if 0 \<le> rat_of_int a / rat_of_int b
+    then \<lfloor>rat_of_int a / rat_of_int b\<rfloor>
+    else -\<lfloor>-(rat_of_int a / rat_of_int b)\<rfloor>"
+
 instantiation i32 :: wasm_int_ops begin
   lift_definition zero_i32 :: i32 is "of_nat 0" .
   definition len_of_i32 :: "i32 itself \<Rightarrow> nat" where [simp]: "len_of_i32 _ = 32"
@@ -82,7 +89,8 @@ instantiation i32 :: wasm_int_ops begin
   lift_definition int_div_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is 
     "\<lambda>i\<^sub>1 i\<^sub>2.
       if i\<^sub>2 = 0 \<or> (i\<^sub>1 = of_int (-(2^31)) \<and> i\<^sub>2 = of_int (-1))
-      then None else Some (of_int (sint i\<^sub>1 div sint i\<^sub>2))" .
+      then None
+      else Some (of_int (int_div_0 (sint i\<^sub>1) (sint i\<^sub>2)))" .
   lift_definition int_rem_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is undefined .
   lift_definition int_rem_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is undefined .
   lift_definition int_and_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
@@ -183,6 +191,54 @@ proof -
     unfolding inv int_of_nat_i32_def using negcase by simp
 qed
 
+lemma div_rat_int_bounds:
+  assumes
+    "0 \<le> (L::rat)"
+    "b \<noteq> 0"
+    "1 \<le> abs b"
+    "-L \<le> a"
+    "a \<le> L"
+  shows
+    "-L \<le> a / b"
+    "a / b \<le> L"
+proof -
+  let ?a = "abs a"
+  let ?b = "abs b"
+  have "?a / ?b \<le> L / 1"
+    apply (rule frac_le[OF \<open>0 \<le> (L::rat)\<close>])
+    using \<open>-L \<le> a\<close> \<open>a \<le> L\<close> apply linarith
+    apply linarith
+    using \<open>1 \<le> abs b\<close> .
+  hence div: "?a / ?b \<le> L" by simp
+  {
+    assume ab: "0 < a \<and> 0 < b \<or> a < 0 \<and> b < 0"
+    have g0: "0 \<le> a / b" using divide_le_0_iff
+      unfolding less_eq_rat_def using ab by (simp add: zero_less_divide_iff)
+    from g0 \<open>0 \<le> L\<close> have lb: "-L \<le> a / b" by linarith
+    have "a / b = ?a / ?b" using abs_divide abs_of_nonneg g0 by fastforce
+    hence ub: "a / b \<le> L" using div by simp
+    note lb ub
+  }
+  note pos = this
+  {
+    assume ab: "0 < a \<and> b < 0 \<or> a < 0 \<and> 0 < b"
+    hence neg: "a / b < 0" by (simp add: divide_less_0_iff)
+    have ub: "a / b \<le> L" using neg assms(1) by linarith
+    have "a / b = - (?a / ?b)"
+      unfolding abs_divide[THEN sym] using abs_of_neg[OF neg] by linarith
+    hence lb: "-L \<le> a / b" using div by linarith
+    note lb ub
+  }
+  note neg = this
+  have zero: "a = 0 \<Longrightarrow> -L \<le> a / b \<and> a / b \<le> L" using \<open>0 \<le> L\<close> by force
+  have "-L \<le> a / b \<and> a / b \<le> L"
+    apply (cases "a < 0"; cases "b < 0")
+      subgoal using pos by blast
+      subgoal using neg zero \<open>b \<noteq> 0\<close> by force
+      subgoal using neg zero \<open>b \<noteq> 0\<close> by force
+      using pos zero \<open>b \<noteq> 0\<close> by force
+  thus "-L \<le> a / b" "a / b \<le> L" by simp_all
+qed
 
 instantiation i32 :: wasm_int begin
 instance
@@ -245,12 +301,40 @@ next
     using sdiv_nrep[THEN iffD2] 9(2)[unfolded abs_int_s_i32] 9(1) by force
   have "int_div_s i\<^sub>1 i\<^sub>2 = int_div_s (Abs_i32 (Rep_i32 i\<^sub>1)) (Abs_i32 (Rep_i32 i\<^sub>2))"
     unfolding Rep_i32_inverse[of i\<^sub>1] Rep_i32_inverse[of i\<^sub>2] ..
-  also have "\<dots> = Some (Abs_i32 (of_int (sint (Rep_i32 i\<^sub>1) div sint (Rep_i32 i\<^sub>2))))"
+  also have "\<dots> = Some (Abs_i32 (of_int (int_div_0 (sint (Rep_i32 i\<^sub>1)) (sint (Rep_i32 i\<^sub>2)))))"
     unfolding int_div_s_i32.abs_eq using ncond nonzero_i32 by simp
   also have "\<dots> = Some (rep_int_s (trunc (rat_of_int (abs_int_s i\<^sub>1) / rat_of_int (abs_int_s i\<^sub>2))))"
   proof -
-    have "Abs_i32 (of_int (sint (Rep_i32 i\<^sub>1) div sint (Rep_i32 i\<^sub>2))) =
-      rep_int_s (trunc (rat_of_int (abs_int_s i\<^sub>1) / rat_of_int (abs_int_s i\<^sub>2)))" sorry
+    let ?r = "rat_of_int (abs_int_s i\<^sub>1) / rat_of_int (abs_int_s i\<^sub>2)"
+    have b0: "(0::rat) \<le> 2 ^ (LENGTH(i32) - 1)" by simp
+    have b1: "rat_of_int (abs_int_s i\<^sub>2) \<noteq> 0"
+      using abs_int_s_i32 ncond nonzero_i32 signed_eq_0_iff by auto
+    have b2: "1 \<le> \<bar>rat_of_int (abs_int_s i\<^sub>2)\<bar>" using b1 by force
+    have "- (2 ^ (LENGTH(i32) - 1)) \<le> abs_int_s i\<^sub>1"
+      apply (subst abs_int_s_i32)
+      apply (subst length_i32)
+      using sint_ge .
+    hence b3: "- (2 ^ (LENGTH(i32) - 1)) \<le> rat_of_int (abs_int_s i\<^sub>1)" by force
+    have "abs_int_s i\<^sub>1 < 2 ^ (LENGTH(i32) - 1)"
+      apply (subst abs_int_s_i32)
+      apply (subst length_i32)
+      using sint_lt .
+    hence b4: "rat_of_int (abs_int_s i\<^sub>1) \<le> 2 ^ (LENGTH(i32) - 1)" by force
+    note bounds = div_rat_int_bounds[OF b0 b1 b2 b3 b4]
+    have ubnex: "?r \<noteq> 2^(LENGTH(i32) - 1)" using "9"(2) by fastforce
+    hence ubr: "?r < 2^(LENGTH(i32) - 1)" using bounds(2) by linarith
+    have lb: "- (2^(LENGTH(i32) - 1)) \<le> trunc ?r" unfolding trunc using bounds(1)
+      by (cases "0 \<le> ?r") auto
+    have ubb: "a \<ge> 1 \<Longrightarrow> ?r < 0 \<Longrightarrow> - \<lfloor>- ?r\<rfloor> < a" for a by linarith
+    have ub: "trunc ?r < 2^(LENGTH(i32) - 1)" unfolding trunc using ubr ubb
+      by (cases "0 \<le> ?r") auto
+    have div: "int_div_0 (sint (Rep_i32 i\<^sub>1)) (sint (Rep_i32 i\<^sub>2)) = trunc ?r"
+      apply (subst int_div_0_def)
+      apply (subst trunc)
+      unfolding abs_int_s_i32 ..
+    have "Abs_i32 (of_int (int_div_0 (sint (Rep_i32 i\<^sub>1)) (sint (Rep_i32 i\<^sub>2))))
+      = rep_int_s (trunc ?r)"
+      unfolding rep_int_s_i32[OF lb ub] div ..
     thus ?thesis by simp
   qed
   finally show ?case .
