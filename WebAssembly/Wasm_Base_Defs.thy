@@ -4,12 +4,8 @@ theory Wasm_Base_Defs
   imports
     Wasm_Ast
     Wasm_Type_Abs
-    "Word_Lib.Most_significant_bit"
+    "Word_Lib.Signed_Division_Word"
 begin
-
-definition word_sdiv :: "('a::len) word \<Rightarrow> 'a word \<Rightarrow> 'a word" where
-  "word_sdiv i\<^sub>1 i\<^sub>2 = of_int (sint i\<^sub>1 div sint i\<^sub>2)"
-
 
 lemma mult_inv_le: "(a::int) < 0 \<Longrightarrow> b \<ge> 0 \<Longrightarrow> a * b \<le> -b"
   by (metis add.inverse_inverse mult.commute mult.right_neutral
@@ -67,13 +63,6 @@ next
     using 2 by simp_all
 qed
 
-\<comment>\<open>div on int in HOL rounds towards -\<infinity> but we have to round towards 0.\<close>
-definition int_div_0 :: "int \<Rightarrow> int \<Rightarrow> int"
-  where "int_div_0 a b \<equiv>
-    if 0 \<le> rat_of_int a / rat_of_int b
-    then \<lfloor>rat_of_int a / rat_of_int b\<rfloor>
-    else -\<lfloor>-(rat_of_int a / rat_of_int b)\<rfloor>"
-
 instantiation i32 :: wasm_int_ops begin
   lift_definition zero_i32 :: i32 is "of_nat 0" .
   definition len_of_i32 :: "i32 itself \<Rightarrow> nat" where [simp]: "len_of_i32 _ = 32"
@@ -90,7 +79,7 @@ instantiation i32 :: wasm_int_ops begin
     "\<lambda>i\<^sub>1 i\<^sub>2.
       if i\<^sub>2 = 0 \<or> (i\<^sub>1 = of_int (-(2^31)) \<and> i\<^sub>2 = of_int (-1))
       then None
-      else Some (of_int (int_div_0 (sint i\<^sub>1) (sint i\<^sub>2)))" .
+      else Some (i\<^sub>1 sdiv i\<^sub>2)" .
   lift_definition int_rem_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is undefined .
   lift_definition int_rem_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is undefined .
   lift_definition int_and_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
@@ -240,6 +229,47 @@ proof -
   thus "-L \<le> a / b" "a / b \<le> L" by simp_all
 qed
 
+lemma sdiv_trunc:
+  assumes "b \<noteq> 0"
+  shows "(a::int) sdiv b = trunc (rat_of_int a / rat_of_int b)"
+proof -
+  let ?a = "rat_of_int a"
+  let ?b = "rat_of_int b"
+  show ?thesis
+  proof (cases "0 < ?a / ?b")
+    case True
+    have "\<not>(0 \<le> ?a \<and> ?b \<le> 0 \<or> ?a \<le> 0 \<and> 0 \<le> ?b)"
+      unfolding divide_le_0_iff[THEN sym] using True by linarith
+    hence sgn: "sgn a = sgn b" using of_int_0_le_iff of_int_le_0_iff by fastforce
+    hence "a sdiv b = \<lfloor>rat_of_int a / rat_of_int b\<rfloor>"
+      unfolding signed_divide_int_def
+      by (simp add: div_eq_sgn_abs floor_divide_of_int_eq)
+    thus ?thesis unfolding trunc using True by simp
+  next
+    case False
+    note res_ge_0 = this
+    show ?thesis
+    proof (cases "a = 0")
+      case False
+      have signs: "0 \<le> ?a \<and> ?b \<le> 0 \<or> ?a \<le> 0 \<and> 0 \<le> ?b"
+        unfolding divide_le_0_iff[THEN sym] using res_ge_0 by linarith
+      hence "sgn a \<noteq> sgn b"
+        apply (rule disjE)
+        using assms using order_class.order.antisym apply fastforce
+        using assms dual_order.antisym by fastforce
+      hence sgn: "sgn a * sgn b = -1" unfolding sgn_if using False assms by presburger
+      have "\<bar>a\<bar> div \<bar>b\<bar> =  \<lfloor>\<bar>?a\<bar> / \<bar>?b\<bar>\<rfloor>"
+        unfolding of_int_abs[THEN sym] floor_divide_of_int_eq ..
+      also have "\<dots> = \<lfloor>- (rat_of_int a / rat_of_int b)\<rfloor>"
+        apply (cases "?a \<le> 0") using signs by auto
+      finally have "a sdiv b = - \<lfloor>- (rat_of_int a / rat_of_int b)\<rfloor>"
+        unfolding signed_divide_int_def using sgn by simp
+      thus ?thesis unfolding trunc using res_ge_0 by simp
+    qed (simp add: trunc)
+  qed
+qed
+
+
 instantiation i32 :: wasm_int begin
 instance
 proof (standard, goal_cases)
@@ -301,7 +331,7 @@ next
     using sdiv_nrep[THEN iffD2] 9(2)[unfolded abs_int_s_i32] 9(1) by force
   have "int_div_s i\<^sub>1 i\<^sub>2 = int_div_s (Abs_i32 (Rep_i32 i\<^sub>1)) (Abs_i32 (Rep_i32 i\<^sub>2))"
     unfolding Rep_i32_inverse[of i\<^sub>1] Rep_i32_inverse[of i\<^sub>2] ..
-  also have "\<dots> = Some (Abs_i32 (of_int (int_div_0 (sint (Rep_i32 i\<^sub>1)) (sint (Rep_i32 i\<^sub>2)))))"
+  also have "\<dots> = Some (Abs_i32 (Rep_i32 i\<^sub>1 sdiv Rep_i32 i\<^sub>2))"
     unfolding int_div_s_i32.abs_eq using ncond nonzero_i32 by simp
   also have "\<dots> = Some (rep_int_s (trunc (rat_of_int (abs_int_s i\<^sub>1) / rat_of_int (abs_int_s i\<^sub>2))))"
   proof -
@@ -328,12 +358,12 @@ next
     have ubb: "a \<ge> 1 \<Longrightarrow> ?r < 0 \<Longrightarrow> - \<lfloor>- ?r\<rfloor> < a" for a by linarith
     have ub: "trunc ?r < 2^(LENGTH(i32) - 1)" unfolding trunc using ubr ubb
       by (cases "0 \<le> ?r") auto
-    have div: "int_div_0 (sint (Rep_i32 i\<^sub>1)) (sint (Rep_i32 i\<^sub>2)) = trunc ?r"
-      apply (subst int_div_0_def)
-      apply (subst trunc)
+    have div: "Rep_i32 i\<^sub>1 sdiv Rep_i32 i\<^sub>2 = of_int (trunc ?r)"
+      apply (subst word_sdiv_def)
+      apply (subst sdiv_trunc)
+      using ncond nonzero_i32 apply auto[1]
       unfolding abs_int_s_i32 ..
-    have "Abs_i32 (of_int (int_div_0 (sint (Rep_i32 i\<^sub>1)) (sint (Rep_i32 i\<^sub>2))))
-      = rep_int_s (trunc ?r)"
+    have "Abs_i32 (Rep_i32 i\<^sub>1 sdiv Rep_i32 i\<^sub>2) = rep_int_s (trunc ?r)"
       unfolding rep_int_s_i32[OF lb ub] div ..
     thus ?thesis by simp
   qed
