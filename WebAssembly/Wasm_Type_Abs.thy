@@ -260,6 +260,12 @@ class wasm_int = wasm_int_ops +
     \<Longrightarrow> rat_of_int (abs_int_s i\<^sub>1) / of_int (abs_int_s i\<^sub>2) \<noteq> 2^(LENGTH('a)-1)
     \<Longrightarrow> int_div_s (i\<^sub>1::'a) i\<^sub>2 =
             Some (rep_int_s (trunc (of_int (abs_int_s i\<^sub>1) / of_int (abs_int_s i\<^sub>2))))"
+  assumes rem_u_0: "i\<^sub>2 = 0 \<Longrightarrow> int_rem_u (i\<^sub>1::'a) i\<^sub>2 = None"
+  assumes rem_u: "i\<^sub>2 \<noteq> 0 \<Longrightarrow> int_rem_u (i\<^sub>1::'a) i\<^sub>2 =
+    Some (rep_int (abs_int i\<^sub>1 - abs_int i\<^sub>2 * trunc (of_int (abs_int i\<^sub>1) / of_int (abs_int i\<^sub>2))))"
+  assumes rem_s_0: "i\<^sub>2 = 0 \<Longrightarrow> int_rem_s (i\<^sub>1::'a) i\<^sub>2 = None"
+  assumes rem_s: "i\<^sub>2 \<noteq> 0 \<Longrightarrow> int_rem_u (i\<^sub>1::'a) i\<^sub>2 = Some (rep_int_s (
+      abs_int_s i\<^sub>1 - abs_int_s i\<^sub>2 * trunc (of_int (abs_int_s i\<^sub>1) / of_int (abs_int_s i\<^sub>2))))"
 
 class wasm_float = wasm_base +
   (* unops *)

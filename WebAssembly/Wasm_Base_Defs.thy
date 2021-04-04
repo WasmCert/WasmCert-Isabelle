@@ -338,6 +338,18 @@ next
     thus ?thesis by simp
   qed
   finally show ?case .
+next
+  case (10 i\<^sub>2 i\<^sub>1)
+  then show ?case sorry
+next
+  case (11 i\<^sub>2 i\<^sub>1)
+  then show ?case sorry
+next
+  case (12 i\<^sub>2 i\<^sub>1)
+  then show ?case sorry
+next
+  case (13 i\<^sub>2 i\<^sub>1)
+  then show ?case sorry
 qed
 
 end
