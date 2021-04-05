@@ -82,7 +82,8 @@ instantiation i32 :: wasm_int_ops begin
       else Some (i\<^sub>1 sdiv i\<^sub>2)" .
   lift_definition int_rem_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is
     "\<lambda>i\<^sub>1 i\<^sub>2. if i\<^sub>2 = 0 then None else Some (i\<^sub>1 mod i\<^sub>2)" .
-  lift_definition int_rem_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is undefined .
+lift_definition int_rem_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is
+    "\<lambda>i\<^sub>1 i\<^sub>2. if i\<^sub>2 = 0 then None else Some (i\<^sub>1 smod i\<^sub>2)".
   lift_definition int_and_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
   lift_definition int_or_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
   lift_definition int_xor_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
@@ -274,7 +275,7 @@ lemma trunc_div:
   "trunc (rat_of_nat (nat_of_int i\<^sub>1) / rat_of_nat (nat_of_int i\<^sub>2)) = uint (Rep_i32 i\<^sub>1 div Rep_i32 i\<^sub>2)"
   by (simp add: abs_int_i32 floor_divide_of_nat_eq trunc uint_div zdiv_int)
 
-lemma mod_u_distr: "i\<^sub>1 - i\<^sub>2 * (i\<^sub>1 div i\<^sub>2) = word_of_nat (nat (uint i\<^sub>1 - uint i\<^sub>2 * uint (i\<^sub>1 div i\<^sub>2)))"
+lemma mod_distr: "i\<^sub>1 - i\<^sub>2 * (i\<^sub>1 div i\<^sub>2) = word_of_nat (nat (uint i\<^sub>1 - uint i\<^sub>2 * uint (i\<^sub>1 div i\<^sub>2)))"
 proof -
   have "i\<^sub>1 - i\<^sub>2 * (i\<^sub>1 div i\<^sub>2) = word_of_int (uint i\<^sub>1 - uint i\<^sub>2 * uint (i\<^sub>1 div i\<^sub>2))" by force
   moreover have "0 \<le> uint i\<^sub>1 - uint i\<^sub>2 * uint (i\<^sub>1 div i\<^sub>2)"
@@ -286,6 +287,20 @@ proof -
     thus ?thesis by linarith
   qed
   ultimately show ?thesis by (subst (asm) word_of_int_nat)
+qed
+
+lemma smod_distr
+: "(i\<^sub>1 - i\<^sub>2 * (i\<^sub>1 sdiv i\<^sub>2)) =
+      (word_of_nat (nat (signed_inv 32 (sint i\<^sub>1 - sint i\<^sub>2 * (sint i\<^sub>1 sdiv sint i\<^sub>2)))))"
+proof -
+  have "i\<^sub>1 - i\<^sub>2 * (i\<^sub>1 sdiv i\<^sub>2) = word_of_int (sint i\<^sub>1 - sint i\<^sub>2 * sint (i\<^sub>1 sdiv i\<^sub>2))" by force
+  also have "\<dots> = word_of_nat (nat (signed_inv 32 (sint i\<^sub>1 - sint i\<^sub>2 * (sint i\<^sub>1 sdiv sint i\<^sub>2))))"
+    apply (subst word_of_int_nat[THEN sym])
+    subgoal apply (rule signed_inv_nneg)
+      apply simp
+      sorry
+    sorry
+  finally show ?thesis .
 qed
 
 instantiation i32 :: wasm_int begin
@@ -388,18 +403,23 @@ next
   finally show ?case .
 next
   case (10 i\<^sub>2 i\<^sub>1)
-  then show ?case unfolding int_rem_u_i32_def using zero_i32.rep_eq by simp
+  thus ?case unfolding int_rem_u_i32_def using zero_i32.rep_eq by simp
 next
   case (11 i\<^sub>2 i\<^sub>1)
-  show ?case unfolding int_rem_u_i32_def minus_mult_div_eq_mod[THEN sym] mod_u_distr
+  show ?case unfolding int_rem_u_i32_def minus_mult_div_eq_mod[THEN sym] mod_distr
     using nonzero_i32[OF \<open>i\<^sub>2 \<noteq> 0\<close>] int_of_nat_i32.abs_eq nat_of_int_i32.rep_eq trunc_div
     by fastforce
 next
   case (12 i\<^sub>2 i\<^sub>1)
-  then show ?case sorry
+  thus ?case unfolding int_rem_s_i32_def using zero_i32.rep_eq by simp
 next
   case (13 i\<^sub>2 i\<^sub>1)
-  then show ?case sorry
+  hence nz: "sint (Rep_i32 i\<^sub>2) \<noteq> 0" using nonzero_i32[OF \<open>i\<^sub>2 \<noteq> 0\<close>] by simp
+  show ?case
+    (* TODO: this is a mess *)
+    unfolding int_rem_s_i32_def smod_word_alt_def abs_int_s_i32 int_of_nat_i32_def apply (unfold sdiv_trunc[OF nz, THEN sym])
+    apply simp apply (unfold mult.commute[of "Rep_i32 i\<^sub>1 sdiv Rep_i32 i\<^sub>2"])
+    apply (unfold smod_distr) using nz by fastforce
 qed
 
 end
