@@ -80,7 +80,8 @@ instantiation i32 :: wasm_int_ops begin
       if i\<^sub>2 = 0 \<or> (i\<^sub>1 = of_int (-(2^31)) \<and> i\<^sub>2 = of_int (-1))
       then None
       else Some (i\<^sub>1 sdiv i\<^sub>2)" .
-  lift_definition int_rem_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is undefined .
+  lift_definition int_rem_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is
+    "\<lambda>i\<^sub>1 i\<^sub>2. if i\<^sub>2 = 0 then None else Some (i\<^sub>1 mod i\<^sub>2)" .
   lift_definition int_rem_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is undefined .
   lift_definition int_and_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
   lift_definition int_or_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
@@ -269,6 +270,23 @@ proof -
   qed
 qed
 
+lemma trunc_div:
+  "trunc (rat_of_nat (nat_of_int i\<^sub>1) / rat_of_nat (nat_of_int i\<^sub>2)) = uint (Rep_i32 i\<^sub>1 div Rep_i32 i\<^sub>2)"
+  by (simp add: abs_int_i32 floor_divide_of_nat_eq trunc uint_div zdiv_int)
+
+lemma mod_u_distr: "i\<^sub>1 - i\<^sub>2 * (i\<^sub>1 div i\<^sub>2) = word_of_nat (nat (uint i\<^sub>1 - uint i\<^sub>2 * uint (i\<^sub>1 div i\<^sub>2)))"
+proof -
+  have "i\<^sub>1 - i\<^sub>2 * (i\<^sub>1 div i\<^sub>2) = word_of_int (uint i\<^sub>1 - uint i\<^sub>2 * uint (i\<^sub>1 div i\<^sub>2))" by force
+  moreover have "0 \<le> uint i\<^sub>1 - uint i\<^sub>2 * uint (i\<^sub>1 div i\<^sub>2)"
+  proof -
+    have "uint i\<^sub>2 * uint (i\<^sub>1 div i\<^sub>2) \<le> uint i\<^sub>1"
+      unfolding uint_div_distrib
+      using div_mult_le[of "nat (uint i\<^sub>1)" "nat (uint i\<^sub>2)"]
+      by (metis mult.commute nat_div_distrib nat_le_eq_zle nat_mult_distrib unsigned_greater_eq)
+    thus ?thesis by linarith
+  qed
+  ultimately show ?thesis by (subst (asm) word_of_int_nat)
+qed
 
 instantiation i32 :: wasm_int begin
 instance
@@ -370,10 +388,12 @@ next
   finally show ?case .
 next
   case (10 i\<^sub>2 i\<^sub>1)
-  then show ?case sorry
+  then show ?case unfolding int_rem_u_i32_def using zero_i32.rep_eq by simp
 next
   case (11 i\<^sub>2 i\<^sub>1)
-  then show ?case sorry
+  show ?case unfolding int_rem_u_i32_def minus_mult_div_eq_mod[THEN sym] mod_u_distr
+    using nonzero_i32[OF \<open>i\<^sub>2 \<noteq> 0\<close>] int_of_nat_i32.abs_eq nat_of_int_i32.rep_eq trunc_div
+    by fastforce
 next
   case (12 i\<^sub>2 i\<^sub>1)
   then show ?case sorry
