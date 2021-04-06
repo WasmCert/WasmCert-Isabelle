@@ -75,7 +75,7 @@ instantiation i32 :: wasm_int_ops begin
   lift_definition int_mul_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "(*)" .
   lift_definition int_div_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is
     "\<lambda>i\<^sub>1 i\<^sub>2. if i\<^sub>2 = 0 then None else Some (i\<^sub>1 div i\<^sub>2)" .
-  lift_definition int_div_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is 
+  lift_definition int_div_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is
     "\<lambda>i\<^sub>1 i\<^sub>2.
       if i\<^sub>2 = 0 \<or> (i\<^sub>1 = of_int (-(2^31)) \<and> i\<^sub>2 = of_int (-1))
       then None
@@ -289,17 +289,108 @@ proof -
   ultimately show ?thesis by (subst (asm) word_of_int_nat)
 qed
 
-lemma smod_distr
-: "(i\<^sub>1 - i\<^sub>2 * (i\<^sub>1 sdiv i\<^sub>2)) =
-      (word_of_nat (nat (signed_inv 32 (sint i\<^sub>1 - sint i\<^sub>2 * (sint i\<^sub>1 sdiv sint i\<^sub>2)))))"
+lemma word_of_nat_signed_inv:
+  assumes "- (2 ^ (LENGTH('a) - 1)) \<le> i" "i < 2 ^ (LENGTH('a) - 1)"
+  shows "(word_of_nat (nat (signed_inv LENGTH('a) i)) :: 'a::len word) = word_of_int i"
 proof -
-  have "i\<^sub>1 - i\<^sub>2 * (i\<^sub>1 sdiv i\<^sub>2) = word_of_int (sint i\<^sub>1 - sint i\<^sub>2 * sint (i\<^sub>1 sdiv i\<^sub>2))" by force
-  also have "\<dots> = word_of_nat (nat (signed_inv 32 (sint i\<^sub>1 - sint i\<^sub>2 * (sint i\<^sub>1 sdiv sint i\<^sub>2))))"
+  have len: "0 < LENGTH('a)" by simp
+  show ?thesis
     apply (subst word_of_int_nat[THEN sym])
-    subgoal apply (rule signed_inv_nneg)
-      apply simp
-      sorry
-    sorry
+    subgoal using signed_inv_nneg[OF len assms] by blast
+    unfolding signed_inv[OF len assms]
+    by (cases "0 \<le> i") auto
+qed
+
+lemma int_div_mult_le:
+  assumes "0 \<le> (a::int)" "0 \<le> b"
+  shows "a div b * b \<le> a"
+proof -
+  have "a div b * b = int (nat a div nat b * nat b)"
+    using assms zdiv_int by fastforce
+  moreover note div_mult_le[of "nat a" "nat b"]
+  moreover have "a = int (nat a)" using assms(1) by simp
+  ultimately show ?thesis by linarith
+qed
+
+lemma smod_distr: "((i\<^sub>1::'a::len word) - i\<^sub>2 * (i\<^sub>1 sdiv i\<^sub>2)) =
+      (word_of_nat (nat (signed_inv LENGTH('a) (sint i\<^sub>1 - sint i\<^sub>2 * (sint i\<^sub>1 sdiv sint i\<^sub>2)))))"
+proof -
+  let ?r = "sint i\<^sub>1 - sint i\<^sub>2 * (sint i\<^sub>1 sdiv sint i\<^sub>2)"
+  have r0: "sint i\<^sub>1 = 0 \<Longrightarrow> ?r = 0" by simp
+  have rp: "0 < sint i\<^sub>1 \<Longrightarrow> ?r = \<bar>sint i\<^sub>1\<bar> - \<bar>sint i\<^sub>2\<bar> * (\<bar>sint i\<^sub>1\<bar> div \<bar>sint i\<^sub>2\<bar>)"
+    unfolding signed_divide_int_def
+    by (simp add: linordered_idom_class.abs_sgn)
+  have rn: "sint i\<^sub>1 < 0 \<Longrightarrow> ?r = - (\<bar>sint i\<^sub>1\<bar> - \<bar>sint i\<^sub>2\<bar> * (\<bar>sint i\<^sub>1\<bar> div \<bar>sint i\<^sub>2\<bar>))"
+    unfolding signed_divide_int_def
+    by (simp add: linordered_idom_class.abs_sgn)
+
+  have rhs_nneg: "0 \<le> \<bar>sint i\<^sub>2\<bar> * (\<bar>sint i\<^sub>1\<bar> div \<bar>sint i\<^sub>2\<bar>)"
+    using abs_ge_zero div_int_pos_iff zero_le_mult_iff by blast
+  hence cmp: "\<bar>sint i\<^sub>1\<bar> - \<bar>sint i\<^sub>2\<bar> * (\<bar>sint i\<^sub>1\<bar> div \<bar>sint i\<^sub>2\<bar>) \<le> \<bar>sint i\<^sub>1\<bar>"
+    by simp
+
+  have "i\<^sub>1 - i\<^sub>2 * (i\<^sub>1 sdiv i\<^sub>2) = word_of_int (sint i\<^sub>1 - sint i\<^sub>2 * (sint i\<^sub>1 sdiv sint i\<^sub>2))"
+    by (simp add: word_sdiv_def)
+  also have "\<dots> = word_of_nat (nat (signed_inv LENGTH('a) ?r))"
+  proof (subst word_of_nat_signed_inv, goal_cases)
+    case 1
+    {
+      assume "0 < sint i\<^sub>1"
+      have "0 \<le> ?r"
+        unfolding rp[OF \<open>0 < sint i\<^sub>1\<close>]
+        apply (subst diff_ge_0_iff_ge)
+        apply (subst mult.commute)
+        apply (rule int_div_mult_le)
+        using \<open>0 < sint i\<^sub>1\<close> by auto
+      have "- (2 ^ (LENGTH('a) - 1)) \<le> ?r"
+        apply (rule order.trans[where b=0])
+        using \<open>0 \<le> ?r\<close> by auto
+    }
+    note ineg = this
+    {
+      assume "sint i\<^sub>1 < 0"
+      have le: "\<bar>sint i\<^sub>1\<bar> - \<bar>sint i\<^sub>2\<bar> * (\<bar>sint i\<^sub>1\<bar> div \<bar>sint i\<^sub>2\<bar>) \<le> 2 ^ (LENGTH('a) - 1)"
+        apply (rule order.trans[OF cmp])
+        by (meson abs_leI le_less minus_le_iff sint_ge sint_lt)
+      have "- (2 ^ (LENGTH('a) - 1)) \<le> ?r"
+        unfolding rn[OF \<open>sint i\<^sub>1 < 0\<close>] using le by simp
+    }
+    note ipos = this
+    show ?case
+      apply (cases "sint i\<^sub>1 < 0")
+      using ipos apply blast
+      apply (cases "sint i\<^sub>1 = 0")
+      using r0 apply simp
+      using ineg by linarith
+  next
+    case 2
+    {
+      assume "0 < sint i\<^sub>1"
+      hence "0 \<le> sint i\<^sub>1" by simp
+      have "?r \<le> \<bar>sint i\<^sub>1\<bar>" unfolding rp[OF \<open>0 < sint i\<^sub>1\<close>] using cmp .
+      also have "\<dots> < 2 ^ (LENGTH('a) - 1)"
+        unfolding abs_of_nonneg[OF \<open>0 \<le> sint i\<^sub>1\<close>]
+        by (rule sint_lt)
+      finally have "?r < 2 ^ (LENGTH('a) - 1)" .
+    }
+    note ineg = this
+    {
+      assume "sint i\<^sub>1 < 0"
+      have "0 \<le> \<bar>sint i\<^sub>1\<bar> - \<bar>sint i\<^sub>2\<bar> * (\<bar>sint i\<^sub>1\<bar> div \<bar>sint i\<^sub>2\<bar>)" using cmp
+        by (metis abs_ge_zero diff_ge_0_iff_ge int_div_mult_le mult.commute)
+      hence "- (\<bar>sint i\<^sub>1\<bar> - \<bar>sint i\<^sub>2\<bar> * (\<bar>sint i\<^sub>1\<bar> div \<bar>sint i\<^sub>2\<bar>)) \<le> 0" by linarith
+      hence "?r < (2 ^ (LENGTH('a) - 1))"
+        unfolding rn[OF \<open>sint i\<^sub>1 < 0\<close>]
+        by (meson le_less_trans zero_less_numeral zero_less_power)
+    }
+    note ipos = this
+    show ?case
+      apply (cases "sint i\<^sub>1 < 0")
+      using ipos apply blast
+      apply (cases "sint i\<^sub>1 = 0")
+      using r0 apply simp
+      using ineg by linarith
+  qed simp
   finally show ?thesis .
 qed
 
@@ -415,11 +506,13 @@ next
 next
   case (13 i\<^sub>2 i\<^sub>1)
   hence nz: "sint (Rep_i32 i\<^sub>2) \<noteq> 0" using nonzero_i32[OF \<open>i\<^sub>2 \<noteq> 0\<close>] by simp
+  have reps: "Rep_i32 i\<^sub>1 - Rep_i32 i\<^sub>1 sdiv Rep_i32 i\<^sub>2 * Rep_i32 i\<^sub>2 =
+    word_of_nat (nat (signed_inv 32 (sint (Rep_i32 i\<^sub>1)
+      - sint (Rep_i32 i\<^sub>2) * (sint (Rep_i32 i\<^sub>1) sdiv sint (Rep_i32 i\<^sub>2)))))"
+    unfolding mult.commute[of "Rep_i32 i\<^sub>1 sdiv Rep_i32 i\<^sub>2"] smod_distr by fastforce
   show ?case
-    (* TODO: this is a mess *)
-    unfolding int_rem_s_i32_def smod_word_alt_def abs_int_s_i32 int_of_nat_i32_def apply (unfold sdiv_trunc[OF nz, THEN sym])
-    apply simp apply (unfold mult.commute[of "Rep_i32 i\<^sub>1 sdiv Rep_i32 i\<^sub>2"])
-    apply (unfold smod_distr) using nz by fastforce
+    unfolding int_rem_s_i32_def smod_word_alt_def abs_int_s_i32 sdiv_trunc[OF nz, THEN sym]
+    using reps int_of_nat_i32.abs_eq nz by auto
 qed
 
 end
@@ -723,7 +816,7 @@ definition rglob_is_mut :: "global \<Rightarrow> bool" where
 
 definition stypes :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> tf" where
   "stypes s i j = ((types i)!j)"
-  
+
 definition sfunc_ind :: "inst \<Rightarrow> nat \<Rightarrow> nat" where
   "sfunc_ind i j = ((inst.funcs i)!j)"
 
@@ -732,7 +825,7 @@ definition sfunc :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> cl" wh
 
 definition sglob_ind :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> nat" where
   "sglob_ind s i j = ((inst.globs i)!j)"
-  
+
 definition sglob :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> global" where
   "sglob s i j = (globs s)!(sglob_ind s i j)"
 
@@ -758,7 +851,7 @@ definition supdate_glob :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow>
 
 definition is_const :: "e \<Rightarrow> bool" where
   "is_const e = (case e of Basic (C _) \<Rightarrow> True | _ \<Rightarrow> False)"
-    
+
 definition const_list :: "e list \<Rightarrow> bool" where
   "const_list xs = list_all is_const xs"
 
@@ -861,7 +954,7 @@ definition cvt_f64 :: "sx option \<Rightarrow> v \<Rightarrow> f64 option" where
 definition cvt :: "t \<Rightarrow> sx option \<Rightarrow> v \<Rightarrow> v option" where
   "cvt t sx v = (case t of
                  T_i32 \<Rightarrow> (case (cvt_i32 sx v) of Some c \<Rightarrow> Some (ConstInt32 c) | None \<Rightarrow> None)
-               | T_i64 \<Rightarrow> (case (cvt_i64 sx v) of Some c \<Rightarrow> Some (ConstInt64 c) | None \<Rightarrow> None) 
+               | T_i64 \<Rightarrow> (case (cvt_i64 sx v) of Some c \<Rightarrow> Some (ConstInt64 c) | None \<Rightarrow> None)
                | T_f32 \<Rightarrow> (case (cvt_f32 sx v) of Some c \<Rightarrow> Some (ConstFloat32 c) | None \<Rightarrow> None)
                | T_f64 \<Rightarrow> (case (cvt_f64 sx v) of Some c \<Rightarrow> Some (ConstFloat64 c) | None \<Rightarrow> None))"
 
