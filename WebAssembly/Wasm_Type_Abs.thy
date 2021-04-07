@@ -6,6 +6,150 @@ theory Wasm_Type_Abs imports
   HOL.Rat
 begin
 
+(* https://webassembly.github.io/spec/core/exec/numerics.html *)
+
+context len
+begin
+
+lemma half_power:
+  "2 ^ LENGTH('a) = 2 * 2 ^ (LENGTH('a) - 1)"
+  using power_Suc[of 2 "LENGTH('a) - 1"] by simp
+
+text\<open>Interpret an unsigned number i obtained from a word of size N as signed.\<close>
+definition signed :: "'a itself \<Rightarrow> int \<Rightarrow> int" where
+  "signed _ i \<equiv>
+    if 0 \<le> i \<and> i < (2^(LENGTH('a)-1)) then i
+    else if 2^(LENGTH('a)-1) \<le> i \<and> i < 2^LENGTH('a) then i - (2^LENGTH('a))
+    else 0"
+
+text\<open>Inverse of signed, refined below.\<close>
+definition signed_inv :: "'a itself \<Rightarrow> int \<Rightarrow> int" where
+  "signed_inv N \<equiv> the_inv_into {0 ..< 2^LENGTH('a)} (signed N)"
+
+lemma signed_inj: "inj_on (signed (N::'a itself)) {0 ..< 2^LENGTH('a)}"
+proof (rule inj_onI, goal_cases)
+  case (1 x y)
+  thus ?case unfolding signed_def
+  apply (cases "x < (2^(LENGTH('a)-1))")
+    subgoal
+      apply (cases "y < (2^(LENGTH('a)-1))")
+      using atLeastLessThan_iff by simp_all
+    apply (cases "y < (2^(LENGTH('a)-1))")
+    using atLeastLessThan_iff by simp_all
+qed
+
+lemma signed_inv_id:
+  assumes "0 \<le> y" "y < 2 ^ (LENGTH('a) - 1)"
+  shows "signed N y = y"
+  unfolding signed_def half_power using assms by simp
+
+lemma signed_inv_neg:
+  assumes "- (2 ^ (LENGTH('a) - 1)) \<le> y" "y < 0"
+  shows "signed N (y + (2 ^ LENGTH('a))) = y"
+proof -
+  let ?x = "y + (2 ^ LENGTH('a))"
+  have "(2^(LENGTH('a)-1)) \<le> ?x " using assms(1) unfolding half_power by simp
+  moreover have "2^(LENGTH('a)-1) \<le> ?x \<and> ?x < 2^LENGTH('a)"
+    using assms(2) calculation by force
+  ultimately show ?thesis unfolding signed_def by simp
+qed
+
+lemma signed_image: "signed N ` {0 ..< 2^LENGTH('a)} = {-(2^(LENGTH('a)-1)) ..< 2^(LENGTH('a)-1)}"
+unfolding image_def proof (intro Set.equalityI Set.subsetI, goal_cases)
+  case (1 y)
+  then obtain x where x: "x\<in>{0..<2 ^ LENGTH('a)}" "y = signed N x" by blast
+  hence xb: "0 \<le> x" "x < 2 ^ LENGTH('a)" by auto
+  {
+    assume nx: "\<not>x < 2 ^ (LENGTH('a) - 1)"
+    hence "2 ^ (LENGTH('a) - 1) \<le> x \<and> x < 2 ^ LENGTH('a)" using xb(2) by fastforce
+    hence signed: "signed N x = x - 2 ^ LENGTH('a)" unfolding signed_def using nx by simp
+    have "- (2 ^ (LENGTH('a) - 1)) \<le> signed N x"
+    proof -
+      have "0 \<le> x - 2 * (2 ^ (LENGTH('a) - 1)) + (2 ^ (LENGTH('a) - 1))"
+        using nx by linarith
+      hence "0 \<le> x - 2 ^ LENGTH('a) + (2 ^ (LENGTH('a) - 1))"
+        unfolding half_power .
+      hence "- (2 ^ (LENGTH('a) - 1)) \<le> x - 2 ^ LENGTH('a)" by simp
+      thus ?thesis by (subst signed)
+    qed
+    moreover from nx have "signed N x < 2 ^ (LENGTH('a) - 1)"
+      using calculation signed xb(2) by force
+    ultimately have "signed N x \<in> {- (2 ^ (LENGTH('a) - 1))..<2 ^ (LENGTH('a) - 1)}" by simp
+  }
+  then show ?case unfolding x(2) signed_def using x(1)
+    by (cases "x < 2 ^ (LENGTH('a) - 1)") auto
+next
+  case (2 y)
+  show ?case
+  proof (cases "0 \<le> y")
+    case True
+    have "signed N y = y"
+      apply (rule signed_inv_id[OF True])
+      using 2 by auto
+    moreover have "y < 2 ^ LENGTH('a)" unfolding half_power using "2" by force
+    ultimately show ?thesis using True by force
+  next
+    case False
+    have eq: "signed N (y + (2 ^ LENGTH('a))) = y"
+      apply (rule signed_inv_neg)
+      subgoal using "2" atLeastLessThan_iff by blast
+      using False by simp
+    have lt: "y + (2 ^ LENGTH('a)) < 2 ^ LENGTH('a)" unfolding half_power using False by auto
+    have ge: "0 \<le> y + 2 ^ LENGTH('a)" unfolding half_power using "2" by auto
+    show ?thesis
+      apply (intro CollectI bexI[where x="y + 2 ^ LENGTH('a)"])
+      subgoal using eq[THEN sym] .
+      unfolding atLeastLessThan_iff
+      using lt ge by blast
+  qed
+qed
+
+lemma signed_bij:
+  "bij_betw (signed N) {0 ..< 2^LENGTH('a)} {-(2^(LENGTH('a)-1)) ..< 2^(LENGTH('a)-1)}"
+  by (rule bij_betw_imageI[OF signed_inj signed_image])
+
+lemma signed_inv:
+  assumes "- (2^(LENGTH('a)-1)) \<le> i" "i < 2^(LENGTH('a)-1)"
+  shows "signed_inv N i = (if 0 \<le> i then i else i + (2^LENGTH('a)))"
+proof (cases "0 \<le> i")
+  case True
+  note val = signed_inv_id[OF True assms(2)]
+  show ?thesis unfolding signed_inv_def the_inv_into_def
+  proof (rule the_equality, goal_cases)
+    case 1
+    then show ?case using val unfolding half_power using assms(2) True by auto
+  next
+    case (2 y)
+    hence other: "signed N y = signed N i" using val by simp
+    show ?case using inj_onD[OF signed_inj other 2[THEN conjunct1]]
+      unfolding half_power using True assms(2) by auto
+  qed
+next
+  case False
+  hence False: "i < 0" by simp
+  note val = signed_inv_neg[OF assms(1) False]
+  show ?thesis unfolding signed_inv_def the_inv_into_def
+  proof (rule the_equality, goal_cases)
+    case 1
+    then show ?case using val unfolding half_power using assms(1) False by auto
+  next
+    case (2 y)
+    hence other: "signed N y = signed N (i + 2 ^ LENGTH('a))" using val by simp
+    show ?case using inj_onD[OF signed_inj other 2[THEN conjunct1]]
+      unfolding half_power using False assms(1) by auto
+  qed
+qed
+
+lemma signed_inv_nneg:
+  assumes "- (2^(LENGTH('a)-1)) \<le> i" "i < 2^(LENGTH('a)-1)"
+  shows "0 \<le> signed_inv N i"
+  using signed_inv[OF assms, unfolded half_power]
+  apply (cases "0 \<le> i")
+  apply presburger
+  using assms(1) by force
+
+end
+
 class wasm_base = zero
 
 class wasm_int_ops = wasm_base + len +
@@ -60,161 +204,11 @@ begin
     where "rep_int a \<equiv> int_of_nat (nat a)"
 end
 
-(* https://webassembly.github.io/spec/core/exec/numerics.html *)
-
-text\<open>Interpret an unsigned number i obtained from a word of size N as signed.\<close>
-definition signed :: "nat \<Rightarrow> int \<Rightarrow> int" where
-  "signed N i =
-    (if 0 \<le> i \<and> i < (2^(N-1)) then i
-    else if 2^(N-1) \<le> i \<and> i < 2^N then i - (2^N)
-    else 0)"
-
-text\<open>Inverse of signed, refined below.\<close>
-definition "signed_inv N \<equiv> the_inv_into {0 ..< 2^N} (signed N)"
-
-lemma signed_inj: assumes "0 < N" shows "inj_on (signed N) {0 ..< 2^N}"
-proof (rule inj_onI, goal_cases)
-  case (1 x y)
-  thus ?case unfolding signed_def
-  apply (cases "x < (2^(N-1))")
-    subgoal
-      apply (cases "y < (2^(N-1))")
-      using atLeastLessThan_iff using assms
-      apply (smt (verit, best) diff_less less_numeral_extra(1) power_strict_increasing_iff) (* TODO: messed up by N *)
-    apply (cases "y < (2^(N-1))")
-    using atLeastLessThan_iff
-     apply blast
-    by (smt (verit, best) atLeastLessThan_iff) (* TODO: messed up by N *)
-  by (smt (verit) atLeastLessThan_iff) (* TODO: messed up by N *)
-qed
-
-lemma half_power:
-  assumes "0 < N"
-  shows "2 ^ N = 2 * 2 ^ (N - 1)"
-  using power_Suc[of 2 "N - 1"] assms by simp
-
-lemma signed_inv_id:
-  assumes "0 < N" "0 \<le> y" "y < 2 ^ (N - 1)"
-  shows "signed N y = y"
-  unfolding signed_def half_power[OF assms(1)] using assms by simp
-
-lemma signed_inv_neg:
-  assumes "0 < N" "- (2 ^ (N - 1)) \<le> y" "y < 0"
-  shows "signed (N) (y + (2 ^ N)) = y"
-proof -
-  let ?x = "y + (2 ^ (N))"
-  have "(2^(N-1)) \<le> ?x " using assms(2) unfolding half_power[OF assms(1)] by simp
-  moreover have "2^(N-1) \<le> ?x \<and> ?x < 2^N"
-    using assms(3) calculation by force
-  ultimately show ?thesis unfolding signed_def by simp
-qed
-
-lemma signed_image:
-  assumes "0 < N"
-  shows "signed N ` {0 ..< 2^N} = {-(2^(N-1)) ..< 2^(N-1)}"
-unfolding image_def proof (intro Set.equalityI Set.subsetI, goal_cases)
-  case (1 y)
-  then obtain x where x: "x\<in>{0..<2 ^ N}" "y = signed N x" by blast
-  hence xb: "0 \<le> x" "x < 2 ^ N" by auto
-  {
-    assume nx: "\<not>x < 2 ^ (N - 1)"
-    hence "2 ^ (N - 1) \<le> x \<and> x < 2 ^ N" using xb(2) by fastforce
-    hence signed: "signed N x = x - 2 ^ N" unfolding signed_def using nx by simp
-    have "- (2 ^ (N - 1)) \<le> signed N x"
-    proof -
-      have "0 \<le> x - 2 * (2 ^ (N - 1)) + (2 ^ (N - 1))"
-        using nx by linarith
-      hence "0 \<le> x - 2 ^ N + (2 ^ (N - 1))"
-        unfolding half_power[OF assms(1)] .
-      hence "- (2 ^ (N - 1)) \<le> x - 2 ^ N" by simp
-      thus ?thesis by (subst signed)
-    qed
-    moreover from nx have "signed N x < 2 ^ (N - 1)"
-      using calculation signed xb(2) by force
-    ultimately have "signed N x \<in> {- (2 ^ (N - 1))..<2 ^ (N - 1)}" by simp
-  }
-  then show ?case unfolding x(2) signed_def using x(1)
-    by (cases "x < 2 ^ (N - 1)") auto
-next
-  case (2 y)
-  show ?case
-  proof (cases "0 \<le> y")
-    case True
-    have "signed N y = y"
-      apply (rule signed_inv_id[OF assms(1) True])
-      using 2 by auto
-    moreover have "y < 2 ^ N" unfolding half_power[OF assms(1)] using "2" by force
-    ultimately show ?thesis using True by force
-  next
-    case False
-    have eq: "signed N (y + (2 ^ N)) = y"
-      apply (rule signed_inv_neg[OF assms(1)])
-      subgoal using "2" atLeastLessThan_iff by blast
-      using False by simp
-    have lt: "y + (2 ^ (N)) < 2 ^ N" unfolding half_power[OF assms(1)]
-      using False by auto
-    have ge: "0 \<le> y + 2 ^ N" unfolding half_power[OF assms(1)]
-      using "2" by auto
-    show ?thesis
-      apply (intro CollectI bexI[where x="y + 2 ^ N"])
-      subgoal using eq[THEN sym] .
-      unfolding atLeastLessThan_iff
-      using lt ge by blast
-  qed 
-qed
-
-lemma signed_bij:
-  assumes "0 < N"
-  shows "bij_betw (signed N) {0 ..< 2^N} {-(2^(N-1)) ..< 2^(N-1)}"
-  by (rule bij_betw_imageI[OF signed_inj[OF assms] signed_image[OF assms]])
-
-lemma signed_inv:
-  assumes "0 < N" "- (2^(N-1)) \<le> i" "i < 2^(N-1)"
-  shows "signed_inv N i = (if 0 \<le> i then i else i + (2^N))"
-proof (cases "0 \<le> i")
-  case True
-  note val = signed_inv_id[OF assms(1) True assms(3)]
-  show ?thesis unfolding signed_inv_def the_inv_into_def
-  proof (rule the_equality, goal_cases)
-    case 1
-    then show ?case using val unfolding half_power[OF assms(1)]
-      using assms(3) True by auto
-  next
-    case (2 y)
-    hence other: "signed N y = signed N i" using val by simp
-    show ?case using inj_onD[OF signed_inj[OF assms(1)] other 2[THEN conjunct1]]
-      unfolding half_power[OF assms(1)] using True assms(3) by auto
-  qed
-next
-  case False
-  hence False: "i < 0" by simp
-  note val = signed_inv_neg[OF assms(1) assms(2) False]
-  show ?thesis unfolding signed_inv_def the_inv_into_def
-  proof (rule the_equality, goal_cases)
-    case 1
-    then show ?case using val unfolding half_power[OF assms(1)]
-      using assms(2) False by auto
-  next
-    case (2 y)
-    hence other: "signed N y = signed N (i + 2 ^ N)" using val by simp
-    show ?case using inj_onD[OF signed_inj[OF assms(1)] other 2[THEN conjunct1]]
-      unfolding half_power[OF assms(1)] using False assms(2) by auto
-  qed
-qed
-
-lemma signed_inv_nneg:
-  assumes "0 < N" "- (2^(N-1)) \<le> i" "i < 2^(N-1)"
-  shows "0 \<le> signed_inv N i"
-  using signed_inv[OF assms, unfolded half_power[OF assms(1)]]
-  apply (cases "0 \<le> i")
-  apply presburger
-  using assms(2) by force
-
 abbreviation (in wasm_int_ops) abs_int_s :: "'a \<Rightarrow> int"
-  where "abs_int_s a \<equiv> signed LENGTH('a) (abs_int a)"
+  where "abs_int_s a \<equiv> signed TYPE('a) (abs_int a)"
 
 abbreviation (in wasm_int_ops) rep_int_s :: "int \<Rightarrow> 'a"
-  where "rep_int_s a \<equiv> rep_int (signed_inv LENGTH('a) a)"
+  where "rep_int_s a \<equiv> rep_int (signed_inv TYPE('a) a)"
 
 definition trunc :: "rat \<Rightarrow> int" where
   "trunc q \<equiv>

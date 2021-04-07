@@ -134,6 +134,8 @@ proof -
 qed
 
 lemma length_i32: "LENGTH(i32) = LENGTH(32)" by simp
+lemma signed_inv_i32: "signed_inv TYPE(i32) = signed_inv TYPE(32)"
+  unfolding signed_inv_def signed_def length_i32 ..
 
 lemma abs_int_s_i32: "abs_int_s x = sint (Rep_i32 x)"
 proof (cases "msb (Rep_i32 x)")
@@ -159,12 +161,11 @@ lemma rep_int_s_i32:
     "i < 2^(LENGTH(i32) - 1)"
   shows "rep_int_s i = Abs_i32 (of_int i)"
 proof -
-  have N: "0 < LENGTH(i32)" by simp
-  note inv = signed_inv[OF N assms]
+  note inv = signed_inv[OF assms]
   {
     assume "i < 0"
     let ?x = "i + 2^LENGTH(i32)"
-    have nneg: "0 \<le> ?x" using half_power[of "LENGTH(i32)"] assms(1) by force
+    have nneg: "0 \<le> ?x" using half_power assms(1) by force
     have "word_of_nat (nat ?x) = (word_of_int i::32 word)"
       apply (subst word_of_int_nat[OF nneg, THEN sym])
       apply (subst word_uint.Abs_norm[of i, where 'a=32, THEN sym])
@@ -291,15 +292,11 @@ qed
 
 lemma word_of_nat_signed_inv:
   assumes "- (2 ^ (LENGTH('a) - 1)) \<le> i" "i < 2 ^ (LENGTH('a) - 1)"
-  shows "(word_of_nat (nat (signed_inv LENGTH('a) i)) :: 'a::len word) = word_of_int i"
-proof -
-  have len: "0 < LENGTH('a)" by simp
-  show ?thesis
-    apply (subst word_of_int_nat[THEN sym])
-    subgoal using signed_inv_nneg[OF len assms] by blast
-    unfolding signed_inv[OF len assms]
-    by (cases "0 \<le> i") auto
-qed
+  shows "(word_of_nat (nat (signed_inv TYPE('a) i)) :: 'a::len word) = word_of_int i"
+  apply (subst word_of_int_nat[THEN sym])
+  subgoal using signed_inv_nneg[OF assms] by blast
+  unfolding signed_inv[OF  assms]
+  by (cases "0 \<le> i") auto
 
 lemma int_div_mult_le:
   assumes "0 \<le> (a::int)" "0 \<le> b"
@@ -313,7 +310,7 @@ proof -
 qed
 
 lemma smod_distr: "((i\<^sub>1::'a::len word) - i\<^sub>2 * (i\<^sub>1 sdiv i\<^sub>2)) =
-      (word_of_nat (nat (signed_inv LENGTH('a) (sint i\<^sub>1 - sint i\<^sub>2 * (sint i\<^sub>1 sdiv sint i\<^sub>2)))))"
+      (word_of_nat (nat (signed_inv TYPE('a) (sint i\<^sub>1 - sint i\<^sub>2 * (sint i\<^sub>1 sdiv sint i\<^sub>2)))))"
 proof -
   let ?r = "sint i\<^sub>1 - sint i\<^sub>2 * (sint i\<^sub>1 sdiv sint i\<^sub>2)"
   have r0: "sint i\<^sub>1 = 0 \<Longrightarrow> ?r = 0" by simp
@@ -331,7 +328,7 @@ proof -
 
   have "i\<^sub>1 - i\<^sub>2 * (i\<^sub>1 sdiv i\<^sub>2) = word_of_int (sint i\<^sub>1 - sint i\<^sub>2 * (sint i\<^sub>1 sdiv sint i\<^sub>2))"
     by (simp add: word_sdiv_def)
-  also have "\<dots> = word_of_nat (nat (signed_inv LENGTH('a) ?r))"
+  also have "\<dots> = word_of_nat (nat (signed_inv TYPE('a) ?r))"
   proof (subst word_of_nat_signed_inv, goal_cases)
     case 1
     {
@@ -507,11 +504,12 @@ next
   case (13 i\<^sub>2 i\<^sub>1)
   hence nz: "sint (Rep_i32 i\<^sub>2) \<noteq> 0" using nonzero_i32[OF \<open>i\<^sub>2 \<noteq> 0\<close>] by simp
   have reps: "Rep_i32 i\<^sub>1 - Rep_i32 i\<^sub>1 sdiv Rep_i32 i\<^sub>2 * Rep_i32 i\<^sub>2 =
-    word_of_nat (nat (signed_inv 32 (sint (Rep_i32 i\<^sub>1)
+    word_of_nat (nat (signed_inv TYPE(32) (sint (Rep_i32 i\<^sub>1)
       - sint (Rep_i32 i\<^sub>2) * (sint (Rep_i32 i\<^sub>1) sdiv sint (Rep_i32 i\<^sub>2)))))"
     unfolding mult.commute[of "Rep_i32 i\<^sub>1 sdiv Rep_i32 i\<^sub>2"] smod_distr by fastforce
   show ?case
     unfolding int_rem_s_i32_def smod_word_alt_def abs_int_s_i32 sdiv_trunc[OF nz, THEN sym]
+      signed_inv_i32
     using reps int_of_nat_i32.abs_eq nz by auto
 qed
 
