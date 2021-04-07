@@ -3,6 +3,7 @@ section {* Syntactic Typeclasses *}
 theory Wasm_Type_Abs imports
   Main
   "HOL-Library.Type_Length"
+  "Word_Lib.Reversed_Bit_Lists"
   HOL.Rat
 begin
 
@@ -10,6 +11,70 @@ begin
 
 context len
 begin
+
+definition ibits :: "'a itself \<Rightarrow> int \<Rightarrow> bool list" where
+  "ibits N i \<equiv> THE l.
+    length l = LENGTH('a) \<and>
+    i = (\<Sum>n \<in> {0..<LENGTH('a)}. if l ! n then (2 ^ (LENGTH('a) - n - 1)) else 0)"
+
+lemma ibits_l:
+  assumes "0 \<le> i" "i < 2 ^ LENGTH('a)"
+  shows "length l = LENGTH('a)
+        \<and> i = (\<Sum>n = 0..<LENGTH('a). if l ! n then 2 ^ (LENGTH('a) - n - 1) else 0)
+     \<longleftrightarrow> l = bin_to_bl LENGTH('a) i"
+proof -
+  have gen: "
+    0 \<le> i \<Longrightarrow> i < 2 ^ N \<Longrightarrow>
+      length l = N
+          \<and> i = (\<Sum>n = 0..<N. if l ! n then 2 ^ (N - n - 1) else 0)
+       \<longleftrightarrow> l = bin_to_bl N i" for N
+  proof (induction N arbitrary: i l)
+    case 0
+    then show ?case by simp
+  next
+    case (Suc N)
+    have IH: "(length (butlast l) = N \<and> i div 2 = (\<Sum>n = 0..<N. if butlast l ! n then 2 ^ (N - n - 1) else 0)) = (butlast l = bin_to_bl N (i div 2))"
+      apply (rule Suc.IH[where l="butlast l" and i="i div 2"])
+      using Suc.prems by auto
+    show ?case
+      unfolding bin_to_bl_def apply (subst bin_to_bl_aux.simps)
+      apply (subst bin_to_bl_aux_alt)
+    proof (rule iffI, goal_cases)
+      case 1
+      hence "length (butlast l) = N" by simp
+      moreover have "i div 2 = (\<Sum>n = 0..<N. if butlast l ! n then 2 ^ (N - n - 1) else 0)"
+      proof -
+        have "(\<Sum>n = 0..<Suc N. if l ! n then 2 ^ (Suc N - n - 1) else 0) div 2 =
+          ((\<Sum>n = 0..<N. (if l ! n then (2 ^ (Suc N - n - 1)) else 0)) + (if l ! N then 1 else 0)) div 2"
+          unfolding sum.atLeast0_lessThan_Suc by simp
+        also have "\<dots> = (\<Sum>n = 0..<N. (if l ! n then (2 ^ (Suc N - n - 1)) else 0)) div 2" sorry
+        also have "\<dots> = (\<Sum>n = 0..<N. if butlast l ! n then 2 ^ (N - n - 1) else 0)" sorry
+        finally show ?thesis using 1 by simp
+      qed
+      ultimately have butlast: "butlast l = bin_to_bl N (i div 2)" using IH by blast
+      have last: "last l = odd i" sorry
+      show ?case
+        apply (subst butlast[THEN sym])
+        apply (subst last[THEN sym])
+        apply (rule append_butlast_last_id[THEN sym])
+        using 1 by force
+    next
+      case 2
+      then show ?case sorry
+    qed
+  qed
+  show ?thesis unfolding bin_to_bl_def using gen[where N="LENGTH('a)", OF assms] by simp
+qed
+
+lemma ibits:
+  assumes "0 \<le> i" "i < 2 ^ LENGTH('a)"
+  shows "ibits N' i = bin_to_bl LENGTH('a) i"
+  unfolding ibits_def
+  apply (rule the_equality)
+  using ibits_l[OF assms] by auto
+
+definition ibits_inv :: "'a itself \<Rightarrow> bool list \<Rightarrow> int" where
+  "ibits_inv N \<equiv> the_inv_into {0 ..< 2^LENGTH('a)} (ibits N)"
 
 lemma half_power:
   "2 ^ LENGTH('a) = 2 * 2 ^ (LENGTH('a) - 1)"
@@ -202,6 +267,12 @@ begin
 
   abbreviation rep_int :: "int \<Rightarrow> 'a"
     where "rep_int a \<equiv> int_of_nat (nat a)"
+
+  abbreviation abs_int_bits :: "'a \<Rightarrow> bool list"
+    where "abs_int_bits a \<equiv> ibits TYPE('a) (abs_int a)"
+
+  abbreviation rep_int_bits :: "bool list \<Rightarrow> 'a"
+    where "rep_int_bits a \<equiv> rep_int (ibits_inv TYPE('a) a)"
 end
 
 abbreviation (in wasm_int_ops) abs_int_s :: "'a \<Rightarrow> int"
@@ -268,6 +339,7 @@ class wasm_int = wasm_int_ops +
   assumes rem_s_0: "i\<^sub>2 = 0 \<Longrightarrow> int_rem_s (i\<^sub>1::'a) i\<^sub>2 = None"
   assumes rem_s: "i\<^sub>2 \<noteq> 0 \<Longrightarrow> int_rem_s (i\<^sub>1::'a) i\<^sub>2 = Some (rep_int_s (
       abs_int_s i\<^sub>1 - abs_int_s i\<^sub>2 * trunc (of_int (abs_int_s i\<^sub>1) / of_int (abs_int_s i\<^sub>2))))"
+  assumes iand: "int_and i\<^sub>1 i\<^sub>2 = rep_int_bits (map2 (\<and>) (abs_int_bits i\<^sub>1) (abs_int_bits i\<^sub>2))"
 
 class wasm_float = wasm_base +
   (* unops *)

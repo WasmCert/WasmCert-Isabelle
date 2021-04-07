@@ -82,7 +82,7 @@ instantiation i32 :: wasm_int_ops begin
       else Some (i\<^sub>1 sdiv i\<^sub>2)" .
   lift_definition int_rem_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is
     "\<lambda>i\<^sub>1 i\<^sub>2. if i\<^sub>2 = 0 then None else Some (i\<^sub>1 mod i\<^sub>2)" .
-lift_definition int_rem_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is
+  lift_definition int_rem_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is
     "\<lambda>i\<^sub>1 i\<^sub>2. if i\<^sub>2 = 0 then None else Some (i\<^sub>1 smod i\<^sub>2)".
   lift_definition int_and_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
   lift_definition int_or_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
