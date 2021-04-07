@@ -17,6 +17,10 @@ definition ibits :: "'a itself \<Rightarrow> int \<Rightarrow> bool list" where
     length l = LENGTH('a) \<and>
     i = (\<Sum>n \<in> {0..<LENGTH('a)}. if l ! n then (2 ^ (LENGTH('a) - n - 1)) else 0)"
 
+lemma "c dvd a \<Longrightarrow> (\<not> c dvd b) \<Longrightarrow> b div c = 0 \<Longrightarrow> ((a::int) + b) div c = (a::int) div c"
+  using div_plus_div_distrib_dvd_left
+  by (simp add: div_plus_div_distrib_dvd_left)
+
 lemma ibits_l:
   assumes "0 \<le> i" "i < 2 ^ LENGTH('a)"
   shows "length l = LENGTH('a)
@@ -33,7 +37,9 @@ proof -
     then show ?case by simp
   next
     case (Suc N)
-    have IH: "(length (butlast l) = N \<and> i div 2 = (\<Sum>n = 0..<N. if butlast l ! n then 2 ^ (N - n - 1) else 0)) = (butlast l = bin_to_bl N (i div 2))"
+    have IH: "(length (butlast l) = N \<and> i div 2 =
+                  (\<Sum>n = 0..<N. if butlast l ! n then 2 ^ (N - n - 1) else 0))
+          \<longleftrightarrow> (butlast l = bin_to_bl N (i div 2))"
       apply (rule Suc.IH[where l="butlast l" and i="i div 2"])
       using Suc.prems by auto
     show ?case
@@ -44,15 +50,61 @@ proof -
       hence "length (butlast l) = N" by simp
       moreover have "i div 2 = (\<Sum>n = 0..<N. if butlast l ! n then 2 ^ (N - n - 1) else 0)"
       proof -
-        have "(\<Sum>n = 0..<Suc N. if l ! n then 2 ^ (Suc N - n - 1) else 0) div 2 =
-          ((\<Sum>n = 0..<N. (if l ! n then (2 ^ (Suc N - n - 1)) else 0)) + (if l ! N then 1 else 0)) div 2"
+        have "(\<Sum>n = 0..<Suc N. if l ! n then 2 ^ (Suc N - n - 1) else (0::int)) div 2 =
+          ((\<Sum>n = 0..<N. (if l ! n then (2 ^ (Suc N - n - 1)) else 0))
+            + (if l ! N then 1 else 0)) div (2::int)"
           unfolding sum.atLeast0_lessThan_Suc by simp
-        also have "\<dots> = (\<Sum>n = 0..<N. (if l ! n then (2 ^ (Suc N - n - 1)) else 0)) div 2" sorry
-        also have "\<dots> = (\<Sum>n = 0..<N. if butlast l ! n then 2 ^ (N - n - 1) else 0)" sorry
+        also have "\<dots> = (\<Sum>n = 0..<N. (if l ! n then (2 ^ (Suc N - n - 1)) else 0)) div 2
+                        + (if l ! N then 1 else 0) div 2"
+          apply (rule div_plus_div_distrib_dvd_left)
+          proof (subst even_sum_iff, goal_cases)
+            case 2
+            have "{a \<in> {0..<N}. odd (if l ! a then 2 ^ (Suc N - a - 1) else 0)} = {}"
+              by simp
+            then show ?case by auto
+          qed simp
+        also have "\<dots> = (\<Sum>n = 0..<N. if l ! n then (2 ^ (Suc N - n - 1)) else 0) div (2::int)"
+          by force
+        also have "\<dots> = (\<Sum>n = 0..<N. if l ! n then (2 ^ (Suc (N - n - 1))) else 0) div 2"
+        proof -
+          have "n \<in> {0..<N} \<Longrightarrow> Suc N - n - 1 = Suc (N - n - 1)" for n by simp
+          thus ?thesis by (metis (no_types, lifting) sum.cong)
+        qed
+        also have "\<dots> = (\<Sum>n = 0..<N. if l ! n then 2 * 2 ^ (N - n - 1) else 2 * 0) div 2"
+          unfolding power_Suc apply (subst mult_zero_right[of 2, THEN sym]) ..
+        also have "\<dots> = (2 * (\<Sum>n = 0..<N. if l ! n then 2 ^ (N - n - 1) else 0)) div 2"
+          unfolding if_distrib[THEN sym] sum_distrib_left[THEN sym] ..
+        also have "\<dots> = (\<Sum>n = 0..<N. if butlast l ! n then 2 ^ (N - n - 1) else 0)"
+        proof -
+          have "n \<in> {0..<N} \<Longrightarrow> butlast l ! n = l ! n" for n
+            apply (rule nth_butlast)
+            using \<open>length (butlast l) = N\<close> atLeastLessThan_iff by blast
+          thus ?thesis by simp
+        qed
         finally show ?thesis using 1 by simp
       qed
       ultimately have butlast: "butlast l = bin_to_bl N (i div 2)" using IH by blast
-      have last: "last l = odd i" sorry
+      have last: "last l = odd i"
+      proof -
+        have set: "{a \<in> {0..<Suc N}. odd (if l ! a then 2 ^ (Suc N - a - 1) else 0)} =
+          (if l ! N then {N} else {})"
+        proof -
+          have "a < Suc N \<Longrightarrow> a \<noteq> N \<Longrightarrow> \<not> odd (if l ! a then 2 ^ (Suc N - a - 1) else 0)" for a
+            by simp
+          hence "{a \<in> {0..<Suc N}. odd (if l ! a then 2 ^ (Suc N - a - 1) else 0)} =
+            {a \<in> {N}. odd (if l ! a then 2 ^ (Suc N - a - 1) else 0)}" by auto
+          thus ?thesis apply (cases "l ! N") apply force by force
+        qed
+        hence "(odd (card {a \<in> {0..<Suc N}. odd (if l ! a then 2 ^ (Suc N - a - 1) else 0)})) =
+          last l"
+          apply (subst last_conv_nth)
+          unfolding set using conjunct1[OF 1] by auto
+        then show ?thesis
+          apply (subst conjunct2[OF 1])
+          apply (subst even_sum_iff)
+           apply simp
+          by fastforce
+      qed
       show ?case
         apply (subst butlast[THEN sym])
         apply (subst last[THEN sym])
@@ -60,7 +112,9 @@ proof -
         using 1 by force
     next
       case 2
-      then show ?case sorry
+      hence len: "length l = Suc N" using size_bin_to_bl by fastforce
+      have "i = (\<Sum>n = 0..<Suc N. if l ! n then 2 ^ (Suc N - n - 1) else 0)" sorry
+      then show ?case using len by blast
     qed
   qed
   show ?thesis unfolding bin_to_bl_def using gen[where N="LENGTH('a)", OF assms] by simp
