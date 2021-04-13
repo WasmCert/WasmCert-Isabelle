@@ -9,20 +9,8 @@ begin
 
 (* https://webassembly.github.io/spec/core/exec/numerics.html *)
 
-context len
-begin
-
-definition ibits :: "'a itself \<Rightarrow> int \<Rightarrow> bool list" where
-  "ibits N i \<equiv> THE l.
-    length l = LENGTH('a) \<and>
-    i = (\<Sum>n \<in> {0..<LENGTH('a)}. (2 ^ (LENGTH('a) - n - 1)) * (if l ! n then 1 else 0))"
-
-lemma "c dvd a \<Longrightarrow> (\<not> c dvd b) \<Longrightarrow> b div c = 0 \<Longrightarrow> ((a::int) + b) div c = (a::int) div c"
-  using div_plus_div_distrib_dvd_left
-  by (simp add: div_plus_div_distrib_dvd_left)
-
 lemma power_sum_div_filter:
-  fixes A :: "'a set" and d :: nat
+  fixes A :: "'a set" and d :: int
   assumes "card (Set.filter (\<lambda>n. f n = 0) A) \<le> 1" "finite A" "d > 1"
   shows "(\<Sum>n\<in>A. d ^ f n) div d = (\<Sum>n\<in>Set.filter (\<lambda>n. f n \<noteq> 0) A. d ^ f n) div d"
 proof -
@@ -55,7 +43,7 @@ proof -
 qed
 
 lemma power_sum_div_n0:
-  fixes A :: "'a set" and d :: nat
+  fixes A :: "'a set" and d :: int
   assumes n0: "\<And>n. n \<in> A \<Longrightarrow> f n \<noteq> 0" and "d \<noteq> 0"
   shows "(\<Sum>n\<in>A. d ^ f n) div d = (\<Sum>n\<in>A. d ^ (f n - 1))"
 proof -
@@ -69,12 +57,48 @@ proof -
 qed
 
 lemma power_sum_div:
-  fixes A :: "'a set" and d :: nat
+  fixes A :: "'a set" and d :: int
   assumes "card (Set.filter (\<lambda>n. f n = 0) A) \<le> 1" "finite A" "d > 1"
   shows "(\<Sum>n\<in>A. d ^ f n) div d = (\<Sum>n\<in>Set.filter (\<lambda>n. f n \<noteq> 0) A. d ^ (f n - 1))"
   apply (subst power_sum_div_filter[OF assms])
   apply (rule power_sum_div_n0)
   using \<open>d > 1\<close> by auto
+
+lemma power_sum_seq_div:
+  fixes d :: int
+  assumes "d > 1"
+  shows "(\<Sum>n = 0..<Suc N. if P n then d ^ n else 0) div d
+          = (\<Sum>n = 0..<N. if P (Suc n) then d ^ n else 0)"
+proof -
+  have *: "(\<Sum>n = 0..<Suc N. if P n then d ^ n else 0) =
+    (\<Sum>n\<in>{n \<in> {0..<Suc N}. P n}. d ^ n)"
+    apply (rule sum.inter_filter[THEN sym]) ..
+  let ?h = "\<lambda>n. n - 1"
+  have h: "{n \<in> {0..<N}. P (Suc n)} = ?h ` Set.filter (\<lambda>n. n \<noteq> 0) {n \<in> {0..<Suc N}. P n}" by force
+  have "(\<Sum>n = 0..<Suc N. if P n then d ^ n else 0) div d = (\<Sum>n\<in>{n \<in> {0..<N}. P (Suc n)}. d ^ n)"
+    apply (subst *)
+    apply (subst power_sum_div)
+    apply (rule subset_eq_atLeast0_lessThan_card)
+    using assms apply auto[3]
+    apply (subst h)
+    apply (subst sum.reindex[where h="?h"])
+     apply (rule inj_onI) by auto
+  also have "\<dots> = (\<Sum>n = 0..<N. if P (Suc n) then d ^ n else 0)"
+    apply (rule sum.inter_filter) ..
+  finally show ?thesis .
+qed
+
+context len
+begin
+
+definition ibits :: "'a itself \<Rightarrow> int \<Rightarrow> bool list" where
+  "ibits N i \<equiv> THE l.
+    length l = LENGTH('a) \<and>
+    i = (\<Sum>n \<in> {0..<LENGTH('a)}. (2 ^ (LENGTH('a) - n - 1)) * (if l ! n then 1 else 0))"
+
+lemma "c dvd a \<Longrightarrow> (\<not> c dvd b) \<Longrightarrow> b div c = 0 \<Longrightarrow> ((a::int) + b) div c = (a::int) div c"
+  using div_plus_div_distrib_dvd_left
+  by (simp add: div_plus_div_distrib_dvd_left)
 
 lemma ibits_l:
   assumes "0 \<le> i" "i < 2 ^ LENGTH('a)"
@@ -97,6 +121,37 @@ proof -
           \<longleftrightarrow> (butlast l = bin_to_bl N (i div 2))"
       apply (rule Suc.IH[where l="butlast l" and i="i div 2"])
       using Suc.prems by auto
+
+    have sumdiv: "length (butlast l) = N \<Longrightarrow>
+        (\<Sum>n = 0..<Suc N. if l ! n then 2 ^ (Suc N - n - 1) else (0::int)) div 2
+        = (\<Sum>n = 0..<N. if butlast l ! n then 2 ^ (N - n - 1) else 0)"
+    proof -
+      assume "length (butlast l) = N"
+      let ?h = "\<lambda>n. n - 1"
+      have l: "Set.filter (\<lambda>n. Suc N - n - 1 \<noteq> 0) {x \<in> {0..<Suc N}. l ! x} = {x \<in> {0..<N}. l ! x}"
+        unfolding Set.filter_def by auto
+      have "(\<Sum>n = 0..<Suc N. if l ! n then 2 ^ (Suc N - n - 1) else (0::int)) div 2 =
+        (\<Sum>n = 0..<N. if l ! n then 2 ^ (N - n - 1) else 0)"
+        apply (subst sum.inter_filter
+            [where P="(!) l", THEN sym, OF finite_atLeastLessThan[of 0 "Suc N"]])
+        apply (subst sum.inter_filter
+            [where P="\<lambda>n. l ! n", THEN sym, OF finite_atLeastLessThan[of 0 N]])
+        apply (subst power_sum_div)
+          subgoal
+            apply (rule ord_le_eq_trans[where b="card {N}"])
+            by (rule card_mono) auto
+          apply auto[2]
+          apply (subst l) by simp
+      also have "\<dots> = (\<Sum>n = 0..<N. if butlast l ! n then 2 ^ (N - n - 1) else 0)"
+      proof -
+        have "n \<in> {0..<N} \<Longrightarrow> butlast l ! n = l ! n" for n
+          apply (rule nth_butlast)
+          using \<open>length (butlast l) = N\<close> atLeastLessThan_iff by blast
+        thus ?thesis by simp
+      qed
+      finally show ?thesis .
+    qed
+
     show ?case
       unfolding bin_to_bl_def apply (subst bin_to_bl_aux.simps)
       apply (subst bin_to_bl_aux_alt)
@@ -104,40 +159,7 @@ proof -
       case 1
       hence "length (butlast l) = N" by simp
       moreover have "i div 2 = (\<Sum>n = 0..<N. if butlast l ! n then 2 ^ (N - n - 1) else 0)"
-      proof -
-        have "(\<Sum>n = 0..<Suc N. if l ! n then 2 ^ (Suc N - n - 1) else (0::int)) div 2 =
-          ((\<Sum>n = 0..<N. (if l ! n then (2 ^ (Suc N - n - 1)) else 0))
-            + (if l ! N then 1 else 0)) div (2::int)"
-          unfolding sum.atLeast0_lessThan_Suc by simp
-        also have "\<dots> = (\<Sum>n = 0..<N. (if l ! n then (2 ^ (Suc N - n - 1)) else 0)) div 2
-                        + (if l ! N then 1 else 0) div 2"
-          apply (rule div_plus_div_distrib_dvd_left)
-          proof (subst even_sum_iff, goal_cases)
-            case 2
-            have "{a \<in> {0..<N}. odd (if l ! a then 2 ^ (Suc N - a - 1) else 0)} = {}"
-              by simp
-            then show ?case by auto
-          qed simp
-        also have "\<dots> = (\<Sum>n = 0..<N. if l ! n then (2 ^ (Suc N - n - 1)) else 0) div (2::int)"
-          by force
-        also have "\<dots> = (\<Sum>n = 0..<N. if l ! n then (2 ^ (Suc (N - n - 1))) else 0) div 2"
-        proof -
-          have "n \<in> {0..<N} \<Longrightarrow> Suc N - n - 1 = Suc (N - n - 1)" for n by simp
-          thus ?thesis by (metis (no_types, lifting) sum.cong)
-        qed
-        also have "\<dots> = (\<Sum>n = 0..<N. if l ! n then 2 * 2 ^ (N - n - 1) else 2 * 0) div 2"
-          unfolding power_Suc apply (subst mult_zero_right[of 2, THEN sym]) ..
-        also have "\<dots> = (2 * (\<Sum>n = 0..<N. if l ! n then 2 ^ (N - n - 1) else 0)) div 2"
-          unfolding if_distrib[THEN sym] sum_distrib_left[THEN sym] ..
-        also have "\<dots> = (\<Sum>n = 0..<N. if butlast l ! n then 2 ^ (N - n - 1) else 0)"
-        proof -
-          have "n \<in> {0..<N} \<Longrightarrow> butlast l ! n = l ! n" for n
-            apply (rule nth_butlast)
-            using \<open>length (butlast l) = N\<close> atLeastLessThan_iff by blast
-          thus ?thesis by simp
-        qed
-        finally show ?thesis using 1 by simp
-      qed
+        using sumdiv 1 by fastforce
       ultimately have butlast: "butlast l = bin_to_bl N (i div 2)" using IH by blast
       have last: "last l = odd i"
       proof -
@@ -167,9 +189,32 @@ proof -
         using 1 by force
     next
       case 2
-      hence len: "length l = Suc N" using size_bin_to_bl by fastforce
-      have "i = (\<Sum>n = 0..<Suc N. if l ! n then 2 ^ (Suc N - n - 1) else 0)" sorry
-      then show ?case using len by blast
+      hence
+        "length (butlast l) = N"
+        "i div 2 = (\<Sum>n = 0..<N. if butlast l ! n then 2 ^ (N - n - 1) else 0)"
+        using IH by auto
+      from 2 have len: "length l = Suc N" using size_bin_to_bl by fastforce
+      have "i = (i div 2) * 2 + (if odd i then 1 else 0)" by presburger
+      also have "\<dots> = (\<Sum>n = 0..<N. if l ! n then 2 ^ (Suc N - n - 1) else 0)
+                      + (if odd i then 1 else 0)"
+        apply (subst \<open>i div 2 = _\<close>)
+        apply (subst sum_distrib_right)
+        apply (subst if_distrib[where f="\<lambda>x. x * 2"])
+        apply (subst power_Suc2[THEN sym])
+        apply (subst mult_zero_left)
+        apply (subst sum.cong[of
+            "{0..<N}" "{0..<N}"
+            "\<lambda>n. if butlast l ! n then 2 ^ Suc (N - n - 1) else 0"
+            "\<lambda>n. if l ! n then 2 ^ (Suc N - n - 1) else 0"])
+        by (auto simp: Suc_diff_Suc len nth_butlast)
+      also have "\<dots> = (\<Sum>n = 0..<N. if l ! n then 2 ^ (Suc N - n - 1) else 0)
+                      + (if l ! N then 1 else 0)"
+      proof -
+        have "l ! length (bin_to_bl N (i div 2)) = odd i" unfolding 2 by simp
+        thus ?thesis using size_bin_to_bl by auto
+      qed
+      also have "\<dots> = (\<Sum>n = 0..<Suc N. if l ! n then 2 ^ (Suc N - n - 1) else 0)" by simp
+      finally show ?case using len by blast
     qed
   qed
   show ?thesis unfolding bin_to_bl_def using gen[where N="LENGTH('a)", OF assms] by simp
@@ -177,13 +222,45 @@ qed
 
 lemma ibits:
   assumes "0 \<le> i" "i < 2 ^ LENGTH('a)"
-  shows "ibits N' i = bin_to_bl LENGTH('a) i"
-  unfolding ibits_def
+  shows "ibits N i = bin_to_bl LENGTH('a) i"
+  unfolding ibits_def sum_distrib_right if_distrib mult_zero_right mult_1_right
   apply (rule the_equality)
   using ibits_l[OF assms] by auto
 
 definition ibits_inv :: "'a itself \<Rightarrow> bool list \<Rightarrow> int" where
   "ibits_inv N \<equiv> the_inv_into {0 ..< 2^LENGTH('a)} (ibits N)"
+
+lemma ibits_inv:
+  assumes "length l = LENGTH('a)"
+  shows "ibits_inv N l = bl_to_bin l"
+proof -
+  have ge0: "0 \<le> bl_to_bin l" using bl_to_bin_ge0 .
+  have lt2p: "bl_to_bin l < 2 ^ LENGTH('a)"
+    unfolding assms[THEN sym] using bl_to_bin_lt2p .
+  show ?thesis
+  unfolding ibits_inv_def
+  proof (rule the_inv_into_f_eq, goal_cases)
+    case 1
+    then show ?case
+      apply (rule inj_onI)
+      apply (subst (asm) ibits)
+      apply auto[2]
+      apply (subst (asm) ibits)
+      apply auto[2]
+      by (metis atLeastLessThan_iff bin_bl_bin take_bit_int_eq_self)
+  next
+    case 2
+    then show ?case
+      apply (subst ibits)
+      using ge0 lt2p apply auto[2]
+      unfolding assms[THEN sym]
+      by (rule bl_bin_bl)
+  next
+    case 3
+    then show ?case using ge0 lt2p by simp
+  qed
+qed
+
 
 lemma half_power:
   "2 ^ LENGTH('a) = 2 * 2 ^ (LENGTH('a) - 1)"
