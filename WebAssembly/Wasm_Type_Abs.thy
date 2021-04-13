@@ -15,11 +15,66 @@ begin
 definition ibits :: "'a itself \<Rightarrow> int \<Rightarrow> bool list" where
   "ibits N i \<equiv> THE l.
     length l = LENGTH('a) \<and>
-    i = (\<Sum>n \<in> {0..<LENGTH('a)}. if l ! n then (2 ^ (LENGTH('a) - n - 1)) else 0)"
+    i = (\<Sum>n \<in> {0..<LENGTH('a)}. (2 ^ (LENGTH('a) - n - 1)) * (if l ! n then 1 else 0))"
 
 lemma "c dvd a \<Longrightarrow> (\<not> c dvd b) \<Longrightarrow> b div c = 0 \<Longrightarrow> ((a::int) + b) div c = (a::int) div c"
   using div_plus_div_distrib_dvd_left
   by (simp add: div_plus_div_distrib_dvd_left)
+
+lemma power_sum_div_filter:
+  fixes A :: "'a set" and d :: nat
+  assumes "card (Set.filter (\<lambda>n. f n = 0) A) \<le> 1" "finite A" "d > 1"
+  shows "(\<Sum>n\<in>A. d ^ f n) div d = (\<Sum>n\<in>Set.filter (\<lambda>n. f n \<noteq> 0) A. d ^ f n) div d"
+proof -
+  have *: "(\<Sum>n\<in>A. d ^ f n) =
+    (\<Sum>n\<in>Set.filter (\<lambda>n. f n \<noteq> 0) A. d ^ f n)
+    + (\<Sum>n\<in>Set.filter (\<lambda>n. f n = 0) A. d ^ f n)"
+    apply (subst sum.union_disjoint[of "Set.filter (\<lambda>n. f n \<noteq> 0) A" "Set.filter (\<lambda>n. f n = 0) A", THEN sym])
+    using assms apply auto[3]
+    apply (rule arg_cong[where f="sum (\<lambda>n. d ^ f n)"]) unfolding Set.filter_def by auto
+  hence "(\<Sum>n\<in>A. d ^ f n) div d =
+    (\<Sum>n\<in>Set.filter (\<lambda>n. f n \<noteq> 0) A. d ^ f n) div d
+    + (\<Sum>n\<in>Set.filter (\<lambda>n. f n = 0) A. d ^ f n) div d"
+    apply (subst *)
+    apply (rule div_plus_div_distrib_dvd_left)
+    apply (rule dvd_sum)
+    by simp
+  moreover have "(\<Sum>n\<in>Set.filter (\<lambda>n. f n = 0) A. d ^ f n) div d = 0"
+  proof (cases "Set.filter (\<lambda>n. f n = 0) A = {}")
+    case False
+    hence "0 < card (Set.filter (\<lambda>n. f n = 0) A)"
+      apply (subst card_gt_0_iff) using \<open>finite A\<close> by simp
+    hence "is_singleton (Set.filter (\<lambda>n. f n = 0) A)"
+      unfolding is_singleton_def apply (subst card_1_singleton_iff[THEN sym])
+      using \<open>card _ \<le> 1\<close> using False by simp
+    then obtain x where x: "Set.filter (\<lambda>n. f n = 0) A = {x}" by (rule is_singletonE)
+    hence 0: "f x = 0" by auto
+    then show ?thesis unfolding x using \<open>d > 1\<close> by simp
+  qed simp
+  ultimately show ?thesis by presburger
+qed
+
+lemma power_sum_div_n0:
+  fixes A :: "'a set" and d :: nat
+  assumes n0: "\<And>n. n \<in> A \<Longrightarrow> f n \<noteq> 0" and "d \<noteq> 0"
+  shows "(\<Sum>n\<in>A. d ^ f n) div d = (\<Sum>n\<in>A. d ^ (f n - 1))"
+proof -
+  have *: "(\<Sum>n\<in>A. d ^ f n) = d * (\<Sum>n\<in>A. d ^ (f n - 1))"
+    apply (subst sum_distrib_left)
+    apply (subst power_eq_if)
+    apply (rule sum.cong)
+    apply standard
+    using n0 by fastforce
+  show ?thesis unfolding * using \<open>d \<noteq> 0\<close> by simp
+qed
+
+lemma power_sum_div:
+  fixes A :: "'a set" and d :: nat
+  assumes "card (Set.filter (\<lambda>n. f n = 0) A) \<le> 1" "finite A" "d > 1"
+  shows "(\<Sum>n\<in>A. d ^ f n) div d = (\<Sum>n\<in>Set.filter (\<lambda>n. f n \<noteq> 0) A. d ^ (f n - 1))"
+  apply (subst power_sum_div_filter[OF assms])
+  apply (rule power_sum_div_n0)
+  using \<open>d > 1\<close> by auto
 
 lemma ibits_l:
   assumes "0 \<le> i" "i < 2 ^ LENGTH('a)"
