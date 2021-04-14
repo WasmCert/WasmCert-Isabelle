@@ -528,6 +528,12 @@ class wasm_int = wasm_int_ops +
   assumes iand: "int_and i\<^sub>1 i\<^sub>2 = rep_int_bits (map2 (\<and>) (abs_int_bits i\<^sub>1) (abs_int_bits i\<^sub>2))"
   assumes ior: "int_or i\<^sub>1 i\<^sub>2 = rep_int_bits (map2 (\<or>) (abs_int_bits i\<^sub>1) (abs_int_bits i\<^sub>2))"
   assumes ixor: "int_xor i\<^sub>1 i\<^sub>2 = rep_int_bits (map2 (\<noteq>) (abs_int_bits i\<^sub>1) (abs_int_bits i\<^sub>2))"
+  assumes shl:
+    "abs_int_bits i\<^sub>1 = d\<^sub>1 @ d\<^sub>2
+    \<Longrightarrow> int k = abs_int i\<^sub>2 mod int (LENGTH('a))
+    \<Longrightarrow> length d\<^sub>1 = k
+    \<Longrightarrow> length d\<^sub>2 = (LENGTH('a) - k)
+    \<Longrightarrow> int_shl i\<^sub>1 i\<^sub>2 = rep_int_bits (d\<^sub>2 @ replicate k False)"
 
 class wasm_float = wasm_base +
   (* unops *)

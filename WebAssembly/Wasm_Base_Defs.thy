@@ -87,7 +87,8 @@ instantiation i32 :: wasm_int_ops begin
   lift_definition int_and_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "and" .
   lift_definition int_or_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "or" .
   lift_definition int_xor_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "xor" .
-  lift_definition int_shl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_shl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is
+    "\<lambda>i\<^sub>1 i\<^sub>2. push_bit (unat i\<^sub>2 mod LENGTH(i32)) i\<^sub>1" .
   lift_definition int_shr_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
   lift_definition int_shr_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
   lift_definition int_rotl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
@@ -406,6 +407,11 @@ proof -
   finally show ?thesis .
 qed
 
+lemma  bit_of_bl_append_high:
+  assumes "length lb \<le> n" "n < LENGTH('a)"
+  shows "bit (of_bl (la @ lb) :: 'a::len word) n = bit (of_bl la :: 'a word) (n - length lb)"
+  unfolding bit_of_bl_iff using assms by (simp add: less_diff_conv2 nth_append)
+
 instantiation i32 :: wasm_int begin
 instance
 proof (standard, goal_cases)
@@ -547,6 +553,41 @@ next
     apply (subst rep_int_bits_i32)
     subgoal by simp
     unfolding bl_word_xor[THEN sym] int_xor_i32_def by simp
+next
+  case (17 i\<^sub>1 d\<^sub>1 d\<^sub>2 k i\<^sub>2)
+  hence "k = unat (Rep_i32 i\<^sub>2) mod LENGTH(i32)"
+    by (metis nat_int nat_of_int_i32.rep_eq of_nat_mod)
+  hence "k \<le> LENGTH(i32)" by simp
+  from 17 have "d\<^sub>2 = drop k (abs_int_bits i\<^sub>1)" by simp
+  from 17 have applen: "length (d\<^sub>2 @ replicate k False) = LENGTH(32)"
+    by (metis \<open>k \<le> LENGTH(i32)\<close> le_add_diff_inverse2 length_append length_i32 length_replicate)
+  have *: "push_bit k (Rep_i32 i\<^sub>1) = of_bl (d\<^sub>2 @ replicate k False)"
+  proof (rule bit_eqI, goal_cases)
+    case (1 n)
+    hence "n < LENGTH(32)"
+      using exp_eq_zero_iff not_le by blast
+    have z: "n < k \<Longrightarrow> bit (push_bit k (Rep_i32 i\<^sub>1)) n = bit (of_bl (d\<^sub>2 @ replicate k False)) n"
+      unfolding bit_of_bl_iff bit_push_bit_iff \<open>d\<^sub>2 = _\<close> abs_int_bits_i32 by (simp add: nth_append)
+    {
+      assume "k \<le> n"
+      hence "bit (push_bit k (Rep_i32 i\<^sub>1)) n = bit (Rep_i32 i\<^sub>1) (n - k)"
+        using 1 bit_push_bit_iff by blast
+      also have "\<dots> = bit (of_bl (d\<^sub>2 @ replicate k False) :: 32 word) n"
+        apply (subst bit_of_bl_append_high)
+        unfolding length_replicate
+        using \<open>k \<le> n\<close> \<open>n < LENGTH(32)\<close> apply auto[2]
+        unfolding \<open>d\<^sub>2 = _\<close> abs_int_bits_i32 of_drop_to_bl bit_and_iff Word.bit_mask_iff
+        by (metis \<open>k \<le> n\<close> \<open>n < LENGTH(32)\<close> diff_less_mono min_minus word_size)
+      finally have "bit (push_bit k (Rep_i32 i\<^sub>1)) n =
+        bit (of_bl (d\<^sub>2 @ replicate k False) :: 32 word) n" .
+    }
+    from this z show ?case by (cases "n < k") auto
+  qed
+  show ?case
+    unfolding int_shl_i32_def
+    apply (subst rep_int_bits_i32)
+    subgoal unfolding length_append \<open>length d\<^sub>2 = _\<close> length_replicate using \<open>k \<le> _\<close> by simp
+    using * unfolding \<open>k = _\<close> by simp
 qed
 
 end
