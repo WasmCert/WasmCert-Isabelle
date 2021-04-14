@@ -183,6 +183,21 @@ proof -
     unfolding inv int_of_nat_i32_def using negcase by simp
 qed
 
+lemma abs_int_bits_i32: "abs_int_bits a = to_bl (Rep_i32 a)"
+  apply (subst ibits)
+  unfolding abs_int_i32 length_i32
+  subgoal by simp
+  apply (rule uint_lt2p)
+  apply (subst to_bl_eq)
+  ..
+
+lemma rep_int_bits_i32:
+  assumes "length l = LENGTH(i32)"
+  shows "rep_int_bits l = Abs_i32 (of_bl l)"
+  apply (subst ibits_inv[OF assms])
+  unfolding int_of_nat_i32.abs_eq
+  by (simp add: bl_to_bin_ge0 of_bl.abs_eq)
+
 lemma div_rat_int_bounds:
   assumes
     "0 \<le> (L::rat)"
@@ -511,6 +526,13 @@ next
     unfolding int_rem_s_i32_def smod_word_alt_def abs_int_s_i32 sdiv_trunc[OF nz, THEN sym]
       signed_inv_i32
     using reps int_of_nat_i32.abs_eq nz by auto
+next
+  case (14 i\<^sub>1 i\<^sub>2)
+  then show ?case
+    unfolding abs_int_bits_i32
+    apply (subst rep_int_bits_i32)
+    subgoal by simp
+    unfolding bl_word_and[THEN sym] int_and_i32_def by simp
 qed
 
 end
