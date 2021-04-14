@@ -526,6 +526,8 @@ class wasm_int = wasm_int_ops +
   assumes rem_s: "i\<^sub>2 \<noteq> 0 \<Longrightarrow> int_rem_s (i\<^sub>1::'a) i\<^sub>2 = Some (rep_int_s (
       abs_int_s i\<^sub>1 - abs_int_s i\<^sub>2 * trunc (of_int (abs_int_s i\<^sub>1) / of_int (abs_int_s i\<^sub>2))))"
   assumes iand: "int_and i\<^sub>1 i\<^sub>2 = rep_int_bits (map2 (\<and>) (abs_int_bits i\<^sub>1) (abs_int_bits i\<^sub>2))"
+  assumes ior: "int_or i\<^sub>1 i\<^sub>2 = rep_int_bits (map2 (\<or>) (abs_int_bits i\<^sub>1) (abs_int_bits i\<^sub>2))"
+  assumes ixor: "int_xor i\<^sub>1 i\<^sub>2 = rep_int_bits (map2 (\<noteq>) (abs_int_bits i\<^sub>1) (abs_int_bits i\<^sub>2))"
 
 class wasm_float = wasm_base +
   (* unops *)

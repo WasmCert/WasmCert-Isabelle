@@ -84,9 +84,9 @@ instantiation i32 :: wasm_int_ops begin
     "\<lambda>i\<^sub>1 i\<^sub>2. if i\<^sub>2 = 0 then None else Some (i\<^sub>1 mod i\<^sub>2)" .
   lift_definition int_rem_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is
     "\<lambda>i\<^sub>1 i\<^sub>2. if i\<^sub>2 = 0 then None else Some (i\<^sub>1 smod i\<^sub>2)".
-  lift_definition int_and_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "(and)" .
-  lift_definition int_or_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
-  lift_definition int_xor_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_and_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "and" .
+  lift_definition int_or_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "or" .
+  lift_definition int_xor_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "xor" .
   lift_definition int_shl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
   lift_definition int_shr_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
   lift_definition int_shr_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
@@ -533,6 +533,20 @@ next
     apply (subst rep_int_bits_i32)
     subgoal by simp
     unfolding bl_word_and[THEN sym] int_and_i32_def by simp
+next
+  case (15 i\<^sub>1 i\<^sub>2)
+  then show ?case
+    unfolding abs_int_bits_i32
+    apply (subst rep_int_bits_i32)
+    subgoal by simp
+    unfolding bl_word_or[THEN sym] int_or_i32_def by simp
+next
+  case (16 i\<^sub>1 i\<^sub>2)
+  then show ?case
+    unfolding abs_int_bits_i32
+    apply (subst rep_int_bits_i32)
+    subgoal by simp
+    unfolding bl_word_xor[THEN sym] int_xor_i32_def by simp
 qed
 
 end
