@@ -516,6 +516,12 @@ class wasm_int = wasm_int_ops +
     \<Longrightarrow> length d\<^sub>1 = (LENGTH('a) - k)
     \<Longrightarrow> length d\<^sub>2 = k
     \<Longrightarrow> int_shr_u i\<^sub>1 i\<^sub>2 = rep_int_bits (replicate k False @ d\<^sub>1)"
+  assumes shr_s:
+    "abs_int_bits i\<^sub>1 = d\<^sub>0 # d\<^sub>1 @ d\<^sub>2
+    \<Longrightarrow> int k = abs_int i\<^sub>2 mod int (LENGTH('a))
+    \<Longrightarrow> length d\<^sub>1 = (LENGTH('a) - k - 1)
+    \<Longrightarrow> length d\<^sub>2 = k
+    \<Longrightarrow> int_shr_s i\<^sub>1 i\<^sub>2 = rep_int_bits (replicate (k + 1) d\<^sub>0 @ d\<^sub>1)"
 
 class wasm_float = wasm_base +
   (* unops *)

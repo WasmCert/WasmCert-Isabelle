@@ -91,7 +91,8 @@ instantiation i32 :: wasm_int_ops begin
     "\<lambda>i\<^sub>1 i\<^sub>2. i\<^sub>1 << (unat i\<^sub>2 mod LENGTH(i32))" .
   lift_definition int_shr_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is
     "\<lambda>i\<^sub>1 i\<^sub>2. i\<^sub>1 >> (unat i\<^sub>2 mod LENGTH(i32))" .
-  lift_definition int_shr_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_shr_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is
+    "\<lambda>i\<^sub>1 i\<^sub>2. i\<^sub>1 >>> (unat i\<^sub>2 mod LENGTH(i32))" .
   lift_definition int_rotl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
   lift_definition int_rotr_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
   (* testops *)
@@ -421,6 +422,116 @@ lemma bit_of_bl_append_high:
   shows "bit (of_bl (la @ lb) :: 'a::len word) n = bit (of_bl la :: 'a word) (n - length lb)"
   unfolding bit_of_bl_iff using assms by (simp add: less_diff_conv2 nth_append)
 
+lemma sshiftr1_bl_of:
+  "length bl = LENGTH('a) \<Longrightarrow>
+    sshiftr1 (of_bl bl::'a::len word) = of_bl (hd bl # butlast bl)"
+  apply (rule word_bl.Rep_eqD)
+  apply (subst bl_sshiftr1[of "of_bl bl :: 'a word"])
+  by (simp add: word_bl.Abs_inverse)
+
+lemma sshiftr1_bl_of':
+  "LENGTH('a) \<le> length bl \<Longrightarrow>
+    sshiftr1 (of_bl bl::'a::len word) =
+    of_bl (hd (drop (length bl - LENGTH('a)) bl) # butlast (drop (length bl - LENGTH('a)) bl))"
+  apply (subst of_bl_drop'[symmetric, of "length bl - LENGTH('a)"])
+  using sshiftr1_bl_of[of "drop (length bl - LENGTH('a)) bl"]
+  by auto
+
+lemma sshiftr_clamp_pos:
+  assumes
+    "LENGTH('a) \<le> n"
+    "0 \<le> sint x"
+  shows "(x::'a::len word) >>> n = 0"
+  apply (rule word_sint.Rep_eqD)
+  apply (unfold sshiftr_div_2n Word.sint_0)
+  apply (rule div_pos_pos_trivial)
+  subgoal using assms(2) .
+  apply (rule order.strict_trans[where b="2 ^ (LENGTH('a) - 1)"])
+  using sint_lt assms(1) by auto
+
+lemma sshiftr_clamp_neg:
+  assumes
+    "LENGTH('a) \<le> n"
+    "sint x < 0"
+  shows "(x::'a::len word) >>> n = -1"
+proof -
+  have *: "- (2 ^ n) < sint x"
+    apply (rule order.strict_trans2[where b="- (2 ^ (LENGTH('a) - 1))"])
+    using assms(1) sint_ge by auto
+  show ?thesis
+    apply (rule word_sint.Rep_eqD)
+    apply (unfold sshiftr_div_2n Word.sint_n1)
+    apply (subst div_minus_minus[symmetric])
+    apply (rule div_pos_neg_trivial)
+    subgoal using assms(2) by linarith
+    using * by simp
+qed
+
+lemma sshiftr_clamp:
+  assumes "LENGTH('a) \<le> n"
+  shows "(x::'a::len word) >>> n = x >>> LENGTH('a)"
+  apply (cases "0 \<le> sint x")
+  subgoal
+    apply (subst sshiftr_clamp_pos[OF assms])
+    defer apply (subst sshiftr_clamp_pos)
+    by auto
+  apply (subst sshiftr_clamp_neg[OF assms])
+  defer apply (subst sshiftr_clamp_neg)
+  by auto
+
+lemma sshiftr_bl_of:
+  assumes "length bl = LENGTH('a)"
+  shows "(of_bl bl::'a::len word) >>> n = of_bl (replicate n (hd bl) @ take (length bl - n) bl)"
+proof -
+  {
+    fix n
+    assume "n \<le> LENGTH('a)"
+    hence "(of_bl bl::'a::len word) >>> n = of_bl (replicate n (hd bl) @ take (length bl - n) bl)"
+    proof (induction n)
+      case (Suc n)
+      hence "n < length bl" by (simp add: assms)
+      hence ne: "\<not>take (length bl - n) bl = []" by auto
+      have left: "hd (replicate n (hd bl) @ take (length bl - n) bl) = (hd bl)"
+        by (cases "0 < n") auto
+      have right: "butlast (take (length bl - n) bl) = take (length bl - Suc n) bl"
+        by (subst butlast_take) auto
+      have "(of_bl bl::'a::len word) >>> Suc n = sshiftr1 ((of_bl bl::'a::len word) >>> n)"
+        unfolding sshiftr_eq_funpow_sshiftr1 by simp
+      also have "\<dots> = of_bl (replicate (Suc n) (hd bl) @ take (length bl - Suc n) bl)"
+        apply (subst Suc.IH[OF Suc_leD[OF Suc.prems]])
+        apply (subst sshiftr1_bl_of)
+        subgoal using assms Suc.prems by simp
+        apply (rule arg_cong[where f=of_bl])
+        apply (subst butlast_append)
+        unfolding left right using ne by simp
+      finally show ?case .
+    qed (transfer, simp)
+  }
+  note pos = this
+  {
+    assume n: "LENGTH('a) \<le> n"
+    have "(of_bl bl::'a::len word) >>> n = (of_bl bl::'a::len word) >>> LENGTH('a)"
+      by (rule sshiftr_clamp[OF n])
+    also have "\<dots> = of_bl (replicate LENGTH('a) (hd bl) @ take (length bl - LENGTH('a)) bl)"
+      apply (rule pos) ..
+    also have "\<dots> = of_bl (replicate n (hd bl) @ take (length bl - n) bl)"
+    proof -
+      have "(of_bl (replicate LENGTH('a) (hd bl)) :: 'a word) = of_bl (replicate n (hd bl))"
+        apply (subst of_bl_drop'[symmetric, of "n - LENGTH('a)" "replicate n (hd bl)"])
+        unfolding length_replicate by (auto simp: n)
+      thus ?thesis by (simp add: assms n)
+    qed
+    finally have "(of_bl bl::'a::len word) >>> n
+      = of_bl (replicate n (hd bl) @ take (length bl - n) bl)" .
+  }
+  thus ?thesis using pos by fastforce
+qed
+
+lemma sshiftr_bl: "x >>> n \<equiv> of_bl (replicate n (msb x) @ take (LENGTH('a) - n) (to_bl x))"
+  for x :: "'a::len word"
+  unfolding word_msb_alt
+  by (smt (z3) length_to_bl_eq sshiftr_bl_of word_bl.Rep_inverse)
+
 instantiation i32 :: wasm_int begin
 instance
 proof (standard, goal_cases)
@@ -593,6 +704,35 @@ next
     apply (subst rep_int_bits_i32)
     subgoal unfolding length_append \<open>length d\<^sub>1 = _\<close> length_replicate using \<open>k \<le> _\<close> by simp
     using * unfolding \<open>k = _\<close> of_bl_rep_False by simp
+next
+  case (19 i\<^sub>1 d\<^sub>0 d\<^sub>1 d\<^sub>2 k i\<^sub>2)
+  hence "k = unat (Rep_i32 i\<^sub>2) mod LENGTH(i32)"
+    by (metis nat_int nat_of_int_i32.rep_eq of_nat_mod)
+  hence "k < LENGTH(i32)" by simp
+  note bl = \<open>abs_int_bits i\<^sub>1 = _\<close>[unfolded abs_int_bits_i32]
+  have "d\<^sub>0 = hd (to_bl (Rep_i32 i\<^sub>1))" using bl by simp
+  have "d\<^sub>1 = drop 1 (take (LENGTH(i32) - k) (to_bl (Rep_i32 i\<^sub>1)))"
+    using bl \<open>length d\<^sub>1 = _\<close> by (simp add: drop_take)
+  have "(Rep_i32 i\<^sub>1) >>> k =
+    of_bl (replicate k (hd (to_bl (Rep_i32 i\<^sub>1))) @ take (LENGTH(32) - k) (to_bl (Rep_i32 i\<^sub>1)))"
+    apply (subst sshiftr_bl) unfolding word_msb_alt ..
+  also have "\<dots> = of_bl (replicate (k + 1) d\<^sub>0 @ d\<^sub>1)"
+  proof -
+    let ?taken = "take (LENGTH(32) - k) (to_bl (Rep_i32 i\<^sub>1))"
+    have hd: "[hd (to_bl (Rep_i32 i\<^sub>1))] = take 1 ?taken"
+      using \<open>k < LENGTH(i32)\<close> bl by force
+    have rest: "?taken = [hd (to_bl (Rep_i32 i\<^sub>1))] @ drop 1 ?taken"
+      unfolding length_i32 hd append_take_drop_id ..
+    show ?thesis
+      apply (rule arg_cong[where f=of_bl])
+      unfolding \<open>d\<^sub>0 = _\<close> \<open>d\<^sub>1 = _\<close> replicate_add using rest by simp
+  qed
+  finally have *: "(Rep_i32 i\<^sub>1) >>> k = of_bl (replicate (k + 1) d\<^sub>0 @ d\<^sub>1)" .
+  show ?case
+    unfolding int_shr_s_i32_def
+    apply (subst rep_int_bits_i32)
+    subgoal unfolding length_append \<open>length d\<^sub>1 = _\<close> length_replicate using \<open>k < _\<close> by simp
+    using * unfolding \<open>k = _\<close> by simp
 qed
 
 end
