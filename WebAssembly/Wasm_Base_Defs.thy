@@ -88,8 +88,9 @@ instantiation i32 :: wasm_int_ops begin
   lift_definition int_or_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "or" .
   lift_definition int_xor_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "xor" .
   lift_definition int_shl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is
-    "\<lambda>i\<^sub>1 i\<^sub>2. push_bit (unat i\<^sub>2 mod LENGTH(i32)) i\<^sub>1" .
-  lift_definition int_shr_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
+    "\<lambda>i\<^sub>1 i\<^sub>2. i\<^sub>1 << (unat i\<^sub>2 mod LENGTH(i32))" .
+  lift_definition int_shr_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is
+    "\<lambda>i\<^sub>1 i\<^sub>2. i\<^sub>1 >> (unat i\<^sub>2 mod LENGTH(i32))" .
   lift_definition int_shr_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
   lift_definition int_rotl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
   lift_definition int_rotr_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
@@ -325,6 +326,14 @@ proof -
   ultimately show ?thesis by linarith
 qed
 
+lemma drop_append2:
+  assumes "n \<le> length xs"
+  shows "drop n (xs @ ys) = drop n xs @ ys"
+proof -
+  have "drop (n - length xs) ys = ys" using assms by simp
+  thus ?thesis using drop_append by simp
+qed
+
 lemma smod_distr: "((i\<^sub>1::'a::len word) - i\<^sub>2 * (i\<^sub>1 sdiv i\<^sub>2)) =
       (word_of_nat (nat (signed_inv TYPE('a) (sint i\<^sub>1 - sint i\<^sub>2 * (sint i\<^sub>1 sdiv sint i\<^sub>2)))))"
 proof -
@@ -407,7 +416,7 @@ proof -
   finally show ?thesis .
 qed
 
-lemma  bit_of_bl_append_high:
+lemma bit_of_bl_append_high:
   assumes "length lb \<le> n" "n < LENGTH('a)"
   shows "bit (of_bl (la @ lb) :: 'a::len word) n = bit (of_bl la :: 'a word) (n - length lb)"
   unfolding bit_of_bl_iff using assms by (simp add: less_diff_conv2 nth_append)
@@ -559,35 +568,31 @@ next
     by (metis nat_int nat_of_int_i32.rep_eq of_nat_mod)
   hence "k \<le> LENGTH(i32)" by simp
   from 17 have "d\<^sub>2 = drop k (abs_int_bits i\<^sub>1)" by simp
-  from 17 have applen: "length (d\<^sub>2 @ replicate k False) = LENGTH(32)"
-    by (metis \<open>k \<le> LENGTH(i32)\<close> le_add_diff_inverse2 length_append length_i32 length_replicate)
-  have *: "push_bit k (Rep_i32 i\<^sub>1) = of_bl (d\<^sub>2 @ replicate k False)"
-  proof (rule bit_eqI, goal_cases)
-    case (1 n)
-    hence "n < LENGTH(32)"
-      using exp_eq_zero_iff not_le by blast
-    have z: "n < k \<Longrightarrow> bit (push_bit k (Rep_i32 i\<^sub>1)) n = bit (of_bl (d\<^sub>2 @ replicate k False)) n"
-      unfolding bit_of_bl_iff bit_push_bit_iff \<open>d\<^sub>2 = _\<close> abs_int_bits_i32 by (simp add: nth_append)
-    {
-      assume "k \<le> n"
-      hence "bit (push_bit k (Rep_i32 i\<^sub>1)) n = bit (Rep_i32 i\<^sub>1) (n - k)"
-        using 1 bit_push_bit_iff by blast
-      also have "\<dots> = bit (of_bl (d\<^sub>2 @ replicate k False) :: 32 word) n"
-        apply (subst bit_of_bl_append_high)
-        unfolding length_replicate
-        using \<open>k \<le> n\<close> \<open>n < LENGTH(32)\<close> apply auto[2]
-        unfolding \<open>d\<^sub>2 = _\<close> abs_int_bits_i32 of_drop_to_bl bit_and_iff Word.bit_mask_iff
-        by (metis \<open>k \<le> n\<close> \<open>n < LENGTH(32)\<close> diff_less_mono min_minus word_size)
-      finally have "bit (push_bit k (Rep_i32 i\<^sub>1)) n =
-        bit (of_bl (d\<^sub>2 @ replicate k False) :: 32 word) n" .
-    }
-    from this z show ?case by (cases "n < k") auto
-  qed
+  have *: "(Rep_i32 i\<^sub>1) << k = of_bl (d\<^sub>2 @ replicate k False)"
+    unfolding \<open>d\<^sub>2 = _\<close> abs_int_bits_i32
+    apply (subst shiftl_bl)
+    apply (subst drop_append2[symmetric])
+    using \<open>k \<le> LENGTH(i32)\<close> apply fastforce
+    by (rule of_bl_drop'[symmetric]) simp
   show ?case
     unfolding int_shl_i32_def
     apply (subst rep_int_bits_i32)
     subgoal unfolding length_append \<open>length d\<^sub>2 = _\<close> length_replicate using \<open>k \<le> _\<close> by simp
     using * unfolding \<open>k = _\<close> by simp
+next
+  case (18 i\<^sub>1 d\<^sub>1 d\<^sub>2 k i\<^sub>2)
+  hence "k = unat (Rep_i32 i\<^sub>2) mod LENGTH(i32)"
+    by (metis nat_int nat_of_int_i32.rep_eq of_nat_mod)
+  hence "k \<le> LENGTH(i32)" by simp
+  from 18 have "d\<^sub>1 = take (LENGTH(i32) - k) (abs_int_bits i\<^sub>1)" by simp
+  have *: "(Rep_i32 i\<^sub>1) >> k = of_bl d\<^sub>1"
+    unfolding \<open>d\<^sub>1 = _\<close> bit_drop_bit_eq abs_int_bits_i32 length_i32
+    by (subst shiftr_bl[symmetric]) simp
+  show ?case
+    unfolding int_shr_u_i32_def
+    apply (subst rep_int_bits_i32)
+    subgoal unfolding length_append \<open>length d\<^sub>1 = _\<close> length_replicate using \<open>k \<le> _\<close> by simp
+    using * unfolding \<open>k = _\<close> of_bl_rep_False by simp
 qed
 
 end

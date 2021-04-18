@@ -64,30 +64,6 @@ lemma power_sum_div:
   apply (rule power_sum_div_n0)
   using \<open>d > 1\<close> by auto
 
-lemma power_sum_seq_div:
-  fixes d :: int
-  assumes "d > 1"
-  shows "(\<Sum>n = 0..<Suc N. if P n then d ^ n else 0) div d
-          = (\<Sum>n = 0..<N. if P (Suc n) then d ^ n else 0)"
-proof -
-  have *: "(\<Sum>n = 0..<Suc N. if P n then d ^ n else 0) =
-    (\<Sum>n\<in>{n \<in> {0..<Suc N}. P n}. d ^ n)"
-    apply (rule sum.inter_filter[THEN sym]) ..
-  let ?h = "\<lambda>n. n - 1"
-  have h: "{n \<in> {0..<N}. P (Suc n)} = ?h ` Set.filter (\<lambda>n. n \<noteq> 0) {n \<in> {0..<Suc N}. P n}" by force
-  have "(\<Sum>n = 0..<Suc N. if P n then d ^ n else 0) div d = (\<Sum>n\<in>{n \<in> {0..<N}. P (Suc n)}. d ^ n)"
-    apply (subst *)
-    apply (subst power_sum_div)
-    apply (rule subset_eq_atLeast0_lessThan_card)
-    using assms apply auto[3]
-    apply (subst h)
-    apply (subst sum.reindex[where h="?h"])
-     apply (rule inj_onI) by auto
-  also have "\<dots> = (\<Sum>n = 0..<N. if P (Suc n) then d ^ n else 0)"
-    apply (rule sum.inter_filter) ..
-  finally show ?thesis .
-qed
-
 context len
 begin
 
@@ -534,6 +510,12 @@ class wasm_int = wasm_int_ops +
     \<Longrightarrow> length d\<^sub>1 = k
     \<Longrightarrow> length d\<^sub>2 = (LENGTH('a) - k)
     \<Longrightarrow> int_shl i\<^sub>1 i\<^sub>2 = rep_int_bits (d\<^sub>2 @ replicate k False)"
+  assumes shr_u:
+    "abs_int_bits i\<^sub>1 = d\<^sub>1 @ d\<^sub>2
+    \<Longrightarrow> int k = abs_int i\<^sub>2 mod int (LENGTH('a))
+    \<Longrightarrow> length d\<^sub>1 = (LENGTH('a) - k)
+    \<Longrightarrow> length d\<^sub>2 = k
+    \<Longrightarrow> int_shr_u i\<^sub>1 i\<^sub>2 = rep_int_bits (replicate k False @ d\<^sub>1)"
 
 class wasm_float = wasm_base +
   (* unops *)
