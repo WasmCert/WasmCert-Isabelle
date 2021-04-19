@@ -70,7 +70,7 @@ instantiation i32 :: wasm_int_ops begin
   definition len_of_i32 :: "i32 itself \<Rightarrow> nat" where [simp]: "len_of_i32 _ = 32"
   lift_definition int_clz_i32 :: "i32 \<Rightarrow> i32" is "of_nat \<circ> word_clz" .
   lift_definition int_ctz_i32 :: "i32 \<Rightarrow> i32" is "of_nat \<circ> word_ctz" .
-  lift_definition int_popcnt_i32 :: "i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_popcnt_i32 :: "i32 \<Rightarrow> i32" is "of_nat \<circ> pop_count" .
   (* binops *)
   lift_definition int_add_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "(+)" .
   lift_definition int_sub_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "(-)" .
@@ -678,6 +678,19 @@ next
   hence "takeWhile Not (rev (to_bl (Rep_i32 i\<^sub>1))) = replicate k False"
     unfolding abs_int_bits_i32 by (simp add: takeWhile_tail)
   then show ?case unfolding int_ctz_i32_def int_of_nat_i32_def word_ctz_def by simp
+next
+  case (26 i\<^sub>1 bls k)
+  from this(3) have "length (filter id (concat bls)) = length bls"
+  proof (induction bls)
+    case (Cons a bls)
+    have "length (filter id a) = 1" by (subst Cons.prems[of a]) auto
+    thus ?case unfolding concat.simps filter_append using Cons.IH Cons.prems by fastforce
+  qed simp
+  hence "pop_count (Rep_i32 i\<^sub>1) = k"
+    apply (subst pop_count_def)
+    apply (subst \<open>abs_int_bits i\<^sub>1 = _\<close>[unfolded abs_int_bits_i32])
+    unfolding filter_append length_append using \<open>length bls = k\<close> by simp
+  then show ?case unfolding int_popcnt_i32_def int_of_nat_i32_def by simp
 qed
 
 end

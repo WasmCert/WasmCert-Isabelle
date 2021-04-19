@@ -538,6 +538,11 @@ class wasm_int = wasm_int_ops +
   assumes clz_1: "abs_int_bits i\<^sub>1 = replicate k False @ True # d \<Longrightarrow> int_clz i\<^sub>1 = int_of_nat k"
   assumes ctz_0: "abs_int_bits i\<^sub>1 = replicate k False \<Longrightarrow> int_ctz i\<^sub>1 = int_of_nat k"
   assumes ctz_1: "abs_int_bits i\<^sub>1 = d @ True # replicate k False \<Longrightarrow> int_ctz i\<^sub>1 = int_of_nat k"
+  assumes popcnt:
+    "abs_int_bits i\<^sub>1 = concat bls @ replicate (LENGTH('a) - length (concat bls)) False
+    \<Longrightarrow> length bls = k
+    \<Longrightarrow> (\<And>bl. bl \<in> set bls \<Longrightarrow> bl = replicate (length bl - 1) False @ [True])
+    \<Longrightarrow> int_popcnt i\<^sub>1 = int_of_nat k"
 
 class wasm_float = wasm_base +
   (* unops *)
