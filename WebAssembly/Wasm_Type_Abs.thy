@@ -543,6 +543,19 @@ class wasm_int = wasm_int_ops +
     \<Longrightarrow> length bls = k
     \<Longrightarrow> (\<And>bl. bl \<in> set bls \<Longrightarrow> bl = replicate (length bl - 1) False @ [True])
     \<Longrightarrow> int_popcnt i\<^sub>1 = int_of_nat k"
+  assumes ieqz: "int_eqz i\<^sub>1 \<longleftrightarrow> abs_int i\<^sub>1 = 0"
+  assumes ieq: "int_eq i\<^sub>1 i\<^sub>2 \<longleftrightarrow> abs_int i\<^sub>1 = abs_int i\<^sub>2"
+  assumes ilt_u: "int_lt_u i\<^sub>1 i\<^sub>2 \<longleftrightarrow> abs_int i\<^sub>1 < abs_int i\<^sub>2"
+  assumes ilt_s: "int_lt_s i\<^sub>1 i\<^sub>2 \<longleftrightarrow> abs_int_s i\<^sub>1 < abs_int_s i\<^sub>2"
+  assumes igt_u: "int_gt_u i\<^sub>1 i\<^sub>2 \<longleftrightarrow> abs_int i\<^sub>1 > abs_int i\<^sub>2"
+  assumes igt_s: "int_gt_s i\<^sub>1 i\<^sub>2 \<longleftrightarrow> abs_int_s i\<^sub>1 > abs_int_s i\<^sub>2"
+  assumes ile_u: "int_le_u i\<^sub>1 i\<^sub>2 \<longleftrightarrow> abs_int i\<^sub>1 \<le> abs_int i\<^sub>2"
+  assumes ile_s: "int_le_s i\<^sub>1 i\<^sub>2 \<longleftrightarrow> abs_int_s i\<^sub>1 \<le> abs_int_s i\<^sub>2"
+  assumes ige_u: "int_ge_u i\<^sub>1 i\<^sub>2 \<longleftrightarrow> abs_int i\<^sub>1 \<ge> abs_int i\<^sub>2"
+  assumes ige_s: "int_ge_s i\<^sub>1 i\<^sub>2 \<longleftrightarrow> abs_int_s i\<^sub>1 \<ge> abs_int_s i\<^sub>2"
+begin
+  lemma ine: "int_ne i\<^sub>1 i\<^sub>2 \<longleftrightarrow> abs_int i\<^sub>1 \<noteq> abs_int i\<^sub>2" unfolding ieq ..
+end
 
 class wasm_float = wasm_base +
   (* unops *)

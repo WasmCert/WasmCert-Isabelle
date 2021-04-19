@@ -100,17 +100,17 @@ instantiation i32 :: wasm_int_ops begin
   lift_definition int_rotr_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is
     "\<lambda>i\<^sub>1 i\<^sub>2. word_rotr (unat i\<^sub>2) i\<^sub>1" .
   (* testops *)
-  definition int_eqz_i32 :: "i32 \<Rightarrow> bool" where "int_eqz_i32 a \<equiv> undefined"
+  definition int_eqz_i32 :: "i32 \<Rightarrow> bool" where "int_eqz_i32 a \<equiv> a = 0"
   (* relops *)
-  definition int_eq_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_eq_i32 a b \<equiv> undefined"
-  definition int_lt_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_lt_u_i32 a b \<equiv> undefined"
-  definition int_lt_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_lt_s_i32 a b \<equiv> undefined"
-  definition int_gt_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_gt_u_i32 a b \<equiv> undefined"
-  definition int_gt_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_gt_s_i32 a b \<equiv> undefined"
-  definition int_le_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_le_u_i32 a b \<equiv> undefined"
-  definition int_le_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_le_s_i32 a b \<equiv> undefined"
-  definition int_ge_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_ge_u_i32 a b \<equiv> undefined"
-  definition int_ge_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_ge_s_i32 a b \<equiv> undefined"
+  definition int_eq_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_eq_i32 a b \<equiv> a = b"
+  definition int_lt_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_lt_u_i32 a b \<equiv> Rep_i32 a < Rep_i32 b"
+  definition int_lt_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_lt_s_i32 a b \<equiv> Rep_i32 a <s Rep_i32 b"
+  definition int_gt_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_gt_u_i32 a b \<equiv> Rep_i32 a > Rep_i32 b"
+  definition int_gt_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_gt_s_i32 a b \<equiv> signed.greater (Rep_i32 a) (Rep_i32 b)"
+  definition int_le_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_le_u_i32 a b \<equiv> Rep_i32 a \<le> Rep_i32 b"
+  definition int_le_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_le_s_i32 a b \<equiv> Rep_i32 a \<le>s Rep_i32 b"
+  definition int_ge_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_ge_u_i32 a b \<equiv> Rep_i32 a \<ge> Rep_i32 b"
+  definition int_ge_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_ge_s_i32 a b \<equiv> signed.greater_eq (Rep_i32 a) (Rep_i32 b)"
 
   lift_definition nat_of_int_i32 :: "i32 \<Rightarrow> nat" is "unat" .
   lift_definition int_of_nat_i32 :: "nat \<Rightarrow> i32" is "of_nat" .
@@ -691,6 +691,37 @@ next
     apply (subst \<open>abs_int_bits i\<^sub>1 = _\<close>[unfolded abs_int_bits_i32])
     unfolding filter_append length_append using \<open>length bls = k\<close> by simp
   then show ?case unfolding int_popcnt_i32_def int_of_nat_i32_def by simp
+next
+  case (27 i\<^sub>1)
+  then show ?case unfolding int_eqz_i32_def abs_int_i32
+    using nonzero_i32 unsigned_eq_0_iff zero_i32.rep_eq by force
+next
+  case (28 i\<^sub>1 i\<^sub>2)
+  then show ?case unfolding int_eq_i32_def abs_int_i32 using Rep_i32_inject by simp
+next
+  case (29 i\<^sub>1 i\<^sub>2)
+  then show ?case unfolding int_lt_u_i32_def abs_int_i32 word_less_def ..
+next
+  case (30 i\<^sub>1 i\<^sub>2)
+  then show ?case unfolding int_lt_s_i32_def abs_int_s_i32 word_sless_alt ..
+next
+  case (31 i\<^sub>1 i\<^sub>2)
+  then show ?case unfolding int_gt_u_i32_def abs_int_i32 word_less_def ..
+next
+  case (32 i\<^sub>1 i\<^sub>2)
+  then show ?case unfolding int_gt_s_i32_def abs_int_s_i32 word_sless_alt ..
+next
+  case (33 i\<^sub>1 i\<^sub>2)
+  then show ?case unfolding int_le_u_i32_def abs_int_i32 word_le_def ..
+next
+  case (34 i\<^sub>1 i\<^sub>2)
+  then show ?case unfolding int_le_s_i32_def abs_int_s_i32 word_sle_eq ..
+next
+  case (35 i\<^sub>1 i\<^sub>2)
+  then show ?case unfolding int_ge_u_i32_def abs_int_i32 word_le_def ..
+next
+  case (36 i\<^sub>1 i\<^sub>2)
+  then show ?case unfolding int_ge_s_i32_def abs_int_s_i32 word_sle_eq ..
 qed
 
 end
