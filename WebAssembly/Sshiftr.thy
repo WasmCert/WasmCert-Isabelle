@@ -2,6 +2,11 @@ theory Sshiftr
   imports "Word_Lib.Reversed_Bit_Lists"
 begin
 
+text\<open>
+Added to the afp: https://foss.heptapod.net/isa-afp/afp-devel/-/commit/6b53a6d8121ef1088de9668d98061fb500e915e5
+So this theory can be removed once it's in a release.
+\<close>
+
 text\<open>Some auxiliaries for shifting by the entire word length or more\<close>
 
 lemma sshiftr_clamp_pos:

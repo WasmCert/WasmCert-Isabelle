@@ -94,8 +94,10 @@ instantiation i32 :: wasm_int_ops begin
     "\<lambda>i\<^sub>1 i\<^sub>2. i\<^sub>1 >> (unat i\<^sub>2 mod LENGTH(i32))" .
   lift_definition int_shr_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is
     "\<lambda>i\<^sub>1 i\<^sub>2. i\<^sub>1 >>> (unat i\<^sub>2 mod LENGTH(i32))" .
-  lift_definition int_rotl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
-  lift_definition int_rotr_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_rotl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is
+    "\<lambda>i\<^sub>1 i\<^sub>2. word_rotl (unat i\<^sub>2) i\<^sub>1" .
+  lift_definition int_rotr_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is
+    "\<lambda>i\<^sub>1 i\<^sub>2. word_rotr (unat i\<^sub>2) i\<^sub>1" .
   (* testops *)
   definition int_eqz_i32 :: "i32 \<Rightarrow> bool" where "int_eqz_i32 a \<equiv> undefined"
   (* relops *)
@@ -624,6 +626,28 @@ next
     apply (subst rep_int_bits_i32)
     subgoal unfolding length_append \<open>length d\<^sub>1 = _\<close> length_replicate using \<open>k < _\<close> by simp
     using * unfolding \<open>k = _\<close> by simp
+next
+  case (20 i\<^sub>1 d\<^sub>1 d\<^sub>2 k i\<^sub>2)
+  hence "k = unat (Rep_i32 i\<^sub>2) mod LENGTH(i32)"
+    by (metis nat_int nat_of_int_i32.rep_eq of_nat_mod)
+  moreover have "d\<^sub>2 = drop k (to_bl (Rep_i32 i\<^sub>1))"
+    using \<open>abs_int_bits _ = _\<close>[unfolded abs_int_bits_i32] \<open>length d\<^sub>1 = k\<close> by simp
+  moreover have "d\<^sub>1 = take k (to_bl (Rep_i32 i\<^sub>1))"
+    using \<open>abs_int_bits _ = _\<close>[unfolded abs_int_bits_i32] \<open>length d\<^sub>1 = k\<close> by simp
+  ultimately have *: "word_rotl (unat (Rep_i32 i\<^sub>2)) (Rep_i32 i\<^sub>1) = of_bl (d\<^sub>2 @ d\<^sub>1)"
+    unfolding word_rotl_dt by simp
+  show ?case unfolding int_rotl_i32_def using 20 * by (subst rep_int_bits_i32) auto
+next
+  case (21 i\<^sub>1 d\<^sub>1 d\<^sub>2 k i\<^sub>2)
+  hence "k = unat (Rep_i32 i\<^sub>2) mod LENGTH(i32)"
+    by (metis nat_int nat_of_int_i32.rep_eq of_nat_mod)
+  moreover have "d\<^sub>2 = drop (LENGTH(i32) - k) (to_bl (Rep_i32 i\<^sub>1))"
+    using \<open>abs_int_bits _ = _\<close>[unfolded abs_int_bits_i32] \<open>length d\<^sub>1 = _\<close> by simp
+  moreover have "d\<^sub>1 = take (LENGTH(i32) - k) (to_bl (Rep_i32 i\<^sub>1))"
+    using \<open>abs_int_bits _ = _\<close>[unfolded abs_int_bits_i32] \<open>length d\<^sub>1 = _\<close> by simp
+  ultimately have *: "word_rotr (unat (Rep_i32 i\<^sub>2)) (Rep_i32 i\<^sub>1) = of_bl (d\<^sub>2 @ d\<^sub>1)"
+    unfolding word_rotr_dt by simp
+  show ?case unfolding int_rotr_i32_def using 21 * by (subst rep_int_bits_i32) auto
 qed
 
 end
