@@ -534,6 +534,10 @@ class wasm_int = wasm_int_ops +
     \<Longrightarrow> length d\<^sub>1 = (LENGTH('a) - k)
     \<Longrightarrow> length d\<^sub>2 = k
     \<Longrightarrow> int_rotr i\<^sub>1 i\<^sub>2 = rep_int_bits (d\<^sub>2 @ d\<^sub>1)"
+  assumes clz_0: "abs_int_bits i\<^sub>1 = replicate k False \<Longrightarrow> int_clz i\<^sub>1 = int_of_nat k"
+  assumes clz_1: "abs_int_bits i\<^sub>1 = replicate k False @ True # d \<Longrightarrow> int_clz i\<^sub>1 = int_of_nat k"
+  assumes ctz_0: "abs_int_bits i\<^sub>1 = replicate k False \<Longrightarrow> int_ctz i\<^sub>1 = int_of_nat k"
+  assumes ctz_1: "abs_int_bits i\<^sub>1 = d @ True # replicate k False \<Longrightarrow> int_ctz i\<^sub>1 = int_of_nat k"
 
 class wasm_float = wasm_base +
   (* unops *)

@@ -5,6 +5,7 @@ theory Wasm_Base_Defs
     Wasm_Ast
     Wasm_Type_Abs
     "Word_Lib.Signed_Division_Word"
+    "Word_Lib.More_Word_Operations"
     Sshiftr
 begin
 
@@ -67,8 +68,8 @@ qed
 instantiation i32 :: wasm_int_ops begin
   lift_definition zero_i32 :: i32 is "of_nat 0" .
   definition len_of_i32 :: "i32 itself \<Rightarrow> nat" where [simp]: "len_of_i32 _ = 32"
-  lift_definition int_clz_i32 :: "i32 \<Rightarrow> i32" is undefined .
-  lift_definition int_ctz_i32 :: "i32 \<Rightarrow> i32" is undefined .
+  lift_definition int_clz_i32 :: "i32 \<Rightarrow> i32" is "of_nat \<circ> word_clz" .
+  lift_definition int_ctz_i32 :: "i32 \<Rightarrow> i32" is "of_nat \<circ> word_ctz" .
   lift_definition int_popcnt_i32 :: "i32 \<Rightarrow> i32" is undefined .
   (* binops *)
   lift_definition int_add_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "(+)" .
@@ -425,6 +426,11 @@ lemma bit_of_bl_append_high:
   shows "bit (of_bl (la @ lb) :: 'a::len word) n = bit (of_bl la :: 'a word) (n - length lb)"
   unfolding bit_of_bl_iff using assms by (simp add: less_diff_conv2 nth_append)
 
+(* TODO: move to afp? *)
+lemma word_ctz_0[simp]:
+  "word_ctz (0::'a::len word) = LENGTH('a)"
+  unfolding word_ctz_def by simp
+
 instantiation i32 :: wasm_int begin
 instance
 proof (standard, goal_cases)
@@ -648,6 +654,30 @@ next
   ultimately have *: "word_rotr (unat (Rep_i32 i\<^sub>2)) (Rep_i32 i\<^sub>1) = of_bl (d\<^sub>2 @ d\<^sub>1)"
     unfolding word_rotr_dt by simp
   show ?case unfolding int_rotr_i32_def using 21 * by (subst rep_int_bits_i32) auto
+next
+  case (22 i\<^sub>1 k)
+  hence "k = LENGTH(32)"
+    apply (subst length_to_bl_eq[symmetric, of "Rep_i32 i\<^sub>1"])
+    unfolding abs_int_bits_i32 using length_replicate by simp
+  moreover have "Rep_i32 i\<^sub>1 = 0" using 22 unfolding abs_int_bits_i32 by (simp add: to_bl_use_of_bl)
+  ultimately show ?case unfolding int_clz_i32_def int_of_nat_i32_def by simp
+next
+  case (23 i\<^sub>1 k d)
+  hence "takeWhile Not (to_bl (Rep_i32 i\<^sub>1)) = replicate k False"
+    unfolding abs_int_bits_i32 by (simp add: takeWhile_tail)
+  then show ?case unfolding int_clz_i32_def int_of_nat_i32_def word_clz_def by simp
+next
+  case (24 i\<^sub>1 k)
+  hence "k = LENGTH(32)"
+    apply (subst length_to_bl_eq[symmetric, of "Rep_i32 i\<^sub>1"])
+    unfolding abs_int_bits_i32 using length_replicate by simp
+  moreover have "Rep_i32 i\<^sub>1 = 0" using 24 unfolding abs_int_bits_i32 by (simp add: to_bl_use_of_bl)
+  ultimately show ?case unfolding int_ctz_i32_def int_of_nat_i32_def by simp
+next
+  case (25 i\<^sub>1 d k)
+  hence "takeWhile Not (rev (to_bl (Rep_i32 i\<^sub>1))) = replicate k False"
+    unfolding abs_int_bits_i32 by (simp add: takeWhile_tail)
+  then show ?case unfolding int_ctz_i32_def int_of_nat_i32_def word_ctz_def by simp
 qed
 
 end
