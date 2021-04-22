@@ -435,13 +435,13 @@ begin
 
   abbreviation rep_int_bits :: "bool list \<Rightarrow> 'a"
     where "rep_int_bits a \<equiv> rep_int (ibits_inv TYPE('a) a)"
+
+  abbreviation abs_int_s :: "'a \<Rightarrow> int"
+    where "abs_int_s a \<equiv> signed TYPE('a) (abs_int a)"
+
+  abbreviation rep_int_s :: "int \<Rightarrow> 'a"
+    where "rep_int_s a \<equiv> rep_int (signed_inv TYPE('a) a)"
 end
-
-abbreviation (in wasm_int_ops) abs_int_s :: "'a \<Rightarrow> int"
-  where "abs_int_s a \<equiv> signed TYPE('a) (abs_int a)"
-
-abbreviation (in wasm_int_ops) rep_int_s :: "int \<Rightarrow> 'a"
-  where "rep_int_s a \<equiv> rep_int (signed_inv TYPE('a) a)"
 
 definition trunc :: "rat \<Rightarrow> int" where
   "trunc q \<equiv>
