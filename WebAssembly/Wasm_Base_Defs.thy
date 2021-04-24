@@ -4,729 +4,119 @@ theory Wasm_Base_Defs
   imports
     Wasm_Ast
     Wasm_Type_Abs
-    "Word_Lib.Signed_Division_Word"
-    "Word_Lib.More_Word_Operations"
-    Sshiftr
+    Wasm_Type_Word
 begin
 
-lemma mult_inv_le: "(a::int) < 0 \<Longrightarrow> b \<ge> 0 \<Longrightarrow> a * b \<le> -b"
-  by (metis add.inverse_inverse mult.commute mult.right_neutral
-      mult_minus_right neg_0_less_iff_less neg_le_iff_le pos_mult_pos_ge)
-
-lemma sdiv_nrep: "(i\<^sub>1::'a::len word) = of_int (-(2^(LENGTH('a)-1))) \<and> i\<^sub>2 = of_int (-1)
-  \<longleftrightarrow> rat_of_int (sint i\<^sub>1) / of_int (sint i\<^sub>2) = 2^(LENGTH('a)-1)"
-proof (rule iffI, goal_cases)
-  case 1
-  thus ?case by (simp add: sint_int_min)
-next
-  case 2
-  {
-    assume i2: "i\<^sub>2 \<noteq> 0"
-    hence nz: "rat_of_int (sint i\<^sub>1) \<noteq> 0" using signed_eq_0_iff 2 by force
-    from 2 this i2 have "rat_of_int (sint i\<^sub>1) = rat_of_int (sint i\<^sub>2) * 2 ^ (LENGTH('a) - 1)"
-      by (metis Word.of_int_sint nonzero_mult_div_cancel_left signed_eq_0_iff times_divide_eq_right)
-    hence mul: "sint i\<^sub>1 = sint i\<^sub>2 * (2 ^ (LENGTH('a) - 1))"
-      by (subst of_int_eq_iff[THEN sym], subst of_int_mult) simp
-    have "sint i\<^sub>1 = - (2 ^ (LENGTH('a) - 1))"
-    proof (rule ccontr)
-      assume "sint i\<^sub>1 \<noteq> - (2 ^ (LENGTH('a) - 1))"
-      hence gt: "sint i\<^sub>1 > - (2 ^ (LENGTH('a) - 1))" using sint_ge[of i\<^sub>1] by linarith
-      have "sint i\<^sub>1 \<ge> 0"
-      proof (rule ccontr)
-        assume "\<not>sint i\<^sub>1 \<ge> 0"
-        hence i1_lt_0: "sint i\<^sub>1 < 0" by simp
-        have "sint i\<^sub>2 \<noteq> 0" apply (rule ccontr) using mul i1_lt_0 by simp
-        {
-          assume "sint i\<^sub>2 > 0"
-          hence "sint i\<^sub>2 * (2 ^ (LENGTH('a) - 1)) \<ge> (2 ^ (LENGTH('a) - 1))"
-            by force
-          hence False using gt i1_lt_0 local.mul by linarith
-        }
-        {
-          assume "sint i\<^sub>2 < 0"
-          have "sint i\<^sub>2 * (2 ^ (LENGTH('a) - 1)) \<le> -(2 ^ (LENGTH('a) - 1))"
-            by (rule mult_inv_le) (simp_all add: \<open>sint i\<^sub>2 < 0\<close>)
-          hence False using mul gt by linarith
-        }
-        then show False using \<open>0 < sint i\<^sub>2 \<Longrightarrow> False\<close> \<open>sint i\<^sub>2 \<noteq> 0\<close> by fastforce
-      qed
-      hence "sint i\<^sub>1 \<ge> (2 ^ (LENGTH('a) - 1))" using mul
-        by (metis div_pos_pos_trivial i2 mult.commute nonzero_mult_div_cancel_left
-            of_int_0 sint_lt word_sint.Rep_inverse)
-      thus False by (smt (z3) sint_lt)
-    qed
-    hence "sint i\<^sub>1 = - (2 ^ (LENGTH('a) - 1)) \<and> sint i\<^sub>2 = - 1" using mul
-      by (smt (z3) mult_cancel_right1 mult_minus_left
-          semiring_1_no_zero_divisors_class.power_not_zero)
-  }
-  thus ?case
-    apply (cases "i\<^sub>2 \<noteq> 0")
-      apply (subst word_sint.Rep_inverse[THEN sym])
-    using 2 by simp_all
-qed
-
-instantiation i32 :: wasm_int_ops begin
-  lift_definition zero_i32 :: i32 is "of_nat 0" .
-  definition len_of_i32 :: "i32 itself \<Rightarrow> nat" where [simp]: "len_of_i32 _ = 32"
-  lift_definition int_clz_i32 :: "i32 \<Rightarrow> i32" is "of_nat \<circ> word_clz" .
-  lift_definition int_ctz_i32 :: "i32 \<Rightarrow> i32" is "of_nat \<circ> word_ctz" .
-  lift_definition int_popcnt_i32 :: "i32 \<Rightarrow> i32" is "of_nat \<circ> pop_count" .
-  (* binops *)
-  lift_definition int_add_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "(+)" .
-  lift_definition int_sub_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "(-)" .
-  lift_definition int_mul_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "(*)" .
-  lift_definition int_div_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is
-    "\<lambda>i\<^sub>1 i\<^sub>2. if i\<^sub>2 = 0 then None else Some (i\<^sub>1 div i\<^sub>2)" .
-  lift_definition int_div_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is
-    "\<lambda>i\<^sub>1 i\<^sub>2.
-      if i\<^sub>2 = 0 \<or> (i\<^sub>1 = of_int (-(2^31)) \<and> i\<^sub>2 = of_int (-1))
-      then None
-      else Some (i\<^sub>1 sdiv i\<^sub>2)" .
-  lift_definition int_rem_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is
-    "\<lambda>i\<^sub>1 i\<^sub>2. if i\<^sub>2 = 0 then None else Some (i\<^sub>1 mod i\<^sub>2)" .
-  lift_definition int_rem_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is
-    "\<lambda>i\<^sub>1 i\<^sub>2. if i\<^sub>2 = 0 then None else Some (i\<^sub>1 smod i\<^sub>2)".
-  lift_definition int_and_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "and" .
-  lift_definition int_or_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "or" .
-  lift_definition int_xor_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "xor" .
-  lift_definition int_shl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is
-    "\<lambda>i\<^sub>1 i\<^sub>2. i\<^sub>1 << (unat i\<^sub>2 mod LENGTH(i32))" .
-  lift_definition int_shr_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is
-    "\<lambda>i\<^sub>1 i\<^sub>2. i\<^sub>1 >> (unat i\<^sub>2 mod LENGTH(i32))" .
-  lift_definition int_shr_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is
-    "\<lambda>i\<^sub>1 i\<^sub>2. i\<^sub>1 >>> (unat i\<^sub>2 mod LENGTH(i32))" .
-  lift_definition int_rotl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is
-    "\<lambda>i\<^sub>1 i\<^sub>2. word_rotl (unat i\<^sub>2) i\<^sub>1" .
-  lift_definition int_rotr_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is
-    "\<lambda>i\<^sub>1 i\<^sub>2. word_rotr (unat i\<^sub>2) i\<^sub>1" .
-  (* testops *)
-  definition int_eqz_i32 :: "i32 \<Rightarrow> bool" where "int_eqz_i32 a \<equiv> a = 0"
-  (* relops *)
-  definition int_eq_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_eq_i32 a b \<equiv> a = b"
-  definition int_lt_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_lt_u_i32 a b \<equiv> Rep_i32 a < Rep_i32 b"
-  definition int_lt_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_lt_s_i32 a b \<equiv> Rep_i32 a <s Rep_i32 b"
-  definition int_gt_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_gt_u_i32 a b \<equiv> Rep_i32 a > Rep_i32 b"
-  definition int_gt_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_gt_s_i32 a b \<equiv> signed.greater (Rep_i32 a) (Rep_i32 b)"
-  definition int_le_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_le_u_i32 a b \<equiv> Rep_i32 a \<le> Rep_i32 b"
-  definition int_le_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_le_s_i32 a b \<equiv> Rep_i32 a \<le>s Rep_i32 b"
-  definition int_ge_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_ge_u_i32 a b \<equiv> Rep_i32 a \<ge> Rep_i32 b"
-  definition int_ge_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" where "int_ge_s_i32 a b \<equiv> signed.greater_eq (Rep_i32 a) (Rep_i32 b)"
-
-  lift_definition nat_of_int_i32 :: "i32 \<Rightarrow> nat" is "unat" .
-  lift_definition int_of_nat_i32 :: "nat \<Rightarrow> i32" is "of_nat" .
-instance by standard simp
+instantiation i32 :: wasm_base begin
+lift_definition zero_i32 :: i32 is "of_nat 0" .
+instance ..
 end
 
-lemma abs_int_i32: "abs_int a = uint (Rep_i32 a)"
-  using nat_of_int_i32.rep_eq by fastforce
+instantiation i32 :: len begin
+definition len_of_i32 :: "i32 itself \<Rightarrow> nat" where [simp]: "len_of_i32 _ = 32"
+instance apply standard unfolding len_of_i32_def by simp
+end
 
-lemma nonzero_i32: "x \<noteq> 0 \<Longrightarrow> Rep_i32 x \<noteq> 0"
-  unfolding zero_i32.abs_eq Abs_fnat_hom_0[THEN sym]
-proof (rule ccontr)
-  assume "x \<noteq> Abs_i32 0" "\<not> Rep_i32 x \<noteq> 0"
-  hence "x \<noteq> Abs_i32 (Rep_i32 x)" by simp
-  thus False using Rep_i32_inverse by fastforce
-qed
+instantiation i64 :: wasm_base begin
+lift_definition zero_i64 :: i64 is "of_nat 0" .
+instance ..
+end
 
-lemma nonneg_i32: "abs_int (x::i32) \<ge> 0"
-  unfolding nat_of_int_i32_def by fastforce
+instantiation i64 :: len begin
+definition len_of_i64 :: "i64 itself \<Rightarrow> nat" where [simp]: "len_of_i64 _ = 64"
+instance apply standard unfolding len_of_i32_def by simp
+end
 
-lemma nonzero_i32_int: "(x::i32) \<noteq> 0 \<Longrightarrow> abs_int x > 0"
-proof -
-  assume x: "x \<noteq> 0"
-  have "abs_int x \<noteq> 0"
-    unfolding nat_of_int_i32.rep_eq using nonzero_i32[OF x]
-    by (simp add: unsigned_eq_0_iff)
-  thus ?thesis using nonneg_i32 by fastforce
-qed
+interpretation I32: Wasm_Int_Word Rep_i32 Abs_i32
+  apply standard unfolding zero_i32_def using Rep_i32_inverse Abs_i32_inverse by auto
 
-lemma length_i32: "LENGTH(i32) = LENGTH(32)" by simp
-lemma signed_inv_i32: "signed_inv TYPE(i32) = signed_inv TYPE(32)"
-  unfolding signed_inv_def signed_def length_i32 ..
-
-lemma abs_int_s_i32: "abs_int_s x = sint (Rep_i32 x)"
-proof (cases "msb (Rep_i32 x)")
-  case True
-  hence sint: "sint (Rep_i32 x) = uint (Rep_i32 x) - 2 ^ LENGTH(i32)"
-    by (simp add: word_sint_msb_eq word_size)
-  moreover from this have "2^(LENGTH(i32)-1) \<le> (uint (Rep_i32 x))"
-    apply (subst length_i32)
-    by (metis True diff_less len_gt_0 less_one not_le not_msb_from_less size_word.rep_eq word_2p_lem)
-  ultimately show ?thesis unfolding abs_int_i32 signed_def length_i32
-    linorder_not_less[THEN sym] by (metis uint_lt2p)
-next
-  case False
-  have "sint (Rep_i32 x) < (2^(LENGTH(i32)-1))"
-    apply (subst length_i32)
-    using sint_lt by blast
-  thus ?thesis unfolding abs_int_i32 signed_def sint_eq_uint[OF False] by simp
-qed
-
-lemma rep_int_s_i32:
-  assumes
-    "- (2^(LENGTH(i32) - 1)) \<le> i"
-    "i < 2^(LENGTH(i32) - 1)"
-  shows "rep_int_s i = Abs_i32 (of_int i)"
-proof -
-  note inv = signed_inv[OF assms]
-  {
-    assume "i < 0"
-    let ?x = "i + 2^LENGTH(i32)"
-    have nneg: "0 \<le> ?x" using half_power assms(1) by force
-    have "word_of_nat (nat ?x) = (word_of_int i::32 word)"
-      apply (subst word_of_int_nat[OF nneg, THEN sym])
-      apply (subst word_uint.Abs_norm[of i, where 'a=32, THEN sym])
-      apply (subst mod_add_self2[THEN sym])
-      apply (subst word_uint.Abs_norm[where 'a=32])
-      apply (subst length_i32)
-      ..
-    hence "Abs_i32 (word_of_nat (nat (i + 2^LENGTH(i32)))) = Abs_i32 (word_of_int i)"
-      by (rule arg_cong)
-  }
-  note negcase = this
-  show ?thesis
-    apply (cases "0 \<le> i")
-    subgoal unfolding inv int_of_nat_i32_def by simp
-    unfolding inv int_of_nat_i32_def using negcase by simp
-qed
-
-lemma abs_int_bits_i32: "abs_int_bits a = to_bl (Rep_i32 a)"
-  apply (subst ibits)
-  unfolding abs_int_i32 length_i32
-  subgoal by simp
-  apply (rule uint_lt2p)
-  apply (subst to_bl_eq)
-  ..
-
-lemma rep_int_bits_i32:
-  assumes "length l = LENGTH(i32)"
-  shows "rep_int_bits l = Abs_i32 (of_bl l)"
-  apply (subst ibits_inv[OF assms])
-  unfolding int_of_nat_i32.abs_eq
-  by (simp add: bl_to_bin_ge0 of_bl.abs_eq)
-
-lemma div_rat_int_bounds:
-  assumes
-    "0 \<le> (L::rat)"
-    "b \<noteq> 0"
-    "1 \<le> abs b"
-    "-L \<le> a"
-    "a \<le> L"
-  shows
-    "-L \<le> a / b"
-    "a / b \<le> L"
-proof -
-  let ?a = "abs a"
-  let ?b = "abs b"
-  have "?a / ?b \<le> L / 1"
-    apply (rule frac_le[OF \<open>0 \<le> (L::rat)\<close>])
-    using \<open>-L \<le> a\<close> \<open>a \<le> L\<close> apply linarith
-    apply linarith
-    using \<open>1 \<le> abs b\<close> .
-  hence div: "?a / ?b \<le> L" by simp
-  {
-    assume ab: "0 < a \<and> 0 < b \<or> a < 0 \<and> b < 0"
-    have g0: "0 \<le> a / b" using divide_le_0_iff
-      unfolding less_eq_rat_def using ab by (simp add: zero_less_divide_iff)
-    from g0 \<open>0 \<le> L\<close> have lb: "-L \<le> a / b" by linarith
-    have "a / b = ?a / ?b" using abs_divide abs_of_nonneg g0 by fastforce
-    hence ub: "a / b \<le> L" using div by simp
-    note lb ub
-  }
-  note pos = this
-  {
-    assume ab: "0 < a \<and> b < 0 \<or> a < 0 \<and> 0 < b"
-    hence neg: "a / b < 0" by (simp add: divide_less_0_iff)
-    have ub: "a / b \<le> L" using neg assms(1) by linarith
-    have "a / b = - (?a / ?b)"
-      unfolding abs_divide[THEN sym] using abs_of_neg[OF neg] by linarith
-    hence lb: "-L \<le> a / b" using div by linarith
-    note lb ub
-  }
-  note neg = this
-  have zero: "a = 0 \<Longrightarrow> -L \<le> a / b \<and> a / b \<le> L" using \<open>0 \<le> L\<close> by force
-  have "-L \<le> a / b \<and> a / b \<le> L"
-    apply (cases "a < 0"; cases "b < 0")
-      subgoal using pos by blast
-      subgoal using neg zero \<open>b \<noteq> 0\<close> by force
-      subgoal using neg zero \<open>b \<noteq> 0\<close> by force
-      using pos zero \<open>b \<noteq> 0\<close> by force
-  thus "-L \<le> a / b" "a / b \<le> L" by simp_all
-qed
-
-lemma sdiv_trunc:
-  assumes "b \<noteq> 0"
-  shows "(a::int) sdiv b = trunc (rat_of_int a / rat_of_int b)"
-proof -
-  let ?a = "rat_of_int a"
-  let ?b = "rat_of_int b"
-  show ?thesis
-  proof (cases "0 < ?a / ?b")
-    case True
-    have "\<not>(0 \<le> ?a \<and> ?b \<le> 0 \<or> ?a \<le> 0 \<and> 0 \<le> ?b)"
-      unfolding divide_le_0_iff[THEN sym] using True by linarith
-    hence sgn: "sgn a = sgn b" using of_int_0_le_iff of_int_le_0_iff by fastforce
-    hence "a sdiv b = \<lfloor>rat_of_int a / rat_of_int b\<rfloor>"
-      unfolding signed_divide_int_def
-      by (simp add: div_eq_sgn_abs floor_divide_of_int_eq)
-    thus ?thesis unfolding trunc using True by simp
-  next
-    case False
-    note res_ge_0 = this
-    show ?thesis
-    proof (cases "a = 0")
-      case False
-      have signs: "0 \<le> ?a \<and> ?b \<le> 0 \<or> ?a \<le> 0 \<and> 0 \<le> ?b"
-        unfolding divide_le_0_iff[THEN sym] using res_ge_0 by linarith
-      hence "sgn a \<noteq> sgn b"
-        apply (rule disjE)
-        using assms using order_class.order.antisym apply fastforce
-        using assms dual_order.antisym by fastforce
-      hence sgn: "sgn a * sgn b = -1" unfolding sgn_if using False assms by presburger
-      have "\<bar>a\<bar> div \<bar>b\<bar> =  \<lfloor>\<bar>?a\<bar> / \<bar>?b\<bar>\<rfloor>"
-        unfolding of_int_abs[THEN sym] floor_divide_of_int_eq ..
-      also have "\<dots> = \<lfloor>- (rat_of_int a / rat_of_int b)\<rfloor>"
-        apply (cases "?a \<le> 0") using signs by auto
-      finally have "a sdiv b = - \<lfloor>- (rat_of_int a / rat_of_int b)\<rfloor>"
-        unfolding signed_divide_int_def using sgn by simp
-      thus ?thesis unfolding trunc using res_ge_0 by simp
-    qed (simp add: trunc)
-  qed
-qed
-
-lemma trunc_div:
-  "trunc (rat_of_nat (nat_of_int i\<^sub>1) / rat_of_nat (nat_of_int i\<^sub>2)) = uint (Rep_i32 i\<^sub>1 div Rep_i32 i\<^sub>2)"
-  by (simp add: abs_int_i32 floor_divide_of_nat_eq trunc uint_div zdiv_int)
-
-lemma mod_distr: "i\<^sub>1 - i\<^sub>2 * (i\<^sub>1 div i\<^sub>2) = word_of_nat (nat (uint i\<^sub>1 - uint i\<^sub>2 * uint (i\<^sub>1 div i\<^sub>2)))"
-proof -
-  have "i\<^sub>1 - i\<^sub>2 * (i\<^sub>1 div i\<^sub>2) = word_of_int (uint i\<^sub>1 - uint i\<^sub>2 * uint (i\<^sub>1 div i\<^sub>2))" by force
-  moreover have "0 \<le> uint i\<^sub>1 - uint i\<^sub>2 * uint (i\<^sub>1 div i\<^sub>2)"
-  proof -
-    have "uint i\<^sub>2 * uint (i\<^sub>1 div i\<^sub>2) \<le> uint i\<^sub>1"
-      unfolding uint_div_distrib
-      using div_mult_le[of "nat (uint i\<^sub>1)" "nat (uint i\<^sub>2)"]
-      by (metis mult.commute nat_div_distrib nat_le_eq_zle nat_mult_distrib unsigned_greater_eq)
-    thus ?thesis by linarith
-  qed
-  ultimately show ?thesis by (subst (asm) word_of_int_nat)
-qed
-
-lemma word_of_nat_signed_inv:
-  assumes "- (2 ^ (LENGTH('a) - 1)) \<le> i" "i < 2 ^ (LENGTH('a) - 1)"
-  shows "(word_of_nat (nat (signed_inv TYPE('a) i)) :: 'a::len word) = word_of_int i"
-  apply (subst word_of_int_nat[THEN sym])
-  subgoal using signed_inv_nneg[OF assms] by blast
-  unfolding signed_inv[OF  assms]
-  by (cases "0 \<le> i") auto
-
-lemma int_div_mult_le:
-  assumes "0 \<le> (a::int)" "0 \<le> b"
-  shows "a div b * b \<le> a"
-proof -
-  have "a div b * b = int (nat a div nat b * nat b)"
-    using assms zdiv_int by fastforce
-  moreover note div_mult_le[of "nat a" "nat b"]
-  moreover have "a = int (nat a)" using assms(1) by simp
-  ultimately show ?thesis by linarith
-qed
-
-lemma drop_append2:
-  assumes "n \<le> length xs"
-  shows "drop n (xs @ ys) = drop n xs @ ys"
-proof -
-  have "drop (n - length xs) ys = ys" using assms by simp
-  thus ?thesis using drop_append by simp
-qed
-
-lemma smod_distr: "((i\<^sub>1::'a::len word) - i\<^sub>2 * (i\<^sub>1 sdiv i\<^sub>2)) =
-      (word_of_nat (nat (signed_inv TYPE('a) (sint i\<^sub>1 - sint i\<^sub>2 * (sint i\<^sub>1 sdiv sint i\<^sub>2)))))"
-proof -
-  let ?r = "sint i\<^sub>1 - sint i\<^sub>2 * (sint i\<^sub>1 sdiv sint i\<^sub>2)"
-  have r0: "sint i\<^sub>1 = 0 \<Longrightarrow> ?r = 0" by simp
-  have rp: "0 < sint i\<^sub>1 \<Longrightarrow> ?r = \<bar>sint i\<^sub>1\<bar> - \<bar>sint i\<^sub>2\<bar> * (\<bar>sint i\<^sub>1\<bar> div \<bar>sint i\<^sub>2\<bar>)"
-    unfolding signed_divide_int_def
-    by (simp add: linordered_idom_class.abs_sgn)
-  have rn: "sint i\<^sub>1 < 0 \<Longrightarrow> ?r = - (\<bar>sint i\<^sub>1\<bar> - \<bar>sint i\<^sub>2\<bar> * (\<bar>sint i\<^sub>1\<bar> div \<bar>sint i\<^sub>2\<bar>))"
-    unfolding signed_divide_int_def
-    by (simp add: linordered_idom_class.abs_sgn)
-
-  have rhs_nneg: "0 \<le> \<bar>sint i\<^sub>2\<bar> * (\<bar>sint i\<^sub>1\<bar> div \<bar>sint i\<^sub>2\<bar>)"
-    using abs_ge_zero div_int_pos_iff zero_le_mult_iff by blast
-  hence cmp: "\<bar>sint i\<^sub>1\<bar> - \<bar>sint i\<^sub>2\<bar> * (\<bar>sint i\<^sub>1\<bar> div \<bar>sint i\<^sub>2\<bar>) \<le> \<bar>sint i\<^sub>1\<bar>"
-    by simp
-
-  have "i\<^sub>1 - i\<^sub>2 * (i\<^sub>1 sdiv i\<^sub>2) = word_of_int (sint i\<^sub>1 - sint i\<^sub>2 * (sint i\<^sub>1 sdiv sint i\<^sub>2))"
-    by (simp add: word_sdiv_def)
-  also have "\<dots> = word_of_nat (nat (signed_inv TYPE('a) ?r))"
-  proof (subst word_of_nat_signed_inv, goal_cases)
-    case 1
-    {
-      assume "0 < sint i\<^sub>1"
-      have "0 \<le> ?r"
-        unfolding rp[OF \<open>0 < sint i\<^sub>1\<close>]
-        apply (subst diff_ge_0_iff_ge)
-        apply (subst mult.commute)
-        apply (rule int_div_mult_le)
-        using \<open>0 < sint i\<^sub>1\<close> by auto
-      have "- (2 ^ (LENGTH('a) - 1)) \<le> ?r"
-        apply (rule order.trans[where b=0])
-        using \<open>0 \<le> ?r\<close> by auto
-    }
-    note ineg = this
-    {
-      assume "sint i\<^sub>1 < 0"
-      have le: "\<bar>sint i\<^sub>1\<bar> - \<bar>sint i\<^sub>2\<bar> * (\<bar>sint i\<^sub>1\<bar> div \<bar>sint i\<^sub>2\<bar>) \<le> 2 ^ (LENGTH('a) - 1)"
-        apply (rule order.trans[OF cmp])
-        by (meson abs_leI le_less minus_le_iff sint_ge sint_lt)
-      have "- (2 ^ (LENGTH('a) - 1)) \<le> ?r"
-        unfolding rn[OF \<open>sint i\<^sub>1 < 0\<close>] using le by simp
-    }
-    note ipos = this
-    show ?case
-      apply (cases "sint i\<^sub>1 < 0")
-      using ipos apply blast
-      apply (cases "sint i\<^sub>1 = 0")
-      using r0 apply simp
-      using ineg by linarith
-  next
-    case 2
-    {
-      assume "0 < sint i\<^sub>1"
-      hence "0 \<le> sint i\<^sub>1" by simp
-      have "?r \<le> \<bar>sint i\<^sub>1\<bar>" unfolding rp[OF \<open>0 < sint i\<^sub>1\<close>] using cmp .
-      also have "\<dots> < 2 ^ (LENGTH('a) - 1)"
-        unfolding abs_of_nonneg[OF \<open>0 \<le> sint i\<^sub>1\<close>]
-        by (rule sint_lt)
-      finally have "?r < 2 ^ (LENGTH('a) - 1)" .
-    }
-    note ineg = this
-    {
-      assume "sint i\<^sub>1 < 0"
-      have "0 \<le> \<bar>sint i\<^sub>1\<bar> - \<bar>sint i\<^sub>2\<bar> * (\<bar>sint i\<^sub>1\<bar> div \<bar>sint i\<^sub>2\<bar>)" using cmp
-        by (metis abs_ge_zero diff_ge_0_iff_ge int_div_mult_le mult.commute)
-      hence "- (\<bar>sint i\<^sub>1\<bar> - \<bar>sint i\<^sub>2\<bar> * (\<bar>sint i\<^sub>1\<bar> div \<bar>sint i\<^sub>2\<bar>)) \<le> 0" by linarith
-      hence "?r < (2 ^ (LENGTH('a) - 1))"
-        unfolding rn[OF \<open>sint i\<^sub>1 < 0\<close>]
-        by (meson le_less_trans zero_less_numeral zero_less_power)
-    }
-    note ipos = this
-    show ?case
-      apply (cases "sint i\<^sub>1 < 0")
-      using ipos apply blast
-      apply (cases "sint i\<^sub>1 = 0")
-      using r0 apply simp
-      using ineg by linarith
-  qed simp
-  finally show ?thesis .
-qed
-
-lemma bit_of_bl_append_high:
-  assumes "length lb \<le> n" "n < LENGTH('a)"
-  shows "bit (of_bl (la @ lb) :: 'a::len word) n = bit (of_bl la :: 'a word) (n - length lb)"
-  unfolding bit_of_bl_iff using assms by (simp add: less_diff_conv2 nth_append)
-
-(* TODO: move to afp? *)
-lemma word_ctz_0[simp]:
-  "word_ctz (0::'a::len word) = LENGTH('a)"
-  unfolding word_ctz_def by simp
+interpretation I64: Wasm_Int_Word Rep_i64 Abs_i64
+  apply standard unfolding zero_i64_def using Rep_i64_inverse Abs_i64_inverse by auto
 
 instantiation i32 :: wasm_int begin
+  lift_definition int_clz_i32 :: "i32 \<Rightarrow> i32" is "I32.int_clz" .
+  lift_definition int_ctz_i32 :: "i32 \<Rightarrow> i32" is "I32.int_ctz" .
+  lift_definition int_popcnt_i32 :: "i32 \<Rightarrow> i32" is "I32.int_popcnt" .
+  lift_definition int_add_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_add" .
+  lift_definition int_sub_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_sub" .
+  lift_definition int_mul_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_mul" .
+  lift_definition int_div_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is "I32.int_div_u" .
+  lift_definition int_div_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is "I32.int_div_s" .
+  lift_definition int_rem_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is "I32.int_rem_u" .
+  lift_definition int_rem_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is "I32.int_rem_s".
+  lift_definition int_and_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_and" .
+  lift_definition int_or_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_or" .
+  lift_definition int_xor_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_xor" .
+  lift_definition int_shl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_shl" .
+  lift_definition int_shr_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_shr_u" .
+  lift_definition int_shr_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_shr_s" .
+  lift_definition int_rotl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_rotl" .
+  lift_definition int_rotr_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_rotr" .
+  lift_definition int_eqz_i32 :: "i32 \<Rightarrow> bool" is "I32.int_eqz" .
+  lift_definition int_eq_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_eq" .
+  lift_definition int_lt_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_lt_u" .
+  lift_definition int_lt_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_lt_s" .
+  lift_definition int_gt_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_gt_u" .
+  lift_definition int_gt_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_gt_s" .
+  lift_definition int_le_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_le_u" .
+  lift_definition int_le_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_le_s" .
+  lift_definition int_ge_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_ge_u" .
+  lift_definition int_ge_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_ge_s" .
+  definition nat_of_int_i32 :: "i32 \<Rightarrow> nat" where "nat_of_int_i32 \<equiv> I32.nat_of_int"
+  definition int_of_nat_i32 :: "nat \<Rightarrow> i32" where "int_of_nat_i32 \<equiv> I32.int_of_nat"
 instance
-proof (standard, goal_cases)
-  case 1
-  show ?case unfolding nat_of_int_i32_def using zero_i32.rep_eq by simp
-next
-  case (2 i\<^sub>1 i\<^sub>2)
-  have "(x::32 word) + y = word_of_int ((uint x + uint y) mod (2^32))" for x y
-    apply (subst word_add_def)
-    apply (subst word_uint.norm_norm(1)[THEN sym])
-    by simp
-  then show ?case unfolding int_add_i32_def int_of_nat_i32_def abs_int_i32 by simp
-next
-  case (3 i\<^sub>1 i\<^sub>2)
-  have "(x::32 word) - y = word_of_int ((uint x - uint y) mod (2^32))" for x y
-    apply (subst word_sub_wi)
-    apply (subst word_uint.norm_norm(1)[THEN sym])
-    by simp
-  then show ?case unfolding int_sub_i32_def int_of_nat_i32_def abs_int_i32 by simp
-next
-  case (4 i\<^sub>1 i\<^sub>2)
-  have "(x::32 word) * y = word_of_int ((uint x * uint y) mod (2^32))" for x y
-    apply (subst word_mult_def)
-    apply (subst word_uint.norm_norm(1)[THEN sym])
-    by simp
-  then show ?case unfolding int_mul_i32_def int_of_nat_i32_def abs_int_i32 by simp
-next
-  case (5 i\<^sub>2 i\<^sub>1)
-  then show ?case unfolding int_div_u_i32_def using zero_i32.rep_eq by simp
-next
-  case (6 i\<^sub>2 i\<^sub>1)
-  hence "abs_int i\<^sub>2 > 0" by (rule nonzero_i32_int)
-  hence div: "trunc (rat_of_int (abs_int i\<^sub>1) / rat_of_int (abs_int i\<^sub>2)) = abs_int i\<^sub>1 div abs_int i\<^sub>2"
-    apply (subst floor_divide_of_int_eq[THEN sym])
-    apply (subst trunc)
-    by simp
-  have "Rep_i32 i\<^sub>1 div Rep_i32 i\<^sub>2 =
-      word_of_nat (nat (trunc (rat_of_int (abs_int i\<^sub>1) / rat_of_int (abs_int i\<^sub>2))))"
-    apply (subst div)
-    apply (rule word_eq_unatI)
-    unfolding nat_of_int_i32.rep_eq by (simp add: nat_div_as_int word_arith_nat_div)
-  hence "Abs_i32 (Rep_i32 i\<^sub>1 div Rep_i32 i\<^sub>2) =
-    rep_int (trunc (rat_of_int (abs_int i\<^sub>1) / rat_of_int (abs_int i\<^sub>2)))"
-    apply (subst int_of_nat_i32_def)
-    apply (subst map_fun_def, subst o_id, subst comp_def)
-    by simp
-  thus ?case unfolding int_div_u_i32_def using nonzero_i32[OF 6] by simp
-next
-  case (7 i\<^sub>2 i\<^sub>1)
-  thus ?case unfolding int_div_s_i32_def using zero_i32.rep_eq by simp
-next
-  case (8 i\<^sub>2 i\<^sub>1)
-  hence "Rep_i32 i\<^sub>1 = word_of_int (- (2 ^ (LENGTH(32) - 1))) \<and> Rep_i32 i\<^sub>2 = word_of_int (- 1)"
-    using sdiv_nrep[THEN iffD2, of "Rep_i32 i\<^sub>1" "Rep_i32 i\<^sub>2"] 8(2)[unfolded abs_int_s_i32] by simp
-  thus ?case unfolding int_div_s_i32_def by simp
-next
-  case (9 i\<^sub>2 i\<^sub>1)
-  have ncond: "\<not>(i\<^sub>2 = 0 \<or> ((Rep_i32 i\<^sub>1) = of_int (-(2^31)) \<and> (Rep_i32 i\<^sub>2) = of_int (-1)))"
-    using sdiv_nrep[THEN iffD2] 9(2)[unfolded abs_int_s_i32] 9(1) by force
-  have "int_div_s i\<^sub>1 i\<^sub>2 = int_div_s (Abs_i32 (Rep_i32 i\<^sub>1)) (Abs_i32 (Rep_i32 i\<^sub>2))"
-    unfolding Rep_i32_inverse[of i\<^sub>1] Rep_i32_inverse[of i\<^sub>2] ..
-  also have "\<dots> = Some (Abs_i32 (Rep_i32 i\<^sub>1 sdiv Rep_i32 i\<^sub>2))"
-    unfolding int_div_s_i32.abs_eq using ncond nonzero_i32 by simp
-  also have "\<dots> = Some (rep_int_s (trunc (rat_of_int (abs_int_s i\<^sub>1) / rat_of_int (abs_int_s i\<^sub>2))))"
-  proof -
-    let ?r = "rat_of_int (abs_int_s i\<^sub>1) / rat_of_int (abs_int_s i\<^sub>2)"
-    have b0: "(0::rat) \<le> 2 ^ (LENGTH(i32) - 1)" by simp
-    have b1: "rat_of_int (abs_int_s i\<^sub>2) \<noteq> 0"
-      using abs_int_s_i32 ncond nonzero_i32 signed_eq_0_iff by auto
-    have b2: "1 \<le> \<bar>rat_of_int (abs_int_s i\<^sub>2)\<bar>" using b1 by force
-    have "- (2 ^ (LENGTH(i32) - 1)) \<le> abs_int_s i\<^sub>1"
-      apply (subst abs_int_s_i32)
-      apply (subst length_i32)
-      using sint_ge .
-    hence b3: "- (2 ^ (LENGTH(i32) - 1)) \<le> rat_of_int (abs_int_s i\<^sub>1)" by force
-    have "abs_int_s i\<^sub>1 < 2 ^ (LENGTH(i32) - 1)"
-      apply (subst abs_int_s_i32)
-      apply (subst length_i32)
-      using sint_lt .
-    hence b4: "rat_of_int (abs_int_s i\<^sub>1) \<le> 2 ^ (LENGTH(i32) - 1)" by force
-    note bounds = div_rat_int_bounds[OF b0 b1 b2 b3 b4]
-    have ubnex: "?r \<noteq> 2^(LENGTH(i32) - 1)" using "9"(2) by fastforce
-    hence ubr: "?r < 2^(LENGTH(i32) - 1)" using bounds(2) by linarith
-    have lb: "- (2^(LENGTH(i32) - 1)) \<le> trunc ?r" unfolding trunc using bounds(1)
-      by (cases "0 \<le> ?r") auto
-    have ubb: "a \<ge> 1 \<Longrightarrow> ?r < 0 \<Longrightarrow> - \<lfloor>- ?r\<rfloor> < a" for a by linarith
-    have ub: "trunc ?r < 2^(LENGTH(i32) - 1)" unfolding trunc using ubr ubb
-      by (cases "0 \<le> ?r") auto
-    have div: "Rep_i32 i\<^sub>1 sdiv Rep_i32 i\<^sub>2 = of_int (trunc ?r)"
-      apply (subst word_sdiv_def)
-      apply (subst sdiv_trunc)
-      using ncond nonzero_i32 apply auto[1]
-      unfolding abs_int_s_i32 ..
-    have "Abs_i32 (Rep_i32 i\<^sub>1 sdiv Rep_i32 i\<^sub>2) = rep_int_s (trunc ?r)"
-      unfolding rep_int_s_i32[OF lb ub] div ..
-    thus ?thesis by simp
-  qed
-  finally show ?case .
-next
-  case (10 i\<^sub>2 i\<^sub>1)
-  thus ?case unfolding int_rem_u_i32_def using zero_i32.rep_eq by simp
-next
-  case (11 i\<^sub>2 i\<^sub>1)
-  show ?case unfolding int_rem_u_i32_def minus_mult_div_eq_mod[THEN sym] mod_distr
-    using nonzero_i32[OF \<open>i\<^sub>2 \<noteq> 0\<close>] int_of_nat_i32.abs_eq nat_of_int_i32.rep_eq trunc_div
-    by fastforce
-next
-  case (12 i\<^sub>2 i\<^sub>1)
-  thus ?case unfolding int_rem_s_i32_def using zero_i32.rep_eq by simp
-next
-  case (13 i\<^sub>2 i\<^sub>1)
-  hence nz: "sint (Rep_i32 i\<^sub>2) \<noteq> 0" using nonzero_i32[OF \<open>i\<^sub>2 \<noteq> 0\<close>] by simp
-  have reps: "Rep_i32 i\<^sub>1 - Rep_i32 i\<^sub>1 sdiv Rep_i32 i\<^sub>2 * Rep_i32 i\<^sub>2 =
-    word_of_nat (nat (signed_inv TYPE(32) (sint (Rep_i32 i\<^sub>1)
-      - sint (Rep_i32 i\<^sub>2) * (sint (Rep_i32 i\<^sub>1) sdiv sint (Rep_i32 i\<^sub>2)))))"
-    unfolding mult.commute[of "Rep_i32 i\<^sub>1 sdiv Rep_i32 i\<^sub>2"] smod_distr by fastforce
-  show ?case
-    unfolding int_rem_s_i32_def smod_word_alt_def abs_int_s_i32 sdiv_trunc[OF nz, THEN sym]
-      signed_inv_i32
-    using reps int_of_nat_i32.abs_eq nz by auto
-next
-  case (14 i\<^sub>1 i\<^sub>2)
-  then show ?case
-    unfolding abs_int_bits_i32
-    apply (subst rep_int_bits_i32)
-    subgoal by simp
-    unfolding bl_word_and[THEN sym] int_and_i32_def by simp
-next
-  case (15 i\<^sub>1 i\<^sub>2)
-  then show ?case
-    unfolding abs_int_bits_i32
-    apply (subst rep_int_bits_i32)
-    subgoal by simp
-    unfolding bl_word_or[THEN sym] int_or_i32_def by simp
-next
-  case (16 i\<^sub>1 i\<^sub>2)
-  then show ?case
-    unfolding abs_int_bits_i32
-    apply (subst rep_int_bits_i32)
-    subgoal by simp
-    unfolding bl_word_xor[THEN sym] int_xor_i32_def by simp
-next
-  case (17 i\<^sub>1 d\<^sub>1 d\<^sub>2 k i\<^sub>2)
-  hence "k = unat (Rep_i32 i\<^sub>2) mod LENGTH(i32)"
-    by (metis nat_int nat_of_int_i32.rep_eq of_nat_mod)
-  hence "k \<le> LENGTH(i32)" by simp
-  from 17 have "d\<^sub>2 = drop k (abs_int_bits i\<^sub>1)" by simp
-  have *: "(Rep_i32 i\<^sub>1) << k = of_bl (d\<^sub>2 @ replicate k False)"
-    unfolding \<open>d\<^sub>2 = _\<close> abs_int_bits_i32
-    apply (subst shiftl_bl)
-    apply (subst drop_append2[symmetric])
-    using \<open>k \<le> LENGTH(i32)\<close> apply fastforce
-    by (rule of_bl_drop'[symmetric]) simp
-  show ?case
-    unfolding int_shl_i32_def
-    apply (subst rep_int_bits_i32)
-    subgoal unfolding length_append \<open>length d\<^sub>2 = _\<close> length_replicate using \<open>k \<le> _\<close> by simp
-    using * unfolding \<open>k = _\<close> by simp
-next
-  case (18 i\<^sub>1 d\<^sub>1 d\<^sub>2 k i\<^sub>2)
-  hence "k = unat (Rep_i32 i\<^sub>2) mod LENGTH(i32)"
-    by (metis nat_int nat_of_int_i32.rep_eq of_nat_mod)
-  hence "k \<le> LENGTH(i32)" by simp
-  from 18 have "d\<^sub>1 = take (LENGTH(i32) - k) (abs_int_bits i\<^sub>1)" by simp
-  have *: "(Rep_i32 i\<^sub>1) >> k = of_bl d\<^sub>1"
-    unfolding \<open>d\<^sub>1 = _\<close> bit_drop_bit_eq abs_int_bits_i32 length_i32
-    by (subst shiftr_bl[symmetric]) simp
-  show ?case
-    unfolding int_shr_u_i32_def
-    apply (subst rep_int_bits_i32)
-    subgoal unfolding length_append \<open>length d\<^sub>1 = _\<close> length_replicate using \<open>k \<le> _\<close> by simp
-    using * unfolding \<open>k = _\<close> of_bl_rep_False by simp
-next
-  case (19 i\<^sub>1 d\<^sub>0 d\<^sub>1 d\<^sub>2 k i\<^sub>2)
-  hence "k = unat (Rep_i32 i\<^sub>2) mod LENGTH(i32)"
-    by (metis nat_int nat_of_int_i32.rep_eq of_nat_mod)
-  hence "k < LENGTH(i32)" by simp
-  note bl = \<open>abs_int_bits i\<^sub>1 = _\<close>[unfolded abs_int_bits_i32]
-  have "d\<^sub>0 = hd (to_bl (Rep_i32 i\<^sub>1))" using bl by simp
-  have "d\<^sub>1 = drop 1 (take (LENGTH(i32) - k) (to_bl (Rep_i32 i\<^sub>1)))"
-    using bl \<open>length d\<^sub>1 = _\<close> by (simp add: drop_take)
-  have "(Rep_i32 i\<^sub>1) >>> k =
-    of_bl (replicate k (hd (to_bl (Rep_i32 i\<^sub>1))) @ take (LENGTH(32) - k) (to_bl (Rep_i32 i\<^sub>1)))"
-    apply (subst sshiftr_bl) unfolding word_msb_alt ..
-  also have "\<dots> = of_bl (replicate (k + 1) d\<^sub>0 @ d\<^sub>1)"
-  proof -
-    let ?taken = "take (LENGTH(32) - k) (to_bl (Rep_i32 i\<^sub>1))"
-    have hd: "[hd (to_bl (Rep_i32 i\<^sub>1))] = take 1 ?taken"
-      using \<open>k < LENGTH(i32)\<close> bl by force
-    have rest: "?taken = [hd (to_bl (Rep_i32 i\<^sub>1))] @ drop 1 ?taken"
-      unfolding length_i32 hd append_take_drop_id ..
-    show ?thesis
-      apply (rule arg_cong[where f=of_bl])
-      unfolding \<open>d\<^sub>0 = _\<close> \<open>d\<^sub>1 = _\<close> replicate_add using rest by simp
-  qed
-  finally have *: "(Rep_i32 i\<^sub>1) >>> k = of_bl (replicate (k + 1) d\<^sub>0 @ d\<^sub>1)" .
-  show ?case
-    unfolding int_shr_s_i32_def
-    apply (subst rep_int_bits_i32)
-    subgoal unfolding length_append \<open>length d\<^sub>1 = _\<close> length_replicate using \<open>k < _\<close> by simp
-    using * unfolding \<open>k = _\<close> by simp
-next
-  case (20 i\<^sub>1 d\<^sub>1 d\<^sub>2 k i\<^sub>2)
-  hence "k = unat (Rep_i32 i\<^sub>2) mod LENGTH(i32)"
-    by (metis nat_int nat_of_int_i32.rep_eq of_nat_mod)
-  moreover have "d\<^sub>2 = drop k (to_bl (Rep_i32 i\<^sub>1))"
-    using \<open>abs_int_bits _ = _\<close>[unfolded abs_int_bits_i32] \<open>length d\<^sub>1 = k\<close> by simp
-  moreover have "d\<^sub>1 = take k (to_bl (Rep_i32 i\<^sub>1))"
-    using \<open>abs_int_bits _ = _\<close>[unfolded abs_int_bits_i32] \<open>length d\<^sub>1 = k\<close> by simp
-  ultimately have *: "word_rotl (unat (Rep_i32 i\<^sub>2)) (Rep_i32 i\<^sub>1) = of_bl (d\<^sub>2 @ d\<^sub>1)"
-    unfolding word_rotl_dt by simp
-  show ?case unfolding int_rotl_i32_def using 20 * by (subst rep_int_bits_i32) auto
-next
-  case (21 i\<^sub>1 d\<^sub>1 d\<^sub>2 k i\<^sub>2)
-  hence "k = unat (Rep_i32 i\<^sub>2) mod LENGTH(i32)"
-    by (metis nat_int nat_of_int_i32.rep_eq of_nat_mod)
-  moreover have "d\<^sub>2 = drop (LENGTH(i32) - k) (to_bl (Rep_i32 i\<^sub>1))"
-    using \<open>abs_int_bits _ = _\<close>[unfolded abs_int_bits_i32] \<open>length d\<^sub>1 = _\<close> by simp
-  moreover have "d\<^sub>1 = take (LENGTH(i32) - k) (to_bl (Rep_i32 i\<^sub>1))"
-    using \<open>abs_int_bits _ = _\<close>[unfolded abs_int_bits_i32] \<open>length d\<^sub>1 = _\<close> by simp
-  ultimately have *: "word_rotr (unat (Rep_i32 i\<^sub>2)) (Rep_i32 i\<^sub>1) = of_bl (d\<^sub>2 @ d\<^sub>1)"
-    unfolding word_rotr_dt by simp
-  show ?case unfolding int_rotr_i32_def using 21 * by (subst rep_int_bits_i32) auto
-next
-  case (22 i\<^sub>1 k)
-  hence "k = LENGTH(32)"
-    apply (subst length_to_bl_eq[symmetric, of "Rep_i32 i\<^sub>1"])
-    unfolding abs_int_bits_i32 using length_replicate by simp
-  moreover have "Rep_i32 i\<^sub>1 = 0" using 22 unfolding abs_int_bits_i32 by (simp add: to_bl_use_of_bl)
-  ultimately show ?case unfolding int_clz_i32_def int_of_nat_i32_def by simp
-next
-  case (23 i\<^sub>1 k d)
-  hence "takeWhile Not (to_bl (Rep_i32 i\<^sub>1)) = replicate k False"
-    unfolding abs_int_bits_i32 by (simp add: takeWhile_tail)
-  then show ?case unfolding int_clz_i32_def int_of_nat_i32_def word_clz_def by simp
-next
-  case (24 i\<^sub>1 k)
-  hence "k = LENGTH(32)"
-    apply (subst length_to_bl_eq[symmetric, of "Rep_i32 i\<^sub>1"])
-    unfolding abs_int_bits_i32 using length_replicate by simp
-  moreover have "Rep_i32 i\<^sub>1 = 0" using 24 unfolding abs_int_bits_i32 by (simp add: to_bl_use_of_bl)
-  ultimately show ?case unfolding int_ctz_i32_def int_of_nat_i32_def by simp
-next
-  case (25 i\<^sub>1 d k)
-  hence "takeWhile Not (rev (to_bl (Rep_i32 i\<^sub>1))) = replicate k False"
-    unfolding abs_int_bits_i32 by (simp add: takeWhile_tail)
-  then show ?case unfolding int_ctz_i32_def int_of_nat_i32_def word_ctz_def by simp
-next
-  case (26 i\<^sub>1 bls k)
-  from this(3) have "length (filter id (concat bls)) = length bls"
-  proof (induction bls)
-    case (Cons a bls)
-    have "length (filter id a) = 1" by (subst Cons.prems[of a]) auto
-    thus ?case unfolding concat.simps filter_append using Cons.IH Cons.prems by fastforce
-  qed simp
-  hence "pop_count (Rep_i32 i\<^sub>1) = k"
-    apply (subst pop_count_def)
-    apply (subst \<open>abs_int_bits i\<^sub>1 = _\<close>[unfolded abs_int_bits_i32])
-    unfolding filter_append length_append using \<open>length bls = k\<close> by simp
-  then show ?case unfolding int_popcnt_i32_def int_of_nat_i32_def by simp
-next
-  case (27 i\<^sub>1)
-  then show ?case unfolding int_eqz_i32_def abs_int_i32
-    using nonzero_i32 unsigned_eq_0_iff zero_i32.rep_eq by force
-next
-  case (28 i\<^sub>1 i\<^sub>2)
-  then show ?case unfolding int_eq_i32_def abs_int_i32 using Rep_i32_inject by simp
-next
-  case (29 i\<^sub>1 i\<^sub>2)
-  then show ?case unfolding int_lt_u_i32_def abs_int_i32 word_less_def ..
-next
-  case (30 i\<^sub>1 i\<^sub>2)
-  then show ?case unfolding int_lt_s_i32_def abs_int_s_i32 word_sless_alt ..
-next
-  case (31 i\<^sub>1 i\<^sub>2)
-  then show ?case unfolding int_gt_u_i32_def abs_int_i32 word_less_def ..
-next
-  case (32 i\<^sub>1 i\<^sub>2)
-  then show ?case unfolding int_gt_s_i32_def abs_int_s_i32 word_sless_alt ..
-next
-  case (33 i\<^sub>1 i\<^sub>2)
-  then show ?case unfolding int_le_u_i32_def abs_int_i32 word_le_def ..
-next
-  case (34 i\<^sub>1 i\<^sub>2)
-  then show ?case unfolding int_le_s_i32_def abs_int_s_i32 word_sle_eq ..
-next
-  case (35 i\<^sub>1 i\<^sub>2)
-  then show ?case unfolding int_ge_u_i32_def abs_int_i32 word_le_def ..
-next
-  case (36 i\<^sub>1 i\<^sub>2)
-  then show ?case unfolding int_ge_s_i32_def abs_int_s_i32 word_sle_eq ..
-qed
-
+  apply (rule Wasm_Type_Abs.class.Wasm_Type_Abs.wasm_int.of_class.intro)
+  apply (unfold int_clz_i32_def int_ctz_i32_def int_popcnt_i32_def int_add_i32_def int_sub_i32_def
+  int_mul_i32_def int_div_u_i32_def int_div_s_i32_def int_rem_u_i32_def int_rem_s_i32_def
+  int_and_i32_def int_or_i32_def int_xor_i32_def int_shl_i32_def int_shr_u_i32_def int_shr_s_i32_def
+  int_rotl_i32_def int_rotr_i32_def int_eqz_i32_def int_eq_i32_def int_lt_u_i32_def int_lt_s_i32_def
+  int_gt_u_i32_def int_gt_s_i32_def int_le_u_i32_def int_le_s_i32_def int_ge_u_i32_def
+  int_ge_s_i32_def nat_of_int_i32_def int_of_nat_i32_def)
+  by (rule I32.Int.wasm_int_axioms)
 end
 
-instantiation i64 :: wasm_int begin instance sorry end
+instantiation i64 :: wasm_int begin
+  lift_definition int_clz_i64 :: "i64 \<Rightarrow> i64" is "I64.int_clz" .
+  lift_definition int_ctz_i64 :: "i64 \<Rightarrow> i64" is "I64.int_ctz" .
+  lift_definition int_popcnt_i64 :: "i64 \<Rightarrow> i64" is "I64.int_popcnt" .
+  lift_definition int_add_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_add" .
+  lift_definition int_sub_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_sub" .
+  lift_definition int_mul_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_mul" .
+  lift_definition int_div_u_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64 option" is "I64.int_div_u" .
+  lift_definition int_div_s_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64 option" is "I64.int_div_s" .
+  lift_definition int_rem_u_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64 option" is "I64.int_rem_u" .
+  lift_definition int_rem_s_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64 option" is "I64.int_rem_s".
+  lift_definition int_and_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_and" .
+  lift_definition int_or_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_or" .
+  lift_definition int_xor_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_xor" .
+  lift_definition int_shl_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_shl" .
+  lift_definition int_shr_u_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_shr_u" .
+  lift_definition int_shr_s_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_shr_s" .
+  lift_definition int_rotl_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_rotl" .
+  lift_definition int_rotr_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_rotr" .
+  lift_definition int_eqz_i64 :: "i64 \<Rightarrow> bool" is "I64.int_eqz" .
+  lift_definition int_eq_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_eq" .
+  lift_definition int_lt_u_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_lt_u" .
+  lift_definition int_lt_s_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_lt_s" .
+  lift_definition int_gt_u_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_gt_u" .
+  lift_definition int_gt_s_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_gt_s" .
+  lift_definition int_le_u_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_le_u" .
+  lift_definition int_le_s_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_le_s" .
+  lift_definition int_ge_u_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_ge_u" .
+  lift_definition int_ge_s_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_ge_s" .
+  definition nat_of_int_i64 :: "i64 \<Rightarrow> nat" where "nat_of_int_i64 \<equiv> I64.nat_of_int"
+  definition int_of_nat_i64 :: "nat \<Rightarrow> i64" where "int_of_nat_i64 \<equiv> I64.int_of_nat"
+instance
+  apply (rule Wasm_Type_Abs.class.Wasm_Type_Abs.wasm_int.of_class.intro)
+  apply (unfold int_clz_i64_def int_ctz_i64_def int_popcnt_i64_def int_add_i64_def int_sub_i64_def
+  int_mul_i64_def int_div_u_i64_def int_div_s_i64_def int_rem_u_i64_def int_rem_s_i64_def
+  int_and_i64_def int_or_i64_def int_xor_i64_def int_shl_i64_def int_shr_u_i64_def int_shr_s_i64_def
+  int_rotl_i64_def int_rotr_i64_def int_eqz_i64_def int_eq_i64_def int_lt_u_i64_def int_lt_s_i64_def
+  int_gt_u_i64_def int_gt_s_i64_def int_le_u_i64_def int_le_s_i64_def int_ge_u_i64_def
+  int_ge_s_i64_def nat_of_int_i64_def int_of_nat_i64_def)
+  by (rule I64.Int.wasm_int_axioms)
+end
+
 instantiation f32 :: wasm_float begin instance .. end
 instantiation f64 :: wasm_float begin instance .. end
 
