@@ -62,8 +62,8 @@ instantiation i32 :: wasm_int begin
   lift_definition int_le_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_le_s" .
   lift_definition int_ge_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_ge_u" .
   lift_definition int_ge_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_ge_s" .
-  definition nat_of_int_i32 :: "i32 \<Rightarrow> nat" where "nat_of_int_i32 \<equiv> I32.nat_of_int"
-  definition int_of_nat_i32 :: "nat \<Rightarrow> i32" where "int_of_nat_i32 \<equiv> I32.int_of_nat"
+  lift_definition nat_of_int_i32 :: "i32 \<Rightarrow> nat" is unat .
+  lift_definition int_of_nat_i32 :: "nat \<Rightarrow> i32" is of_nat .
 instance
   apply (rule Wasm_Type_Abs.class.Wasm_Type_Abs.wasm_int.of_class.intro)
   apply (unfold int_clz_i32_def int_ctz_i32_def int_popcnt_i32_def int_add_i32_def int_sub_i32_def
@@ -72,7 +72,7 @@ instance
   int_rotl_i32_def int_rotr_i32_def int_eqz_i32_def int_eq_i32_def int_lt_u_i32_def int_lt_s_i32_def
   int_gt_u_i32_def int_gt_s_i32_def int_le_u_i32_def int_le_s_i32_def int_ge_u_i32_def
   int_ge_s_i32_def nat_of_int_i32_def int_of_nat_i32_def)
-  by (rule I32.Int.wasm_int_axioms)
+  by (rule I32.Int.wasm_int_axioms[unfolded I32.nat_of_int_def I32.int_of_nat_def])
 end
 
 instantiation i64 :: wasm_int begin
@@ -104,8 +104,8 @@ instantiation i64 :: wasm_int begin
   lift_definition int_le_s_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_le_s" .
   lift_definition int_ge_u_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_ge_u" .
   lift_definition int_ge_s_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_ge_s" .
-  definition nat_of_int_i64 :: "i64 \<Rightarrow> nat" where "nat_of_int_i64 \<equiv> I64.nat_of_int"
-  definition int_of_nat_i64 :: "nat \<Rightarrow> i64" where "int_of_nat_i64 \<equiv> I64.int_of_nat"
+  lift_definition nat_of_int_i64 :: "i64 \<Rightarrow> nat" is unat .
+  lift_definition int_of_nat_i64 :: "nat \<Rightarrow> i64" is of_nat .
 instance
   apply (rule Wasm_Type_Abs.class.Wasm_Type_Abs.wasm_int.of_class.intro)
   apply (unfold int_clz_i64_def int_ctz_i64_def int_popcnt_i64_def int_add_i64_def int_sub_i64_def
@@ -114,7 +114,7 @@ instance
   int_rotl_i64_def int_rotr_i64_def int_eqz_i64_def int_eq_i64_def int_lt_u_i64_def int_lt_s_i64_def
   int_gt_u_i64_def int_gt_s_i64_def int_le_u_i64_def int_le_s_i64_def int_ge_u_i64_def
   int_ge_s_i64_def nat_of_int_i64_def int_of_nat_i64_def)
-  by (rule I64.Int.wasm_int_axioms)
+  by (rule I64.Int.wasm_int_axioms[unfolded I64.nat_of_int_def I64.int_of_nat_def])
 end
 
 instantiation f32 :: wasm_float begin instance .. end
