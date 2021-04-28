@@ -7,6 +7,11 @@ theory Wasm_Base_Defs
     Wasm_Type_Word
 begin
 
+text\<open>
+Concrete types \<open>i32\<close> and \<open>i64\<close>, making use of @{locale Wasm_Int_Word} to avoid duplicating
+the identical definitions and proofs with only the size changed.
+\<close>
+
 instantiation i32 :: wasm_base begin
 lift_definition zero_i32 :: i32 is "of_nat 0" .
 instance ..

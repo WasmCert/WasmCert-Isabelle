@@ -1,6 +1,7 @@
+section\<open>Implementation of arbitrarily-sized WebAssembly Numeric Types using Words\<close>
+
 theory Wasm_Type_Word
   imports
-    Wasm_Ast (* TODO: remove *)
     Wasm_Type_Abs
     "Word_Lib.Signed_Division_Word"
     "Word_Lib.More_Word_Operations"
@@ -112,7 +113,7 @@ proof -
     by simp
 
   have "i\<^sub>1 - i\<^sub>2 * (i\<^sub>1 sdiv i\<^sub>2) = word_of_int (sint i\<^sub>1 - sint i\<^sub>2 * (sint i\<^sub>1 sdiv sint i\<^sub>2))"
-    by (simp add: word_sdiv_def)
+    by (simp add: sdiv_word_def)
   also have "\<dots> = word_of_nat (nat (signed_inv TYPE('a) ?r))"
   proof (subst word_of_nat_signed_inv, goal_cases)
     case 1
@@ -186,6 +187,10 @@ lemma word_ctz_0[simp]:
   "word_ctz (0::'a::len word) = LENGTH('a)"
   unfolding word_ctz_def by simp
 
+text\<open>
+Generic locale implementing all ops for a WebAssembly integer type of any given size, proving
+that its implementation fulfills the specification given by @{class wasm_int}.
+\<close>
 locale Wasm_Int_Word =
   fixes rep :: "'a :: {len, wasm_base} \<Rightarrow> 'n :: len word"
   fixes abs :: "'n word \<Rightarrow> 'a"
@@ -562,7 +567,7 @@ next
     have ub: "trunc ?r < 2^(LENGTH('a) - 1)" unfolding trunc using ubr ubb
       by (cases "0 \<le> ?r") (auto simp: floor_less_iff)
     have div: "rep i\<^sub>1 sdiv rep i\<^sub>2 = of_int (trunc ?r)"
-      apply (subst word_sdiv_def)
+      apply (subst sdiv_word_def)
       apply (subst sdiv_trunc)
       using ncond nonzero apply auto[1]
       unfolding abs_int_s ..

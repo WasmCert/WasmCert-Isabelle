@@ -10,9 +10,9 @@ The following lemmas speak about cases like
 where @{term "(div)"} is integer division.
 
 This is useful for example when for bit-shifting a number
-\<open>X\<close> with binary representation \<open>x\<^sub>0 x\<^sub>1 x\<^sub>2 \<dots>\<close> such that \<open>X = 2^(0*x\<^sub>0) + 2^(1*x\<^sub>1) + 2^(2*x\<^sub>2) + \<dots>\<close>
+\<open>X\<close> with binary representation \<open>x\<^sub>0 x\<^sub>1 x\<^sub>2 \<dots>\<close> such that \<open>X = x\<^sub>0 * 2^0 + x\<^sub>1 * 2^1 + x\<^sub>2 * 2^2 + \<dots>\<close>
 we can say that
-\<open>X >> 1 = (2^(0*x\<^sub>0) + 2^(1*x\<^sub>1) + 2^(2*x\<^sub>2) + \<dots>) div 2 = 2^(0*x\<^sub>1) + 2^(1*x\<^sub>2) + \<dots>\<close>
+\<open>X >> 1 = (x\<^sub>0 * 2^0 + x\<^sub>1 * 2^1 + x\<^sub>2 * 2^2 + \<dots>) div 2 = x\<^sub>1 * 2^0 + x\<^sub>2 * 2^1 + \<dots>\<close>
 so in this case:
  1. Filter out the summand where the exponent is 0
  2. Subtract 1 from all remaining exponents

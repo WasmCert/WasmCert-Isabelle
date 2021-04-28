@@ -1,4 +1,4 @@
-section {* Syntactic Typeclasses *}
+section\<open>Numeric WebAssembly Types\<close>
 
 theory Wasm_Type_Abs imports
   Main
@@ -8,7 +8,14 @@ theory Wasm_Type_Abs imports
   PowerSum
 begin
 
-(* https://webassembly.github.io/spec/core/exec/numerics.html *)
+text\<open>
+This contains word size-agnostic specifications of numeric types and ops as found in the
+WebAssembly specification.
+\<close>
+
+class wasm_base = zero
+
+subsection\<open>Integer\<close>
 
 context len
 begin
@@ -323,8 +330,7 @@ lemma signed_inv_nneg:
 
 end
 
-class wasm_base = zero
-
+text\<open>Pure syntactic type class for integers\<close>
 class wasm_int_ops = wasm_base + len +
   (* unops*)
   fixes int_clz :: "'a \<Rightarrow> 'a"
@@ -420,6 +426,7 @@ proof -
   thus ?thesis unfolding trunc_def by auto
 qed
 
+text\<open>Extension of wasm_int with semantic specifications\<close>
 class wasm_int = wasm_int_ops +
   assumes zero: "nat_of_int (0::'a) = 0"
   assumes add: "int_add (i\<^sub>1::'a) i\<^sub>2 =
@@ -502,6 +509,8 @@ class wasm_int = wasm_int_ops +
 begin
   lemma ine: "int_ne i\<^sub>1 i\<^sub>2 \<longleftrightarrow> abs_int i\<^sub>1 \<noteq> abs_int i\<^sub>2" unfolding ieq ..
 end
+
+subsection\<open>Float\<close>
 
 class wasm_float = wasm_base +
   (* unops *)
