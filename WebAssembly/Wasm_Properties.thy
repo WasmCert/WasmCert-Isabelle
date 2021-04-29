@@ -7,12 +7,7 @@ subsection {* Preservation *}
 lemma t_cvt: assumes "cvt t sx v = Some v'" shows "t = typeof v'"
   using assms
   unfolding cvt_def typeof_def
-  apply (cases t)
-     apply (simp add: option.case_eq_if, metis option.discI option.inject v.simps(17))
-    apply (simp add: option.case_eq_if, metis option.discI option.inject v.simps(18))
-   apply (simp add: option.case_eq_if, metis option.discI option.inject v.simps(19))
-  apply (simp add: option.case_eq_if, metis option.discI option.inject v.simps(20))
-  done
+  by (auto split: t.splits option.splits v.splits)
 
 lemma reduce_inst_is:
   assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
@@ -706,7 +701,7 @@ proof -
     by simp_all
   have 1:"tfs = map typeof zs"
     using n_zeros_typeof assms(8)
-    by simp
+    by fast
   have "t1s = map typeof vs"
     using typing_map_typeof assms(3) tvs_def t_eqs
     by fastforce

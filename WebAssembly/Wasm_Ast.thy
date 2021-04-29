@@ -1,6 +1,11 @@
 section {* WebAssembly Core AST *}
 
-theory Wasm_Ast imports Main "HOL-Word.Word" begin
+theory Wasm_Ast
+  imports
+    Main
+    "HOL-Library.Word"
+    "Word_Lib.Reversed_Bit_Lists"
+begin
 
 type_synonym \<comment> \<open>immediate\<close>
   i = nat

@@ -67,7 +67,7 @@ lemma b_e_check_single_type_not_bot_sound:
           "c_types_agree ts' tm"
           "\<C> \<turnstile> [e] : (t_in _> t_out)"
   shows "\<exists>tn. c_types_agree ts tn \<and> \<C> \<turnstile> [e] : (tn _> tm)"
-  using assms b_e_check_single_type_sound 
+  using assms b_e_check_single_type_sound
 proof (cases ts)
   case (TopType x1)
   then obtain x1' where x_def:"TopType x1' = ts'"
@@ -104,12 +104,6 @@ lemma b_e_check_single_sound_unop_testop_cvtop:
 proof -
   have "(e = (Cvtop t1 Convert t sx) \<Longrightarrow> convert_cond t1 t sx)"
     using assms(2)
-    by simp
-  hence temp0:"(e = (Cvtop t1 Convert t sx)) \<Longrightarrow> (type_update tn' [TSome t] (Type [arity_1_result e]) = tm')"
-    using assms(1,5) arity_1_result_def
-    by (simp del: convert_cond.simps)
-  have temp1:"(e = (Cvtop t1 Reinterpret t sx)) \<Longrightarrow> (type_update tn' [TSome t] (Type [arity_1_result e]) = tm')"
-    using assms(1,2,5) arity_1_result_def
     by simp
   have 1:"type_update tn' (to_ct_list [t]) (Type [arity_1_result e]) = tm'"
     using assms arity_1_result_def
@@ -832,141 +826,10 @@ lemma check_single_imp:
   shows "check_single \<C> e = id
          \<or> check_single \<C> e = (\<lambda>ctn. type_update_select ctn)
          \<or> (\<exists>cons prods. (check_single \<C> e = (\<lambda>ctn. type_update ctn cons prods)))"
-proof -
-  have True
-  and True
-  and "check_single \<C> e ctn = ctm \<Longrightarrow>
-       ctm \<noteq> Bot \<Longrightarrow>
-         ?thesis"
-  proof (induction rule: b_e_type_checker_check_check_single.induct)
-    case (1 \<C> es tn tm)
-    thus ?case
-      by simp
-  next
-    case (2 \<C> es ts)
-    thus ?case
-      by simp
-  next
-    case (3 \<C> v ts)
-    thus ?case
-      by fastforce
-  next
-    case (4 \<C> t uu ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (5 \<C> t uv ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (6 \<C> t uw ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (7 \<C> t ux ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (8 \<C> t1 t2 sx ts)
-    thus ?case
-      by (simp del: convert_cond.simps, meson assms(2) type_update.simps)
-  next
-    case (9 \<C> t1 t2 sx ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (10 \<C> ts)
-    thus ?case
-      by fastforce
-  next
-    case (11 \<C> ts)
-    thus ?case
-      by fastforce
-  next
-    case (12 \<C> ts)
-    thus ?case
-      by fastforce
-  next
-    case (13 \<C> ts)
-    thus ?case
-      by fastforce
-  next
-    case (14 \<C> tn tm es ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (15 \<C> tn tm es ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (16 \<C> tn tm es1 es2 ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (17 \<C> i ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (18 \<C> i ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (19 \<C> "is" ts)
-    thus ?case
-      by (simp, metis assms(2) option.case_eq_if type_update.simps)
-  next
-    case (20 \<C> ts)
-    thus ?case
-      by (simp, metis assms(2) option.case_eq_if type_update.simps)
-  next
-    case (21 \<C> i ts)
-    then show ?case
-      by (simp, metis (no_types, lifting) assms(2) tf.case tf.exhaust type_update.simps)
-  next
-    case (22 \<C> i ts)
-    thus ?case
-      by (simp, metis (no_types, lifting) assms(2) tf.case tf.exhaust type_update.simps)
-  next
-    case (23 \<C> i ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (24 \<C> i ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (25 \<C> i ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (26 \<C> i ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (27 \<C> i ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (28 \<C> t tp_sx a off ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (29 \<C> t tp a off ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (30 \<C> ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  next
-    case (31 \<C> ts)
-    thus ?case
-      by (simp, meson assms(2) type_update.simps)
-  qed
-  thus ?thesis
-    using assms
-    by simp
-qed
+  using assms
+  apply (cases rule: check_single.cases[of "(\<C>, e, ctn)"])
+  apply (fastforce split: if_splits option.splits tf.splits)+
+  done
 
 lemma check_equiv_fold:
   "check \<C> es ts = foldl (\<lambda> ts e. (case ts of Bot \<Rightarrow> Bot | _ \<Rightarrow> check_single \<C> e ts)) ts es"

@@ -1,6 +1,11 @@
 section {* WebAssembly Base Definitions *}
 
-theory Wasm_Base_Defs imports Wasm_Ast Wasm_Type_Abs begin
+theory Wasm_Base_Defs
+  imports
+    Wasm_Ast
+    Wasm_Type_Abs
+    "Word_Lib.Most_significant_bit"
+begin
 
 instantiation i32 :: wasm_int begin                 
   lift_definition nat_of_int_i32 :: "i32 \<Rightarrow> nat" is "unat" .

@@ -994,7 +994,7 @@ proof -
     using nat_def select_return_top_exists
     apply (cases "select_return_top cts (cts ! Suc nat) (cts ! nat)")
       apply simp_all
-    apply blast
+    apply (metis checker_type.distinct(1) checker_type.distinct(5))
     done
 qed
 
