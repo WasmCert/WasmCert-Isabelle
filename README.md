@@ -1,7 +1,6 @@
 # WasmCert-Isabelle
-A mechanisation of Wasm in Isabelle.
 
-(C) C. Watt 2021 - see LICENSE
+A mechanisation of Wasm in Isabelle. BSD-2 licensed - see LICENSE for details and copyright.
 
 An updated version of the mechanisation from "Mechanising and Verifying the WebAssembly Specification" (C. Watt, CPP 2018).
 
