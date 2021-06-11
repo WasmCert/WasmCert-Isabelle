@@ -71,6 +71,7 @@ lemma[code]: "mem_rep_append (Abs_mem_rep m) n b = Abs_mem_rep (app_rev_tr (rev 
   using mem_rep_append.abs_eq
   by (simp add: append_app_rev_tr)
 
-export_code open m_imports module_type_checker interp_instantiate typing run in OCaml module_name WasmRef_Isa file "code/WasmRef_Isa.ml"
+export_code open m_imports module_type_checker interp_instantiate typing run
+  in OCaml module_name WasmRef_Isa file_prefix WasmRef_Isa
 
 end

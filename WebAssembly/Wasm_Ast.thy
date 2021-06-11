@@ -16,12 +16,14 @@ type_synonym \<comment> \<open>alignment exponent\<close>
 
 \<comment> \<open>primitive types\<close>
 typedef i32 = "UNIV :: (32 word) set" ..
-typedecl i64
+typedef i64 = "UNIV :: (64 word) set" ..
 typedecl f32
 typedecl f64
 
 setup_lifting type_definition_i32
 declare Quotient_i32[transfer_rule]
+setup_lifting type_definition_i64
+declare Quotient_i64[transfer_rule]
 
 \<comment> \<open>memory\<close>
 (* type_synonym byte = "8 word" *)

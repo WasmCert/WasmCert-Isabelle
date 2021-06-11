@@ -4,16 +4,124 @@ theory Wasm_Base_Defs
   imports
     Wasm_Ast
     Wasm_Type_Abs
-    "Word_Lib.Most_significant_bit"
+    Wasm_Type_Word
 begin
 
-instantiation i32 :: wasm_int begin                 
-  lift_definition nat_of_int_i32 :: "i32 \<Rightarrow> nat" is "unat" .
-  lift_definition int_of_nat_i32 :: "nat \<Rightarrow> i32" is "of_nat" .
-instance ..
+text\<open>
+Concrete types \<open>i32\<close> and \<open>i64\<close>, making use of @{locale Wasm_Int_Word} to avoid duplicating
+the identical definitions and proofs with only the size changed.
+\<close>
 
+instantiation i32 :: wasm_base begin
+lift_definition zero_i32 :: i32 is "of_nat 0" .
+instance ..
 end
-instantiation i64 :: wasm_int begin instance .. end
+
+instantiation i32 :: len begin
+definition len_of_i32 :: "i32 itself \<Rightarrow> nat" where [simp]: "len_of_i32 _ = 32"
+instance apply standard unfolding len_of_i32_def by simp
+end
+
+instantiation i64 :: wasm_base begin
+lift_definition zero_i64 :: i64 is "of_nat 0" .
+instance ..
+end
+
+instantiation i64 :: len begin
+definition len_of_i64 :: "i64 itself \<Rightarrow> nat" where [simp]: "len_of_i64 _ = 64"
+instance apply standard unfolding len_of_i32_def by simp
+end
+
+interpretation I32: Wasm_Int_Word Rep_i32 Abs_i32
+  apply standard unfolding zero_i32_def using Rep_i32_inverse Abs_i32_inverse by auto
+
+interpretation I64: Wasm_Int_Word Rep_i64 Abs_i64
+  apply standard unfolding zero_i64_def using Rep_i64_inverse Abs_i64_inverse by auto
+
+instantiation i32 :: wasm_int begin
+  lift_definition int_clz_i32 :: "i32 \<Rightarrow> i32" is "I32.int_clz" .
+  lift_definition int_ctz_i32 :: "i32 \<Rightarrow> i32" is "I32.int_ctz" .
+  lift_definition int_popcnt_i32 :: "i32 \<Rightarrow> i32" is "I32.int_popcnt" .
+  lift_definition int_add_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_add" .
+  lift_definition int_sub_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_sub" .
+  lift_definition int_mul_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_mul" .
+  lift_definition int_div_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is "I32.int_div_u" .
+  lift_definition int_div_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is "I32.int_div_s" .
+  lift_definition int_rem_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is "I32.int_rem_u" .
+  lift_definition int_rem_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32 option" is "I32.int_rem_s".
+  lift_definition int_and_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_and" .
+  lift_definition int_or_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_or" .
+  lift_definition int_xor_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_xor" .
+  lift_definition int_shl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_shl" .
+  lift_definition int_shr_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_shr_u" .
+  lift_definition int_shr_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_shr_s" .
+  lift_definition int_rotl_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_rotl" .
+  lift_definition int_rotr_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> i32" is "I32.int_rotr" .
+  lift_definition int_eqz_i32 :: "i32 \<Rightarrow> bool" is "I32.int_eqz" .
+  lift_definition int_eq_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_eq" .
+  lift_definition int_lt_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_lt_u" .
+  lift_definition int_lt_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_lt_s" .
+  lift_definition int_gt_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_gt_u" .
+  lift_definition int_gt_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_gt_s" .
+  lift_definition int_le_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_le_u" .
+  lift_definition int_le_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_le_s" .
+  lift_definition int_ge_u_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_ge_u" .
+  lift_definition int_ge_s_i32 :: "i32 \<Rightarrow> i32 \<Rightarrow> bool" is "I32.int_ge_s" .
+  lift_definition nat_of_int_i32 :: "i32 \<Rightarrow> nat" is unat .
+  lift_definition int_of_nat_i32 :: "nat \<Rightarrow> i32" is of_nat .
+instance
+  apply (rule Wasm_Type_Abs.class.Wasm_Type_Abs.wasm_int.of_class.intro)
+  apply (unfold int_clz_i32_def int_ctz_i32_def int_popcnt_i32_def int_add_i32_def int_sub_i32_def
+  int_mul_i32_def int_div_u_i32_def int_div_s_i32_def int_rem_u_i32_def int_rem_s_i32_def
+  int_and_i32_def int_or_i32_def int_xor_i32_def int_shl_i32_def int_shr_u_i32_def int_shr_s_i32_def
+  int_rotl_i32_def int_rotr_i32_def int_eqz_i32_def int_eq_i32_def int_lt_u_i32_def int_lt_s_i32_def
+  int_gt_u_i32_def int_gt_s_i32_def int_le_u_i32_def int_le_s_i32_def int_ge_u_i32_def
+  int_ge_s_i32_def nat_of_int_i32_def int_of_nat_i32_def)
+  by (rule I32.Int.wasm_int_axioms[unfolded I32.nat_of_int_def I32.int_of_nat_def])
+end
+
+instantiation i64 :: wasm_int begin
+  lift_definition int_clz_i64 :: "i64 \<Rightarrow> i64" is "I64.int_clz" .
+  lift_definition int_ctz_i64 :: "i64 \<Rightarrow> i64" is "I64.int_ctz" .
+  lift_definition int_popcnt_i64 :: "i64 \<Rightarrow> i64" is "I64.int_popcnt" .
+  lift_definition int_add_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_add" .
+  lift_definition int_sub_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_sub" .
+  lift_definition int_mul_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_mul" .
+  lift_definition int_div_u_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64 option" is "I64.int_div_u" .
+  lift_definition int_div_s_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64 option" is "I64.int_div_s" .
+  lift_definition int_rem_u_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64 option" is "I64.int_rem_u" .
+  lift_definition int_rem_s_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64 option" is "I64.int_rem_s".
+  lift_definition int_and_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_and" .
+  lift_definition int_or_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_or" .
+  lift_definition int_xor_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_xor" .
+  lift_definition int_shl_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_shl" .
+  lift_definition int_shr_u_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_shr_u" .
+  lift_definition int_shr_s_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_shr_s" .
+  lift_definition int_rotl_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_rotl" .
+  lift_definition int_rotr_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> i64" is "I64.int_rotr" .
+  lift_definition int_eqz_i64 :: "i64 \<Rightarrow> bool" is "I64.int_eqz" .
+  lift_definition int_eq_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_eq" .
+  lift_definition int_lt_u_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_lt_u" .
+  lift_definition int_lt_s_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_lt_s" .
+  lift_definition int_gt_u_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_gt_u" .
+  lift_definition int_gt_s_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_gt_s" .
+  lift_definition int_le_u_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_le_u" .
+  lift_definition int_le_s_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_le_s" .
+  lift_definition int_ge_u_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_ge_u" .
+  lift_definition int_ge_s_i64 :: "i64 \<Rightarrow> i64 \<Rightarrow> bool" is "I64.int_ge_s" .
+  lift_definition nat_of_int_i64 :: "i64 \<Rightarrow> nat" is unat .
+  lift_definition int_of_nat_i64 :: "nat \<Rightarrow> i64" is of_nat .
+instance
+  apply (rule Wasm_Type_Abs.class.Wasm_Type_Abs.wasm_int.of_class.intro)
+  apply (unfold int_clz_i64_def int_ctz_i64_def int_popcnt_i64_def int_add_i64_def int_sub_i64_def
+  int_mul_i64_def int_div_u_i64_def int_div_s_i64_def int_rem_u_i64_def int_rem_s_i64_def
+  int_and_i64_def int_or_i64_def int_xor_i64_def int_shl_i64_def int_shr_u_i64_def int_shr_s_i64_def
+  int_rotl_i64_def int_rotr_i64_def int_eqz_i64_def int_eq_i64_def int_lt_u_i64_def int_lt_s_i64_def
+  int_gt_u_i64_def int_gt_s_i64_def int_le_u_i64_def int_le_s_i64_def int_ge_u_i64_def
+  int_ge_s_i64_def nat_of_int_i64_def int_of_nat_i64_def)
+  by (rule I64.Int.wasm_int_axioms[unfolded I64.nat_of_int_def I64.int_of_nat_def])
+end
+
 instantiation f32 :: wasm_float begin instance .. end
 instantiation f64 :: wasm_float begin instance .. end
 
@@ -312,7 +420,7 @@ definition rglob_is_mut :: "global \<Rightarrow> bool" where
 
 definition stypes :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> tf" where
   "stypes s i j = ((types i)!j)"
-  
+
 definition sfunc_ind :: "inst \<Rightarrow> nat \<Rightarrow> nat" where
   "sfunc_ind i j = ((inst.funcs i)!j)"
 
@@ -321,7 +429,7 @@ definition sfunc :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> cl" wh
 
 definition sglob_ind :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> nat" where
   "sglob_ind s i j = ((inst.globs i)!j)"
-  
+
 definition sglob :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> global" where
   "sglob s i j = (globs s)!(sglob_ind s i j)"
 
@@ -347,7 +455,7 @@ definition supdate_glob :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow>
 
 definition is_const :: "e \<Rightarrow> bool" where
   "is_const e = (case e of Basic (C _) \<Rightarrow> True | _ \<Rightarrow> False)"
-    
+
 definition const_list :: "e list \<Rightarrow> bool" where
   "const_list xs = list_all is_const xs"
 
@@ -450,7 +558,7 @@ definition cvt_f64 :: "sx option \<Rightarrow> v \<Rightarrow> f64 option" where
 definition cvt :: "t \<Rightarrow> sx option \<Rightarrow> v \<Rightarrow> v option" where
   "cvt t sx v = (case t of
                  T_i32 \<Rightarrow> (case (cvt_i32 sx v) of Some c \<Rightarrow> Some (ConstInt32 c) | None \<Rightarrow> None)
-               | T_i64 \<Rightarrow> (case (cvt_i64 sx v) of Some c \<Rightarrow> Some (ConstInt64 c) | None \<Rightarrow> None) 
+               | T_i64 \<Rightarrow> (case (cvt_i64 sx v) of Some c \<Rightarrow> Some (ConstInt64 c) | None \<Rightarrow> None)
                | T_f32 \<Rightarrow> (case (cvt_f32 sx v) of Some c \<Rightarrow> Some (ConstFloat32 c) | None \<Rightarrow> None)
                | T_f64 \<Rightarrow> (case (cvt_f64 sx v) of Some c \<Rightarrow> Some (ConstFloat64 c) | None \<Rightarrow> None))"
 

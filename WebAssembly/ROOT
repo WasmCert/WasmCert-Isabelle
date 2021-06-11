@@ -1,0 +1,29 @@
+session WebAssembly_Dev = "HOL-Library" +
+  description "WebAssembly"
+  options [quick_and_dirty]
+  sessions
+    Native_Word
+  theories
+    Wasm
+    Wasm_Ast
+    Wasm_Axioms
+    Wasm_Base_Defs
+    Wasm_Checker
+    Wasm_Checker_Printing
+    Wasm_Checker_Properties
+    Wasm_Checker_Types
+    Wasm_Instantiation
+    Wasm_Instantiation_Printing
+    Wasm_Interpreter
+    Wasm_Interpreter_Printing
+    Wasm_Interpreter_Properties
+    Wasm_Module
+    Wasm_Module_Checker
+    Wasm_Printing
+    Wasm_Properties
+    Wasm_Properties_Aux
+    Wasm_Soundness
+    Wasm_Type_Abs
+    Wasm_Type_Printing
+  export_files (in "code") [2]
+    "WebAssembly_Dev.Wasm_Printing:code/WasmRef_Isa.ocaml"
