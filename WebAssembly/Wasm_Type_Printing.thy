@@ -2,24 +2,24 @@ theory Wasm_Type_Printing imports Wasm_Base_Defs begin
 (* Maps types to Andreas' Ocaml implementation - a thin wrapper over Ocaml ints/floats for the most part. *)
 
 code_printing
-  type_constructor i32 \<rightharpoonup> (OCaml) "I32Wrapper.t"
-| type_constructor i64 \<rightharpoonup> (OCaml) "I64Wrapper.t"
-| type_constructor f32 \<rightharpoonup> (OCaml) "F32Wrapper.t"
+(*  type_constructor i32 \<rightharpoonup> (OCaml) "I32Wrapper.t" *)
+(*| type_constructor i64 \<rightharpoonup> (OCaml) "I64Wrapper.t" *)
+  type_constructor f32 \<rightharpoonup> (OCaml) "F32Wrapper.t"
 | type_constructor f64 \<rightharpoonup> (OCaml) "F64Wrapper.t"
 
 (* zero consts *)
 code_printing
-  constant zero_i32_inst.zero_i32 \<rightharpoonup> (OCaml) "I32Wrapper.zero"
-| constant zero_i64_inst.zero_i64 \<rightharpoonup> (OCaml) "I64Wrapper.zero"
-| constant zero_f32_inst.zero_f32 \<rightharpoonup> (OCaml) "F32Wrapper.zero"
+(*  constant zero_i32_inst.zero_i32 \<rightharpoonup> (OCaml) "I32Wrapper.zero"
+| constant zero_i64_inst.zero_i64 \<rightharpoonup> (OCaml) "I64Wrapper.zero" *)
+  constant zero_f32_inst.zero_f32 \<rightharpoonup> (OCaml) "F32Wrapper.zero"
 | constant zero_f64_inst.zero_f64 \<rightharpoonup> (OCaml) "F64Wrapper.zero"
 
 (* intra-{int,float} conversions *)
 code_printing
-  constant wasm_wrap \<rightharpoonup> (OCaml) "(I32Wrapper'_convert.wrap'_i64)"
+(*  constant wasm_wrap \<rightharpoonup> (OCaml) "(I32Wrapper'_convert.wrap'_i64)"
 | constant wasm_extend_u \<rightharpoonup> (OCaml) "(I64Wrapper'_convert.extend'_u'_i32)"
-| constant wasm_extend_s \<rightharpoonup> (OCaml) "(I64Wrapper'_convert.extend'_s'_i32)"
-| constant wasm_demote \<rightharpoonup> (OCaml) "(F32Wrapper'_convert.demote'_f64)"
+| constant wasm_extend_s \<rightharpoonup> (OCaml) "(I64Wrapper'_convert.extend'_s'_i32)" *)
+  constant wasm_demote \<rightharpoonup> (OCaml) "(F32Wrapper'_convert.demote'_f64)"
 | constant wasm_promote \<rightharpoonup> (OCaml) "(F64Wrapper'_convert.promote'_f32)"
 
 text\<open>
@@ -171,11 +171,182 @@ lemma[code]: "int_ge_u (Abs_i64 x) (Abs_i64 y) \<longleftrightarrow> x \<ge> y"
 lemma[code]: "int_ge_s (Abs_i64 x) (Abs_i64 y) \<longleftrightarrow> signed.greater_eq x y"
   by (simp add: I64.int_ge_s_def int_ge_s_i64.abs_eq)
 
+(* Sometimes to implement conversions we need to indirect through OCaml int types *)
+typedecl ocaml_i32
+typedecl ocaml_i64
+typedecl ocaml_char
+
+code_printing
+  type_constructor ocaml_i32 \<rightharpoonup> (OCaml) "Int32.t"
+| type_constructor ocaml_i64 \<rightharpoonup> (OCaml) "Int64.t"
+| type_constructor ocaml_char \<rightharpoonup> (OCaml) "Char.t"
+
+axiomatization
+  ocaml_i32_to_integer :: "ocaml_i32 \<Rightarrow> integer" and
+  integer_to_ocaml_i32 :: "integer \<Rightarrow> ocaml_i32" and
+  ocaml_i64_to_integer :: "ocaml_i64 \<Rightarrow> integer" and
+  integer_to_ocaml_i64 :: "integer \<Rightarrow> ocaml_i64" and
+  ocaml_char_to_integer :: "ocaml_char \<Rightarrow> integer" and
+  integer_to_ocaml_char :: "integer \<Rightarrow> ocaml_char"
+
+code_printing
+  constant ocaml_i32_to_integer \<rightharpoonup> (OCaml) "LibAux.z'_of'_uint32"
+| constant integer_to_ocaml_i32 \<rightharpoonup> (OCaml) "LibAux.uint32'_of'_z"
+| constant ocaml_i64_to_integer \<rightharpoonup> (OCaml) "LibAux.z'_of'_uint64"
+| constant integer_to_ocaml_i64 \<rightharpoonup> (OCaml) "LibAux.uint64'_of'_z"
+| constant ocaml_char_to_integer \<rightharpoonup> (OCaml) "LibAux.z'_of'_char"
+| constant integer_to_ocaml_char \<rightharpoonup> (OCaml) "LibAux.char'_of'_z"
+
+definition ocaml_int32_to_isabelle_int32 :: "ocaml_i32 \<Rightarrow> i32" where
+  "ocaml_int32_to_isabelle_int32 n \<equiv> wasm_int_ops_i32_inst.int_of_nat_i32 (nat_of_integer (ocaml_i32_to_integer n))"
+
+definition isabelle_int32_to_ocaml_int32 :: "i32 \<Rightarrow> ocaml_i32" where
+  "isabelle_int32_to_ocaml_int32 n \<equiv> integer_to_ocaml_i32 (integer_of_nat (wasm_int_ops_i32_inst.nat_of_int_i32 n))"
+
+definition ocaml_int64_to_isabelle_int64 :: "ocaml_i64 \<Rightarrow> i64" where
+  "ocaml_int64_to_isabelle_int64 n \<equiv> wasm_int_ops_i64_inst.int_of_nat_i64 (nat_of_integer (ocaml_i64_to_integer n))"
+
+definition isabelle_int64_to_ocaml_int64 :: "i64 \<Rightarrow> ocaml_i64" where
+  "isabelle_int64_to_ocaml_int64 n \<equiv> integer_to_ocaml_i64 (integer_of_nat (wasm_int_ops_i64_inst.nat_of_int_i64 n))"
+
+definition ocaml_char_to_isabelle_byte :: "ocaml_char \<Rightarrow> byte" where
+  "ocaml_char_to_isabelle_byte n \<equiv> byte_of_nat (nat_of_integer (ocaml_char_to_integer n))"
+
+definition isabelle_byte_to_ocaml_char :: "byte \<Rightarrow> ocaml_char" where
+  "isabelle_byte_to_ocaml_char n \<equiv> integer_to_ocaml_char (integer_of_nat (nat_of_byte n))"
+
+(* axiomatise the existence of conversions between floats and OCaml ints/char lists *)
+axiomatization
+  f32_convert_u_ocaml_i32 :: "ocaml_i32 \<Rightarrow> f32" and
+  f32_convert_s_ocaml_i32 :: "ocaml_i32 \<Rightarrow> f32" and
+  f32_convert_u_ocaml_i64 :: "ocaml_i64 \<Rightarrow> f32" and
+  f32_convert_s_ocaml_i64 :: "ocaml_i64 \<Rightarrow> f32" and
+  f64_convert_u_ocaml_i32 :: "ocaml_i32 \<Rightarrow> f64" and
+  f64_convert_s_ocaml_i32 :: "ocaml_i32 \<Rightarrow> f64" and
+  f64_convert_u_ocaml_i64 :: "ocaml_i64 \<Rightarrow> f64" and
+  f64_convert_s_ocaml_i64 :: "ocaml_i64 \<Rightarrow> f64" and
+  ocaml_i32_trunc_u_f32 :: "f32 \<Rightarrow> ocaml_i32 option" and
+  ocaml_i32_trunc_s_f32 :: "f32 \<Rightarrow> ocaml_i32 option" and
+  ocaml_i32_trunc_u_f64 :: "f64 \<Rightarrow> ocaml_i32 option" and
+  ocaml_i32_trunc_s_f64 :: "f64 \<Rightarrow> ocaml_i32 option" and
+  ocaml_i64_trunc_u_f32 :: "f32 \<Rightarrow> ocaml_i64 option" and
+  ocaml_i64_trunc_s_f32 :: "f32 \<Rightarrow> ocaml_i64 option" and
+  ocaml_i64_trunc_u_f64 :: "f64 \<Rightarrow> ocaml_i64 option" and
+  ocaml_i64_trunc_s_f64 :: "f64 \<Rightarrow> ocaml_i64 option" and
+  f32_serialise_ocaml_char :: "f32 \<Rightarrow> ocaml_char list" and
+  f64_serialise_ocaml_char :: "f64 \<Rightarrow> ocaml_char list" and
+  f32_deserialise_ocaml_char :: "ocaml_char list \<Rightarrow> f32" and
+  f64_deserialise_ocaml_char :: "ocaml_char list \<Rightarrow> f64"
+
+code_printing
+  constant f32_convert_u_ocaml_i32 \<rightharpoonup> (OCaml) "F32Wrapper'_convert.convert'_u'_i32"
+| constant f32_convert_s_ocaml_i32 \<rightharpoonup> (OCaml) "F32Wrapper'_convert.convert'_s'_i32"
+| constant f32_convert_u_ocaml_i64 \<rightharpoonup> (OCaml) "F32Wrapper'_convert.convert'_u'_i64"
+| constant f32_convert_s_ocaml_i64 \<rightharpoonup> (OCaml) "F32Wrapper'_convert.convert'_s'_i64"
+| constant f64_convert_u_ocaml_i32 \<rightharpoonup> (OCaml) "F64Wrapper'_convert.convert'_u'_i32"
+| constant f64_convert_s_ocaml_i32 \<rightharpoonup> (OCaml) "F64Wrapper'_convert.convert'_s'_i32"
+| constant f64_convert_u_ocaml_i64 \<rightharpoonup> (OCaml) "F64Wrapper'_convert.convert'_u'_i64"
+| constant f64_convert_s_ocaml_i64 \<rightharpoonup> (OCaml) "F64Wrapper'_convert.convert'_s'_i64"
+| constant ocaml_i32_trunc_u_f32 \<rightharpoonup> (OCaml) "I32Wrapper'_convert.trunc'_u'_f32"
+| constant ocaml_i32_trunc_s_f32 \<rightharpoonup> (OCaml) "I32Wrapper'_convert.trunc'_s'_f32"
+| constant ocaml_i32_trunc_u_f64 \<rightharpoonup> (OCaml) "I32Wrapper'_convert.trunc'_u'_f64"
+| constant ocaml_i32_trunc_s_f64 \<rightharpoonup> (OCaml) "I32Wrapper'_convert.trunc'_s'_f64"
+| constant ocaml_i64_trunc_u_f32 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.trunc'_u'_f32"
+| constant ocaml_i64_trunc_s_f32 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.trunc'_s'_f32"
+| constant ocaml_i64_trunc_u_f64 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.trunc'_u'_f64"
+| constant ocaml_i64_trunc_s_f64 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.trunc'_s'_f64"
+| constant f32_serialise_ocaml_char \<rightharpoonup> (OCaml) "ImplWrapper.serialise'_f32"
+| constant f64_serialise_ocaml_char \<rightharpoonup> (OCaml) "ImplWrapper.serialise'_f64"
+| constant f32_deserialise_ocaml_char \<rightharpoonup> (OCaml) "ImplWrapper.deserialise'_f32"
+| constant f64_deserialise_ocaml_char \<rightharpoonup> (OCaml) "ImplWrapper.deserialise'_f64"
+
+definition f32_convert_u_isabelle_i32 :: "i32 \<Rightarrow> f32" where
+  "f32_convert_u_isabelle_i32 i = f32_convert_u_ocaml_i32 (isabelle_int32_to_ocaml_int32 i)"
+
+definition f32_convert_s_isabelle_i32 :: "i32 \<Rightarrow> f32" where
+  "f32_convert_s_isabelle_i32 i = f32_convert_s_ocaml_i32 (isabelle_int32_to_ocaml_int32 i)"
+
+definition f32_convert_u_isabelle_i64 :: "i64 \<Rightarrow> f32" where
+  "f32_convert_u_isabelle_i64 i = f32_convert_u_ocaml_i64 (isabelle_int64_to_ocaml_int64 i)"
+
+definition f32_convert_s_isabelle_i64 :: "i64 \<Rightarrow> f32" where
+  "f32_convert_s_isabelle_i64 i = f32_convert_s_ocaml_i64 (isabelle_int64_to_ocaml_int64 i)"
+
+definition f64_convert_u_isabelle_i32 :: "i32 \<Rightarrow> f64" where
+  "f64_convert_u_isabelle_i32 i = f64_convert_u_ocaml_i32 (isabelle_int32_to_ocaml_int32 i)"
+
+definition f64_convert_s_isabelle_i32 :: "i32 \<Rightarrow> f64" where
+  "f64_convert_s_isabelle_i32 i = f64_convert_s_ocaml_i32 (isabelle_int32_to_ocaml_int32 i)"
+
+definition f64_convert_u_isabelle_i64 :: "i64 \<Rightarrow> f64" where
+  "f64_convert_u_isabelle_i64 i = f64_convert_u_ocaml_i64 (isabelle_int64_to_ocaml_int64 i)"
+
+definition f64_convert_s_isabelle_i64 :: "i64 \<Rightarrow> f64" where
+  "f64_convert_s_isabelle_i64 i = f64_convert_s_ocaml_i64 (isabelle_int64_to_ocaml_int64 i)"
+
+definition isabelle_i32_trunc_u_f32 :: "f32 \<Rightarrow>i32 option" where
+  "isabelle_i32_trunc_u_f32 f = map_option ocaml_int32_to_isabelle_int32 (ocaml_i32_trunc_u_f32 f)"
+
+definition isabelle_i32_trunc_s_f32 :: "f32 \<Rightarrow>i32 option" where
+  "isabelle_i32_trunc_s_f32 f = map_option ocaml_int32_to_isabelle_int32 (ocaml_i32_trunc_s_f32 f)"
+
+definition isabelle_i32_trunc_u_f64 :: "f64 \<Rightarrow>i32 option" where
+  "isabelle_i32_trunc_u_f64 f = map_option ocaml_int32_to_isabelle_int32 (ocaml_i32_trunc_u_f64 f)"
+
+definition isabelle_i32_trunc_s_f64 :: "f64 \<Rightarrow>i32 option" where
+  "isabelle_i32_trunc_s_f64 f = map_option ocaml_int32_to_isabelle_int32 (ocaml_i32_trunc_s_f64 f)"
+
+definition isabelle_i64_trunc_u_f32 :: "f32 \<Rightarrow>i64 option" where
+  "isabelle_i64_trunc_u_f32 f = map_option ocaml_int64_to_isabelle_int64 (ocaml_i64_trunc_u_f32 f)"
+
+definition isabelle_i64_trunc_s_f32 :: "f32 \<Rightarrow>i64 option" where
+  "isabelle_i64_trunc_s_f32 f = map_option ocaml_int64_to_isabelle_int64 (ocaml_i64_trunc_s_f32 f)"
+
+definition isabelle_i64_trunc_u_f64 :: "f64 \<Rightarrow>i64 option" where
+  "isabelle_i64_trunc_u_f64 f = map_option ocaml_int64_to_isabelle_int64 (ocaml_i64_trunc_u_f64 f)"
+
+definition isabelle_i64_trunc_s_f64 :: "f64 \<Rightarrow>i64 option" where
+  "isabelle_i64_trunc_s_f64 f = map_option ocaml_int64_to_isabelle_int64 (ocaml_i64_trunc_s_f64 f)"
+
+definition f32_serialise_isabelle_bytes :: "f32 \<Rightarrow> bytes" where
+  "f32_serialise_isabelle_bytes f = List.map ocaml_char_to_isabelle_byte (f32_serialise_ocaml_char f)"
+
+definition f64_serialise_isabelle_bytes :: "f64 \<Rightarrow> bytes" where
+  "f64_serialise_isabelle_bytes f = List.map ocaml_char_to_isabelle_byte (f64_serialise_ocaml_char f)"
+
+definition f32_deserialise_isabelle_bytes :: "bytes \<Rightarrow> f32" where
+  "f32_deserialise_isabelle_bytes bs = f32_deserialise_ocaml_char (List.map isabelle_byte_to_ocaml_char bs)"
+
+definition f64_deserialise_isabelle_bytes :: "bytes \<Rightarrow> f64" where
+  "f64_deserialise_isabelle_bytes bs = f64_deserialise_ocaml_char (List.map isabelle_byte_to_ocaml_char bs)"
+
+axiomatization where
+  f32_convert_ui32_is[code]: "f32_convert_ui32 \<equiv> f32_convert_u_isabelle_i32" and
+  f32_convert_si32_is[code]: "f32_convert_si32 \<equiv> f32_convert_s_isabelle_i32" and
+  f32_convert_ui64_is[code]: "f32_convert_ui64 \<equiv> f32_convert_u_isabelle_i64" and
+  f32_convert_si64_is[code]: "f32_convert_si64 \<equiv> f32_convert_s_isabelle_i64" and
+  f64_convert_ui32_is[code]: "f64_convert_ui32 \<equiv> f64_convert_u_isabelle_i32" and
+  f64_convert_si32_is[code]: "f64_convert_si32 \<equiv> f64_convert_s_isabelle_i32" and
+  f64_convert_ui64_is[code]: "f64_convert_ui64 \<equiv> f64_convert_u_isabelle_i64" and
+  f64_convert_si64_is[code]: "f64_convert_si64 \<equiv> f64_convert_s_isabelle_i64" and
+  ui32_trunc_f32_is[code]: "ui32_trunc_f32 \<equiv> isabelle_i32_trunc_u_f32" and
+  si32_trunc_f32_is[code]: "si32_trunc_f32 \<equiv> isabelle_i32_trunc_u_f32" and
+  ui32_trunc_f64_is[code]: "ui32_trunc_f64 \<equiv> isabelle_i32_trunc_u_f64" and
+  si32_trunc_f64_is[code]: "si32_trunc_f64 \<equiv> isabelle_i32_trunc_u_f64" and
+  ui64_trunc_f32_is[code]: "ui64_trunc_f32 \<equiv> isabelle_i64_trunc_u_f32" and
+  si64_trunc_f32_is[code]: "si64_trunc_f32 \<equiv> isabelle_i64_trunc_u_f32" and
+  ui64_trunc_f64_is[code]: "ui64_trunc_f64 \<equiv> isabelle_i64_trunc_u_f64" and
+  si64_trunc_f64_is[code]: "si64_trunc_f64 \<equiv> isabelle_i64_trunc_u_f64" and
+  serialise_f32_is[code]: "serialise_f32 \<equiv> f32_serialise_isabelle_bytes" and
+  serialise_f64_is[code]: "serialise_f64 \<equiv> f64_serialise_isabelle_bytes" and
+  deserialise_f32_is[code]: "deserialise_f32 \<equiv> f32_deserialise_isabelle_bytes" and
+  deserialise_f64_is[code]: "deserialise_f64 \<equiv> f64_deserialise_isabelle_bytes"
+
 (* arithmetic *)
 code_printing
 (* INT32 *)
   (* UNOPS *)
-  constant wasm_int_ops_i32_inst.int_clz_i32 \<rightharpoonup> (OCaml) "I32Wrapper.clz"
+(*  constant wasm_int_ops_i32_inst.int_clz_i32 \<rightharpoonup> (OCaml) "I32Wrapper.clz"
 | constant wasm_int_ops_i32_inst.int_ctz_i32 \<rightharpoonup> (OCaml) "I32Wrapper.ctz"
 | constant wasm_int_ops_i32_inst.int_popcnt_i32 \<rightharpoonup> (OCaml) "I32Wrapper.popcnt"
   (* BINOPS - wrap *)
@@ -205,20 +376,22 @@ code_printing
 | constant wasm_int_ops_i32_inst.int_le_u_i32 \<rightharpoonup> (OCaml) "I32Wrapper.le'_u"
 | constant wasm_int_ops_i32_inst.int_le_s_i32 \<rightharpoonup> (OCaml) "I32Wrapper.le'_s"
 | constant wasm_int_ops_i32_inst.int_ge_u_i32 \<rightharpoonup> (OCaml) "I32Wrapper.ge'_u"
-| constant wasm_int_ops_i32_inst.int_ge_s_i32 \<rightharpoonup> (OCaml) "I32Wrapper.ge'_s"
+| constant wasm_int_ops_i32_inst.int_ge_s_i32 \<rightharpoonup> (OCaml) "I32Wrapper.ge'_s" *)
   (* CONVERSIONS *)
-| constant f32_convert_ui32 \<rightharpoonup> (OCaml) "F32Wrapper'_convert.convert'_u'_i32"
+(*
+  constant f32_convert_ui32 \<rightharpoonup> (OCaml) "F32Wrapper'_convert.convert'_u'_i32"
 | constant f32_convert_si32 \<rightharpoonup> (OCaml) "F32Wrapper'_convert.convert'_s'_i32"
 | constant f64_convert_ui32 \<rightharpoonup> (OCaml) "F64Wrapper'_convert.convert'_u'_i32"
 | constant f64_convert_si32 \<rightharpoonup> (OCaml) "F64Wrapper'_convert.convert'_s'_i32"
+*)
   (* VALUE CONVERSIONS - wrap *)
-| constant wasm_int_ops_i32_inst.int_of_nat_i32 \<rightharpoonup> (OCaml) "I32Wrapper.int'_of'_z (integer'_of'_nat _)"
-| constant wasm_int_ops_i32_inst.nat_of_int_i32 \<rightharpoonup> (OCaml) "Nat (I32Wrapper.z'_of'_int _)"
+(* | constant wasm_int_ops_i32_inst.int_of_nat_i32 \<rightharpoonup> (OCaml) "I32Wrapper.int'_of'_z (integer'_of'_nat _)"
+| constant wasm_int_ops_i32_inst.nat_of_int_i32 \<rightharpoonup> (OCaml) "Nat (I32Wrapper.z'_of'_int _)" *)
   (* SIGN EXTENDING DESERIALISATION TODO *)
 
 (* INT64 *)
   (* UNOPS *)
-| constant wasm_int_ops_i64_inst.int_clz_i64 \<rightharpoonup> (OCaml) "I64Wrapper.clz"
+(*| constant wasm_int_ops_i64_inst.int_clz_i64 \<rightharpoonup> (OCaml) "I64Wrapper.clz"
 | constant wasm_int_ops_i64_inst.int_ctz_i64 \<rightharpoonup> (OCaml) "I64Wrapper.ctz"
 | constant wasm_int_ops_i64_inst.int_popcnt_i64 \<rightharpoonup> (OCaml) "I64Wrapper.popcnt"
   (* BINOPS - wrap *)
@@ -248,18 +421,20 @@ code_printing
 | constant wasm_int_ops_i64_inst.int_le_u_i64 \<rightharpoonup> (OCaml) "I64Wrapper.le'_u"
 | constant wasm_int_ops_i64_inst.int_le_s_i64 \<rightharpoonup> (OCaml) "I64Wrapper.le'_s"
 | constant wasm_int_ops_i64_inst.int_ge_u_i64 \<rightharpoonup> (OCaml) "I64Wrapper.ge'_u"
-| constant wasm_int_ops_i64_inst.int_ge_s_i64 \<rightharpoonup> (OCaml) "I64Wrapper.ge'_s"
+| constant wasm_int_ops_i64_inst.int_ge_s_i64 \<rightharpoonup> (OCaml) "I64Wrapper.ge'_s" *)
   (* CONVERSIONS *)
+(*
 | constant f32_convert_ui64 \<rightharpoonup> (OCaml) "F32Wrapper'_convert.convert'_u'_i64"
 | constant f32_convert_si64 \<rightharpoonup> (OCaml) "F32Wrapper'_convert.convert'_s'_i64"
 | constant f64_convert_ui64 \<rightharpoonup> (OCaml) "F64Wrapper'_convert.convert'_u'_i64"
 | constant f64_convert_si64 \<rightharpoonup> (OCaml) "F64Wrapper'_convert.convert'_s'_i64"
+*)
   (* VALUE CONVERSIONS - wrap *)
-| constant wasm_int_ops_i64_inst.int_of_nat_i64 \<rightharpoonup> (OCaml) "I64Wrapper.int'_of'_z (integer'_of'_nat _)"
-| constant wasm_int_ops_i64_inst.nat_of_int_i64 \<rightharpoonup> (OCaml) "Nat (I64Wrapper.z'_of'_int _)"
+(*| constant wasm_int_ops_i64_inst.int_of_nat_i64 \<rightharpoonup> (OCaml) "I64Wrapper.int'_of'_z (integer'_of'_nat _)"
+| constant wasm_int_ops_i64_inst.nat_of_int_i64 \<rightharpoonup> (OCaml) "Nat (I64Wrapper.z'_of'_int _)" *)
 (* FLOAT32 *)
   (* UNOPS *)
-| constant wasm_float_f32_inst.float_neg_f32 \<rightharpoonup> (OCaml) "F32Wrapper.neg"
+  constant wasm_float_f32_inst.float_neg_f32 \<rightharpoonup> (OCaml) "F32Wrapper.neg"
 | constant wasm_float_f32_inst.float_abs_f32 \<rightharpoonup> (OCaml) "F32Wrapper.abs"
 | constant wasm_float_f32_inst.float_ceil_f32 \<rightharpoonup> (OCaml) "F32Wrapper.ceil"
 | constant wasm_float_f32_inst.float_floor_f32 \<rightharpoonup> (OCaml) "F32Wrapper.floor"
@@ -282,10 +457,12 @@ code_printing
 | constant wasm_float_f32_inst.float_le_f32 \<rightharpoonup> (OCaml) "F32Wrapper.le"
 | constant wasm_float_f32_inst.float_ge_f32 \<rightharpoonup> (OCaml) "F32Wrapper.ge"
   (* CONVERSIONS *)
+(*
 | constant ui32_trunc_f32 \<rightharpoonup> (OCaml) "I32Wrapper'_convert.trunc'_u'_f32"
 | constant si32_trunc_f32 \<rightharpoonup> (OCaml) "I32Wrapper'_convert.trunc'_s'_f32"
 | constant ui64_trunc_f32 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.trunc'_u'_f32"
 | constant si64_trunc_f32 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.trunc'_s'_f32"
+*)
 (* FLOAT64 *)
   (* UNOPS *)
 | constant wasm_float_f64_inst.float_neg_f64 \<rightharpoonup> (OCaml) "F64Wrapper.neg"
@@ -311,11 +488,13 @@ code_printing
 | constant wasm_float_f64_inst.float_le_f64 \<rightharpoonup> (OCaml) "F64Wrapper.le"
 | constant wasm_float_f64_inst.float_ge_f64 \<rightharpoonup> (OCaml) "F64Wrapper.ge"
   (* CONVERSIONS *)
+(*
 | constant ui32_trunc_f64 \<rightharpoonup> (OCaml) "I32Wrapper'_convert.trunc'_u'_f64"
 | constant si32_trunc_f64 \<rightharpoonup> (OCaml) "I32Wrapper'_convert.trunc'_s'_f64"
 | constant ui64_trunc_f64 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.trunc'_u'_f64"
 | constant si64_trunc_f64 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.trunc'_s'_f64"
-
+*)
+(*
 code_printing
   constant serialise_i32 \<rightharpoonup> (OCaml) "ImplWrapper.serialise'_i32"
 | constant serialise_i64 \<rightharpoonup> (OCaml) "ImplWrapper.serialise'_i64"
@@ -326,6 +505,6 @@ code_printing
 | constant deserialise_f32 \<rightharpoonup> (OCaml) "ImplWrapper.deserialise'_f32"
 | constant deserialise_f64 \<rightharpoonup> (OCaml) "ImplWrapper.deserialise'_f64"
 | constant wasm_bool \<rightharpoonup> (OCaml) "ImplWrapper.bool"
-| constant int32_minus_one \<rightharpoonup> (OCaml) "I32Wrapper.minus'_one"
+| constant int32_minus_one \<rightharpoonup> (OCaml) "I32Wrapper.minus'_one" *)
 
 end

@@ -5,6 +5,7 @@ theory Wasm_Base_Defs
     Wasm_Ast
     Wasm_Type_Abs
     Wasm_Type_Word
+    Word_Lib.Rsplit
 begin
 
 text\<open>
@@ -147,23 +148,85 @@ consts
   f64_convert_si32 :: "i32 \<Rightarrow> f64"
   f64_convert_ui64 :: "i64 \<Rightarrow> f64"
   f64_convert_si64 :: "i64 \<Rightarrow> f64"
-  (* intra-{int/float} conversions *)
-  wasm_wrap :: "i64 \<Rightarrow> i32"
-  wasm_extend_u :: "i32 \<Rightarrow> i64"
-  wasm_extend_s :: "i32 \<Rightarrow> i64"
+  (* intra-float conversions *)
   wasm_demote :: "f64 \<Rightarrow> f32"
   wasm_promote :: "f32 \<Rightarrow> f64"
-  (* boolean encoding *)
-  serialise_i32 :: "i32 \<Rightarrow> bytes"
-  serialise_i64 :: "i64 \<Rightarrow> bytes"
+  (* float byte encoding *)
   serialise_f32 :: "f32 \<Rightarrow> bytes"
   serialise_f64 :: "f64 \<Rightarrow> bytes"
-  deserialise_i32 :: "bytes \<Rightarrow> i32"
-  deserialise_i64 :: "bytes \<Rightarrow> i64"
   deserialise_f32 :: "bytes \<Rightarrow> f32"
   deserialise_f64 :: "bytes \<Rightarrow> f64"
-  wasm_bool :: "bool \<Rightarrow> i32"
-  int32_minus_one :: i32
+(* TODO: check correctness of the below *)
+(* intra-int conversions *)
+lift_definition wasm_wrap :: "i64 \<Rightarrow> i32" is "Word.ucast" .
+lift_definition wasm_extend_u :: "i32 \<Rightarrow> i64" is "Word.ucast" .
+lift_definition wasm_extend_s :: "i32 \<Rightarrow> i64" is "Word.scast" .
+
+(* int byte encoding *)
+
+fun bin_rsplit_rev :: "nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> int list"
+  where "bin_rsplit_rev n m c =
+    (if m = 0 \<or> n = 0 then []
+     else
+      let (a, b) = bin_split n c
+      in b # bin_rsplit_rev n (m - n) a)"
+
+lemma bin_rsplit_rev_is:
+  "(rev acc)@(bin_rsplit_rev n m c) = rev (bin_rsplit_aux n m c acc)"
+proof (induction n m c arbitrary: acc rule: bin_rsplit_rev.induct)
+  case (1 n m c)
+  consider (1) "m = 0 \<or> n = 0" | (2) "\<not>(m = 0 \<or> n = 0)"
+    by blast
+  thus ?case
+  proof (cases)
+    case 1
+    thus ?thesis
+      by fastforce
+  next
+    case 2
+    obtain a b where a:"(a,b) = bin_split n c"
+      by simp
+    have "rev (b # acc) @ bin_rsplit_rev n (m - n) a =
+            rev (bin_rsplit_aux n (m - n) a (b # acc))"
+      using 2 1 a
+      by blast
+    thus ?thesis
+      using 2 a bin_rsplit_aux.elims
+      by fastforce
+  qed
+qed
+
+definition word_rsplit_rev :: "'a::len word \<Rightarrow> 'b::len word list"
+  where "word_rsplit_rev w = map word_of_int (bin_rsplit_rev (LENGTH('b)) (LENGTH('a)) (uint w))"
+
+lemma word_rsplit_rev_is: "word_rsplit_rev = rev \<circ> word_rsplit"
+  using bin_rsplit_rev_is
+  unfolding word_rsplit_def bin_rsplit_def word_rsplit_rev_def comp_def
+  by (metis (no_types, hide_lams) append_Nil fst_conv rev.simps(1) rev_map snd_conv)
+
+lift_definition serialise_i32 :: "i32 \<Rightarrow> bytes" is "word_rsplit_rev" .
+lift_definition serialise_i64 :: "i64 \<Rightarrow> bytes" is "word_rsplit_rev" .
+
+definition word_rcat_rev :: \<open>'a::len word list \<Rightarrow> 'b::len word\<close>
+  where \<open>word_rcat_rev = word_of_int \<circ> horner_sum uint (2 ^ LENGTH('a))\<close>
+
+lemma word_rcat_rev_is: "word_rcat_rev = word_rcat \<circ> rev"
+  unfolding word_rcat_def word_rcat_rev_def comp_def
+  by simp
+
+lemma word_rcat_rsplit_rev: "word_rcat_rev (word_rsplit_rev w) = w"
+  using word_rcat_rsplit[of w]
+  by (simp add: word_rcat_rev_is word_rsplit_rev_is)
+
+(* For some reason declaring these in two stages makes code extraction work better *)
+lift_definition deserialise_i32_aux :: "8 word list \<Rightarrow> i32" is "(\<lambda>x :: (8 word list). (word_rcat_rev x))" .
+lift_definition deserialise_i64_aux :: "8 word list \<Rightarrow> i64" is "(\<lambda>x :: (8 word list). (word_rcat_rev x))" .
+
+lift_definition deserialise_i32 :: "bytes \<Rightarrow> i32" is deserialise_i32_aux .
+lift_definition deserialise_i64 :: "bytes \<Rightarrow> i64" is "deserialise_i64_aux" .
+
+lift_definition wasm_bool :: "bool \<Rightarrow> i32" is "(\<lambda>b. if b then 1 else 0)" .
+lift_definition  int32_minus_one :: i32 is "max_word" .
 
   (* memory *)
 definition mem_size :: "mem \<Rightarrow> nat" where

@@ -31,9 +31,15 @@ typedef byte = "UNIV :: (8 word) set" ..
 setup_lifting type_definition_byte
 declare Quotient_byte[transfer_rule]
 
+(* For some reason this lemma does get automatically generated *)
+lemmas[code] = Abs_byte_inverse[simplified]
+
 lift_definition msb_byte :: "byte \<Rightarrow> bool" is msb .
 lift_definition zero_byte :: "byte" is 0 .
-lift_definition negone_byte :: "byte" is "-1" .
+lift_definition negone_byte :: "byte" is "max_word" .
+
+lift_definition nat_of_byte :: "byte \<Rightarrow> nat" is "unat" .
+lift_definition byte_of_nat :: "nat \<Rightarrow> byte" is "of_nat" .
 
 type_synonym bytes = "byte list"
 

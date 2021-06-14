@@ -16,6 +16,7 @@ and
 
 (* memory *)
 
+(*
 code_printing
   type_constructor byte \<rightharpoonup> (OCaml) "ImplWrapper.byte"
 
@@ -23,5 +24,6 @@ code_printing
   constant msb_byte \<rightharpoonup> (OCaml) "ImplWrapper.msb'_byte"
 | constant zero_byte \<rightharpoonup> (OCaml) "ImplWrapper.zero'_byte"
 | constant negone_byte \<rightharpoonup> (OCaml) "ImplWrapper.negone'_byte"
+*)
 
 end
