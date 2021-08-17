@@ -138,7 +138,7 @@ qed
 
 lemma lfilled_collapse2:
   assumes "Lfilled n lholed (es@es') LI"
-  shows "\<exists>lholed' vs'. Lfilled n lholed' es LI"
+  shows "\<exists>lholed'. Lfilled n lholed' es LI"
   using assms
 proof (induction "es@es'" LI rule: Lfilled.induct)
   case (L0 vs lholed es')
@@ -1103,6 +1103,24 @@ proof -
   qed
 qed
 
+lemma not_const_vs_to_es_list:
+  assumes "~(is_const e)"
+  shows "vs1 @ [e] @ vs2 \<noteq> $C* vs"
+proof -
+  fix vs
+  {
+    assume "vs1 @ [e] @ vs2 = $C* vs"
+    hence "(\<forall>y\<in>set (vs1 @ [e] @ vs2). \<exists>x. y = $C x)"
+      by simp
+    hence False
+      using assms
+      unfolding is_const_def
+      by fastforce
+  }
+  thus "vs1 @ [e] @ vs2 \<noteq> $C* vs"
+    by fastforce
+qed
+
 lemma e_type_const1:
   assumes "is_const e"
   shows "\<exists>t. (\<S>\<bullet>\<C> \<turnstile> [e] : (ts _> ts@[t]))"
@@ -1423,11 +1441,11 @@ lemma inst_typing_func_length:
 lemma store_typing_imp_glob_agree:
   assumes "inst_typing s i \<C>"
           "j < length (global \<C>)"
-  shows "(sglob_ind s i j) < length (globs s)"
+  shows "(sglob_ind i j) < length (globs s)"
         "glob_typing (sglob s i j) ((global \<C>)!j)"
 proof -
   show "glob_typing (sglob s i j) ((global \<C>)!j)"
-       "(sglob_ind s i j) < length (globs s)"
+       "(sglob_ind i j) < length (globs s)"
     using assms
     unfolding inst_typing.simps sglob_def sglob_ind_def list_all2_conv_all_nth
     by (metis globi_agree_def inst.select_convs(5) t_context.select_convs(3))+
@@ -1435,7 +1453,7 @@ qed
 
 lemma inst_typing_imp_memi_agree:
   assumes "inst_typing s i \<C>"
-          "(smem_ind s i) = Some k"
+          "(smem_ind i) = Some k"
   shows "memi_agree (mems s) k (hd (memory \<C>))"
 proof -
   show "memi_agree (mems s) k (hd (memory \<C>))"
@@ -1834,17 +1852,17 @@ qed
 lemma update_glob_store_extension:
   assumes "store_typing s"
           "supdate_glob s i j v = s'"
-          "(globs s)!sglob_ind s i j = g"
+          "(globs s)!sglob_ind i j = g"
           "g_mut g = T_mut"
           "typeof (g_val g) = typeof v"
   shows "store_extension s s'"
         "store_typing s'"
 proof -
-  obtain k where k_def:"k = (sglob_ind s i j)"
+  obtain k where k_def:"k = (sglob_ind i j)"
     by blast
   hence s'_def:"s' = s\<lparr>s.globs := (s.globs s)[k := (s.globs s ! k)\<lparr>g_val := v\<rparr>]\<rparr>"
     using assms(2)
-    unfolding supdate_glob_def sglob_ind_def supdate_glob_s_def
+    unfolding supdate_glob_def sglob_ind_def update_glob_def
     by metis
   have 1:"(funcs s) = (funcs s')"
          "(tabs s) = (tabs s')"
@@ -2029,4 +2047,40 @@ next
     using lfilledk'_def(1)
     by auto
 qed
+
+lemma lfilled_single:
+  assumes "Lfilled k lholed es [e]"
+          "\<And> a b c. e \<noteq> Label a b c"
+  shows "(es = [e] \<and> lholed = LBase [] [] \<and> k = 0) \<or> es = []"
+  using assms
+proof (cases rule: Lfilled.cases)
+  case (L0 vs es')
+  thus ?thesis
+    by (metis (no_types, lifting) Cons_eq_append_conv append_is_Nil_conv list.map_disc_iff)
+next
+  case (LN vs n es' l es'' k lfilledk)
+  assume "(\<And>a b c. e \<noteq> Label a b c)"
+  thus ?thesis
+    using LN(2)
+    unfolding Cons_eq_append_conv
+    by fastforce
+qed
+
+lemma lfilled_eq:
+  assumes "Lfilled j lholed es LI"
+          "Lfilled j lholed es' LI"
+  shows "es = es'"
+  using assms
+proof (induction arbitrary: es' rule: Lfilled.induct)
+  case (L0 vs lholed es' es)
+  thus ?case
+    using Lfilled.simps[of 0, simplified]
+    by auto
+next
+  case (LN lholed vs n les' l les'' k les lfilledk)
+  thus ?case
+    using Lfilled.simps[of "(k+1)" "LRec vs n les' l les''" es' "(($C*vs) @ [Label n les' lfilledk] @ les'')", simplified]
+    by auto
+qed
+
 end

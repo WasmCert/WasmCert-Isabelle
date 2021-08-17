@@ -2,31 +2,274 @@ section \<open>WebAssembly Interpreter\<close>
 
 theory Wasm_Interpreter imports Wasm begin
 
-datatype res_crash =
-  CError
-| CExhaustion
+abbreviation expect :: "'a option \<Rightarrow> ('a \<Rightarrow> 'b) \<Rightarrow> 'b \<Rightarrow> 'b" where
+  "expect a f b \<equiv> (case a of
+                     Some a' \<Rightarrow> f a'
+                   | None \<Rightarrow> b)"
 
-datatype res =
-  RCrash res_crash
-| RTrap
-| RValue "v list"  
+definition name :: "'a :: typerep \<Rightarrow> String.literal" where
+  "name a = (case (typerep_of a) of Typerep.Typerep s _ \<Rightarrow> s)"
+
+type_synonym v_stack = "v list"
 
 datatype res_step =
-  RSCrash res_crash
-| RSBreak nat "v list"
-| RSReturn "v list"
-| RSNormal "v list" "e list"
+  Res_crash String.literal
+| Res_trap String.literal
+| Step_normal
 
-abbreviation crash_error where "crash_error \<equiv> RSCrash CError"
+datatype res =
+  RCrash String.literal
+| RTrap String.literal
+| RValue "v_stack"
 
-abbreviation res_trap where "res_trap vs es \<equiv> RSNormal vs (Trap#es)"
+definition crash_invalid where "crash_invalid \<equiv> Res_crash (STR ''type system violation'')"
+definition crash_invariant where "crash_invariant \<equiv> Res_crash (STR ''interpreter invariant violation'')"
+definition crash_exhaustion where "crash_exhaustion \<equiv> Res_crash (STR ''call stack exhausted'')"
+
+definition res_crash_fuel where "res_crash_fuel \<equiv> RCrash (STR ''fuel exhausted'')"
+
+lemmas[simp] = crash_invalid_def crash_invariant_def crash_exhaustion_def res_crash_fuel_def
+
+definition app_v_s_drop :: "v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_drop v_s =
+     (case v_s of
+       v1#v_s' \<Rightarrow> (v_s', Step_normal)
+     | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_v_s_unop :: "unop \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_unop unop v_s =
+     (case v_s of
+       v1#v_s' \<Rightarrow> ((app_unop unop v1)#v_s', Step_normal)
+     | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_v_s_testop :: "testop \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_testop testop v_s =
+     (case v_s of
+       v1#v_s' \<Rightarrow> ((app_testop testop v1)#v_s', Step_normal)
+     | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_v_s_binop :: "binop \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_binop binop v_s =
+     (case v_s of
+       v2#v1#v_s' \<Rightarrow>
+         expect (app_binop binop v1 v2)
+                (\<lambda>v. (v#v_s', Step_normal))
+                (v_s', Res_trap (name binop))
+     | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_v_s_relop :: "relop \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_relop relop v_s =
+     (case v_s of
+       v2#v1#v_s' \<Rightarrow> ((app_relop relop v1 v2)#v_s', Step_normal)
+     | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_v_s_cvtop :: "cvtop \<Rightarrow> t \<Rightarrow> t \<Rightarrow> sx option \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_cvtop cvtop t1 t2 sx v_s =
+     (case v_s of
+       v1#v_s' \<Rightarrow>
+       (if types_agree t1 v1 then
+         (case cvtop of
+            Convert \<Rightarrow>
+              expect (cvt t2 sx v1)
+                     (\<lambda>v. (v#v_s', Step_normal))
+                     (v_s', Res_trap (name cvtop))
+          | Reinterpret \<Rightarrow> if sx = None then
+                             ((wasm_deserialise (bits v1) t2)#v_s', Step_normal)
+                           else (v_s, crash_invalid))
+        else (v_s, crash_invalid))
+     | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_v_s_select :: "v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_select v_s =
+     (case v_s of
+       (ConstInt32 c)#v2#v1#v_s' \<Rightarrow>
+         (if int_eq c 0 then (v2#v_s', Step_normal) else (v1#v_s', Step_normal))
+     | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_f_v_s_get_local :: "nat \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_f_v_s_get_local k f v_s =
+     (let locs = (f_locs f) in
+     (if k < length locs
+        then ((locs!k)#v_s, Step_normal)
+        else (v_s, crash_invalid)))"
+
+definition app_f_v_s_set_local :: "nat \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (f \<times> v_stack \<times> res_step)" where
+  "app_f_v_s_set_local k f v_s =
+     (let locs = (f_locs f) in
+     (case v_s of
+       v1#v_s' \<Rightarrow> if k < length locs
+                  then (\<lparr> f_locs = locs[k := v1], f_inst = (f_inst f) \<rparr>, v_s', Step_normal)
+                  else (f, v_s, crash_invalid)
+     | _ \<Rightarrow> (f, v_s, crash_invalid)))"
+
+definition app_v_s_tee_local :: "nat \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
+  "app_v_s_tee_local k v_s =
+     (case v_s of
+       v1#v_s' \<Rightarrow> (v1#v1#v_s', [$Set_local k], Step_normal)
+     | _ \<Rightarrow> (v_s, [], crash_invalid))"
+
+definition app_v_s_if :: "tf \<Rightarrow> b_e list \<Rightarrow> b_e list \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
+  "app_v_s_if tf es1 es2 v_s =
+     (case v_s of
+       (ConstInt32 c)#v_s' \<Rightarrow>
+         (if int_eq c 0 then (v_s', [$(Block tf es2)], Step_normal) else (v_s', [$(Block tf es1)], Step_normal))
+     | _ \<Rightarrow> (v_s, [], crash_invalid))"
+
+definition app_v_s_br_if :: "nat \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
+  "app_v_s_br_if k v_s =
+     (case v_s of
+       (ConstInt32 c)#v_s' \<Rightarrow>
+         (if int_eq c 0 then (v_s', [], Step_normal) else (v_s', [$(Br k)], Step_normal))
+     | _ \<Rightarrow> (v_s, [], crash_invalid))"
+
+definition app_v_s_br_table :: "nat list \<Rightarrow> nat \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
+  "app_v_s_br_table ks k v_s =
+     (case v_s of
+       (ConstInt32 c)#v_s' \<Rightarrow>
+             let j = nat_of_int c in
+                if j < length ks
+                  then (v_s', [$Br (ks!j)], Step_normal)
+                  else (v_s', [$Br k], Step_normal)
+     | _ \<Rightarrow> (v_s, [], crash_invalid))"
+
+definition app_f_call :: "nat \<Rightarrow> f \<Rightarrow> (e list \<times> res_step)" where
+  "app_f_call k f = ([Invoke (sfunc_ind (f_inst f) k)], Step_normal)"
+
+definition app_s_f_v_s_call_indirect :: "nat \<Rightarrow> tabinst list \<Rightarrow> cl list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
+  "app_s_f_v_s_call_indirect k tinsts cls f v_s = 
+          (let i = (f_inst f) in
+           case v_s of
+             (ConstInt32 c)#v_s' \<Rightarrow>
+               (case (inst.tabs i) of
+                  (j#_) => (case (tab_cl_ind tinsts j (nat_of_int c)) of
+                             Some i_cl \<Rightarrow> (if (stypes i k = cl_type (cls!i_cl))
+                                            then  (v_s', [(Invoke i_cl)], Step_normal)
+                                            else (v_s', [], (Res_trap (STR ''call_indirect''))))
+                           | None \<Rightarrow> (v_s', [], (Res_trap (STR ''call_indirect''))))
+                | [] => (v_s, [], crash_invalid))
+           | _ \<Rightarrow> (v_s, [], crash_invalid))"
+
+definition app_s_f_v_s_get_global :: "nat \<Rightarrow> global list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_s_f_v_s_get_global k gs f v_s =  ((g_val (gs!(sglob_ind (f_inst f) k)))#v_s, Step_normal)"
+
+definition app_s_f_v_s_set_global :: "nat \<Rightarrow> global list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (global list \<times>  v_stack \<times> res_step)" where
+  "app_s_f_v_s_set_global k gs f v_s =
+     (case v_s of
+        v1#v_s' \<Rightarrow> (update_glob gs (f_inst f) k v1, v_s', Step_normal)
+      | _ \<Rightarrow> (gs, v_s, crash_invalid))"
+
+definition app_s_f_v_s_load :: "t \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_s_f_v_s_load t off ms f v_s = 
+          (let i = (f_inst f) in
+           case v_s of
+             (ConstInt32 c)#v_s' \<Rightarrow>
+               (case smem_ind i of
+                  Some j => expect (load (ms!j) (nat_of_int c) off (t_length t))
+                                  (\<lambda>bs. ((wasm_deserialise bs t)#v_s', Step_normal))
+                                  (v_s', (Res_trap (STR ''load'')))
+                | None => (v_s, crash_invalid))
+           | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_s_f_v_s_load_packed :: "t \<Rightarrow> tp \<Rightarrow> sx \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_s_f_v_s_load_packed t tp sx off ms f v_s = 
+          (let i = (f_inst f) in
+           case v_s of
+             (ConstInt32 c)#v_s' \<Rightarrow>
+               (case smem_ind i of
+                  Some j => expect (load_packed sx (ms!j) (nat_of_int c) off (tp_length tp) (t_length t))
+                                  (\<lambda>bs. ((wasm_deserialise bs t)#v_s', Step_normal))
+                                  (v_s', (Res_trap (STR ''load'')))
+                | None => (v_s, crash_invalid))
+           | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_s_f_v_s_load_maybe_packed :: "t \<Rightarrow> (tp \<times> sx) option \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_s_f_v_s_load_maybe_packed t tp_sx off ms f v_s =
+     (case tp_sx of
+        Some (tp, sx) \<Rightarrow> app_s_f_v_s_load_packed t tp sx off ms f v_s
+      | None \<Rightarrow> app_s_f_v_s_load t off ms f v_s)"
+
+
+definition app_s_f_v_s_store :: "t \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (mem list \<times> v_stack \<times> res_step)" where
+  "app_s_f_v_s_store t off ms f v_s = 
+          (let i = (f_inst f) in
+           case v_s of
+             v#(ConstInt32 c)#v_s' \<Rightarrow>
+               (if (types_agree t v) then
+                 (case smem_ind i of
+                    Some j => expect (store (ms!j) (nat_of_int c) off (bits v) (t_length t))
+                                    (\<lambda>mem'. ((ms[j := mem']), v_s', Step_normal))
+                                    (ms, v_s', Res_trap (STR ''store''))
+                  | None => (ms, v_s, crash_invalid))
+                else (ms, v_s, crash_invalid))
+           | _ \<Rightarrow> (ms, v_s, crash_invalid))"
+
+definition app_s_f_v_s_store_packed :: "t \<Rightarrow> tp \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (mem list \<times> v_stack \<times> res_step)" where
+  "app_s_f_v_s_store_packed t tp off ms f v_s = 
+          (let i = (f_inst f) in
+           case v_s of
+             v#(ConstInt32 c)#v_s' \<Rightarrow>
+               (if (types_agree t v) then
+                 (case smem_ind i of
+                    Some j => expect (store_packed (ms!j) (nat_of_int c) off (bits v) (tp_length tp))
+                                    (\<lambda>mem'. ((ms[j := mem']), v_s', Step_normal))
+                                    (ms, v_s', Res_trap (STR ''store''))
+                  | None => (ms, v_s, crash_invalid))
+                else (ms, v_s, crash_invalid))
+           | _ \<Rightarrow> (ms, v_s, crash_invalid))"
+
+definition app_s_f_v_s_store_maybe_packed :: "t \<Rightarrow> tp option \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (mem list \<times> v_stack \<times> res_step)" where
+  "app_s_f_v_s_store_maybe_packed t tp_opt off ms f v_s =
+     (case tp_opt of
+        Some tp \<Rightarrow> app_s_f_v_s_store_packed t tp off ms f v_s
+      | None \<Rightarrow> app_s_f_v_s_store t off ms f v_s)"
+
+definition app_s_f_v_s_mem_size :: "mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_s_f_v_s_mem_size ms f v_s = 
+          (let i = (f_inst f) in
+          (case smem_ind i of
+             Some j => (((ConstInt32 (int_of_nat (mem_size (ms!j))))#v_s), Step_normal)
+           | None => (v_s, crash_invalid)))"
+
+definition app_s_f_v_s_mem_grow :: "mem list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (mem list \<times> v_stack \<times> res_step)" where
+  "app_s_f_v_s_mem_grow ms f v_s = 
+          (let i = (f_inst f) in
+           case v_s of
+             (ConstInt32 c)#v_s' \<Rightarrow>
+               (case smem_ind i of
+                  Some j => let l = (mem_size (ms!j)) in
+                           expect (mem_grow (ms!j) (nat_of_int c))
+                                  (\<lambda>mem'. ((ms[j := mem']), (ConstInt32 (int_of_nat l))#v_s', Step_normal))
+                                  (ms, (ConstInt32 int32_minus_one)#v_s', Step_normal)
+                | None => (ms, v_s, crash_invalid))
+           | _ \<Rightarrow> (ms, v_s, crash_invalid))"
+
+(* 0: local value stack, 1: current redex, 2: tail of redex *)
+type_synonym redex = "v_stack \<times> e list \<times> b_e list"
+
+(* 0: outer value stack, 1: outer tail of redex, 2: label arity, 3: label continuation *)
+(* corresponds to <0> label <2> <3> ... end <1>  *)
+type_synonym label_context = "v_stack \<times> b_e list \<times> nat \<times> b_e list"
+
+abbreviation label_arity :: "label_context \<Rightarrow> nat" where
+  "label_arity lc \<equiv> fst (snd (snd lc))"
+
+(* 0: redex, 1: label contexts, 2: frame arity, 3: frame *)
+type_synonym frame_context = "redex \<times> label_context list \<times> nat \<times> f"
+
+abbreviation frame_arity :: "frame_context \<Rightarrow> nat" where
+  "frame_arity fc \<equiv> fst (snd (snd fc))"
+
+definition frame_arity_outer :: "frame_context \<Rightarrow> frame_context list \<Rightarrow> nat" where
+  "frame_arity_outer fc fcs \<equiv> if fcs = [] then (frame_arity fc) else (frame_arity (last fcs))"
 
 type_synonym depth = nat
 type_synonym fuel = nat
 
-type_synonym config_tuple = "s \<times> f \<times> (v list \<times> e list)"
+type_synonym config_tuple = "depth \<times> s \<times> frame_context \<times> frame_context list"
 
-type_synonym res_tuple = "s \<times> f \<times> res_step"
+type_synonym res_step_tuple = "config_tuple \<times> res_step"
+
+type_synonym res_tuple = "config_tuple \<times> res"
 
 fun split_vals :: "b_e list \<Rightarrow> v list \<times> b_e list" where
   "split_vals ((C v)#es) = (let (vs', es') = split_vals es in (v#vs', es'))"
@@ -35,6 +278,13 @@ fun split_vals :: "b_e list \<Rightarrow> v list \<times> b_e list" where
 fun split_vals_e :: "e list \<Rightarrow> v list \<times> e list" where
   "split_vals_e (($ C v)#es) = (let (vs', es') = split_vals_e es in (v#vs', es'))"
 | "split_vals_e es = ([], es)"
+
+fun split_v_s_b_s_aux :: "v_stack \<Rightarrow> b_e list \<Rightarrow> v_stack \<times> b_e list" where
+  "split_v_s_b_s_aux v_s ((C v)#b_es) = (v#v_s, b_es)"
+| "split_v_s_b_s_aux v_s es = (v_s, es)"
+
+fun split_v_s_b_s :: "b_e list \<Rightarrow> v_stack \<times> b_e list" where
+  "split_v_s_b_s es = split_v_s_b_s_aux [] es"
 
 fun split_n :: "v list \<Rightarrow> nat \<Rightarrow> v list \<times> v list" where
   "split_n [] n = ([], [])"
@@ -71,6 +321,18 @@ lemma split_vals_const_list: "split_vals (map EConst vs) = (vs, [])"
 lemma split_vals_e_const_list: "split_vals_e ($C* vs) = (vs, [])"
   by (induction vs, simp_all)
 
+lemma split_v_s_b_s_aux_conv_app:
+  assumes "split_v_s_b_s_aux v_s_aux b_es = (v_s, b_es')"
+  shows "(map EConst (rev v_s_aux))@b_es = (map EConst (rev v_s))@b_es'"
+  using assms
+  by (induction v_s_aux b_es rule: split_v_s_b_s_aux.induct) auto
+
+lemma split_v_s_b_s_conv_app:
+  assumes "split_v_s_b_s b_es = (v_s, b_es')"
+  shows "b_es = (map EConst (rev v_s))@b_es'"
+  using assms split_v_s_b_s_aux_conv_app
+  by fastforce
+
 lemma split_vals_e_conv_app:
   assumes "split_vals_e xs = (as, bs)"
   shows "xs = ($C* as)@bs"
@@ -84,13 +346,11 @@ proof (induction xs arbitrary: as rule: split_vals_e.induct)
     by fastforce
 qed simp_all
 
-abbreviation expect :: "'a option \<Rightarrow> ('a \<Rightarrow> 'b) \<Rightarrow> 'b \<Rightarrow> 'b" where
-  "expect a f b \<equiv> (case a of
-                     Some a' \<Rightarrow> f a'
-                   | None \<Rightarrow> b)"
+abbreviation v_stack_to_b_es :: " v_stack \<Rightarrow> b_e list"
+  where "v_stack_to_b_es v \<equiv> map (\<lambda>v. C v) (rev v)"
 
-abbreviation vs_to_es :: " v list \<Rightarrow> e list"
-  where "vs_to_es v \<equiv> $C* (rev v)"
+abbreviation v_stack_to_es :: " v_stack \<Rightarrow> e list"
+  where "v_stack_to_es v \<equiv> $C* (rev v)"
 
 definition e_is_trap :: "e \<Rightarrow> bool" where
   "e_is_trap e = (case e of Trap \<Rightarrow> True | _ \<Rightarrow> False)"
@@ -135,363 +395,257 @@ axiomatization
   host_apply_impl:: "s \<Rightarrow> tf \<Rightarrow> host \<Rightarrow> v list \<Rightarrow> (s \<times> v list) option" where
   host_apply_impl_correct:"(host_apply_impl s tf h vs = Some m') \<Longrightarrow> (\<exists>hs. host_apply s tf h vs hs (Some m'))"
 
-function (sequential)
-  run_step :: "depth \<Rightarrow> config_tuple \<Rightarrow> res_tuple" where
-  "run_step d (s,f,(ves, es)) = (case es of
-                               [] \<Rightarrow> (s,f, crash_error)
-                             | e#es' \<Rightarrow>
-                               if e_is_trap e
-                                 then
-                                   if (es' \<noteq> [] \<or> ves \<noteq> [])
-                                     then
-                                       (s, f, RSNormal [] [Trap])
-                                     else
-                                       (s, f, crash_error)
-                                 else
-  case e of
-    \<comment> \<open>\<open>B_E\<close>\<close>
-      \<comment> \<open>\<open>UNOPS\<close>\<close>
-        $(Unop t op) \<Rightarrow>
-         (case ves of
-            v#ves' \<Rightarrow>
-              (s, f, RSNormal ((app_unop op v)#ves') es')
-          | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>BINOPS\<close>\<close>
-      | $(Binop t op) \<Rightarrow>
-          (case ves of
-             v2#v1#ves' \<Rightarrow>
-                expect (app_binop op v1 v2) (\<lambda>v. (s, f, RSNormal (v#ves') es')) (s, f, res_trap ves' es')
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>TESTOPS\<close>\<close>
-      | $(Testop t testop) \<Rightarrow>
-          (case ves of
-             v#ves' \<Rightarrow>
-               (s, f, RSNormal ((app_testop testop v)#ves') es')
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>RELOPS\<close>\<close>
-      | $(Relop t op) \<Rightarrow>
-          (case ves of
-             v2#v1#ves' \<Rightarrow>
-               (s, f, RSNormal ((app_relop op v1 v2)#ves') es')
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>CONVERT\<close>\<close>
-      | $(Cvtop t2 Convert t1 sx) \<Rightarrow>
-          (case ves of
-             v#ves' \<Rightarrow>
-               (if (types_agree t1 v)
-                  then
-                    expect (cvt t2 sx v) (\<lambda>v'. (s, f, RSNormal (v'#ves') es')) (s, f, res_trap ves' es')
-                  else
-                    (s, f, crash_error))
-           | _ \<Rightarrow> (s, f, crash_error))
-      | $(Cvtop t2 Reinterpret t1 sx) \<Rightarrow>
-          (case ves of
-             v#ves' \<Rightarrow>
-               (if (types_agree t1 v \<and> sx = None)
-                  then
-                    (s, f, RSNormal ((wasm_deserialise (bits v) t2)#ves') es')
-                  else
-                    (s, f, crash_error))
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>UNREACHABLE\<close>\<close>
-      | $Unreachable \<Rightarrow>
-          (s, f, res_trap ves es')
-      \<comment> \<open>\<open>NOP\<close>\<close>
-      | $Nop \<Rightarrow>
-          (s, f, RSNormal ves es')
-      \<comment> \<open>\<open>DROP\<close>\<close>
-      | $Drop \<Rightarrow>
-          (case ves of
-             v#ves' \<Rightarrow>
-               (s, f, RSNormal ves' es')
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>SELECT\<close>\<close>
-      | $Select \<Rightarrow>
-          (case ves of
-             (ConstInt32 c)#v2#v1#ves' \<Rightarrow>
-               (if int_eq c 0 then (s, f, RSNormal (v2#ves') es') else (s, f, RSNormal (v1#ves') es'))
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>BLOCK\<close>\<close>
-      | $(Block (t1s _> t2s) es) \<Rightarrow>
-          (if length ves \<ge> length t1s
-             then
-               let (ves', ves'') = split_n ves (length t1s) in
-               (s, f, RSNormal ves'' ((Label (length t2s) [] ((vs_to_es ves')@($* es)))#es'))
-             else
-               (s, f, crash_error))
-      \<comment> \<open>\<open>LOOP\<close>\<close>
-      | $(Loop (t1s _> t2s) es) \<Rightarrow>
-          (if length ves \<ge> length t1s
-             then
-               let (ves', ves'') = split_n ves (length t1s) in
-               (s, f, RSNormal ves'' ((Label (length t1s) [$(Loop (t1s _> t2s) es)] ((vs_to_es ves')@($* es)))#es'))
-             else
-               (s, f, crash_error))
-      \<comment> \<open>\<open>IF\<close>\<close>
-      | $(If tf es1 es2) \<Rightarrow>
-          (case ves of
-             (ConstInt32 c)#ves' \<Rightarrow>
-                if int_eq c 0
-                  then
-                    (s, f, RSNormal (ves') (($(Block tf es2))#es'))
-                  else
-                    (s, f, RSNormal (ves') (($(Block tf es1))#es'))
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>BR\<close>\<close>
-      | $Br j \<Rightarrow>
-          (s, f, RSBreak j ves)
-      \<comment> \<open>\<open>BR_IF\<close>\<close>
-      | $Br_if j \<Rightarrow>
-          (case ves of
-             (ConstInt32 c)#ves' \<Rightarrow>
-                if int_eq c 0
-                  then
-                    (s, f, RSNormal ves' es')
-                  else
-                    (s, f, RSNormal ves' (($Br j) # es'))
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>BR_TABLE\<close>\<close>
-      | $Br_table js j \<Rightarrow>
-          (case ves of
-             (ConstInt32 c)#ves' \<Rightarrow>
-             let k = nat_of_int c in
-                if k < length js
-                  then
-                    (s, f, RSNormal ves' (($Br (js!k)) # es'))
-                  else
-                    (s, f, RSNormal ves' (($Br j) # es'))
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>CALL\<close>\<close>
-      | $Call j \<Rightarrow>
-          (s, f, RSNormal ves (Invoke (sfunc_ind (f_inst f) j) # es'))
-      \<comment> \<open>\<open>CALL_INDIRECT\<close>\<close>
-      | $Call_indirect j \<Rightarrow>
-          (let i = (f_inst f) in
-           case ves of
-             (ConstInt32 c)#ves' \<Rightarrow>
-               (case (stab s i (nat_of_int c)) of
-                  Some i_cl \<Rightarrow>
-                    if (stypes s i j = cl_type (funcs s!i_cl))
-                      then
-                        (s, f, RSNormal ves' (Invoke i_cl # es'))
-                      else
-                        (s, f, res_trap ves' es')
-                | _ \<Rightarrow> (s, f, res_trap ves' es'))
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>RETURN\<close>\<close>
-      | $Return \<Rightarrow>
-          (s, f, RSReturn ves)
-      \<comment> \<open>\<open>GET_LOCAL\<close>\<close>
-      | $Get_local j \<Rightarrow>
-          (let vs = (f_locs f) in
-           if j < length vs
-             then (s, f, RSNormal ((vs!j)#ves) es')
-             else (s, f, crash_error))
-      \<comment> \<open>\<open>SET_LOCAL\<close>\<close>
-      | $Set_local j \<Rightarrow>
-          (let vs = (f_locs f) in
-           case ves of
-             v#ves' \<Rightarrow>
-               if j < length vs
-                 then (s, \<lparr> f_locs = vs[j := v], f_inst = (f_inst f) \<rparr>, RSNormal ves' es')
-                 else (s, f, crash_error)
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>TEE_LOCAL\<close>\<close>
-      | $Tee_local j \<Rightarrow>
-          (case ves of
-             v#ves' \<Rightarrow>
-               (s, f, RSNormal (v#ves) (($(Set_local j))#es'))
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>GET_GLOBAL\<close>\<close>
-      | $Get_global j \<Rightarrow>
-          (s, f, RSNormal ((sglob_val s (f_inst f) j)#ves) es')
-      \<comment> \<open>\<open>SET_GLOBAL\<close>\<close>
-      | $Set_global j \<Rightarrow>
-          (case ves of
-             v#ves' \<Rightarrow> ((supdate_glob s (f_inst f) j v), f, RSNormal ves' es')
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>LOAD\<close>\<close>
-      | $(Load t None a off) \<Rightarrow>
-          (let i = (f_inst f) in
-           case ves of
-             (ConstInt32 k)#ves' \<Rightarrow>
-               expect (smem_ind s i)
-                  (\<lambda>j.
-                    expect (load ((mems s)!j) (nat_of_int k) off (t_length t))
-                      (\<lambda>bs. (s, f, RSNormal ((wasm_deserialise bs t)#ves') es'))
-                      (s, f, res_trap ves' es'))
-                  (s, f, crash_error)
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>LOAD PACKED\<close>\<close>
-      | $(Load t (Some (tp, sx)) a off) \<Rightarrow>
-          (let i = (f_inst f) in
-           case ves of
-             (ConstInt32 k)#ves' \<Rightarrow>
-               expect (smem_ind s i)
-                  (\<lambda>j.
-                    expect (load_packed sx ((mems s)!j) (nat_of_int k) off (tp_length tp) (t_length t))
-                      (\<lambda>bs. (s, f, RSNormal ((wasm_deserialise bs t)#ves') es'))
-                      (s, f, res_trap ves' es'))
-                  (s, f, crash_error)
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>STORE\<close>\<close>
-      | $(Store t None a off) \<Rightarrow>
-          (let i = (f_inst f) in
-           case ves of
-             v#(ConstInt32 k)#ves' \<Rightarrow>
-               (if (types_agree t v)
-                 then
-                   expect (smem_ind s i)
-                      (\<lambda>j.
-                         expect (store ((mems s)!j) (nat_of_int k) off (bits v) (t_length t))
-                           (\<lambda>mem'. (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>, f, RSNormal ves' es'))
-                           (s, f, res_trap ves' es'))
-                      (s, f, crash_error)
-                 else
-                   (s, f, crash_error))
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>STORE_PACKED\<close>\<close>
-      | $(Store t (Some tp) a off) \<Rightarrow>
-          (let i = (f_inst f) in
-           case ves of
-                  v#(ConstInt32 k)#ves' \<Rightarrow>
-                    (if (types_agree t v)
-                      then
-                        expect (smem_ind s i)
-                           (\<lambda>j.
-                              expect (store_packed ((mems s)!j) (nat_of_int k) off (bits v) (tp_length tp))
-                                (\<lambda>mem'. (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>, f, RSNormal ves' es'))
-                                (s, f, res_trap ves' es'))
-                           (s, f, crash_error)
-                      else
-                        (s, f, crash_error))
-                | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>CURRENT_MEMORY\<close>\<close>
-      | $Current_memory \<Rightarrow>
-          expect (smem_ind s (f_inst f))
-            (\<lambda>j. (s, f, RSNormal ((ConstInt32 (int_of_nat (mem_size ((s.mems s)!j))))#ves) es'))
-            (s, f, crash_error)
-      \<comment> \<open>\<open>GROW_MEMORY\<close>\<close>
-      | $Grow_memory \<Rightarrow>
-          (case ves of
-             (ConstInt32 c)#ves' \<Rightarrow>
-                expect (smem_ind s (f_inst f))
-                  (\<lambda>j.
-                     let l = (mem_size ((s.mems s)!j)) in
-                     (expect (mem_grow ((mems s)!j) (nat_of_int c))
-                        (\<lambda>mem'. (s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>, f, RSNormal ((ConstInt32 (int_of_nat l))#ves') es'))
-                        (s, f, RSNormal ((ConstInt32 int32_minus_one)#ves') es')))
-                  (s, f, crash_error)
-           | _ \<Rightarrow> (s, f, crash_error))
-      \<comment> \<open>\<open>VAL\<close> - should not be executed\<close>
-      | $C v \<Rightarrow> (s, f, crash_error)
-    \<comment> \<open>\<open>E\<close>\<close>
-      \<comment> \<open>\<open>CALLCL\<close>\<close>
-      | Invoke i_cl \<Rightarrow>
-          (case (funcs s!i_cl) of
-             Func_native i' (t1s _> t2s) ts es \<Rightarrow>
-               let n = length t1s in
-               let m = length t2s in
-               if length ves \<ge> n
-                 then
-                   let (ves', ves'') = split_n ves n in
-                   let zs = n_zeros ts in
-                     (s, f, RSNormal ves'' ((Frame m \<lparr> f_locs = ((rev ves')@zs), f_inst = i'\<rparr> [$(Block ([] _> t2s) es)]) # es'))
-                 else
-                   (s, f, crash_error)
+fun update_redex_step :: "redex \<Rightarrow> v_stack \<Rightarrow> e list \<Rightarrow> redex" where
+  "update_redex_step (v_s, es, b_es) v_s' es_cont = (v_s', es_cont@es, b_es)"
+
+fun update_fc_step :: "frame_context \<Rightarrow> v_stack \<Rightarrow> e list \<Rightarrow> frame_context" where
+  "update_fc_step (redex, rest) v_s' es_cont = (update_redex_step redex v_s' es_cont, rest)"
+
+fun update_redex_return :: "redex \<Rightarrow> v_stack \<Rightarrow> redex" where
+  "update_redex_return (v_s, es, b_es) v_s' = (v_s'@v_s, es, b_es)"
+
+fun update_fc_return :: "frame_context \<Rightarrow> v_stack \<Rightarrow> frame_context" where
+  "update_fc_return (redex, rest) v_s' = (update_redex_return redex v_s', rest)"
+
+fun update_fcs_return :: "frame_context list \<Rightarrow> v_stack \<Rightarrow> frame_context list" where
+  "update_fcs_return [] v_s = []"
+| "update_fcs_return (fc#fcs) v_s = (update_fc_return fc v_s)#fcs"
+
+fun update_redex_trap :: "redex \<Rightarrow> redex" where
+  "update_redex_trap (v_s, es, b_es) = ([], es, b_es)"
+
+fun update_fc_trap :: "frame_context \<Rightarrow> frame_context" where
+  "update_fc_trap (redex, rest) = (update_redex_trap redex, rest)"
+
+fun update_fcs_trap :: "frame_context list \<Rightarrow> frame_context list" where
+  "update_fcs_trap [] = []"
+| "update_fcs_trap (fc#fcs) = (update_fc_trap fc)#fcs"
+
+fun run_step_b_e :: "b_e \<Rightarrow> config_tuple \<Rightarrow> res_step_tuple" where
+  "run_step_b_e b_e (d,s,fc,fcs) =
+    (let ((v_s, es, b_es), lcs, nf, f) = fc in
+    (case b_e of
+      (Unop t op) \<Rightarrow>
+        let (v_s', res) = (app_v_s_unop op v_s) in
+        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+
+    | (Binop t op) \<Rightarrow>
+        let (v_s', res) = (app_v_s_binop op v_s) in
+        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+
+    | (Testop t op) \<Rightarrow>
+        let (v_s', res) = (app_v_s_testop op v_s) in
+        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+
+    | (Relop t op) \<Rightarrow>
+        let (v_s', res) = (app_v_s_relop op v_s) in
+        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+
+    | (Cvtop t2 op t1 sx) \<Rightarrow>
+        let (v_s', res) = (app_v_s_cvtop op t1 t2 sx v_s) in
+        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+
+    | (Unreachable) \<Rightarrow>
+        ((d,s,fc,fcs), Res_trap (STR ''unreachable''))
+
+    | (Nop) \<Rightarrow>
+        ((d,s,fc,fcs), Step_normal)
+
+    | (Drop) \<Rightarrow>
+        let (v_s', res) = (app_v_s_drop v_s) in
+        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+
+    | (Select) \<Rightarrow>
+        let (v_s', res) = (app_v_s_select v_s) in
+        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+
+    | (Block (t1s _> t2s) b_ebs) \<Rightarrow>
+        if es \<noteq> [] then ((d,s,fc,fcs), crash_invariant)
+        else
+          let n = length t1s in
+          let m = length t2s in
+          if (length v_s \<ge> n) then
+            let (v_bs, v_s') = split_n v_s n in
+            let lc = (v_s', b_es, m, []) in 
+            let fc' = ((v_bs, [], b_ebs), lc#lcs, nf, f) in
+            ((d,s,fc',fcs), Step_normal)
+          else ((d,s,fc,fcs), crash_invalid)
+
+    | (Loop (t1s _> t2s) b_els) \<Rightarrow>
+        if es \<noteq> [] then ((d,s,fc,fcs), crash_invariant)
+        else
+          let n = length t1s in
+          let m = length t2s in
+          if (length v_s \<ge> n) then
+            let (v_bs, v_s') = split_n v_s n in
+            let lc = (v_s', b_es, n, [(Loop (t1s _> t2s) b_els)]) in 
+            let fc' = ((v_bs, [], b_els), lc#lcs, nf, f) in
+            ((d,s,fc',fcs), Step_normal)
+          else ((d,s,fc,fcs), crash_invalid)
+
+    | (If tf es1 es2) \<Rightarrow>
+        let (v_s', es_cont, res) = (app_v_s_if tf es1 es2 v_s) in
+        ((d,s,(update_fc_step fc v_s' es_cont),fcs), res)
+
+    | (Br k) \<Rightarrow>
+        if (length lcs > k) then
+          let (v_ls, b_els, nl, b_ecls) = (lcs!k) in
+          if (length v_s \<ge> nl) then
+            let v_s' = (take nl v_s) in
+            let fc' = ((v_s'@v_ls, [], b_ecls@b_els), (drop (Suc k) lcs), nf, f) in
+            ((d,s,fc',fcs), Step_normal)
+          else
+            ((d,s,fc,fcs), crash_invalid)
+        else
+          ((d,s,fc,fcs), crash_invalid)
+
+    | (Br_if k) \<Rightarrow>
+        let (v_s', es_cont, res) = (app_v_s_br_if k v_s) in
+        ((d,s,(update_fc_step fc v_s' es_cont),fcs), res)
+
+    | (Br_table ks k) \<Rightarrow>
+        let (v_s', es_cont, res) = (app_v_s_br_table ks k v_s) in
+        ((d,s,(update_fc_step fc v_s' es_cont),fcs), res)
+
+    | (Call k) \<Rightarrow>
+        let (es_cont, res) = (app_f_call k f) in
+        ((d,s,(update_fc_step fc v_s es_cont),fcs), res)
+
+    | (Call_indirect k) \<Rightarrow>
+        let (v_s', es_cont, res) = (app_s_f_v_s_call_indirect k (tabs s) (funcs s) f v_s) in
+        ((d,s,(update_fc_step fc v_s' es_cont),fcs), res)
+
+    | (Return) \<Rightarrow>
+        (case fcs of
+           [] \<Rightarrow> ((d,s,fc,fcs), crash_invalid)
+         | fc'#fcs' \<Rightarrow> if (length v_s \<ge> nf) then
+                         ((Suc d,s,(update_fc_return fc' (take nf v_s)),fcs'), Step_normal)
+                       else ((d,s,fc,fcs), crash_invalid))
+
+    | (Get_local k) \<Rightarrow>
+        let (v_s', res) = (app_f_v_s_get_local k f v_s) in
+        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+
+    | (Set_local k) \<Rightarrow>
+        let (f', v_s', res) = (app_f_v_s_set_local k f v_s) in
+        let fc' = ((v_s', es, b_es), lcs, nf, f') in
+        ((d,s,fc',fcs), res)
+
+    | (Tee_local k) \<Rightarrow>
+        let (v_s', es_cont, res) = (app_v_s_tee_local k v_s) in
+        ((d,s,(update_fc_step fc v_s' es_cont),fcs), res)
+
+    | (Get_global k) \<Rightarrow>
+        let (v_s', res) = (app_s_f_v_s_get_global k (globs s) f v_s) in
+        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+
+    | (Set_global k) \<Rightarrow>
+        let (gs', v_s', res) = (app_s_f_v_s_set_global k (globs s) f v_s) in
+        ((d,s\<lparr>globs:=gs'\<rparr>,(update_fc_step fc v_s' []),fcs), res)
+
+    | (Load t tp_sx a off) \<Rightarrow>
+        let (v_s', res) = (app_s_f_v_s_load_maybe_packed t tp_sx off (mems s) f v_s) in
+        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+
+    | (Store t tp a off) \<Rightarrow>
+        let (ms', v_s', res) = (app_s_f_v_s_store_maybe_packed t tp off (mems s) f v_s) in
+        ((d,s\<lparr>mems:=ms'\<rparr>,(update_fc_step fc v_s' []),fcs), res)
+
+    | (Current_memory) \<Rightarrow>
+        let (v_s', res) = (app_s_f_v_s_mem_size (mems s) f v_s) in
+        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+
+    | (Grow_memory) \<Rightarrow>
+        let (ms', v_s', res) = (app_s_f_v_s_mem_grow (mems s) f v_s) in
+        ((d,s\<lparr>mems:=ms'\<rparr>,(update_fc_step fc v_s' []),fcs), res)
+
+    | _ \<Rightarrow> ((d,s,fc,fcs), crash_invariant)))"
+
+fun run_step_e :: "e \<Rightarrow> config_tuple \<Rightarrow> res_step_tuple" where
+  "run_step_e e (d,s,fc,fcs) =
+    (let ((v_s, es, b_es), lcs, nf, f) = fc in
+    (case e of
+       Basic b_e \<Rightarrow> run_step_b_e b_e (d,s,fc,fcs)
+     | Invoke i_cl \<Rightarrow>
+         (case (funcs s!i_cl) of
+             Func_native i' (t1s _> t2s) ts es_f \<Rightarrow>
+               (case d of
+                 Suc d' \<Rightarrow>
+                   (let n = length t1s in
+                    let m = length t2s in
+                    if (length v_s \<ge> n) then
+                      let (v_fs, v_s') = split_n v_s n in
+                      let fc' = ((v_s', es, b_es), lcs, nf, f) in
+                      let zs = n_zeros ts in
+                      let ff = \<lparr> f_locs = ((rev v_fs)@zs), f_inst = i'\<rparr> in
+                      let fcf = (([], [], [Block ([] _> t2s) es_f]), [], m, ff) in
+                      ((d',s,fcf,fc'#fcs), Step_normal)
+                    else
+                      ((d,s,fc,fcs), crash_invalid))
+               | 0 \<Rightarrow> ((d,s,fc,fcs), crash_exhaustion))
            | Func_host (t1s _> t2s) h \<Rightarrow>
                let n = length t1s in
                let m = length t2s in
-               if length ves \<ge> n
+               if length v_s \<ge> n
                  then
-                   let (ves', ves'') = split_n ves n in
-                   case host_apply_impl s (t1s _> t2s) h (rev ves') of
-                     Some (s',rves) \<Rightarrow> 
-                       if list_all2 types_agree t2s rves
+                   let (v_fs, v_s') = split_n v_s n in
+                   case host_apply_impl s (t1s _> t2s) h (rev v_fs) of
+                     Some (s',rvs) \<Rightarrow> 
+                       if list_all2 types_agree t2s rvs
                          then
-                           (s', f, RSNormal ((rev rves)@ves'') es')
+                           let fc' = (((rev rvs)@v_s', es, b_es), lcs, nf, f) in
+                           ((d,s',fc',fcs), Step_normal)
                          else
-                           (s', f, crash_error)
-                   | None \<Rightarrow> (s, f, res_trap ves'' es')
+                           ((d,s',fc,fcs), crash_invalid)
+                   | None \<Rightarrow> ((d,s,((v_s', es, b_es), lcs, nf, f),fcs), Res_trap (STR ''host_apply''))
                  else
-                   (s, f, crash_error))
-      \<comment> \<open>\<open>LABEL\<close>\<close>
-      | Label ln les es \<Rightarrow>
-          if es_is_trap es
-            then
-              (s, f, res_trap ves es')
-             else
-               (case (split_vals_e es) of
-                  (lsves, []) \<Rightarrow> (s, f, RSNormal ((rev lsves)@ves) es')
-                | (lsves, lses) \<Rightarrow> 
-                    let (s', f', res) = run_step d (s, f, (rev lsves, lses)) in
-                    (case res of
-                       RSBreak 0 bvs \<Rightarrow>
-                         if (length bvs \<ge> ln)
-                           then (s', f', RSNormal ((take ln bvs)@ves) (les@es'))
-                           else (s', f', crash_error)
-                     | RSBreak (Suc n) bvs \<Rightarrow>
-                         (s', f', RSBreak n bvs)
-                     | RSReturn rvs \<Rightarrow>
-                         (s', f', RSReturn rvs)
-                     | RSNormal lsves' lses' \<Rightarrow>
-                         (s', f', RSNormal ves ((Label ln les ((vs_to_es lsves')@lses'))#es'))
-                     | RSCrash c \<Rightarrow> (s', f', RSCrash c)))
-     \<comment> \<open>\<open>LOCAL\<close>\<close>
-     | Frame ln fls es \<Rightarrow>
-          if es_is_trap es
-            then
-              (s, f, res_trap ves es')
-             else
-               (case (split_vals_e es) of
-                  (fsves, []) \<Rightarrow> (s, f, RSNormal ((rev fsves)@ves) es')
-                | (fsves, fses) \<Rightarrow> 
-                    case d of
-                      0 \<Rightarrow> (s, f, RSCrash CExhaustion)
-                    | Suc d' \<Rightarrow>
-                        let (s', fls', res) = run_step d' (s, fls, (rev fsves, fses)) in
-                        (case res of
-                           RSReturn rvs \<Rightarrow>
-                             if (length rvs \<ge> ln)
-                               then (s', f, RSNormal ((take ln rvs)@ves) (es'))
-                               else (s', f, crash_error)
-                         | RSNormal fsves' fses' \<Rightarrow>
-                             (s', f, RSNormal ves ((Frame ln fls' ((vs_to_es fsves')@fses')) # es'))
-                         | RSBreak _ _ \<Rightarrow> (s', f, crash_error)
-                         | RSCrash c \<Rightarrow> (s', f, RSCrash c)))
-     \<comment> \<open>\<open>TRAP\<close> - should not be executed\<close>
-     | Trap \<Rightarrow> (s, f, crash_error))"
+                    ((d,s,fc,fcs), crash_invalid))
+     | _ \<Rightarrow> ((d,s,fc,fcs), crash_invariant)))"
+(* should never produce Label, Frame, or Trap *)
+
+function(sequential) run_iter :: "fuel \<Rightarrow> config_tuple \<Rightarrow> res_tuple" where
+(* stack values in the outermost Frame *)
+  "run_iter (Suc n) (d,s,((v_s, [], []), [], nf, f),[]) =
+     ((d,s,((v_s, [], []), [], nf, f),[]), RValue v_s)"
+
+(* stack values returned from an inner Frame *)
+| "run_iter (Suc n) (d,s,((v_s, [], []), [], nf, f),fc#fcs) =
+     run_iter n (Suc d,s,(update_fc_return fc v_s),fcs)"
+
+(* stack values returned from an inner Label *)
+| "run_iter (Suc n) (d,s,((v_s, [], []), (v_ls, b_els, nl, b_elcs)#lcs, nf, f),fcs) =
+    (let f_new = ((v_s@v_ls, [], b_els), lcs, nf, f) in
+     run_iter n (d,s,f_new,fcs))"
+
+(* run a step of the intermediate reduct *)
+| "run_iter (Suc n) (d,s,((v_s, e#es, b_es), lcs, nf, f),fcs) =
+    (let (cfg', res) = run_step_e e (d,s,((v_s, es, b_es), lcs, nf, f),fcs) in
+                      (case res of
+                         Step_normal \<Rightarrow> run_iter n cfg'
+                       | Res_trap str \<Rightarrow> (cfg', RTrap str)
+                       | Res_crash str \<Rightarrow> (cfg', RCrash str)))"
+
+(* run a step of regular code *)
+| "run_iter (Suc n) (d,s,((v_s, [], b_es), lcs, nf, f),fcs) =
+     (case split_v_s_b_s b_es of
+       (v_s',[]) \<Rightarrow> run_iter n (d,s,((v_s'@v_s, [], []), lcs, nf, f),fcs)
+     | (v_s',b_e#b_es') \<Rightarrow> 
+         (let (cfg', res) = run_step_b_e b_e (d,s,((v_s'@v_s, [], b_es'), lcs, nf, f),fcs) in
+                               (case res of
+                                  Step_normal \<Rightarrow> run_iter n cfg'
+                                | Res_trap str \<Rightarrow> (cfg', RTrap str)
+                                | Res_crash str \<Rightarrow> (cfg', RCrash str))))"
+
+(* out of fuel *)
+| "run_iter 0 cfg = (cfg, res_crash_fuel)"
+
   by pat_completeness auto
 termination
-proof -
-  {
-    fix xs::"e list" and as b bs
-    assume local_assms:"(as,b#bs) = split_vals_e xs"
-    have "(size b + size_list size bs) \<le> (size_list size xs)"
-      using split_vals_e_conv_app
-            local_assms[symmetric]
-            size_list_append[of size _ bs]
-      by fastforce
-  }
-  thus ?thesis
-    apply (relation "measure (\<lambda>p. size_list size (snd (snd (snd (snd p)))))")
-    apply fastforce+
-    done
-qed
+  by (relation "measure (\<lambda>p. fst p)") auto
 
-fun run_vs_es :: "fuel \<Rightarrow> depth \<Rightarrow> config_tuple \<Rightarrow> (s \<times> res)" where
-  "run_vs_es (Suc n) d (s,f,(ves,es)) = (if (es_is_trap es)
-                                    then (s, RTrap)
-                                    else if (es = [])
-                                           then (s, RValue (rev ves))
-                                           else (let (s',f',res) = (run_step d (s,f,(ves,es))) in
-                                                 case res of
-                                                   RSNormal ves' es' \<Rightarrow> run_vs_es n d (s',f',(ves',es'))
-                                                 | RSCrash error \<Rightarrow> (s, RCrash error)
-                                                 | _ \<Rightarrow> (s, RCrash CError)))"
-| "run_vs_es 0 d (s,f,(ves,es)) = (s, RCrash CExhaustion)"
-
-fun run_v :: "fuel \<Rightarrow> depth \<Rightarrow> (s \<times> f \<times> e list) \<Rightarrow> (s \<times> res)" where
-  "run_v n d (s,f,es) = (let (ves, es') = split_vals_e es in run_vs_es n d (s,f,(rev ves, es')))"
+fun run_v :: "fuel \<Rightarrow> depth \<Rightarrow> s \<Rightarrow> f \<Rightarrow> b_e list \<Rightarrow> (s \<times> res)" where
+  "run_v n d s f b_es =
+     (let ((d,s,fc,fcs),res) = run_iter n (d, s, (([],[],b_es),[],0,f), []) in
+      (s,res))"
 
 end

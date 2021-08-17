@@ -481,8 +481,8 @@ definition cl_type :: "cl \<Rightarrow> tf" where
 definition rglob_is_mut :: "global \<Rightarrow> bool" where
   "rglob_is_mut g = (g_mut g = T_mut)"
 
-definition stypes :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> tf" where
-  "stypes s i j = ((types i)!j)"
+definition stypes :: "inst \<Rightarrow> nat \<Rightarrow> tf" where
+  "stypes i j = ((types i)!j)"
 
 definition sfunc_ind :: "inst \<Rightarrow> nat \<Rightarrow> nat" where
   "sfunc_ind i j = ((inst.funcs i)!j)"
@@ -490,31 +490,34 @@ definition sfunc_ind :: "inst \<Rightarrow> nat \<Rightarrow> nat" where
 definition sfunc :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> cl" where
   "sfunc s i j = (funcs s)!(sfunc_ind i j)"
 
-definition sglob_ind :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> nat" where
-  "sglob_ind s i j = ((inst.globs i)!j)"
+definition sglob_ind :: "inst \<Rightarrow> nat \<Rightarrow> nat" where
+  "sglob_ind i j = ((inst.globs i)!j)"
 
 definition sglob :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> global" where
-  "sglob s i j = (globs s)!(sglob_ind s i j)"
+  "sglob s i j = (globs s)!(sglob_ind i j)"
 
 definition sglob_val :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v" where
   "sglob_val s i j = g_val (sglob s i j)"
 
-definition smem_ind :: "s \<Rightarrow> inst \<Rightarrow> nat option" where
-  "smem_ind s i = (case (inst.mems i) of (n#_) \<Rightarrow> Some n | [] \<Rightarrow> None)"
+definition smem_ind :: "inst \<Rightarrow> nat option" where
+  "smem_ind i = (case (inst.mems i) of (n#_) \<Rightarrow> Some n | [] \<Rightarrow> None)"
+
+definition tab_cl_ind :: "tabinst list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> i option" where
+  "tab_cl_ind st i j = (let stabinst = fst (st!i) in
+                       (if ((length stabinst) > j) then (stabinst!j)
+                        else None))"
 
 definition stab_cl_ind :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> i option" where
-  "stab_cl_ind s i j = (let stabinst = fst ((tabs s)!i) in
-                   (if ((length stabinst) > j) then (stabinst!j)
-                    else None))"
+  "stab_cl_ind s i j = tab_cl_ind (tabs s) i j"
 
 definition stab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> i option" where
   "stab s i j = (case (inst.tabs i) of (k#_) => stab_cl_ind s k j | [] => None)"
 
-definition supdate_glob_s :: "s \<Rightarrow> nat \<Rightarrow> v \<Rightarrow> s" where
-  "supdate_glob_s s k v = s\<lparr>globs := (globs s)[k:=((globs s)!k)\<lparr>g_val := v\<rparr>]\<rparr>"
+definition update_glob :: "global list \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v \<Rightarrow> global list" where
+  "update_glob gs i j v =  (let k = sglob_ind i j in gs[k:=(gs!k)\<lparr>g_val := v\<rparr>])"
 
 definition supdate_glob :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v \<Rightarrow> s" where
-  "supdate_glob s i j v = (let k = sglob_ind s i j in supdate_glob_s s k v)"
+  "supdate_glob s i j v = s\<lparr>globs := (update_glob (globs s) i j v)\<rparr>"
 
 definition is_const :: "e \<Rightarrow> bool" where
   "is_const e = (case e of Basic (C _) \<Rightarrow> True | _ \<Rightarrow> False)"
@@ -664,7 +667,7 @@ lemma stab_unfold:
                      length (fst ((tabs s)!k)) > j \<and>
                      (fst ((tabs s)!k))!j = Some i_cl"
   using assms
-  unfolding stab_def stab_cl_ind_def
+  unfolding stab_def stab_cl_ind_def tab_cl_ind_def
   by (simp add: Let_def split: list.splits if_splits option.splits)
 
 lemma inj_basic: "inj Basic"

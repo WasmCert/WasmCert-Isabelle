@@ -601,7 +601,7 @@ qed
 lemma types_preserved_call_indirect_Some:
   assumes "s\<bullet>\<C> \<turnstile> [$C ConstInt32 c, $Call_indirect j] : (ts _> ts')"
           "stab s i' (nat_of_int c) = Some i_cl"
-          "stypes s i' j = tf"
+          "stypes i' j = tf"
           "cl_type (funcs s!i_cl) = tf"
           "store_typing s"
           "inst_typing s i' \<C>i"
@@ -1714,7 +1714,21 @@ lemma progress_L0:
   shows "\<lparr>s;f;($C*vs)@es@es_c\<rparr> \<leadsto> \<lparr>s';f';($C*vs)@es'@es_c\<rparr>"
 proof -
   have "\<And>es. Lfilled 0 (LBase vs es_c) es (($C*vs)@es@es_c)"
-    using Lfilled.intros(1)[of "(LBase vs es_c)" vs es_c] assms
+    using Lfilled.intros(1)[of "(LBase vs es_c)" vs es_c]
+    unfolding const_list_def
+    by fastforce
+  thus ?thesis
+    using reduce.intros(23) assms(1)
+    by blast
+qed
+
+lemma progress_L1:
+  assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
+  shows "\<lparr>s;f;($C*vs)@[Label n esl es]@es_c\<rparr> \<leadsto> \<lparr>s';f';($C*vs)@[Label n esl es']@es_c\<rparr>"
+proof -
+  have "\<And>es. Lfilled 1 (LRec vs n esl (LBase [] []) es_c) es (($C*vs)@[Label n esl es]@es_c)"
+    using Lfilled.intros(2)[of "((LRec vs n esl (LBase [] []) es_c))"]
+          Lfilled.intros(1)[of "(LBase [] [])"]
     unfolding const_list_def
     by fastforce
   thus ?thesis
@@ -2279,8 +2293,8 @@ next
     using cs_def(2) const_of_i32
     by fastforce
   consider 
-    (1) "\<exists>i_cl tf. stab s (f_inst f) (nat_of_int c) = Some i_cl \<and> stypes s (f_inst f) j = tf \<and> cl_type (funcs s!i_cl) = tf"
-  | (2) "\<exists>i_cl. stab s (f_inst f) (nat_of_int c) = Some i_cl \<and> stypes s (f_inst f) j \<noteq> cl_type (funcs s!i_cl)"
+    (1) "\<exists>i_cl tf. stab s (f_inst f) (nat_of_int c) = Some i_cl \<and> stypes (f_inst f) j = tf \<and> cl_type (funcs s!i_cl) = tf"
+  | (2) "\<exists>i_cl. stab s (f_inst f) (nat_of_int c) = Some i_cl \<and> stypes (f_inst f) j \<noteq> cl_type (funcs s!i_cl)"
   | (3) "stab s (f_inst f) (nat_of_int c) = None"
     by (metis option.collapse)
   hence "\<exists>a s' f' es'. \<lparr>s;f;[$C ConstInt32 c, $Call_indirect j]\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
@@ -2368,7 +2382,7 @@ next
     using const_of_i32 load(3,6) e_type_const_unwrap
     unfolding const_list_def
     by fastforce
-  obtain j where mem_some:"smem_ind s (f_inst f) = Some j"
+  obtain j where mem_some:"smem_ind (f_inst f) = Some j"
     using load(1,8)
     unfolding smem_ind_def
     by (fastforce split: list.splits)
@@ -2420,7 +2434,7 @@ next
   have t_def:"typeof v = t"
     using cs_def(2) b_e_type_value[OF unlift_b_e[of s \<C> "[C v]" "([] _> [t])"]]
     by fastforce
-  obtain j where mem_some:"smem_ind s (f_inst f) = Some j"
+  obtain j where mem_some:"smem_ind (f_inst f) = Some j"
     using store(1,8)
     unfolding smem_ind_def
     by (fastforce split: list.splits)
@@ -2468,7 +2482,7 @@ next
     by fastforce
 next
   case (current_memory \<C>)
-  obtain j where mem_some:"smem_ind s (f_inst f) = Some j"
+  obtain j where mem_some:"smem_ind (f_inst f) = Some j"
     using current_memory(1,7)
     unfolding smem_ind_def
     by (fastforce split: list.splits)
@@ -2480,7 +2494,7 @@ next
   obtain c where c_def:"vs = [ConstInt32 c]"
     using const_of_i32 grow_memory(2,5)
     by fastforce
-  obtain j where mem_some:"smem_ind s (f_inst f) = Some j"
+  obtain j where mem_some:"smem_ind (f_inst f) = Some j"
     using grow_memory(1,7)
     unfolding smem_ind_def
     by (fastforce split: list.splits)
@@ -3058,6 +3072,143 @@ lemma progress_e3:
   using assms progress_e progress_e1 progress_e2
   by fastforce
 
+lemma reduce_simple_not_value:
+  assumes "\<lparr>es\<rparr> \<leadsto> \<lparr>es'\<rparr>"
+  shows "es \<noteq> $C* vs"
+  using assms
+proof (induction rule: reduce_simple.induct)
+  case (block vs n t1s t2s m es)
+  thus ?case
+    by (metis b_e.distinct(239) const_list_cons_last(2) consts_const_list e.inject(1) e_type_const_unwrap)
+next
+  case (loop vs n t1s t2s m es)
+  thus ?case
+    by (metis b_e.distinct(283) const_list_cons_last(2) consts_const_list e.inject(1) e_type_const_unwrap)
+next
+  case (trap lholed es)
+  thus ?case
+    using Lfilled.simps[of 0] consts_app_ex(2)
+    by simp fastforce
+qed auto
+
+lemma reduce_not_value:
+  assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
+  shows "es \<noteq> $C* ves"
+  using assms
+proof (induction es' arbitrary: ves rule: reduce.induct)
+  case (basic e e' s vs i)
+  thus ?case
+    using reduce_simple_not_value
+    by fastforce
+next
+  case (invoke_native s i_cl j t1s t2s ts es ves vcs n k m zs f)
+  have "\<not>(is_const (Invoke i_cl))"
+    unfolding is_const_def
+    by simp
+  thus ?case
+    using not_const_vs_to_es_list
+    by (metis append.right_neutral)
+next
+  case (invoke_host_Some s i_cl t1s t2s h ves vcs n m hs s' vcs' f)
+  have "\<not>(is_const (Invoke i_cl))"
+    unfolding is_const_def
+    by simp
+  thus ?case
+    using not_const_vs_to_es_list
+    by (metis append.right_neutral)
+next
+  case (invoke_host_None s i_cl t1s t2s f ves vcs n m vs i)
+  have "\<not>(is_const (Invoke i_cl))"
+    unfolding is_const_def
+    by simp
+  thus ?case
+    using not_const_vs_to_es_list
+    by (metis append.right_neutral)
+next
+  case (label s vs es i s' vs' es' k lholed les les')
+  show ?case
+    using label(2,4)
+  proof (induction rule: Lfilled.induct)
+    case (L0 lholed lvs les' les)
+    {
+      assume "($C*lvs) @ les @ les' = $C* ves"
+      hence "(\<forall>y\<in>set (($C*lvs) @ les @ les'). \<exists>x. y = $C x)"
+        by simp
+      hence "(\<forall>y\<in>set les. \<exists>x. y = $C x)"
+        by simp
+      hence "\<exists>vs1. les = $C* vs1"
+        unfolding ex_map_conv.
+    }
+    thus ?case
+      using L0(2)
+      by (metis consts_app_ex(1) consts_app_ex(2))
+  next
+    case (LN lvs lholed ln les' l les'' k les lfilledk)
+    have "\<not>(is_const (Label ln les' lfilledk))"
+      unfolding is_const_def
+      by simp
+    thus ?case
+      using not_const_vs_to_es_list
+      by fastforce
+  qed
+qed auto
+
+lemma reduce_simple_not_nil:
+  assumes "\<lparr>es\<rparr> \<leadsto> \<lparr>es'\<rparr>"
+  shows "es \<noteq> []"
+  using assms
+proof (induction rule: reduce_simple.induct)
+  case (trap es lholed)
+  thus ?case
+    using Lfilled.simps[of 0 lholed "[Trap]"]
+    by auto
+qed auto
+
+lemma reduce_not_nil:
+  assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
+  shows "es \<noteq> []"
+  using assms
+proof (induction rule: reduce.induct)
+  case (basic e e' s vs)
+  thus ?case
+    using reduce_simple_not_nil
+    by simp
+next
+  case (label s vs es s' vs' es' k lholed les les')
+  thus ?case
+    by (metis empty_no_progress reduce.label)
+qed auto
+
+lemma reduce_simple_not_trap:
+  assumes "\<lparr>es\<rparr> \<leadsto> \<lparr>es'\<rparr>"
+  shows "es \<noteq> [Trap]"
+  using assms
+  by (induction rule: reduce_simple.induct) auto
+
+lemma reduce_not_trap:
+  assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
+  shows "es \<noteq> [Trap]"
+  using assms
+proof (induction rule: reduce.induct)
+  case (basic e e' s vs)
+  thus ?case
+    using reduce_simple_not_trap
+    by simp
+next
+  case (label s vs es s' vs' es' k lholed les les')
+  {
+    assume "les = [Trap]"
+    hence "Lfilled k lholed es [Trap]"
+      using label(2)
+      by simp
+    hence False
+      using lfilled_single reduce_not_nil[OF label(1)] label(4)
+      by fastforce
+  }
+  thus ?case
+    by auto
+qed auto
+
 lemma reduce_trans_app:
   assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s'';f'';es''\<rparr>"
           "reduce_trans (s'',f'',es'') (s',f',es')"
@@ -3260,5 +3411,98 @@ lemma reduce_trans_compose:
   using assms
   unfolding reduce_trans_def
   by auto
+
+lemma reduce_trans_to_trap_not_nil:
+  assumes "reduce_trans (s,f,es) (s',f',[Trap])"
+  shows "es \<noteq> []"
+  using assms
+  unfolding reduce_trans_def
+proof (induction "(s, f, es)" arbitrary: s' f' rule: converse_rtranclp_induct)
+  case base
+  thus ?case
+    by blast
+next
+  case (step z)
+  thus ?case
+    by (simp add: reduce_not_nil split: prod.splits)
+qed
+
+lemma reduce_trans_to_trap_L0:
+  assumes "reduce_trans (s,f,es) (s',f',[Trap])"
+  shows "reduce_trans (s,f,($C*ves)@es@esc) (s',f',[Trap])"
+proof (cases "ves = [] \<and> esc = []")
+  case True
+  thus ?thesis
+    using assms
+    by simp
+next
+  case False
+  have 1:"reduce_trans (s,f,($C*ves)@es@esc) (s',f',($C*ves)@[Trap]@esc)"
+    using reduce_trans_L0[OF assms]
+    by blast
+  have 2:"($C*ves)@[Trap]@esc \<noteq> [Trap]"
+    by (metis False Lfilled.L0 Lholed.inject(1) e.distinct(11) lfilled_single not_Cons_self2)
+  show ?thesis
+    using reduce.basic[OF reduce_simple.trap[OF 2, of "LBase ves esc"], of s' f'] Lfilled.simps[of 0]
+          reduce_trans_app_end[OF _ 1]
+    by simp
+qed
+
+lemma reduce_trans_to_trap_label:
+  assumes "reduce_trans (s,f,es) (s',f',[Trap])"
+  shows "reduce_trans (s,f,[Label n esc es]) (s',f',[Trap])"
+proof -
+  have "reduce_trans (s,f,[Label n esc es]) (s',f',[Label n esc [Trap]])"
+    using assms reduce_trans_label
+    by blast
+  thus ?thesis
+    using reduce.basic[OF reduce_simple.label_trap] reduce_trans_app_end
+    by blast
+qed
+
+lemma reduce_trans_to_trap_local:
+  assumes "reduce_trans (s,f,es) (s',f',[Trap])"
+  shows "reduce_trans (s,ff,[Frame n f es]) (s',ff,[Trap])"
+proof -
+  have "reduce_trans (s,ff,[Frame n f es]) (s',ff,[Frame n f' [Trap]])"
+    using reduce_trans_local[OF assms]
+    by blast
+  thus ?thesis
+    using reduce.basic[OF reduce_simple.local_trap] reduce_trans_app_end
+    by blast
+qed
+
+lemma reduce_trans_trap_LN:
+  assumes "Lfilled n lfilled [Trap] esl"
+  shows "reduce_trans (s,f,esl) (s,f,[Trap])"
+  using assms
+proof (induction "[Trap]" esl rule: Lfilled.induct)
+  case (L0 lholed vs es')
+  thus ?case
+    using reduce_trans_to_trap_L0[of s f "[Trap]" s f vs es']
+    unfolding reduce_trans_def
+    by simp
+next
+  case (LN lholed vs n es' l es'' k lfilledk)
+  thus ?case
+    using reduce_trans_to_trap_L0 reduce_trans_to_trap_label
+    by blast
+qed
+
+lemma reduce_trans_to_trap_LN:
+  assumes "reduce_trans (s,f,es) (s',f',[Trap])"
+          "Lfilled n lfilled es esl"
+  shows "reduce_trans (s,f,esl) (s',f',[Trap])"
+proof -
+  obtain esl' where esl'_is:"Lfilled n lfilled [Trap] esl'"
+    using assms(2) progress_LN2
+    by blast
+  have "reduce_trans (s,f,esl) (s',f',esl')"
+    using reduce_trans_lfilled[OF assms] esl'_is
+    by blast
+  thus ?thesis
+    using reduce_trans_trap_LN esl'_is reduce_trans_compose
+    by blast
+qed
 
 end
