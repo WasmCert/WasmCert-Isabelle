@@ -527,51 +527,38 @@ fun es_frame_context_to_e :: "e list \<Rightarrow> frame_context \<Rightarrow> e
    (let esl = es_redex_to_es es rdx in
     Frame n f (es_label_contexts_to_es esl lcs))"
 
-fun es_s_frame_context_to_config :: "e list \<Rightarrow> s \<Rightarrow> frame_context \<Rightarrow> (s \<times> f \<times> e list)" where
-  "es_s_frame_context_to_config es s (Frame_context rdx lcs n f) =
+fun es_frame_context_to_config :: "e list \<Rightarrow> frame_context \<Rightarrow> (f \<times> e list)" where
+  "es_frame_context_to_config es (Frame_context rdx lcs n f) =
    (let esl = es_redex_to_es es rdx in
-    (s, f, (es_label_contexts_to_es esl lcs)))"
+    (f, (es_label_contexts_to_es esl lcs)))"
 
-fun es_s_frame_contexts_to_config :: "e list \<Rightarrow> s \<Rightarrow> frame_context \<Rightarrow> frame_context list \<Rightarrow> (s \<times> f \<times> e list)" where
-  "es_s_frame_contexts_to_config es s fc [] = (es_s_frame_context_to_config es s fc)"
-| "es_s_frame_contexts_to_config es s fc (fc'#fcs) =
-     (let e' = es_frame_context_to_e es fc in es_s_frame_contexts_to_config [e'] s fc' fcs)"
+fun es_frame_contexts_to_config :: "e list \<Rightarrow> frame_context \<Rightarrow> frame_context list \<Rightarrow> (f \<times> e list)" where
+  "es_frame_contexts_to_config es fc [] = (es_frame_context_to_config es fc)"
+| "es_frame_contexts_to_config es fc (fc'#fcs) =
+     (let e' = es_frame_context_to_e es fc in es_frame_contexts_to_config [e'] fc' fcs)"
 
-lemma es_s_frame_contexts_to_config_s: "\<exists>f' es'. es_s_frame_contexts_to_config es s fc fcs = (s, f', es')"
-proof (induction arbitrary: s rule: es_s_frame_contexts_to_config.induct)
-case (1 es s fc)
-  thus ?case
-    apply (cases fc)
-    apply auto
-    done
-next
-  case (2 es s fc fc' fcs)
-  thus ?case
-    by fastforce
-qed
-
-lemma es_s_frame_contexts_to_config_e_one:
-  "es_s_frame_contexts_to_config [e] s (Frame_context (Redex v_s es b_es) lcs nf f) fcs = 
-     es_s_frame_contexts_to_config [] s (Frame_context (Redex v_s (e#es) b_es) lcs nf f) fcs"
+lemma es_frame_contexts_to_config_e_one:
+  "es_frame_contexts_to_config [e] (Frame_context (Redex v_s es b_es) lcs nf f) fcs = 
+     es_frame_contexts_to_config [] (Frame_context (Redex v_s (e#es) b_es) lcs nf f) fcs"
   by (cases fcs) auto
 
-lemma es_s_frame_contexts_to_config_b_e_one:
-  "es_s_frame_contexts_to_config [$b_e] s (Frame_context (Redex v_s [] b_es) lcs nf f) fcs = 
-     es_s_frame_contexts_to_config [] s (Frame_context (Redex v_s [] (b_e#b_es)) lcs nf f) fcs"
+lemma es_frame_contexts_to_config_b_e_one:
+  "es_frame_contexts_to_config [$b_e] (Frame_context (Redex v_s [] b_es) lcs nf f) fcs = 
+     es_frame_contexts_to_config [] (Frame_context (Redex v_s [] (b_e#b_es)) lcs nf f) fcs"
   by (cases fcs) auto
 
-lemma es_s_frame_contexts_to_config_b_e_split_v_s_b_s:
-  "es_s_frame_contexts_to_config [] s (Frame_context (Redex (v_s'@v_s) [] b_es) lcs nf f) fcs =
-     es_s_frame_contexts_to_config [] s (Frame_context (Redex v_s [] ((v_stack_to_b_es v_s')@b_es)) lcs nf f) fcs"
+lemma es_frame_contexts_to_config_b_e_split_v_s_b_s:
+  "es_frame_contexts_to_config [] (Frame_context (Redex (v_s'@v_s) [] b_es) lcs nf f) fcs =
+     es_frame_contexts_to_config [] (Frame_context (Redex v_s [] ((v_stack_to_b_es v_s')@b_es)) lcs nf f) fcs"
   apply (cases fcs)
   apply simp_all
   apply (metis comp_apply)+
   done
 
-lemma es_s_frame_contexts_to_config_b_e_step:
-  "es_s_frame_contexts_to_config [$b_e] s (Frame_context (Redex (v_s'@v_s) [] b_es) lcs nf f) fcs =
-     es_s_frame_contexts_to_config [] s (Frame_context (Redex v_s [] ((v_stack_to_b_es v_s')@b_e#b_es)) lcs nf f) fcs"
-  using es_s_frame_contexts_to_config_b_e_one es_s_frame_contexts_to_config_b_e_split_v_s_b_s
+lemma es_frame_contexts_to_config_b_e_step:
+  "es_frame_contexts_to_config [$b_e] (Frame_context (Redex (v_s'@v_s) [] b_es) lcs nf f) fcs =
+     es_frame_contexts_to_config [] (Frame_context (Redex v_s [] ((v_stack_to_b_es v_s')@b_e#b_es)) lcs nf f) fcs"
+  using es_frame_contexts_to_config_b_e_one es_frame_contexts_to_config_b_e_split_v_s_b_s
   by simp
 
 lemma es_redex_to_es_LN:
@@ -694,24 +681,24 @@ next
     by (simp add: es_label_contexts_to_es_LN tranclp.trancl_into_trancl split: prod.splits)
 qed
 
-lemma es_s_frame_contexts_to_config_snoc:
-  assumes "es_s_frame_contexts_to_config es s fc_inner fcs = (s,f,esfc)"
-  shows "es_s_frame_contexts_to_config es s fc_inner (fcs@[fc]) = (es_s_frame_context_to_config ([Frame (frame_arity_outer fc_inner fcs) f esfc]) s fc)"
+lemma es_frame_contexts_to_config_snoc:
+  assumes "es_frame_contexts_to_config es fc_inner fcs = (f,esfc)"
+  shows "es_frame_contexts_to_config es fc_inner (fcs@[fc]) = (es_frame_context_to_config ([Frame (frame_arity_outer fc_inner fcs) f esfc]) fc)"
   using assms
-proof (induction es s fc_inner fcs rule: es_s_frame_contexts_to_config.induct)
-  case (1 es s fc')
+proof (induction es fc_inner fcs rule: es_frame_contexts_to_config.induct)
+  case (1 es fc')
   then show ?case
     by (cases fc') (auto simp add: frame_arity_outer_def)
 next
-  case (2 es s fc fc' fcs)
+  case (2 es fc fc' fcs)
   then show ?case
     by (cases fc') (auto simp add: frame_arity_outer_def)
 qed
 
-lemma es_s_frame_context_to_config_ctx:
+lemma es_frame_context_to_config_ctx:
   assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
-          "es_s_frame_context_to_config ([Frame n f es]) s fc = (s, f_fc, es_fc)"
-  shows "\<exists>es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc;es_fc'\<rparr> \<and> es_s_frame_context_to_config ([Frame n f' es']) s' fc = (s', f_fc, es_fc')"
+          "es_frame_context_to_config ([Frame n f es]) fc = (f_fc, es_fc)"
+  shows "\<exists>es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc;es_fc'\<rparr> \<and> es_frame_context_to_config ([Frame n f' es']) fc = (f_fc, es_fc')"
 proof -
   obtain v_sr esr b_esr lcs nf f_c rdx where fc_is:"fc = Frame_context rdx lcs nf f_c"
                                                    "rdx = Redex v_sr esr b_esr"
@@ -725,16 +712,16 @@ proof -
     by simp
 qed
 
-lemma es_s_frame_context_to_config_ctx_irrtrans:
+lemma es_frame_context_to_config_ctx_irrtrans:
   assumes "reduce_irrtrans (s, f, es) (s', f', es')"
-          "es_s_frame_context_to_config ([Frame n f es]) s fc = (s, f_fc, es_fc)"
-  shows "\<exists>es_fc'. reduce_irrtrans (s,f_fc,es_fc) (s',f_fc,es_fc') \<and> es_s_frame_context_to_config ([Frame n f' es']) s' fc = (s', f_fc, es_fc')"
+          "es_frame_context_to_config ([Frame n f es]) fc = (f_fc, es_fc)"
+  shows "\<exists>es_fc'. reduce_irrtrans (s,f_fc,es_fc) (s',f_fc,es_fc') \<and> es_frame_context_to_config ([Frame n f' es']) fc = (f_fc, es_fc')"
   using assms
   unfolding reduce_irrtrans_def
 proof (induction "(s, f, es)" "(s', f', es')" arbitrary: s' f' es' rule: tranclp.induct)
   case r_into_trancl
   show ?case
-    using es_s_frame_context_to_config_ctx[OF _ r_into_trancl(2)] r_into_trancl(1)
+    using es_frame_context_to_config_ctx[OF _ r_into_trancl(2)] r_into_trancl(1)
     by fastforce
 next
   case (trancl_into_trancl b)
@@ -745,13 +732,13 @@ next
     by (simp split: prod.splits)
   then obtain es_fc'' where b:
        "(\<lambda>(s, f, es) (s', x, y). \<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';x;y\<rparr>)\<^sup>+\<^sup>+ (s, f_fc, es_fc) (s'', f_fc, es_fc'')"
-       "es_s_frame_context_to_config [Frame n f'' es''] s'' fc = (s'', f_fc, es_fc'')"
+       "es_frame_context_to_config [Frame n f'' es''] fc = (f_fc, es_fc'')"
     using trancl_into_trancl(2,4)
     by blast
   obtain es_fc' where c:
        "\<lparr>s'';f_fc;es_fc''\<rparr> \<leadsto> \<lparr>s';f_fc;es_fc'\<rparr>"
-       "es_s_frame_context_to_config [Frame n f' es'] s' fc = (s', f_fc, es_fc')"
-    using a(3) b(2) es_s_frame_context_to_config_ctx
+       "es_frame_context_to_config [Frame n f' es'] fc = (f_fc, es_fc')"
+    using a(3) b(2) es_frame_context_to_config_ctx
     by blast
   thus ?case
     using a b
@@ -798,10 +785,10 @@ next
     by (metis (no_types, lifting) reduce_trans_app_end reduce_trans_def rtranclp.simps tranclp_rtranclp_tranclp)
 qed
 
-lemma es_s_frame_contexts_to_config_ctx:
+lemma es_frame_contexts_to_config_ctx:
   assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
-          "es_s_frame_contexts_to_config es s (Frame_context rdx lcs nf f) fcs = (s,f_fc,es_fc)"
-  shows "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and> es_s_frame_contexts_to_config es' s' (Frame_context rdx lcs nf f') fcs = (s',f_fc',es_fc')"
+          "es_frame_contexts_to_config es (Frame_context rdx lcs nf f) fcs = (f_fc,es_fc)"
+  shows "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and> es_frame_contexts_to_config es' (Frame_context rdx lcs nf f') fcs = (f_fc',es_fc')"
   using assms
 proof (induction fcs arbitrary: f_fc es_fc rule: List.rev_induct)
   case Nil
@@ -811,33 +798,33 @@ proof (induction fcs arbitrary: f_fc es_fc rule: List.rev_induct)
 next
   case (snoc x xs)
   obtain f_fci es_fci f_fci' es_fci' where 0:
-    "es_s_frame_contexts_to_config es s (Frame_context rdx lcs nf f) xs = (s, f_fci, es_fci)"
+    "es_frame_contexts_to_config es (Frame_context rdx lcs nf f) xs = (f_fci, es_fci)"
     "\<lparr>s;f_fci;es_fci\<rparr> \<leadsto> \<lparr>s';f_fci';es_fci'\<rparr>"
-    "es_s_frame_contexts_to_config es' s' (Frame_context rdx lcs nf f') xs = (s', f_fci', es_fci')"
-    using snoc(1)[OF snoc(2)] es_s_frame_contexts_to_config_s[of es s "(Frame_context rdx lcs nf f)" xs]
-    by metis
+    "es_frame_contexts_to_config es' (Frame_context rdx lcs nf f') xs = (f_fci', es_fci')"
+    using snoc(1)[OF snoc(2)]
+    by (metis prod.exhaust)
   have "(frame_arity_outer (Frame_context rdx lcs nf f') xs) = (frame_arity_outer (Frame_context rdx lcs nf f) xs)"
     unfolding frame_arity_outer_def
     by (simp split: if_splits)
   thus ?case
-    using es_s_frame_contexts_to_config_snoc[OF 0(1), of x]
-          es_s_frame_contexts_to_config_snoc[OF 0(3), of x]
-          es_s_frame_context_to_config_ctx[OF 0(2)] snoc(3)
+    using es_frame_contexts_to_config_snoc[OF 0(1), of x]
+          es_frame_contexts_to_config_snoc[OF 0(3), of x]
+          es_frame_context_to_config_ctx[OF 0(2)] snoc(3)
     apply simp
     apply metis+
     done
 qed
 
-lemma es_s_frame_contexts_to_config_ctx_irrtrans:
+lemma es_frame_contexts_to_config_ctx_irrtrans:
   assumes "reduce_irrtrans (s, f, es) (s', f', es')"
-          "es_s_frame_contexts_to_config es s (Frame_context rdx lcs nf f) fcs = (s,f_fc,es_fc)"
-  shows "\<exists>f_fc' es_fc'. reduce_irrtrans (s,f_fc,es_fc) (s',f_fc',es_fc') \<and> es_s_frame_contexts_to_config es' s' (Frame_context rdx lcs nf f') fcs = (s',f_fc',es_fc')"
+          "es_frame_contexts_to_config es (Frame_context rdx lcs nf f) fcs = (f_fc,es_fc)"
+  shows "\<exists>f_fc' es_fc'. reduce_irrtrans (s,f_fc,es_fc) (s',f_fc',es_fc') \<and> es_frame_contexts_to_config es' (Frame_context rdx lcs nf f') fcs = (f_fc',es_fc')"
   using assms
   unfolding reduce_irrtrans_def
 proof (induction "(s, f, es)" "(s', f', es')" arbitrary: s' f' es' rule: tranclp.induct)
   case r_into_trancl
   show ?case
-    using es_s_frame_contexts_to_config_ctx[OF _ r_into_trancl(2)] r_into_trancl(1)
+    using es_frame_contexts_to_config_ctx[OF _ r_into_trancl(2)] r_into_trancl(1)
     by fastforce
 next
   case (trancl_into_trancl b)
@@ -848,13 +835,13 @@ next
     by (simp split: prod.splits)
   then obtain f_fc'' es_fc'' where b:
        "(\<lambda>(s, f, es) (s', x, y). \<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';x;y\<rparr>)\<^sup>+\<^sup>+ (s, f_fc, es_fc) (s'', f_fc'', es_fc'')"
-       "es_s_frame_contexts_to_config es'' s'' (Frame_context rdx lcs nf f'') fcs = (s'',f_fc'',es_fc'')"
+       "es_frame_contexts_to_config es'' (Frame_context rdx lcs nf f'') fcs = (f_fc'',es_fc'')"
     using trancl_into_trancl(2)[OF a(1) trancl_into_trancl(4)]
     by blast
   obtain f_fc' es_fc' where c:
        "\<lparr>s'';f_fc'';es_fc''\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr>"
-       "es_s_frame_contexts_to_config es' s' (Frame_context rdx lcs nf f') fcs = (s', f_fc', es_fc')"
-    using a(3) b(2) es_s_frame_contexts_to_config_ctx
+       "es_frame_contexts_to_config es' (Frame_context rdx lcs nf f') fcs = (f_fc', es_fc')"
+    using a(3) b(2) es_frame_contexts_to_config_ctx
     by blast
   thus ?case
     using a b
@@ -862,10 +849,10 @@ next
 qed
 
 
-lemma es_s_frame_contexts_to_config_ctx1:
+lemma es_frame_contexts_to_config_ctx1:
   assumes "\<lparr>s;f;(v_stack_to_es v_s)@es\<rparr> \<leadsto> \<lparr>s';f';(v_stack_to_es v_s')@es'\<rparr>"
-          "es_s_frame_contexts_to_config es s (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs = (s,f_fc,es_fc)"
-  shows "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and> es_s_frame_contexts_to_config [] s' (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' es') lcs nf f') fcs = (s',f_fc',es_fc')"
+          "es_frame_contexts_to_config es (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs = (f_fc,es_fc)"
+  shows "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and> es_frame_contexts_to_config [] (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' es') lcs nf f') fcs = (f_fc',es_fc')"
   using assms
 proof (induction fcs arbitrary: s f_fc es_fc rule: List.rev_induct)
   case Nil
@@ -875,40 +862,40 @@ proof (induction fcs arbitrary: s f_fc es_fc rule: List.rev_induct)
 next
   case (snoc fc fcs')
    obtain f_fci es_fci f_fci' es_fci' where 0:
-    "es_s_frame_contexts_to_config es s (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs' = (s, f_fci, es_fci)"
+    "es_frame_contexts_to_config es (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs' = (f_fci, es_fci)"
     "\<lparr>s;f_fci;es_fci\<rparr> \<leadsto> \<lparr>s';f_fci';es_fci'\<rparr>"
-    "es_s_frame_contexts_to_config [] s' (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' es') lcs nf f') fcs' = (s', f_fci', es_fci')"
-    using snoc(1)[OF snoc(2)] es_s_frame_contexts_to_config_s
-    by metis
+    "es_frame_contexts_to_config [] (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' es') lcs nf f') fcs' = (f_fci', es_fci')"
+    using snoc(1)[OF snoc(2)]
+    by (metis prod.exhaust)
   have "(frame_arity_outer (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' es') lcs nf f') fcs') = (frame_arity_outer (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs')"
     unfolding frame_arity_outer_def
     by (simp split: if_splits)
   thus ?case
-    using es_s_frame_contexts_to_config_snoc[OF 0(3), of fc]
-          es_s_frame_contexts_to_config_snoc[OF 0(1), of fc] snoc(3)
-          es_s_frame_context_to_config_ctx[OF 0(2)]
+    using es_frame_contexts_to_config_snoc[OF 0(3), of fc]
+          es_frame_contexts_to_config_snoc[OF 0(1), of fc] snoc(3)
+          es_frame_context_to_config_ctx[OF 0(2)]
     apply (simp split: if_splits)
     apply metis+
     done
 qed
 
-lemma es_s_frame_contexts_to_config_ctx2:
+lemma es_frame_contexts_to_config_ctx2:
   assumes "\<lparr>s;f;(v_stack_to_es v_s)@es\<rparr> \<leadsto> \<lparr>s';f';(v_stack_to_es v_s')\<rparr>"
-          "es_s_frame_contexts_to_config es s (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs = (s,f_fc,es_fc)"
-  shows "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and> es_s_frame_contexts_to_config [] s' (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' []) lcs nf f') fcs = (s',f_fc',es_fc')"
+          "es_frame_contexts_to_config es (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs = (f_fc,es_fc)"
+  shows "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and> es_frame_contexts_to_config [] (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' []) lcs nf f') fcs = (f_fc',es_fc')"
 proof -
   have 1:"\<lparr>s;f;(v_stack_to_es v_s)@es\<rparr> \<leadsto> \<lparr>s';f';(v_stack_to_es v_s'@[])\<rparr>"
     using assms
     by simp
   thus ?thesis
-    using es_s_frame_contexts_to_config_ctx1[OF 1]
+    using es_frame_contexts_to_config_ctx1[OF 1]
     by (simp add: assms(2))
 qed
 
-lemma es_s_frame_contexts_to_config_trap_ctx:
+lemma es_frame_contexts_to_config_trap_ctx:
   assumes "\<lparr>s;f;(v_stack_to_es v_s)@es\<rparr> \<leadsto> \<lparr>s';f';(v_stack_to_es v_s')@[Trap]\<rparr>"
-          "es_s_frame_contexts_to_config es s (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs = (s,f_fc,es_fc)"
-  shows "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and> es_s_frame_contexts_to_config [Trap] s' (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' []) lcs nf f') fcs = (s',f_fc',es_fc')"
+          "es_frame_contexts_to_config es (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs = (f_fc,es_fc)"
+  shows "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and> es_frame_contexts_to_config [Trap] (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' []) lcs nf f') fcs = (f_fc',es_fc')"
   using assms
 proof (induction fcs arbitrary: f_fc es_fc rule: List.rev_induct)
   case Nil
@@ -921,19 +908,19 @@ proof (induction fcs arbitrary: f_fc es_fc rule: List.rev_induct)
 next
   case (snoc fc fcs')
   obtain f_fci es_fci f_fci' es_fci' where 0:
-    "es_s_frame_contexts_to_config es s (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs' = (s, f_fci, es_fci)"
+    "es_frame_contexts_to_config es (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs' = (f_fci, es_fci)"
     "\<lparr>s;f_fci;es_fci\<rparr> \<leadsto> \<lparr>s';f_fci';es_fci'\<rparr>"
-    "es_s_frame_contexts_to_config [Trap] s' (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' []) lcs nf f') fcs' = (s', f_fci', es_fci')"
-    using snoc(1)[OF snoc(2)] es_s_frame_contexts_to_config_s
-    by metis
+    "es_frame_contexts_to_config [Trap] (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' []) lcs nf f') fcs' = (f_fci', es_fci')"
+    using snoc(1)[OF snoc(2)]
+    by (metis prod.exhaust)
   have "(frame_arity_outer (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' []) lcs nf f') fcs') = (frame_arity_outer (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs')"
     unfolding frame_arity_outer_def
     by (simp split: if_splits)
   thus ?case
-    using es_s_frame_contexts_to_config_snoc[OF 0(3), of fc]
-          es_s_frame_contexts_to_config_snoc[OF 0(1), of fc] snoc(3)
+    using es_frame_contexts_to_config_snoc[OF 0(3), of fc]
+          es_frame_contexts_to_config_snoc[OF 0(1), of fc] snoc(3)
     apply (simp)
-    apply (metis (no_types, lifting) 0(2) es_s_frame_context_to_config_ctx)
+    apply (metis (no_types, lifting) 0(2) es_frame_context_to_config_ctx)
     done
 qed
 
@@ -963,20 +950,20 @@ lemma es_label_contexts_to_es_to_trap_reduce_trans:
         assms(1) reduce_trans_to_trap_LN
   by blast
 
-lemma es_s_frame_contexts_to_config_to_trap_reduce_trans_weak:
+lemma es_frame_contexts_to_config_to_trap_reduce_trans_weak:
   assumes "\<And>f_inner. reduce_trans (s,f_inner,es) (s',f_inner,[Trap])"
-          "es_s_frame_contexts_to_config es s fc fcs = (s, f, es')"
+          "es_frame_contexts_to_config es fc fcs = (f, es')"
   shows "reduce_trans (s,f,es') (s',f,[Trap])"
   using assms
-proof (induction es s fc fcs arbitrary: s f es' rule: es_s_frame_contexts_to_config.induct)
-  case (1 es s fc)
+proof (induction es fc fcs arbitrary: s f es' rule: es_frame_contexts_to_config.induct)
+  case (1 es fc)
   thus ?case
     apply (cases fc)
     apply simp
     apply (metis es_label_contexts_to_es_to_trap_reduce_trans es_redex_to_es_to_trap_reduce_trans)
     done
 next
-  case (2 es s fc fc' fcs)
+  case (2 es fc fc' fcs)
   obtain rdx lcs nf ff where fc_is:"fc = (Frame_context rdx lcs nf ff)"
     by (metis frame_context.exhaust)
   hence "\<And>f_inner. reduce_trans (s,f_inner,[es_frame_context_to_e es fc]) (s',f_inner,[Trap])"
@@ -989,15 +976,15 @@ next
     by simp
 qed
 
-lemma es_s_frame_contexts_to_config_trap_reduce_trans:
-  assumes "es_s_frame_contexts_to_config [Trap] s fc fcs = (s, f, es)"
+lemma es_frame_contexts_to_config_trap_reduce_trans:
+  assumes "es_frame_contexts_to_config [Trap] fc fcs = (f, es)"
   shows "reduce_trans (s,f,es) (s,f,[Trap])"
 proof -
   have "(\<And>f_inner. reduce_trans (s, f_inner, [Trap]) (s, f_inner, [Trap]))"
     unfolding reduce_trans_def
     by simp
   thus ?thesis
-    using es_s_frame_contexts_to_config_to_trap_reduce_trans_weak[OF _ assms]
+    using es_frame_contexts_to_config_to_trap_reduce_trans_weak[OF _ assms]
     by simp
 qed
 
@@ -1005,13 +992,13 @@ lemma run_step_b_e_sound:
   assumes "run_step_b_e b_e (Config d s fc fcs) = ((Config d' s' fc' fcs'), res)"
   shows "(\<exists>f esfc f' esfc'.
             res = Step_normal \<and>
-            es_s_frame_contexts_to_config ([$b_e]) s fc fcs = (s,f,esfc) \<and>
-            es_s_frame_contexts_to_config [] s' fc' fcs' = (s',f',esfc') \<and>
+            es_frame_contexts_to_config ([$b_e]) fc fcs = (f,esfc) \<and>
+            es_frame_contexts_to_config [] fc' fcs' = (f',esfc') \<and>
             \<lparr>s;f;esfc\<rparr> \<leadsto> \<lparr>s';f';esfc'\<rparr>) \<or>
          (\<exists>str f esfc f' esfc'.
             res = Res_trap str \<and>
-            es_s_frame_contexts_to_config ([$b_e]) s fc fcs = (s,f,esfc) \<and>
-            es_s_frame_contexts_to_config ([Trap]) s' fc' fcs' = (s',f',esfc') \<and>
+            es_frame_contexts_to_config ([$b_e]) fc fcs = (f,esfc) \<and>
+            es_frame_contexts_to_config ([Trap]) fc' fcs' = (f',esfc') \<and>
             \<lparr>s;f;esfc\<rparr> \<leadsto> \<lparr>s';f';esfc'\<rparr>) \<or>
          (\<exists>str. res = Res_crash str)"
 proof -
@@ -1019,9 +1006,8 @@ proof -
                                                "rdx = (Redex v_s es b_es)"
     by (metis frame_context.exhaust redex.exhaust)
   obtain f'' esfc'' where 0:
-    "es_s_frame_contexts_to_config ([$b_e]) s (Frame_context (Redex v_s es b_es) lcs nf f) fcs = (s,f'',esfc'')"
-    using fc_is es_s_frame_contexts_to_config_s[of "[$b_e]" s "(Frame_context (Redex v_s es b_es) lcs nf f)" fcs]
-    by metis
+    "es_frame_contexts_to_config ([$b_e]) (Frame_context (Redex v_s es b_es) lcs nf f) fcs = (f'',esfc'')"
+    by (metis prod.exhaust)
   show ?thesis
   proof (cases b_e)
     case Unreachable
@@ -1034,8 +1020,8 @@ proof -
       by auto
     obtain f''' esfc''' where
     "\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s;f''';esfc'''\<rparr>"
-    "es_s_frame_contexts_to_config [Trap] s fc' fcs = (s, f''', esfc''')"
-      using 1(4) fc_is Unreachable es_s_frame_contexts_to_config_trap_ctx[OF progress_L0_left[OF reduce.basic[OF reduce_simple.unreachable, of s f], of "rev v_s"]] 0
+    "es_frame_contexts_to_config [Trap] fc' fcs = (f''', esfc''')"
+      using 1(4) fc_is Unreachable es_frame_contexts_to_config_trap_ctx[OF progress_L0_left[OF reduce.basic[OF reduce_simple.unreachable, of s f], of "rev v_s"]] 0
       by simp blast
     thus ?thesis
       using 0 1 fc_is(1,2)
@@ -1050,9 +1036,9 @@ proof -
       using Cons assms Nop fc_is
       by fastforce+
     obtain f''' esfc''' where
-      "es_s_frame_contexts_to_config [] s' (Frame_context rdx lcs nf f) fcs = (s',f''',esfc''')"
+      "es_frame_contexts_to_config [] (Frame_context rdx lcs nf f) fcs = (f''',esfc''')"
       "\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s';f''';esfc'''\<rparr>"
-      using es_s_frame_contexts_to_config_ctx[OF reduce.basic[OF reduce_simple.nop, of s f]] 0 1(2) fc_is(2) Nop
+      using es_frame_contexts_to_config_ctx[OF reduce.basic[OF reduce_simple.nop, of s f]] 0 1(2) fc_is(2) Nop
       by blast
     thus ?thesis
       using 0 1 Nop fc_is(1,2)
@@ -1073,7 +1059,7 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx2[OF a(5)] Drop fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Drop fc_is 0
         by simp blast
     qed auto
   next
@@ -1092,7 +1078,7 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx2[OF a(5)] Select fc_is Cons 0
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Select fc_is Cons 0
         by simp blast
     qed auto
   next
@@ -1119,9 +1105,8 @@ proof -
         using fc_is fc'_is(7,8)
         by (simp add: es_label_contexts_to_es_LN local)
       obtain f''' esfc''' where f'''_is:
-        "es_s_frame_contexts_to_config [] s' fc' fcs' = (s', f''', esfc''')"
-        using es_s_frame_contexts_to_config_s
-        by blast
+        "es_frame_contexts_to_config [] fc' fcs' = (f''', esfc''')"
+        by (metis prod.exhaust)
       have "\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s';f''';esfc'''\<rparr>"
       proof (cases fcs)
         case Nil
@@ -1131,7 +1116,7 @@ proof -
       next
         case (Cons a list)
         thus ?thesis
-          using f'''_is 0 es_s_frame_contexts_to_config_ctx[OF fc_red2] fc_is fc'_is(1,5,6,7,8) Block
+          using f'''_is 0 es_frame_contexts_to_config_ctx[OF fc_red2] fc_is fc'_is(1,5,6,7,8) Block
           by (cases a) fastforce
       qed
       thus ?thesis
@@ -1167,9 +1152,8 @@ proof -
         using fc_is fc'_is(7,8)
         by (simp add: es_label_contexts_to_es_LN local)
       then obtain f''' esfc''' where f'''_is:
-        "es_s_frame_contexts_to_config [] s' fc' fcs' = (s', f''', esfc''')"
-        using es_s_frame_contexts_to_config_s
-        by blast
+        "es_frame_contexts_to_config [] fc' fcs' = (f''', esfc''')"
+        by (metis prod.exhaust)
       have "\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s';f''';esfc'''\<rparr>"
       proof (cases fcs)
         case Nil
@@ -1179,7 +1163,7 @@ proof -
       next
         case (Cons a list)
         thus ?thesis
-        using f'''_is 0 es_s_frame_contexts_to_config_ctx[OF fc_red2] fc_is fc'_is(1,5,6,7,8) Loop
+        using f'''_is 0 es_frame_contexts_to_config_ctx[OF fc_red2] fc_is fc'_is(1,5,6,7,8) Loop
         by (cases a) fastforce
       qed
       thus ?thesis
@@ -1207,7 +1191,7 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx1[OF a(5)] If fc_is Cons 0
+        using es_frame_contexts_to_config_ctx1[OF a(5)] If fc_is Cons 0
         by simp blast
     qed auto
   next
@@ -1267,10 +1251,10 @@ proof -
           using 2 fc_is a(5) reduce.local[OF 2, of _ nf] a(7)
           by simp
         obtain f_fc es_fc where
-          "es_s_frame_contexts_to_config [es_frame_context_to_e [$Br k] fc] s a list = (s, f_fc, es_fc)"
+          "es_frame_contexts_to_config [es_frame_context_to_e [$Br k] fc] a list = (f_fc, es_fc)"
           "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and>
-             es_s_frame_contexts_to_config [es_frame_context_to_e [] fc'] s' a list = (s', f_fc', es_fc')"
-          using es_s_frame_contexts_to_config_ctx[OF fc_red, of _ _ _ _ list] 0 Br fc_is Cons
+             es_frame_contexts_to_config [es_frame_context_to_e [] fc'] a list = (f_fc', es_fc')"
+          using es_frame_contexts_to_config_ctx[OF fc_red, of _ _ _ _ list] 0 Br fc_is Cons
           apply (cases a)
           apply simp
           done
@@ -1295,7 +1279,7 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx1[OF a(5)] Br_if fc_is 0
+        using es_frame_contexts_to_config_ctx1[OF a(5)] Br_if fc_is 0
         by simp blast
     qed auto
   next
@@ -1314,7 +1298,7 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx1[OF a(5)] Br_table fc_is Cons 0
+        using es_frame_contexts_to_config_ctx1[OF a(5)] Br_table fc_is Cons 0
         by simp blast
     qed auto
   next
@@ -1347,13 +1331,12 @@ proof -
         using reduce.basic[OF reduce_simple.return[OF _ lholed_is], of nf s _ f] fc_is eslk_is(1) a(1,3)
         by simp
       obtain f_fc es_fc where f_fc_is:
-        "es_s_frame_contexts_to_config [es_frame_context_to_e [$Return] fc] s (Frame_context t1 t2 t3 t4) fcs' = (s, f_fc, es_fc)"
-        using es_s_frame_contexts_to_config_s[of "[es_frame_context_to_e [$Return] fc]" s "(Frame_context t1 t2 t3 t4)" fcs']
-        by fastforce
+        "es_frame_contexts_to_config [es_frame_context_to_e [$Return] fc] (Frame_context t1 t2 t3 t4) fcs' = (f_fc, es_fc)"
+        by (metis prod.exhaust)
       have
         "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and>
-           es_s_frame_contexts_to_config [] s' fc' fcs' = (s', f_fc', es_fc')"
-        using es_s_frame_contexts_to_config_ctx[OF fc_red f_fc_is] a(4)
+           es_frame_contexts_to_config [] fc' fcs' = (f_fc', es_fc')"
+        using es_frame_contexts_to_config_ctx[OF fc_red f_fc_is] a(4)
         apply (cases t1)
         apply simp
         apply (cases fcs')
@@ -1379,7 +1362,7 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx1[OF a(5)] Call fc_is 0
+        using es_frame_contexts_to_config_ctx1[OF a(5)] Call fc_is 0
         by simp blast
     qed auto
   next
@@ -1405,12 +1388,12 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx1[OF a(2)] 0 Call_indirect fc_is ms'_is(1,2)
+        using es_frame_contexts_to_config_ctx1[OF a(2)] 0 Call_indirect fc_is ms'_is(1,2)
         by simp blast
     next
       case b
       thus ?thesis
-        using es_s_frame_contexts_to_config_trap_ctx[OF b(3), of es b_es lcs nf fcs f'' esfc''] 0 Call_indirect fc_is ms'_is(1,2,4)
+        using es_frame_contexts_to_config_trap_ctx[OF b(3), of es b_es lcs nf fcs f'' esfc''] 0 Call_indirect fc_is ms'_is(1,2,4)
         by simp blast
     qed auto
   next
@@ -1429,7 +1412,7 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx2[OF a(5)] Get_local fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Get_local fc_is 0
         by simp blast
     qed auto
   next
@@ -1448,7 +1431,7 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx2[OF a(5)] Set_local fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Set_local fc_is 0
         by simp blast
     qed auto
   next
@@ -1467,7 +1450,7 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx1[OF a(5)] Tee_local fc_is 0
+        using es_frame_contexts_to_config_ctx1[OF a(5)] Tee_local fc_is 0
         by simp blast
     qed auto
   next
@@ -1481,7 +1464,7 @@ proof -
       using app_s_f_v_s_get_global_is[of _ "globs s"] assms Get_global fc_is
       by (fastforce split: prod.splits)
     thus ?thesis
-      using es_s_frame_contexts_to_config_ctx2[OF a(5)] Get_global fc_is Cons 0
+      using es_frame_contexts_to_config_ctx2[OF a(5)] Get_global fc_is Cons 0
       by simp blast
   next
     case (Set_global k)
@@ -1500,7 +1483,7 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx2[OF a(6)] Set_global fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(6)] Set_global fc_is 0
         by simp blast
     qed auto
   next
@@ -1525,12 +1508,12 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx2[OF a(5)] Load fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Load fc_is 0
         by fastforce
     next
       case b
       thus ?thesis
-        using es_s_frame_contexts_to_config_trap_ctx[OF b(5)] Load fc_is 0
+        using es_frame_contexts_to_config_trap_ctx[OF b(5)] Load fc_is 0
         by fastforce
     qed auto
   next
@@ -1556,7 +1539,7 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx2[OF a(2)] Store fc_is ms'_is(1,2) 0
+        using es_frame_contexts_to_config_ctx2[OF a(2)] Store fc_is ms'_is(1,2) 0
         by simp blast
     next
       case b
@@ -1564,7 +1547,7 @@ proof -
         using b(1) ms'_is(4)
         by simp
       thus ?thesis
-        using es_s_frame_contexts_to_config_trap_ctx[OF b(3)] Store fc_is Cons ms'_is(1,2) b 0
+        using es_frame_contexts_to_config_trap_ctx[OF b(3)] Store fc_is Cons ms'_is(1,2) b 0
         by simp blast
     qed auto
   next
@@ -1583,7 +1566,7 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx2[OF a(5)] Current_memory fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Current_memory fc_is 0
         by simp blast
     qed auto
   next
@@ -1603,7 +1586,7 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx2[OF a(6)] Grow_memory fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(6)] Grow_memory fc_is 0
         by simp blast
     qed auto
   next
@@ -1627,7 +1610,7 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx2[OF a(5)] Unop fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Unop fc_is 0
         by simp blast
     qed auto
   next
@@ -1652,12 +1635,12 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx2[OF a(5)] Binop fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Binop fc_is 0
         by simp blast
     next
       case b
       thus ?thesis
-        using es_s_frame_contexts_to_config_trap_ctx[OF b(5)] Binop fc_is 0
+        using es_frame_contexts_to_config_trap_ctx[OF b(5)] Binop fc_is 0
         by simp blast
     qed auto
   next
@@ -1676,7 +1659,7 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx2[OF a(5)] Testop fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Testop fc_is 0
         by simp blast
     qed auto
   next
@@ -1695,7 +1678,7 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx2[OF a(5)] Relop fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Relop fc_is 0
         by simp blast
     qed auto
   next
@@ -1720,12 +1703,12 @@ proof -
     proof (cases)
       case a
       thus ?thesis
-        using es_s_frame_contexts_to_config_ctx2[OF a(5)] Cvtop fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Cvtop fc_is 0
         by simp blast
     next
       case b
       thus ?thesis
-        using es_s_frame_contexts_to_config_trap_ctx[OF b(5)] Cvtop fc_is 0
+        using es_frame_contexts_to_config_trap_ctx[OF b(5)] Cvtop fc_is 0
         by simp blast
     qed auto
   qed
@@ -1735,13 +1718,13 @@ lemma run_step_e_sound:
   assumes "run_step_e e (Config d s fc fcs) = ((Config d' s' fc' fcs'), res)"
   shows "(\<exists>f esfc f' esfc'.
             res = Step_normal \<and>
-            es_s_frame_contexts_to_config ([e]) s fc fcs = (s,f,esfc) \<and>
-            es_s_frame_contexts_to_config [] s' fc' fcs' = (s',f',esfc') \<and>
+            es_frame_contexts_to_config ([e]) fc fcs = (f,esfc) \<and>
+            es_frame_contexts_to_config [] fc' fcs' = (f',esfc') \<and>
             \<lparr>s;f;esfc\<rparr> \<leadsto> \<lparr>s';f';esfc'\<rparr>) \<or>
          (\<exists>str f esfc f' esfc'.
             res = Res_trap str \<and>
-            es_s_frame_contexts_to_config ([e]) s fc fcs = (s,f,esfc) \<and>
-            es_s_frame_contexts_to_config ([Trap]) s' fc' fcs' = (s',f',esfc') \<and>
+            es_frame_contexts_to_config ([e]) fc fcs = (f,esfc) \<and>
+            es_frame_contexts_to_config ([Trap]) fc' fcs' = (f',esfc') \<and>
             \<lparr>s;f;esfc\<rparr> \<leadsto> \<lparr>s';f';esfc'\<rparr>) \<or>
          (\<exists>str. res = Res_crash str)"
 proof -
@@ -1749,9 +1732,8 @@ proof -
                                                "rdx = (Redex v_s es b_es)"
     by (metis frame_context.exhaust redex.exhaust)
   obtain f'' esfc'' where 0:
-    "es_s_frame_contexts_to_config ([e]) s (Frame_context (Redex v_s es b_es) lcs nf f) fcs = (s,f'',esfc'')"
-    using fc_is es_s_frame_contexts_to_config_s[of "[e]" s "(Frame_context (Redex v_s es b_es) lcs nf f)" fcs]
-    by metis
+    "es_frame_contexts_to_config ([e]) (Frame_context (Redex v_s es b_es) lcs nf f) fcs = (f'',esfc'')"
+    by (metis prod.exhaust)
   show ?thesis
     using assms fc_is
   proof (cases e)
@@ -1793,9 +1775,8 @@ proof -
         using fc_is tf_is(1,5,6) reduce.local[OF es_label_contexts_to_es_LN[OF fc_red1]]
         by simp
       obtain f''' esfc''' where f'''_is:
-        "es_s_frame_contexts_to_config [] s' fc' fcs' = (s', f''', esfc''')"
-        using es_s_frame_contexts_to_config_s
-        by blast
+        "es_frame_contexts_to_config [] fc' fcs' = (f''', esfc''')"
+        by (metis prod.exhaust)
       have "\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s';f''';esfc'''\<rparr>"
       proof (cases fcs)
         case Nil
@@ -1805,7 +1786,7 @@ proof -
       next
         case (Cons a list)
         thus ?thesis
-        using f'''_is 0 es_s_frame_contexts_to_config_ctx[OF fc_red2] fc_is tf_is Invoke Func_native
+        using f'''_is 0 es_frame_contexts_to_config_ctx[OF fc_red2] fc_is tf_is Invoke Func_native
         by (cases a) fastforce
       qed
       thus ?thesis
@@ -1836,7 +1817,7 @@ proof -
             using fc_is tf_is Func_host None progress_L0_left[OF reduce.invoke_host_None, of s i_cl t1s t2s host "v_stack_to_es v_fs" "rev v_fs" _ _ f "rev v_s'"]
             by (simp add: a_is(1) v_s_rev_is) (metis a_is(5) split_n_length)
           show ?thesis
-            using es_s_frame_contexts_to_config_trap_ctx[OF red_is] a_is(2,3,4) fc_is(1,2) 0 Invoke
+            using es_frame_contexts_to_config_trap_ctx[OF red_is] a_is(2,3,4) fc_is(1,2) 0 Invoke
             by simp blast
         next
           case (Some a)
@@ -1852,7 +1833,7 @@ proof -
             using fc_is tf_is Func_host Some a_is(1,5) progress_L0_left[OF reduce.invoke_host_Some, of s i_cl t1s t2s host "v_stack_to_es v_fs" "rev v_fs" _ _ _ s' rvs f "rev v_s'"]
             by (simp add: v_s_rev_is) (metis host_apply_impl_correct split_n_length)
           show ?thesis
-            using es_s_frame_contexts_to_config_ctx2[OF red_is] a_is(2,3,4) fc_is(1,2) 0 Invoke
+            using es_frame_contexts_to_config_ctx2[OF red_is] a_is(2,3,4) fc_is(1,2) 0 Invoke
             by simp blast
         qed
       qed
@@ -1864,11 +1845,11 @@ theorem run_iter_sound:
   assumes "run_iter fuel (Config d s fc fcs) = ((Config d' s' fc' fcs'), res)"
   shows "(\<exists>v_sres f esfc f'.
             res = RValue v_sres \<and>
-            es_s_frame_contexts_to_config [] s fc fcs = (s,f,esfc) \<and>
+            es_frame_contexts_to_config [] fc fcs = (f,esfc) \<and>
             reduce_trans (s,f,esfc) (s',f',v_stack_to_es v_sres)) \<or>
          (\<exists>str f esfc f'.
             res = RTrap str \<and>
-            es_s_frame_contexts_to_config [] s fc fcs = (s,f,esfc) \<and>
+            es_frame_contexts_to_config [] fc fcs = (f,esfc) \<and>
             reduce_trans (s,f,esfc) (s',f',[Trap])) \<or>
          (\<exists>str. res = RCrash str)"
   using assms
@@ -1899,12 +1880,10 @@ proof (induction fuel "(Config d s fc fcs)" arbitrary: d s fc fcs rule: run_iter
       using fc_old_is
       by (simp add: reduce.local)
     obtain f'' esfc'' where 0:
-      "es_s_frame_contexts_to_config [] s (Frame_context (Redex v_s [] []) [] nf f) (fc_hd # fcs_tl) = (s,f'',esfc'')"
-      using es_s_frame_contexts_to_config_s[of "[]" s "(Frame_context (Redex v_s [] []) [] nf f)" "fc_hd # fcs_tl"]
-      by metis
+      "es_frame_contexts_to_config [] (Frame_context (Redex v_s [] []) [] nf f) (fc_hd # fcs_tl) = (f'',esfc'')"
+      by (metis prod.exhaust)
     obtain f''' esfc''' where f'''_is:
-      "es_s_frame_contexts_to_config [] s (update_fc_return fc_hd v_s) fcs_tl = (s, f''', esfc''')"
-      using es_s_frame_contexts_to_config_s
+      "es_frame_contexts_to_config [] (update_fc_return fc_hd v_s) fcs_tl = (f''', esfc''')"
       by (fastforce simp del: run_iter.simps)
     have red_is:"\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s;f''';esfc'''\<rparr>"
     proof (cases fcs_tl)
@@ -1915,7 +1894,7 @@ proof (induction fuel "(Config d s fc fcs)" arbitrary: d s fc fcs rule: run_iter
     next
       case (Cons a list)
       thus ?thesis
-      using f'''_is 0 es_s_frame_contexts_to_config_ctx[OF fc_red2] fc_old_is
+      using f'''_is 0 es_frame_contexts_to_config_ctx[OF fc_red2] fc_old_is
       by (cases a) fastforce
     qed
     thus ?thesis
@@ -1931,13 +1910,11 @@ proof (induction fuel "(Config d s fc fcs)" arbitrary: d s fc fcs rule: run_iter
       using reduce.local[OF fc_red1]
       by fastforce
     obtain f'' esfc'' where 0:
-      "es_s_frame_contexts_to_config [] s (Frame_context (Redex v_s [] []) ((Label_context v_ls b_els nl b_elcs)#lcs) nf f) fcs = (s,f'',esfc'')"
-      using es_s_frame_contexts_to_config_s[of "[]" s "(Frame_context (Redex v_s [] []) ((Label_context v_ls b_els nl b_elcs)#lcs) nf f)" "fcs"]
-      by metis
+      "es_frame_contexts_to_config [] (Frame_context (Redex v_s [] []) ((Label_context v_ls b_els nl b_elcs)#lcs) nf f) fcs = (f'',esfc'')"
+      by (metis prod.exhaust)
     obtain f''' esfc''' where f'''_is:
-      "es_s_frame_contexts_to_config [] s (Frame_context (Redex (v_s@v_ls) [] b_els) lcs nf f) fcs = (s, f''', esfc''')"
-      using es_s_frame_contexts_to_config_s
-      by blast
+      "es_frame_contexts_to_config [] (Frame_context (Redex (v_s@v_ls) [] b_els) lcs nf f) fcs = (f''', esfc''')"
+      by (metis prod.exhaust)
     have "\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s;f''';esfc'''\<rparr>"
     proof (cases fcs)
       case Nil
@@ -1947,7 +1924,7 @@ proof (induction fuel "(Config d s fc fcs)" arbitrary: d s fc fcs rule: run_iter
     next
       case (Cons a list)
       thus ?thesis
-        using f'''_is 0 es_s_frame_contexts_to_config_ctx[OF fc_red2]
+        using f'''_is 0 es_frame_contexts_to_config_ctx[OF fc_red2]
       by (cases a) fastforce
     qed
     thus ?thesis
@@ -1962,7 +1939,7 @@ proof (induction fuel "(Config d s fc fcs)" arbitrary: d s fc fcs rule: run_iter
       case Nil
       thus ?thesis
         using b_es'_is 1(3,6) d
-              es_s_frame_contexts_to_config_b_e_split_v_s_b_s split_v_s_b_s_conv_app
+              es_frame_contexts_to_config_b_e_split_v_s_b_s split_v_s_b_s_conv_app
         by fastforce
     next
       case (Cons b_e'' b_es'')
@@ -1979,15 +1956,15 @@ proof (induction fuel "(Config d s fc fcs)" arbitrary: d s fc fcs rule: run_iter
         case (Res_trap x2)
         thus ?thesis
           using run_step_b_e_sound[OF run_step_b_e_is] 1(6) Cons d
-                b_es'_is run_step_b_e_is es_s_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
-                es_s_frame_contexts_to_config_trap_reduce_trans reduce_trans_app
+                b_es'_is run_step_b_e_is es_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
+                es_frame_contexts_to_config_trap_reduce_trans reduce_trans_app
           by (fastforce simp del: run_step_b_e.simps split_v_s_b_s.simps)
       next
         case Step_normal
         thus ?thesis
           using run_step_b_e_sound[OF run_step_b_e_is] 1(4,6) Cons d
-                b_es'_is run_step_b_e_is es_s_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
-                es_s_frame_contexts_to_config_trap_reduce_trans reduce_trans_app
+                b_es'_is run_step_b_e_is es_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
+                es_frame_contexts_to_config_trap_reduce_trans reduce_trans_app
           by (fastforce simp del: run_step_b_e.simps split_v_s_b_s.simps)
       qed
     qed
@@ -2006,8 +1983,8 @@ proof (induction fuel "(Config d s fc fcs)" arbitrary: d s fc fcs rule: run_iter
       case (Res_trap x2)
       thus ?thesis
           using run_step_e_sound[OF run_step_e_is] 1(5)[OF _ _ _ _ run_step_e_is[symmetric]]
-                run_step_e_is es_s_frame_contexts_to_config_e_one
-                es_s_frame_contexts_to_config_trap_reduce_trans 1(6) e
+                run_step_e_is es_frame_contexts_to_config_e_one
+                es_frame_contexts_to_config_trap_reduce_trans 1(6) e
           apply (simp del: run_step_e.simps)
           apply (metis reduce_trans_app)
           done
@@ -2015,7 +1992,7 @@ proof (induction fuel "(Config d s fc fcs)" arbitrary: d s fc fcs rule: run_iter
       case Step_normal
       thus ?thesis
         using run_step_e_sound[OF run_step_e_is] 1(5)[OF _ _ _ _ run_step_e_is[symmetric]]
-              run_step_e_is es_s_frame_contexts_to_config_e_one 1(6) e
+              run_step_e_is es_frame_contexts_to_config_e_one 1(6) e
         apply (simp del: run_step_e.simps)
         apply (metis (mono_tags, lifting) reduce_trans_app)
         done
@@ -2028,8 +2005,15 @@ next
 qed
 
 theorem run_v_sound:
-  assumes "run_v fuel d s f b_es = (s', RValue vs)"
+  assumes "run_v fuel d (s, f, b_es) = (s', RValue vs)"
   shows "(\<exists>f'. reduce_trans (s,f,$*b_es) (s',f',v_stack_to_es vs))"
   using assms run_iter_sound[of fuel d s "(Frame_context (Redex [] [] b_es) [] 0 f)" "[]"]
   by (fastforce split: prod.splits config.splits)
+
+theorem run_v_sound_trap:
+  assumes "run_v fuel d (s, f, b_es) = (s', RTrap str)"
+  shows "(\<exists>f'. reduce_trans (s,f,$*b_es) (s',f',[Trap]))"
+  using assms run_iter_sound[of fuel d s "(Frame_context (Redex [] [] b_es) [] 0 f)" "[]"]
+  by (fastforce split: prod.splits config.splits)
+
 end
