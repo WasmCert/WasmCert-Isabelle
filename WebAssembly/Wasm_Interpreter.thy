@@ -244,20 +244,14 @@ definition app_s_f_v_s_mem_grow :: "mem list \<Rightarrow> f \<Rightarrow> v_sta
            | _ \<Rightarrow> (ms, v_s, crash_invalid))"
 
 (* 0: local value stack, 1: current redex, 2: tail of redex *)
-type_synonym redex = "v_stack \<times> e list \<times> b_e list"
+datatype redex = Redex v_stack "e list" "b_e list"
 
 (* 0: outer value stack, 1: outer tail of redex, 2: label arity, 3: label continuation *)
 (* corresponds to <0> label <2> <3> ... end <1>  *)
-type_synonym label_context = "v_stack \<times> b_e list \<times> nat \<times> b_e list"
-
-abbreviation label_arity :: "label_context \<Rightarrow> nat" where
-  "label_arity lc \<equiv> fst (snd (snd lc))"
+datatype label_context = Label_context v_stack "b_e list" (label_arity:nat) "b_e list"
 
 (* 0: redex, 1: label contexts, 2: frame arity, 3: frame *)
-type_synonym frame_context = "redex \<times> label_context list \<times> nat \<times> f"
-
-abbreviation frame_arity :: "frame_context \<Rightarrow> nat" where
-  "frame_arity fc \<equiv> fst (snd (snd fc))"
+datatype frame_context = Frame_context redex "label_context list" (frame_arity:nat) f
 
 definition frame_arity_outer :: "frame_context \<Rightarrow> frame_context list \<Rightarrow> nat" where
   "frame_arity_outer fc fcs \<equiv> if fcs = [] then (frame_arity fc) else (frame_arity (last fcs))"
@@ -265,11 +259,11 @@ definition frame_arity_outer :: "frame_context \<Rightarrow> frame_context list 
 type_synonym depth = nat
 type_synonym fuel = nat
 
-type_synonym config_tuple = "depth \<times> s \<times> frame_context \<times> frame_context list"
+datatype config = Config depth s frame_context "frame_context list"
 
-type_synonym res_step_tuple = "config_tuple \<times> res_step"
+type_synonym res_step_tuple = "config \<times> res_step"
 
-type_synonym res_tuple = "config_tuple \<times> res"
+type_synonym res_tuple = "config \<times> res"
 
 fun split_vals :: "b_e list \<Rightarrow> v list \<times> b_e list" where
   "split_vals ((C v)#es) = (let (vs', es') = split_vals es in (v#vs', es'))"
@@ -396,176 +390,176 @@ axiomatization
   host_apply_impl_correct:"(host_apply_impl s tf h vs = Some m') \<Longrightarrow> (\<exists>hs. host_apply s tf h vs hs (Some m'))"
 
 fun update_redex_step :: "redex \<Rightarrow> v_stack \<Rightarrow> e list \<Rightarrow> redex" where
-  "update_redex_step (v_s, es, b_es) v_s' es_cont = (v_s', es_cont@es, b_es)"
+  "update_redex_step (Redex v_s es b_es) v_s' es_cont = (Redex v_s' (es_cont@es) b_es)"
 
 fun update_fc_step :: "frame_context \<Rightarrow> v_stack \<Rightarrow> e list \<Rightarrow> frame_context" where
-  "update_fc_step (redex, rest) v_s' es_cont = (update_redex_step redex v_s' es_cont, rest)"
+  "update_fc_step (Frame_context rdx lcs nf f) v_s' es_cont = (Frame_context (update_redex_step rdx v_s' es_cont) lcs nf f)"
 
 fun update_redex_return :: "redex \<Rightarrow> v_stack \<Rightarrow> redex" where
-  "update_redex_return (v_s, es, b_es) v_s' = (v_s'@v_s, es, b_es)"
+  "update_redex_return (Redex v_s es b_es) v_s' = (Redex (v_s'@v_s) es b_es)"
 
 fun update_fc_return :: "frame_context \<Rightarrow> v_stack \<Rightarrow> frame_context" where
-  "update_fc_return (redex, rest) v_s' = (update_redex_return redex v_s', rest)"
+  "update_fc_return (Frame_context rdx lcs nf f) v_s' = (Frame_context (update_redex_return rdx v_s') lcs nf f)"
 
 fun update_fcs_return :: "frame_context list \<Rightarrow> v_stack \<Rightarrow> frame_context list" where
   "update_fcs_return [] v_s = []"
 | "update_fcs_return (fc#fcs) v_s = (update_fc_return fc v_s)#fcs"
 
 fun update_redex_trap :: "redex \<Rightarrow> redex" where
-  "update_redex_trap (v_s, es, b_es) = ([], es, b_es)"
+  "update_redex_trap (Redex v_s es b_es) = (Redex [] es b_es)"
 
 fun update_fc_trap :: "frame_context \<Rightarrow> frame_context" where
-  "update_fc_trap (redex, rest) = (update_redex_trap redex, rest)"
+  "update_fc_trap (Frame_context rdx lcs nf f) = (Frame_context (update_redex_trap rdx) lcs nf f)"
 
 fun update_fcs_trap :: "frame_context list \<Rightarrow> frame_context list" where
   "update_fcs_trap [] = []"
 | "update_fcs_trap (fc#fcs) = (update_fc_trap fc)#fcs"
 
-fun run_step_b_e :: "b_e \<Rightarrow> config_tuple \<Rightarrow> res_step_tuple" where
-  "run_step_b_e b_e (d,s,fc,fcs) =
-    (let ((v_s, es, b_es), lcs, nf, f) = fc in
+fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" where
+  "run_step_b_e b_e (Config d s fc fcs) =
+    (case fc of (Frame_context (Redex v_s es b_es) lcs nf f) \<Rightarrow>
     (case b_e of
       (Unop t op) \<Rightarrow>
         let (v_s', res) = (app_v_s_unop op v_s) in
-        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
 
     | (Binop t op) \<Rightarrow>
         let (v_s', res) = (app_v_s_binop op v_s) in
-        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
 
     | (Testop t op) \<Rightarrow>
         let (v_s', res) = (app_v_s_testop op v_s) in
-        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
 
     | (Relop t op) \<Rightarrow>
         let (v_s', res) = (app_v_s_relop op v_s) in
-        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
 
     | (Cvtop t2 op t1 sx) \<Rightarrow>
         let (v_s', res) = (app_v_s_cvtop op t1 t2 sx v_s) in
-        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
 
     | (Unreachable) \<Rightarrow>
-        ((d,s,fc,fcs), Res_trap (STR ''unreachable''))
+        (Config d s fc fcs, Res_trap (STR ''unreachable''))
 
     | (Nop) \<Rightarrow>
-        ((d,s,fc,fcs), Step_normal)
+        (Config d s fc fcs, Step_normal)
 
     | (Drop) \<Rightarrow>
         let (v_s', res) = (app_v_s_drop v_s) in
-        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
 
     | (Select) \<Rightarrow>
         let (v_s', res) = (app_v_s_select v_s) in
-        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
 
     | (Block (t1s _> t2s) b_ebs) \<Rightarrow>
-        if es \<noteq> [] then ((d,s,fc,fcs), crash_invariant)
+        if es \<noteq> [] then (Config d s fc fcs, crash_invariant)
         else
           let n = length t1s in
           let m = length t2s in
           if (length v_s \<ge> n) then
             let (v_bs, v_s') = split_n v_s n in
-            let lc = (v_s', b_es, m, []) in 
-            let fc' = ((v_bs, [], b_ebs), lc#lcs, nf, f) in
-            ((d,s,fc',fcs), Step_normal)
-          else ((d,s,fc,fcs), crash_invalid)
+            let lc = Label_context v_s' b_es m [] in 
+            let fc' = Frame_context (Redex v_bs [] b_ebs) (lc#lcs) nf f in
+            (Config d s fc' fcs, Step_normal)
+          else (Config d s fc fcs, crash_invalid)
 
     | (Loop (t1s _> t2s) b_els) \<Rightarrow>
-        if es \<noteq> [] then ((d,s,fc,fcs), crash_invariant)
+        if es \<noteq> [] then (Config d s fc fcs, crash_invariant)
         else
           let n = length t1s in
           let m = length t2s in
           if (length v_s \<ge> n) then
             let (v_bs, v_s') = split_n v_s n in
-            let lc = (v_s', b_es, n, [(Loop (t1s _> t2s) b_els)]) in 
-            let fc' = ((v_bs, [], b_els), lc#lcs, nf, f) in
-            ((d,s,fc',fcs), Step_normal)
-          else ((d,s,fc,fcs), crash_invalid)
+            let lc = Label_context v_s' b_es n [(Loop (t1s _> t2s) b_els)] in 
+            let fc' = Frame_context (Redex v_bs [] b_els) (lc#lcs) nf f in
+            (Config d s fc' fcs, Step_normal)
+          else (Config d s fc fcs, crash_invalid)
 
     | (If tf es1 es2) \<Rightarrow>
         let (v_s', es_cont, res) = (app_v_s_if tf es1 es2 v_s) in
-        ((d,s,(update_fc_step fc v_s' es_cont),fcs), res)
+        (Config d s (update_fc_step fc v_s' es_cont) fcs, res)
 
     | (Br k) \<Rightarrow>
         if (length lcs > k) then
-          let (v_ls, b_els, nl, b_ecls) = (lcs!k) in
+          case (lcs!k) of (Label_context v_ls b_els nl b_ecls) \<Rightarrow>
           if (length v_s \<ge> nl) then
             let v_s' = (take nl v_s) in
-            let fc' = ((v_s'@v_ls, [], b_ecls@b_els), (drop (Suc k) lcs), nf, f) in
-            ((d,s,fc',fcs), Step_normal)
+            let fc' = Frame_context (Redex (v_s'@v_ls) [] (b_ecls@b_els)) (drop (Suc k) lcs) nf f in
+            (Config d s fc' fcs, Step_normal)
           else
-            ((d,s,fc,fcs), crash_invalid)
+            (Config d s fc fcs, crash_invalid)
         else
-          ((d,s,fc,fcs), crash_invalid)
+          (Config d s fc fcs, crash_invalid)
 
     | (Br_if k) \<Rightarrow>
         let (v_s', es_cont, res) = (app_v_s_br_if k v_s) in
-        ((d,s,(update_fc_step fc v_s' es_cont),fcs), res)
+        (Config d s (update_fc_step fc v_s' es_cont) fcs, res)
 
     | (Br_table ks k) \<Rightarrow>
         let (v_s', es_cont, res) = (app_v_s_br_table ks k v_s) in
-        ((d,s,(update_fc_step fc v_s' es_cont),fcs), res)
+        (Config d s (update_fc_step fc v_s' es_cont) fcs, res)
 
     | (Call k) \<Rightarrow>
         let (es_cont, res) = (app_f_call k f) in
-        ((d,s,(update_fc_step fc v_s es_cont),fcs), res)
+        (Config d s (update_fc_step fc v_s es_cont) fcs, res)
 
     | (Call_indirect k) \<Rightarrow>
         let (v_s', es_cont, res) = (app_s_f_v_s_call_indirect k (tabs s) (funcs s) f v_s) in
-        ((d,s,(update_fc_step fc v_s' es_cont),fcs), res)
+        (Config d s (update_fc_step fc v_s' es_cont) fcs, res)
 
     | (Return) \<Rightarrow>
         (case fcs of
-           [] \<Rightarrow> ((d,s,fc,fcs), crash_invalid)
+           [] \<Rightarrow> (Config d s fc fcs, crash_invalid)
          | fc'#fcs' \<Rightarrow> if (length v_s \<ge> nf) then
-                         ((Suc d,s,(update_fc_return fc' (take nf v_s)),fcs'), Step_normal)
-                       else ((d,s,fc,fcs), crash_invalid))
+                         (Config (Suc d) s (update_fc_return fc' (take nf v_s)) fcs', Step_normal)
+                       else (Config d s fc fcs, crash_invalid))
 
     | (Get_local k) \<Rightarrow>
         let (v_s', res) = (app_f_v_s_get_local k f v_s) in
-        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+        (Config d s (update_fc_step fc v_s' []) fcs, res)
 
     | (Set_local k) \<Rightarrow>
         let (f', v_s', res) = (app_f_v_s_set_local k f v_s) in
-        let fc' = ((v_s', es, b_es), lcs, nf, f') in
-        ((d,s,fc',fcs), res)
+        let fc' = Frame_context (Redex v_s' es b_es) lcs nf f' in
+        (Config d s fc' fcs, res)
 
     | (Tee_local k) \<Rightarrow>
         let (v_s', es_cont, res) = (app_v_s_tee_local k v_s) in
-        ((d,s,(update_fc_step fc v_s' es_cont),fcs), res)
+        (Config d s (update_fc_step fc v_s' es_cont) fcs, res)
 
     | (Get_global k) \<Rightarrow>
         let (v_s', res) = (app_s_f_v_s_get_global k (globs s) f v_s) in
-        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+        (Config d s (update_fc_step fc v_s' []) fcs, res)
 
     | (Set_global k) \<Rightarrow>
         let (gs', v_s', res) = (app_s_f_v_s_set_global k (globs s) f v_s) in
-        ((d,s\<lparr>globs:=gs'\<rparr>,(update_fc_step fc v_s' []),fcs), res)
+        (Config d (s\<lparr>globs:=gs'\<rparr>) (update_fc_step fc v_s' []) fcs, res)
 
     | (Load t tp_sx a off) \<Rightarrow>
         let (v_s', res) = (app_s_f_v_s_load_maybe_packed t tp_sx off (mems s) f v_s) in
-        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+        (Config d s (update_fc_step fc v_s' []) fcs, res)
 
     | (Store t tp a off) \<Rightarrow>
         let (ms', v_s', res) = (app_s_f_v_s_store_maybe_packed t tp off (mems s) f v_s) in
-        ((d,s\<lparr>mems:=ms'\<rparr>,(update_fc_step fc v_s' []),fcs), res)
+        (Config d (s\<lparr>mems:=ms'\<rparr>) (update_fc_step fc v_s' []) fcs, res)
 
     | (Current_memory) \<Rightarrow>
         let (v_s', res) = (app_s_f_v_s_mem_size (mems s) f v_s) in
-        ((d,s,(update_fc_step fc v_s' []),fcs), res)
+        (Config d s (update_fc_step fc v_s' []) fcs, res)
 
     | (Grow_memory) \<Rightarrow>
         let (ms', v_s', res) = (app_s_f_v_s_mem_grow (mems s) f v_s) in
-        ((d,s\<lparr>mems:=ms'\<rparr>,(update_fc_step fc v_s' []),fcs), res)
+        (Config d (s\<lparr>mems:=ms'\<rparr>) (update_fc_step fc v_s' []) fcs, res)
 
-    | _ \<Rightarrow> ((d,s,fc,fcs), crash_invariant)))"
+    | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))"
 
-fun run_step_e :: "e \<Rightarrow> config_tuple \<Rightarrow> res_step_tuple" where
-  "run_step_e e (d,s,fc,fcs) =
-    (let ((v_s, es, b_es), lcs, nf, f) = fc in
+fun run_step_e :: "e \<Rightarrow> config \<Rightarrow> res_step_tuple" where
+  "run_step_e e (Config d s fc fcs) =
+    (case fc of Frame_context (Redex v_s es b_es) lcs nf f \<Rightarrow>
     (case e of
-       Basic b_e \<Rightarrow> run_step_b_e b_e (d,s,fc,fcs)
+       Basic b_e \<Rightarrow> run_step_b_e b_e (Config d s fc fcs)
      | Invoke i_cl \<Rightarrow>
          (case (funcs s!i_cl) of
              Func_native i' (t1s _> t2s) ts es_f \<Rightarrow>
@@ -575,14 +569,14 @@ fun run_step_e :: "e \<Rightarrow> config_tuple \<Rightarrow> res_step_tuple" wh
                     let m = length t2s in
                     if (length v_s \<ge> n) then
                       let (v_fs, v_s') = split_n v_s n in
-                      let fc' = ((v_s', es, b_es), lcs, nf, f) in
+                      let fc' = Frame_context (Redex v_s' es b_es) lcs nf f in
                       let zs = n_zeros ts in
                       let ff = \<lparr> f_locs = ((rev v_fs)@zs), f_inst = i'\<rparr> in
-                      let fcf = (([], [], [Block ([] _> t2s) es_f]), [], m, ff) in
-                      ((d',s,fcf,fc'#fcs), Step_normal)
+                      let fcf = Frame_context (Redex [] [] [Block ([] _> t2s) es_f]) [] m ff in
+                      (Config d' s fcf (fc'#fcs), Step_normal)
                     else
-                      ((d,s,fc,fcs), crash_invalid))
-               | 0 \<Rightarrow> ((d,s,fc,fcs), crash_exhaustion))
+                      (Config d s fc fcs, crash_invalid))
+               | 0 \<Rightarrow> (Config d s fc fcs, crash_exhaustion))
            | Func_host (t1s _> t2s) h \<Rightarrow>
                let n = length t1s in
                let m = length t2s in
@@ -593,50 +587,47 @@ fun run_step_e :: "e \<Rightarrow> config_tuple \<Rightarrow> res_step_tuple" wh
                      Some (s',rvs) \<Rightarrow> 
                        if list_all2 types_agree t2s rvs
                          then
-                           let fc' = (((rev rvs)@v_s', es, b_es), lcs, nf, f) in
-                           ((d,s',fc',fcs), Step_normal)
+                           let fc' = Frame_context (Redex ((rev rvs)@v_s') es b_es) lcs nf f in
+                           (Config d s' fc' fcs, Step_normal)
                          else
-                           ((d,s',fc,fcs), crash_invalid)
-                   | None \<Rightarrow> ((d,s,((v_s', es, b_es), lcs, nf, f),fcs), Res_trap (STR ''host_apply''))
+                           (Config d s' fc fcs, crash_invalid)
+                   | None \<Rightarrow> (Config d s (Frame_context (Redex v_s' es b_es) lcs nf f) fcs, Res_trap (STR ''host_apply''))
                  else
-                    ((d,s,fc,fcs), crash_invalid))
-     | _ \<Rightarrow> ((d,s,fc,fcs), crash_invariant)))"
+                    (Config d s fc fcs, crash_invalid))
+     | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))"
 (* should never produce Label, Frame, or Trap *)
 
-function(sequential) run_iter :: "fuel \<Rightarrow> config_tuple \<Rightarrow> res_tuple" where
-(* stack values in the outermost Frame *)
-  "run_iter (Suc n) (d,s,((v_s, [], []), [], nf, f),[]) =
-     ((d,s,((v_s, [], []), [], nf, f),[]), RValue v_s)"
-
-(* stack values returned from an inner Frame *)
-| "run_iter (Suc n) (d,s,((v_s, [], []), [], nf, f),fc#fcs) =
-     run_iter n (Suc d,s,(update_fc_return fc v_s),fcs)"
-
-(* stack values returned from an inner Label *)
-| "run_iter (Suc n) (d,s,((v_s, [], []), (v_ls, b_els, nl, b_elcs)#lcs, nf, f),fcs) =
-    (let f_new = ((v_s@v_ls, [], b_els), lcs, nf, f) in
-     run_iter n (d,s,f_new,fcs))"
-
-(* run a step of the intermediate reduct *)
-| "run_iter (Suc n) (d,s,((v_s, e#es, b_es), lcs, nf, f),fcs) =
-    (let (cfg', res) = run_step_e e (d,s,((v_s, es, b_es), lcs, nf, f),fcs) in
+function(sequential) run_iter :: "fuel \<Rightarrow> config \<Rightarrow> res_tuple" where
+  "run_iter (Suc n) cfg =
+     (case cfg of
+        (Config d s (Frame_context (Redex v_s es b_es) lcs nf f) fcs) \<Rightarrow>
+     (case es of
+        [] \<Rightarrow> (case b_es of
+                 [] \<Rightarrow> (case lcs of
+                          [] \<Rightarrow> (case fcs of
+\<comment> \<open> stack values in the outermost frame \<close>
+                                   [] \<Rightarrow> ((Config d s (Frame_context (Redex v_s [] []) [] nf f) []), RValue v_s)
+\<comment> \<open> stack values returned from an inner frame \<close>
+                                 | fc'#fcs' \<Rightarrow> run_iter n (Config (Suc d) s (update_fc_return fc' v_s) fcs'))
+\<comment> \<open> stack values returned from an inner label \<close>
+                        | (Label_context v_ls b_els nl b_elcs)#lcs' \<Rightarrow> (let f_new = Frame_context (Redex (v_s@v_ls) [] b_els) lcs' nf f in
+                                                             run_iter n (Config d s f_new fcs)))
+\<comment> \<open> run a step of regular code \<close>
+               | b_es \<Rightarrow> (case split_v_s_b_s b_es of
+                            (v_s',[]) \<Rightarrow> run_iter n (Config d s (Frame_context (Redex (v_s'@v_s) [] []) lcs nf f) fcs)
+                          | (v_s',b_e#b_es') \<Rightarrow> (let (cfg', res) = run_step_b_e b_e (Config d s (Frame_context (Redex (v_s'@v_s) [] b_es') lcs nf f) fcs) in
+                                                (case res of
+                                                   Step_normal \<Rightarrow> run_iter n cfg'
+                                                 | Res_trap str \<Rightarrow> (cfg', RTrap str)
+                                                 | Res_crash str \<Rightarrow> (cfg', RCrash str)))))
+\<comment> \<open> run a step of the intermediate reduct \<close>
+      | e#es' \<Rightarrow> (let (cfg', res) = run_step_e e (Config d s (Frame_context (Redex v_s es' b_es) lcs nf f) fcs) in
                       (case res of
                          Step_normal \<Rightarrow> run_iter n cfg'
                        | Res_trap str \<Rightarrow> (cfg', RTrap str)
-                       | Res_crash str \<Rightarrow> (cfg', RCrash str)))"
+                       | Res_crash str \<Rightarrow> (cfg', RCrash str)))))"
 
-(* run a step of regular code *)
-| "run_iter (Suc n) (d,s,((v_s, [], b_es), lcs, nf, f),fcs) =
-     (case split_v_s_b_s b_es of
-       (v_s',[]) \<Rightarrow> run_iter n (d,s,((v_s'@v_s, [], []), lcs, nf, f),fcs)
-     | (v_s',b_e#b_es') \<Rightarrow> 
-         (let (cfg', res) = run_step_b_e b_e (d,s,((v_s'@v_s, [], b_es'), lcs, nf, f),fcs) in
-                               (case res of
-                                  Step_normal \<Rightarrow> run_iter n cfg'
-                                | Res_trap str \<Rightarrow> (cfg', RTrap str)
-                                | Res_crash str \<Rightarrow> (cfg', RCrash str))))"
-
-(* out of fuel *)
+\<comment> \<open> out of fuel \<close>
 | "run_iter 0 cfg = (cfg, res_crash_fuel)"
 
   by pat_completeness auto
@@ -645,7 +636,7 @@ termination
 
 fun run_v :: "fuel \<Rightarrow> depth \<Rightarrow> s \<Rightarrow> f \<Rightarrow> b_e list \<Rightarrow> (s \<times> res)" where
   "run_v n d s f b_es =
-     (let ((d,s,fc,fcs),res) = run_iter n (d, s, (([],[],b_es),[],0,f), []) in
-      (s,res))"
+     (let (cfg',res) = run_iter n (Config d s (Frame_context (Redex [] [] b_es) [] 0 f) []) in
+      case cfg' of (Config d s fc fcs) \<Rightarrow> (s,res))"
 
 end

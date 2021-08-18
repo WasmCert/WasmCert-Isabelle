@@ -513,22 +513,22 @@ next
 qed
 
 fun es_redex_to_es :: "e list \<Rightarrow> redex \<Rightarrow> e list" where
-  "es_redex_to_es es (v_sr, esr, b_esr) = v_stack_to_es v_sr @ es @ esr @ ($*b_esr)"
+  "es_redex_to_es es (Redex v_sr esr b_esr) = v_stack_to_es v_sr @ es @ esr @ ($*b_esr)"
 
 fun es_label_context_to_es :: "e list \<Rightarrow> label_context \<Rightarrow> e list" where
-  "es_label_context_to_es es (v_so, eso, n, esc) = (v_stack_to_es v_so)@[Label n ($*esc) es]@($*eso)"
+  "es_label_context_to_es es (Label_context v_so eso n esc) = (v_stack_to_es v_so)@[Label n ($*esc) es]@($*eso)"
 
 fun es_label_contexts_to_es :: "e list \<Rightarrow> label_context list \<Rightarrow> e list" where
   "es_label_contexts_to_es es [] = es"
 | "es_label_contexts_to_es es (lc#lcs) = (let esl =  es_label_context_to_es es lc in es_label_contexts_to_es esl lcs)"
 
 fun es_frame_context_to_e :: "e list \<Rightarrow> frame_context \<Rightarrow> e" where
-  "es_frame_context_to_e es (rdx, lcs, n, f) =
+  "es_frame_context_to_e es (Frame_context rdx lcs n f) =
    (let esl = es_redex_to_es es rdx in
     Frame n f (es_label_contexts_to_es esl lcs))"
 
 fun es_s_frame_context_to_config :: "e list \<Rightarrow> s \<Rightarrow> frame_context \<Rightarrow> (s \<times> f \<times> e list)" where
-  "es_s_frame_context_to_config es s (rdx, lcs, n, f) =
+  "es_s_frame_context_to_config es s (Frame_context rdx lcs n f) =
    (let esl = es_redex_to_es es rdx in
     (s, f, (es_label_contexts_to_es esl lcs)))"
 
@@ -551,26 +551,26 @@ next
 qed
 
 lemma es_s_frame_contexts_to_config_e_one:
-  "es_s_frame_contexts_to_config [e] s ((v_s, es, b_es), lcs, nf, f) fcs = 
-     es_s_frame_contexts_to_config [] s ((v_s, e#es, b_es), lcs, nf, f) fcs"
+  "es_s_frame_contexts_to_config [e] s (Frame_context (Redex v_s es b_es) lcs nf f) fcs = 
+     es_s_frame_contexts_to_config [] s (Frame_context (Redex v_s (e#es) b_es) lcs nf f) fcs"
   by (cases fcs) auto
 
 lemma es_s_frame_contexts_to_config_b_e_one:
-  "es_s_frame_contexts_to_config [$b_e] s ((v_s, [], b_es), lcs, nf, f) fcs = 
-     es_s_frame_contexts_to_config [] s ((v_s, [], b_e#b_es), lcs, nf, f) fcs"
+  "es_s_frame_contexts_to_config [$b_e] s (Frame_context (Redex v_s [] b_es) lcs nf f) fcs = 
+     es_s_frame_contexts_to_config [] s (Frame_context (Redex v_s [] (b_e#b_es)) lcs nf f) fcs"
   by (cases fcs) auto
 
 lemma es_s_frame_contexts_to_config_b_e_split_v_s_b_s:
-  "es_s_frame_contexts_to_config [] s ((v_s'@v_s, [], b_es), lcs, nf, f) fcs =
-     es_s_frame_contexts_to_config [] s ((v_s, [], (v_stack_to_b_es v_s')@b_es), lcs, nf, f) fcs"
+  "es_s_frame_contexts_to_config [] s (Frame_context (Redex (v_s'@v_s) [] b_es) lcs nf f) fcs =
+     es_s_frame_contexts_to_config [] s (Frame_context (Redex v_s [] ((v_stack_to_b_es v_s')@b_es)) lcs nf f) fcs"
   apply (cases fcs)
   apply simp_all
   apply (metis comp_apply)+
   done
 
 lemma es_s_frame_contexts_to_config_b_e_step:
-  "es_s_frame_contexts_to_config [$b_e] s ((v_s'@v_s, [], b_es), lcs, nf, f) fcs =
-     es_s_frame_contexts_to_config [] s ((v_s, [], (v_stack_to_b_es v_s')@b_e#b_es), lcs, nf, f) fcs"
+  "es_s_frame_contexts_to_config [$b_e] s (Frame_context (Redex (v_s'@v_s) [] b_es) lcs nf f) fcs =
+     es_s_frame_contexts_to_config [] s (Frame_context (Redex v_s [] ((v_stack_to_b_es v_s')@b_e#b_es)) lcs nf f) fcs"
   using es_s_frame_contexts_to_config_b_e_one es_s_frame_contexts_to_config_b_e_split_v_s_b_s
   by simp
 
@@ -699,16 +699,23 @@ lemma es_s_frame_contexts_to_config_snoc:
   shows "es_s_frame_contexts_to_config es s fc_inner (fcs@[fc]) = (es_s_frame_context_to_config ([Frame (frame_arity_outer fc_inner fcs) f esfc]) s fc)"
   using assms
 proof (induction es s fc_inner fcs rule: es_s_frame_contexts_to_config.induct)
-qed (auto simp add: frame_arity_outer_def)
+  case (1 es s fc')
+  then show ?case
+    by (cases fc') (auto simp add: frame_arity_outer_def)
+next
+  case (2 es s fc fc' fcs)
+  then show ?case
+    by (cases fc') (auto simp add: frame_arity_outer_def)
+qed
 
 lemma es_s_frame_context_to_config_ctx:
   assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
           "es_s_frame_context_to_config ([Frame n f es]) s fc = (s, f_fc, es_fc)"
   shows "\<exists>es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc;es_fc'\<rparr> \<and> es_s_frame_context_to_config ([Frame n f' es']) s' fc = (s', f_fc, es_fc')"
 proof -
-  obtain v_sr esr b_esr lcs nf f_c rdx where fc_is:"fc = (rdx, lcs, nf, f_c)"
-                                              "rdx = (v_sr, esr, b_esr)"
-    by (metis prod.exhaust)
+  obtain v_sr esr b_esr lcs nf f_c rdx where fc_is:"fc = Frame_context rdx lcs nf f_c"
+                                                   "rdx = Redex v_sr esr b_esr"
+    by (metis frame_context.exhaust redex.exhaust)
   have "\<lparr>s;f_c;es_label_contexts_to_es (v_stack_to_es v_sr @ (Frame n f es) # esr @ ($* b_esr)) lcs\<rparr> \<leadsto>
           \<lparr>s';f_c;es_label_contexts_to_es (v_stack_to_es v_sr @ (Frame n f' es') # esr @ ($* b_esr)) lcs\<rparr>"
     using progress_L0[OF reduce.local[OF assms(1)]] es_label_contexts_to_es_LN
@@ -753,7 +760,7 @@ qed
 
 lemma es_frame_context_to_e_ctx:
   assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
-  shows "\<lparr>s;f_arb;[es_frame_context_to_e es (rdx, lcs, nf, f)]\<rparr> \<leadsto> \<lparr>s';f_arb;[es_frame_context_to_e es' (rdx, lcs, nf, f')]\<rparr>"
+  shows "\<lparr>s;f_arb;[es_frame_context_to_e es (Frame_context rdx lcs nf f)]\<rparr> \<leadsto> \<lparr>s';f_arb;[es_frame_context_to_e es' (Frame_context rdx lcs nf f')]\<rparr>"
   using reduce.local
         es_label_contexts_to_es_LN
         progress_L0[OF assms]
@@ -763,7 +770,7 @@ lemma es_frame_context_to_e_ctx:
 
 lemma es_frame_context_to_e_ctx_irrtrans:
   assumes "reduce_irrtrans (s, f, es) (s', f', es')"
-  shows "reduce_irrtrans (s,f_arb,[es_frame_context_to_e es (rdx, lcs, nf, f)]) (s',f_arb,[es_frame_context_to_e es' (rdx, lcs, nf, f')])"
+  shows "reduce_irrtrans (s,f_arb,[es_frame_context_to_e es (Frame_context rdx lcs nf f)]) (s',f_arb,[es_frame_context_to_e es' (Frame_context rdx lcs nf f')])"
   using assms
   unfolding reduce_irrtrans_def
 proof (induction "(s, f, es)" "(s', f', es')" arbitrary: s' f' es' rule: tranclp.induct)
@@ -779,11 +786,11 @@ next
     by (simp split: prod.splits)
   hence b:
        "(\<lambda>(s, f, es) (s', x, y). \<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';x;y\<rparr>)\<^sup>+\<^sup>+
-          (s, f_arb, [es_frame_context_to_e es (rdx, lcs, nf, f)])
-            (s'', f_arb, [es_frame_context_to_e es'' (rdx, lcs, nf, f'')])"
+          (s, f_arb, [es_frame_context_to_e es (Frame_context rdx lcs nf f)])
+            (s'', f_arb, [es_frame_context_to_e es'' (Frame_context rdx lcs nf f'')])"
     using trancl_into_trancl(2)
     by blast
-  hence "\<lparr>s'';f_arb;[es_frame_context_to_e es'' (rdx, lcs, nf, f'')]\<rparr> \<leadsto> \<lparr>s';f_arb;[es_frame_context_to_e es' (rdx, lcs, nf, f')]\<rparr>"
+  hence "\<lparr>s'';f_arb;[es_frame_context_to_e es'' (Frame_context rdx lcs nf f'')]\<rparr> \<leadsto> \<lparr>s';f_arb;[es_frame_context_to_e es' (Frame_context rdx lcs nf f')]\<rparr>"
     using a b es_frame_context_to_e_ctx
     by blast
   thus ?case
@@ -793,8 +800,8 @@ qed
 
 lemma es_s_frame_contexts_to_config_ctx:
   assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
-          "es_s_frame_contexts_to_config es s (rdx, lcs, nf, f) fcs = (s,f_fc,es_fc)"
-  shows "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and> es_s_frame_contexts_to_config es' s' (rdx, lcs, nf, f') fcs = (s',f_fc',es_fc')"
+          "es_s_frame_contexts_to_config es s (Frame_context rdx lcs nf f) fcs = (s,f_fc,es_fc)"
+  shows "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and> es_s_frame_contexts_to_config es' s' (Frame_context rdx lcs nf f') fcs = (s',f_fc',es_fc')"
   using assms
 proof (induction fcs arbitrary: f_fc es_fc rule: List.rev_induct)
   case Nil
@@ -804,12 +811,12 @@ proof (induction fcs arbitrary: f_fc es_fc rule: List.rev_induct)
 next
   case (snoc x xs)
   obtain f_fci es_fci f_fci' es_fci' where 0:
-    "es_s_frame_contexts_to_config es s (rdx, lcs, nf, f) xs = (s, f_fci, es_fci)"
+    "es_s_frame_contexts_to_config es s (Frame_context rdx lcs nf f) xs = (s, f_fci, es_fci)"
     "\<lparr>s;f_fci;es_fci\<rparr> \<leadsto> \<lparr>s';f_fci';es_fci'\<rparr>"
-    "es_s_frame_contexts_to_config es' s' (rdx, lcs, nf, f') xs = (s', f_fci', es_fci')"
-    using snoc(1)[OF snoc(2)] es_s_frame_contexts_to_config_s[of es s "(rdx, lcs, nf, f)" xs]
+    "es_s_frame_contexts_to_config es' s' (Frame_context rdx lcs nf f') xs = (s', f_fci', es_fci')"
+    using snoc(1)[OF snoc(2)] es_s_frame_contexts_to_config_s[of es s "(Frame_context rdx lcs nf f)" xs]
     by metis
-  have "(frame_arity_outer (rdx, lcs, nf, f') xs) = (frame_arity_outer (rdx, lcs, nf, f) xs)"
+  have "(frame_arity_outer (Frame_context rdx lcs nf f') xs) = (frame_arity_outer (Frame_context rdx lcs nf f) xs)"
     unfolding frame_arity_outer_def
     by (simp split: if_splits)
   thus ?case
@@ -823,8 +830,8 @@ qed
 
 lemma es_s_frame_contexts_to_config_ctx_irrtrans:
   assumes "reduce_irrtrans (s, f, es) (s', f', es')"
-          "es_s_frame_contexts_to_config es s (rdx, lcs, nf, f) fcs = (s,f_fc,es_fc)"
-  shows "\<exists>f_fc' es_fc'. reduce_irrtrans (s,f_fc,es_fc) (s',f_fc',es_fc') \<and> es_s_frame_contexts_to_config es' s' (rdx, lcs, nf, f') fcs = (s',f_fc',es_fc')"
+          "es_s_frame_contexts_to_config es s (Frame_context rdx lcs nf f) fcs = (s,f_fc,es_fc)"
+  shows "\<exists>f_fc' es_fc'. reduce_irrtrans (s,f_fc,es_fc) (s',f_fc',es_fc') \<and> es_s_frame_contexts_to_config es' s' (Frame_context rdx lcs nf f') fcs = (s',f_fc',es_fc')"
   using assms
   unfolding reduce_irrtrans_def
 proof (induction "(s, f, es)" "(s', f', es')" arbitrary: s' f' es' rule: tranclp.induct)
@@ -841,12 +848,12 @@ next
     by (simp split: prod.splits)
   then obtain f_fc'' es_fc'' where b:
        "(\<lambda>(s, f, es) (s', x, y). \<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';x;y\<rparr>)\<^sup>+\<^sup>+ (s, f_fc, es_fc) (s'', f_fc'', es_fc'')"
-       "es_s_frame_contexts_to_config es'' s'' (rdx, lcs, nf, f'') fcs = (s'',f_fc'',es_fc'')"
+       "es_s_frame_contexts_to_config es'' s'' (Frame_context rdx lcs nf f'') fcs = (s'',f_fc'',es_fc'')"
     using trancl_into_trancl(2)[OF a(1) trancl_into_trancl(4)]
     by blast
   obtain f_fc' es_fc' where c:
        "\<lparr>s'';f_fc'';es_fc''\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr>"
-       "es_s_frame_contexts_to_config es' s' (rdx, lcs, nf, f') fcs = (s', f_fc', es_fc')"
+       "es_s_frame_contexts_to_config es' s' (Frame_context rdx lcs nf f') fcs = (s', f_fc', es_fc')"
     using a(3) b(2) es_s_frame_contexts_to_config_ctx
     by blast
   thus ?case
@@ -857,8 +864,8 @@ qed
 
 lemma es_s_frame_contexts_to_config_ctx1:
   assumes "\<lparr>s;f;(v_stack_to_es v_s)@es\<rparr> \<leadsto> \<lparr>s';f';(v_stack_to_es v_s')@es'\<rparr>"
-          "es_s_frame_contexts_to_config es s ((v_s,es_ctx,b_es_ctx), lcs, nf, f) fcs = (s,f_fc,es_fc)"
-  shows "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and> es_s_frame_contexts_to_config [] s' (update_redex_step (v_s,es_ctx,b_es_ctx) v_s' es', lcs, nf, f') fcs = (s',f_fc',es_fc')"
+          "es_s_frame_contexts_to_config es s (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs = (s,f_fc,es_fc)"
+  shows "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and> es_s_frame_contexts_to_config [] s' (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' es') lcs nf f') fcs = (s',f_fc',es_fc')"
   using assms
 proof (induction fcs arbitrary: s f_fc es_fc rule: List.rev_induct)
   case Nil
@@ -868,12 +875,12 @@ proof (induction fcs arbitrary: s f_fc es_fc rule: List.rev_induct)
 next
   case (snoc fc fcs')
    obtain f_fci es_fci f_fci' es_fci' where 0:
-    "es_s_frame_contexts_to_config es s ((v_s,es_ctx,b_es_ctx), lcs, nf, f) fcs' = (s, f_fci, es_fci)"
+    "es_s_frame_contexts_to_config es s (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs' = (s, f_fci, es_fci)"
     "\<lparr>s;f_fci;es_fci\<rparr> \<leadsto> \<lparr>s';f_fci';es_fci'\<rparr>"
-    "es_s_frame_contexts_to_config [] s' (update_redex_step (v_s, es_ctx, b_es_ctx) v_s' es', lcs, nf, f') fcs' = (s', f_fci', es_fci')"
+    "es_s_frame_contexts_to_config [] s' (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' es') lcs nf f') fcs' = (s', f_fci', es_fci')"
     using snoc(1)[OF snoc(2)] es_s_frame_contexts_to_config_s
     by metis
-  have "(frame_arity_outer (update_redex_step (v_s, es_ctx, b_es_ctx) v_s' es', lcs, nf, f') fcs') = (frame_arity_outer ((v_s,es_ctx,b_es_ctx), lcs, nf, f) fcs')"
+  have "(frame_arity_outer (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' es') lcs nf f') fcs') = (frame_arity_outer (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs')"
     unfolding frame_arity_outer_def
     by (simp split: if_splits)
   thus ?case
@@ -887,8 +894,8 @@ qed
 
 lemma es_s_frame_contexts_to_config_ctx2:
   assumes "\<lparr>s;f;(v_stack_to_es v_s)@es\<rparr> \<leadsto> \<lparr>s';f';(v_stack_to_es v_s')\<rparr>"
-          "es_s_frame_contexts_to_config es s ((v_s,es_ctx,b_es_ctx), lcs, nf, f) fcs = (s,f_fc,es_fc)"
-  shows "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and> es_s_frame_contexts_to_config [] s' (update_redex_step (v_s,es_ctx,b_es_ctx) v_s' [], lcs, nf, f') fcs = (s',f_fc',es_fc')"
+          "es_s_frame_contexts_to_config es s (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs = (s,f_fc,es_fc)"
+  shows "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and> es_s_frame_contexts_to_config [] s' (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' []) lcs nf f') fcs = (s',f_fc',es_fc')"
 proof -
   have 1:"\<lparr>s;f;(v_stack_to_es v_s)@es\<rparr> \<leadsto> \<lparr>s';f';(v_stack_to_es v_s'@[])\<rparr>"
     using assms
@@ -900,8 +907,8 @@ qed
 
 lemma es_s_frame_contexts_to_config_trap_ctx:
   assumes "\<lparr>s;f;(v_stack_to_es v_s)@es\<rparr> \<leadsto> \<lparr>s';f';(v_stack_to_es v_s')@[Trap]\<rparr>"
-          "es_s_frame_contexts_to_config es s ((v_s,es_ctx,b_es_ctx), lcs, nf, f) fcs = (s,f_fc,es_fc)"
-  shows "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and> es_s_frame_contexts_to_config [Trap] s' (update_redex_step (v_s,es_ctx,b_es_ctx) v_s' [], lcs, nf, f') fcs = (s',f_fc',es_fc')"
+          "es_s_frame_contexts_to_config es s (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs = (s,f_fc,es_fc)"
+  shows "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and> es_s_frame_contexts_to_config [Trap] s' (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' []) lcs nf f') fcs = (s',f_fc',es_fc')"
   using assms
 proof (induction fcs arbitrary: f_fc es_fc rule: List.rev_induct)
   case Nil
@@ -914,12 +921,12 @@ proof (induction fcs arbitrary: f_fc es_fc rule: List.rev_induct)
 next
   case (snoc fc fcs')
   obtain f_fci es_fci f_fci' es_fci' where 0:
-    "es_s_frame_contexts_to_config es s ((v_s,es_ctx,b_es_ctx), lcs, nf, f) fcs' = (s, f_fci, es_fci)"
+    "es_s_frame_contexts_to_config es s (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs' = (s, f_fci, es_fci)"
     "\<lparr>s;f_fci;es_fci\<rparr> \<leadsto> \<lparr>s';f_fci';es_fci'\<rparr>"
-    "es_s_frame_contexts_to_config [Trap] s' (update_redex_step (v_s,es_ctx,b_es_ctx) v_s' [], lcs, nf, f') fcs' = (s', f_fci', es_fci')"
+    "es_s_frame_contexts_to_config [Trap] s' (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' []) lcs nf f') fcs' = (s', f_fci', es_fci')"
     using snoc(1)[OF snoc(2)] es_s_frame_contexts_to_config_s
     by metis
-  have "(frame_arity_outer (update_redex_step (v_s,es_ctx,b_es_ctx) v_s' [], lcs, nf, f') fcs') = (frame_arity_outer ((v_s,es_ctx,b_es_ctx), lcs, nf, f) fcs')"
+  have "(frame_arity_outer (Frame_context (update_redex_step (Redex v_s es_ctx b_es_ctx) v_s' []) lcs nf f') fcs') = (frame_arity_outer (Frame_context (Redex v_s es_ctx b_es_ctx) lcs nf f) fcs')"
     unfolding frame_arity_outer_def
     by (simp split: if_splits)
   thus ?case
@@ -942,8 +949,8 @@ lemma es_label_context_to_es_to_trap_reduce_trans:
           "es_label_context_to_es es lc = es'"
   shows "reduce_trans (s,f,es') (s',f',[Trap])"
 proof -
-  obtain v_so eso n esc where lc_is:"lc = (v_so, eso, n, esc)"
-    by (metis prod.exhaust)
+  obtain v_so eso n esc where lc_is:"lc = (Label_context v_so eso n esc)"
+    by (metis label_context.exhaust)
   show ?thesis
     by (metis assms es_label_context_to_es.simps lc_is reduce_trans_to_trap_L0 reduce_trans_to_trap_label)
 qed
@@ -970,8 +977,8 @@ proof (induction es s fc fcs arbitrary: s f es' rule: es_s_frame_contexts_to_con
     done
 next
   case (2 es s fc fc' fcs)
-  obtain rdx lcs nf ff where fc_is:"fc = (rdx, lcs, nf, ff)"
-    by (metis prod.exhaust)
+  obtain rdx lcs nf ff where fc_is:"fc = (Frame_context rdx lcs nf ff)"
+    by (metis frame_context.exhaust)
   hence "\<And>f_inner. reduce_trans (s,f_inner,[es_frame_context_to_e es fc]) (s',f_inner,[Trap])"
     using fc_is 2(2)
     apply simp
@@ -995,7 +1002,7 @@ proof -
 qed
 
 lemma run_step_b_e_sound:
-  assumes "run_step_b_e b_e (d, s, fc, fcs) = ((d', s', fc', fcs'), res)"
+  assumes "run_step_b_e b_e (Config d s fc fcs) = ((Config d' s' fc' fcs'), res)"
   shows "(\<exists>f esfc f' esfc'.
             res = Step_normal \<and>
             es_s_frame_contexts_to_config ([$b_e]) s fc fcs = (s,f,esfc) \<and>
@@ -1008,12 +1015,12 @@ lemma run_step_b_e_sound:
             \<lparr>s;f;esfc\<rparr> \<leadsto> \<lparr>s';f';esfc'\<rparr>) \<or>
          (\<exists>str. res = Res_crash str)"
 proof -
-  obtain v_s es b_es lcs nf f rdx where fc_is: "fc = (rdx, lcs, nf, f)"
-                                               "rdx = (v_s, es, b_es)"
-    by (metis prod.exhaust)
+  obtain v_s es b_es lcs nf f rdx where fc_is: "fc = (Frame_context rdx lcs nf f)"
+                                               "rdx = (Redex v_s es b_es)"
+    by (metis frame_context.exhaust redex.exhaust)
   obtain f'' esfc'' where 0:
-    "es_s_frame_contexts_to_config ([$b_e]) s ((v_s, es, b_es), lcs, nf, f) fcs = (s,f'',esfc'')"
-    using fc_is es_s_frame_contexts_to_config_s[of "[$b_e]" s "((v_s, es, b_es), lcs, nf, f)" fcs]
+    "es_s_frame_contexts_to_config ([$b_e]) s (Frame_context (Redex v_s es b_es) lcs nf f) fcs = (s,f'',esfc'')"
+    using fc_is es_s_frame_contexts_to_config_s[of "[$b_e]" s "(Frame_context (Redex v_s es b_es) lcs nf f)" fcs]
     by metis
   show ?thesis
   proof (cases b_e)
@@ -1043,7 +1050,7 @@ proof -
       using Cons assms Nop fc_is
       by fastforce+
     obtain f''' esfc''' where
-      "es_s_frame_contexts_to_config [] s' (rdx, lcs, nf, f) fcs = (s',f''',esfc''')"
+      "es_s_frame_contexts_to_config [] s' (Frame_context rdx lcs nf f) fcs = (s',f''',esfc''')"
       "\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s';f''';esfc'''\<rparr>"
       using es_s_frame_contexts_to_config_ctx[OF reduce.basic[OF reduce_simple.nop, of s f]] 0 1(2) fc_is(2) Nop
       by blast
@@ -1098,13 +1105,13 @@ proof -
               "es = []"
               "length v_s \<ge> length t1s"
               "(v_bs, v_s') = split_n v_s (length t1s)"
-              "lc_b = (v_s', b_es, length t2s, [])"
+              "lc_b = (Label_context v_s' b_es (length t2s) [])"
               "s' = s"
               "fcs' = fcs"
-              "fc' = ((v_bs, [], es_b), lc_b#lcs, nf, f)"
+              "fc' = (Frame_context (Redex v_bs [] es_b) (lc_b#lcs) nf f)"
         using assms Block fc_is
         by (simp add: Let_def split: tf.splits prod.splits if_splits)
-      have fc_red1:"(\<lparr>s;f;(es_redex_to_es [$Block (t1s _> t2s) es_b] rdx)\<rparr> \<leadsto> \<lparr>s;f;es_label_context_to_es (es_redex_to_es [] (v_bs, [], es_b)) lc_b\<rparr>)"
+      have fc_red1:"(\<lparr>s;f;(es_redex_to_es [$Block (t1s _> t2s) es_b] rdx)\<rparr> \<leadsto> \<lparr>s;f;es_label_context_to_es (es_redex_to_es [] (Redex v_bs [] es_b)) lc_b\<rparr>)"
         using progress_L0[OF reduce.basic[OF reduce_simple.block], of "rev v_bs" _ t1s t2s _ s f "rev v_s'"  es_b "$*b_es"]
               fc'_is(1,2,3,4,5) split_n_conv_app fc_is
         by simp (metis append_assoc map_append rev_append split_n_length)
@@ -1115,13 +1122,18 @@ proof -
         "es_s_frame_contexts_to_config [] s' fc' fcs' = (s', f''', esfc''')"
         using es_s_frame_contexts_to_config_s
         by blast
-      hence "\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s';f''';esfc'''\<rparr>"
-        using 0 fc_red1 es_s_frame_contexts_to_config_ctx[OF fc_red2] fc_is fc'_is(1,5,6,7,8) Block
-        apply (cases fcs)
-        apply simp_all
-        apply (meson es_label_contexts_to_es_LN)
-        apply fastforce
-        done
+      have "\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s';f''';esfc'''\<rparr>"
+      proof (cases fcs)
+        case Nil
+        thus ?thesis
+          using f'''_is 0 fc_red1 fc_is fc'_is(1,5,6,7,8) Block
+          by simp (meson es_label_contexts_to_es_LN)
+      next
+        case (Cons a list)
+        thus ?thesis
+          using f'''_is 0 es_s_frame_contexts_to_config_ctx[OF fc_red2] fc_is fc'_is(1,5,6,7,8) Block
+          by (cases a) fastforce
+      qed
       thus ?thesis
         using True fc_is fc'_is(6,7,8) f'''_is 0
         by blast
@@ -1141,13 +1153,13 @@ proof -
               "es = []"
               "length v_s \<ge> length t1s"
               "(v_bs, v_s') = split_n v_s (length t1s)"
-              "lc_b = (v_s', b_es, length t1s, [(Loop (t1s _> t2s) es_b)])"
+              "lc_b = (Label_context v_s' b_es (length t1s) [(Loop (t1s _> t2s) es_b)])"
               "s' = s"
               "fcs' = fcs"
-              "fc' = ((v_bs, [], es_b), lc_b#lcs, nf, f)"
+              "fc' = (Frame_context (Redex v_bs [] es_b) (lc_b#lcs) nf f)"
         using assms Loop fc_is
         by (simp add: Let_def split: tf.splits prod.splits if_splits)
-      have fc_red1:"(\<lparr>s;f;(es_redex_to_es [$Loop (t1s _> t2s) es_b] rdx)\<rparr> \<leadsto> \<lparr>s;f;es_label_context_to_es (es_redex_to_es [] (v_bs, [], es_b)) lc_b\<rparr>)"
+      have fc_red1:"(\<lparr>s;f;(es_redex_to_es [$Loop (t1s _> t2s) es_b] rdx)\<rparr> \<leadsto> \<lparr>s;f;es_label_context_to_es (es_redex_to_es [] (Redex v_bs [] es_b)) lc_b\<rparr>)"
         using progress_L0[OF reduce.basic[OF reduce_simple.loop], of "rev v_bs" _ t1s t2s _ s f "rev v_s'"  es_b "$*b_es"]
               fc'_is(1,2,3,4,5) split_n_conv_app fc_is
         by simp (metis append_assoc map_append rev_append split_n_length)
@@ -1158,13 +1170,18 @@ proof -
         "es_s_frame_contexts_to_config [] s' fc' fcs' = (s', f''', esfc''')"
         using es_s_frame_contexts_to_config_s
         by blast
-      hence "\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s';f''';esfc'''\<rparr>"
-        using 0 fc_red1 es_s_frame_contexts_to_config_ctx[OF fc_red2] fc_is fc'_is(1,5,6,7,8) Loop
-        apply (cases fcs)
-        apply simp_all
-        apply (meson es_label_contexts_to_es_LN)
-        apply fastforce
-        done
+      have "\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s';f''';esfc'''\<rparr>"
+      proof (cases fcs)
+        case Nil
+        thus ?thesis
+        using f'''_is 0 fc_red1 fc_is fc'_is(1,5,6,7,8) Loop
+        by simp (meson es_label_contexts_to_es_LN)
+      next
+        case (Cons a list)
+        thus ?thesis
+        using f'''_is 0 es_s_frame_contexts_to_config_ctx[OF fc_red2] fc_is fc'_is(1,5,6,7,8) Loop
+        by (cases a) fastforce
+      qed
       thus ?thesis
         using True fc_is fc'_is(6,7,8) f'''_is 0
         by blast
@@ -1197,24 +1214,24 @@ proof -
     case (Br k)
     consider (a) v_ls b_els nl b_ecls v_ls' where
                    "(length lcs > k)"
-                   "(v_ls, b_els, nl, b_ecls) = (lcs!k)"
+                   "(Label_context v_ls b_els nl b_ecls) = (lcs!k)"
                    "(length v_s \<ge> nl)"
                    "v_ls' = (take nl v_s)"
                    "s' = s"
                    "fcs' = fcs"
-                   "fc' = ((v_ls'@v_ls, [], b_ecls@b_els), (drop (Suc k) lcs), nf, f)"
+                   "fc' = (Frame_context (Redex (v_ls'@v_ls) [] (b_ecls@b_els)) (drop (Suc k) lcs) nf f)"
                    "res = Step_normal"
            | (b) "((d', s', fcs'), res) = ((d,s,fcs), crash_invalid)"
       using assms Br fc_is Cons
-      by (simp split: if_splits prod.splits)
+      by (simp split: if_splits prod.splits label_context.splits)
     thus ?thesis
     proof (cases)
       case a
-      have 1:"lcs = (take k lcs)@(v_ls, b_els, nl, b_ecls)#(drop (Suc k) lcs)"
+      have 1:"lcs = (take k lcs)@(Label_context v_ls b_els nl b_ecls)#(drop (Suc k) lcs)"
              "length (take k lcs) = k"
         using a(1,2)
         by (simp_all add: Cons_nth_drop_Suc)
-      have 2:"\<lparr>s; f; es_label_contexts_to_es (es_redex_to_es [$Br k] rdx) lcs\<rparr> \<leadsto> \<lparr>s; f; es_label_contexts_to_es (es_redex_to_es [] ((v_ls'@v_ls), [], b_ecls@b_els)) (drop (Suc k) lcs)\<rparr>"
+      have 2:"\<lparr>s; f; es_label_contexts_to_es (es_redex_to_es [$Br k] rdx) lcs\<rparr> \<leadsto> \<lparr>s; f; es_label_contexts_to_es (es_redex_to_es [] (Redex (v_ls'@v_ls) [] (b_ecls@b_els))) (drop (Suc k) lcs)\<rparr>"
       proof -
         obtain eslk lholed' where eslk_is:"es_label_contexts_to_es (es_redex_to_es [$Br k] rdx) (take k lcs) = eslk"
                                           "Lfilled k lholed' (es_redex_to_es [$Br k] rdx) eslk"
@@ -1304,13 +1321,15 @@ proof -
     case Return
     consider (a) t1 t2 t3 t4 where
                   "(length v_s \<ge> nf)"
-                  "(fcs = (t1,t2,t3,t4)#fcs')"
+                  "(fcs = (Frame_context t1 t2 t3 t4)#fcs')"
                   "s' = s"
-                  "fc' = (update_fc_return (t1,t2,t3,t4) (take nf v_s))"
+                  "fc' = (update_fc_return (Frame_context t1 t2 t3 t4) (take nf v_s))"
                   "res = Step_normal"
            | (b) "((d', s', fcs'), res) = ((d,s,fcs), crash_invalid)"
-      using assms Return fc_is Cons
-      by (simp split: if_splits prod.splits list.splits) fastforce
+      using assms Return
+      apply (simp split: if_splits prod.splits list.splits frame_context.splits redex.splits)
+      apply (metis fc_is(1,2) frame_context.exhaust frame_context.inject redex.inject update_fc_return.simps)
+      done
     thus ?thesis
     proof (cases)
       case a
@@ -1328,8 +1347,8 @@ proof -
         using reduce.basic[OF reduce_simple.return[OF _ lholed_is], of nf s _ f] fc_is eslk_is(1) a(1,3)
         by simp
       obtain f_fc es_fc where f_fc_is:
-        "es_s_frame_contexts_to_config [es_frame_context_to_e [$Return] fc] s (t1,t2,t3,t4) fcs' = (s, f_fc, es_fc)"
-        using es_s_frame_contexts_to_config_s[of "[es_frame_context_to_e [$Return] fc]" s "(t1,t2,t3,t4)" fcs']
+        "es_s_frame_contexts_to_config [es_frame_context_to_e [$Return] fc] s (Frame_context t1 t2 t3 t4) fcs' = (s, f_fc, es_fc)"
+        using es_s_frame_contexts_to_config_s[of "[es_frame_context_to_e [$Return] fc]" s "(Frame_context t1 t2 t3 t4)" fcs']
         by fastforce
       have
         "\<exists>f_fc' es_fc'. \<lparr>s;f_fc;es_fc\<rparr> \<leadsto> \<lparr>s';f_fc';es_fc'\<rparr> \<and>
@@ -1419,7 +1438,7 @@ proof -
         (a) f' v_s' where
               "s' = s"
               "fcs' = fcs"
-              "fc' = ((v_s', es, b_es), lcs, nf, f')"
+              "fc' = (Frame_context (Redex v_s' es b_es) lcs nf f')"
               "res = Step_normal"
               "(\<lparr>s;f;(v_stack_to_es v_s)@[$Set_local k]\<rparr> \<leadsto> \<lparr>s;f';(v_stack_to_es v_s')\<rparr>)"
       | (b) "(res = crash_invalid)"
@@ -1713,7 +1732,7 @@ proof -
 qed
 
 lemma run_step_e_sound:
-  assumes "run_step_e e (d, s, fc, fcs) = ((d', s', fc', fcs'), res)"
+  assumes "run_step_e e (Config d s fc fcs) = ((Config d' s' fc' fcs'), res)"
   shows "(\<exists>f esfc f' esfc'.
             res = Step_normal \<and>
             es_s_frame_contexts_to_config ([e]) s fc fcs = (s,f,esfc) \<and>
@@ -1726,12 +1745,12 @@ lemma run_step_e_sound:
             \<lparr>s;f;esfc\<rparr> \<leadsto> \<lparr>s';f';esfc'\<rparr>) \<or>
          (\<exists>str. res = Res_crash str)"
 proof -
-  obtain v_s es b_es lcs nf f rdx where fc_is: "fc = (rdx, lcs, nf, f)"
-                                               "rdx = (v_s, es, b_es)"
-    by (metis prod.exhaust)
+  obtain v_s es b_es lcs nf f rdx where fc_is: "fc = (Frame_context rdx lcs nf f)"
+                                               "rdx = (Redex v_s es b_es)"
+    by (metis frame_context.exhaust redex.exhaust)
   obtain f'' esfc'' where 0:
-    "es_s_frame_contexts_to_config ([e]) s ((v_s, es, b_es), lcs, nf, f) fcs = (s,f'',esfc'')"
-    using fc_is es_s_frame_contexts_to_config_s[of "[e]" s "((v_s, es, b_es), lcs, nf, f)" fcs]
+    "es_s_frame_contexts_to_config ([e]) s (Frame_context (Redex v_s es b_es) lcs nf f) fcs = (s,f'',esfc'')"
+    using fc_is es_s_frame_contexts_to_config_s[of "[e]" s "(Frame_context (Redex v_s es b_es) lcs nf f)" fcs]
     by metis
   show ?thesis
     using assms fc_is
@@ -1757,8 +1776,8 @@ proof -
           "d = Suc d'"
           "tf = (t1s _> t2s)"
           "(v_fs, v_s') = split_n v_s (length t1s)"
-          "fcs' = ((v_s', es, b_es), lcs, nf, f)#fcs"
-          "fc' = (([], [], [Block ([] _> t2s) es_f]), [], length t2s, \<lparr> f_locs = ((rev v_fs)@(n_zeros ts_f)), f_inst = i'\<rparr>)"
+          "fcs' = (Frame_context (Redex v_s' es b_es) lcs nf f)#fcs"
+          "fc' = (Frame_context (Redex [] [] [Block ([] _> t2s) es_f]) [] (length t2s) \<lparr> f_locs = ((rev v_fs)@(n_zeros ts_f)), f_inst = i'\<rparr>)"
           "length v_s \<ge> length t1s"
           "res = Step_normal"
             using assms Invoke Func_native fc_is False
@@ -1767,23 +1786,28 @@ proof -
             done
       have v_s_rev_is:"v_stack_to_es v_s = v_stack_to_es v_s' @ v_stack_to_es v_fs"
         by (metis map_append rev_append split_n_conv_app tf_is(4))
-      have fc_red1:"(\<lparr>s;f;(es_redex_to_es [Invoke i_cl] rdx)\<rparr> \<leadsto> \<lparr>s;f;es_redex_to_es [es_frame_context_to_e [] fc'] (v_s', es, b_es)\<rparr>)"
+      have fc_red1:"(\<lparr>s;f;(es_redex_to_es [Invoke i_cl] rdx)\<rparr> \<leadsto> \<lparr>s;f;es_redex_to_es [es_frame_context_to_e [] fc'] (Redex v_s' es b_es)\<rparr>)"
         using fc_is tf_is Func_native progress_L0[OF reduce.invoke_native, of s i_cl i' t1s t2s ts_f es_f "v_stack_to_es v_fs" "rev v_fs" "length (rev v_fs)" "length ts_f" "length t2s" "n_zeros ts_f" f "rev v_s'" "es@($*b_es)"]
         by (simp add: v_s_rev_is) (metis split_n_length)
-      hence fc_red2:"\<And>ff. \<lparr>s;ff;[es_frame_context_to_e ([Invoke i_cl]) fc]\<rparr> \<leadsto> \<lparr>s;ff;[es_frame_context_to_e ([es_frame_context_to_e [] fc']) ((v_s', es, b_es), lcs, nf, f)]\<rparr>"
+      hence fc_red2:"\<And>ff. \<lparr>s;ff;[es_frame_context_to_e ([Invoke i_cl]) fc]\<rparr> \<leadsto> \<lparr>s;ff;[es_frame_context_to_e ([es_frame_context_to_e [] fc']) (Frame_context (Redex v_s' es b_es) lcs nf f)]\<rparr>"
         using fc_is tf_is(1,5,6) reduce.local[OF es_label_contexts_to_es_LN[OF fc_red1]]
         by simp
       obtain f''' esfc''' where f'''_is:
         "es_s_frame_contexts_to_config [] s' fc' fcs' = (s', f''', esfc''')"
         using es_s_frame_contexts_to_config_s
         by blast
-      hence "\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s';f''';esfc'''\<rparr>"
-        using 0 fc_red1 es_s_frame_contexts_to_config_ctx[OF fc_red2] fc_is tf_is Invoke Func_native
-        apply (cases fcs)
-        apply simp_all
-        apply (meson es_label_contexts_to_es_LN)
-        apply fastforce
-        done
+      have "\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s';f''';esfc'''\<rparr>"
+      proof (cases fcs)
+        case Nil
+        thus ?thesis
+        using f'''_is 0 fc_red1 fc_is tf_is Invoke Func_native
+        by simp (meson es_label_contexts_to_es_LN)
+      next
+        case (Cons a list)
+        thus ?thesis
+        using f'''_is 0 es_s_frame_contexts_to_config_ctx[OF fc_red2] fc_is tf_is Invoke Func_native
+        by (cases a) fastforce
+      qed
       thus ?thesis
         using Invoke Func_native fc_is tf_is f'''_is 0
         by blast
@@ -1801,7 +1825,7 @@ proof -
           have a_is:
             "s' = s"
             "fcs' = fcs"
-            "fc' = ((v_s', es, b_es), lcs, nf, f)"
+            "fc' = (Frame_context (Redex v_s' es b_es) lcs nf f)"
             "\<exists>str. res = Res_trap str"
             "length v_s \<ge> length t1s"
             using assms Invoke Func_host fc_is tf_is False None
@@ -1819,7 +1843,7 @@ proof -
           obtain rvs where a_is:
             "a = (s', rvs)"
             "fcs' = fcs"
-            "fc' = (((rev rvs)@v_s', es, b_es), lcs, nf, f)"
+            "fc' = (Frame_context (Redex ((rev rvs)@v_s') es b_es) lcs nf f)"
             "res = Step_normal"
             "length v_s \<ge> length t1s"
             using assms Invoke Func_host fc_is tf_is False Some
@@ -1837,7 +1861,7 @@ proof -
 qed
 
 theorem run_iter_sound:
-  assumes "run_iter fuel (d, s, fc, fcs) = ((d', s', fc', fcs'), res)"
+  assumes "run_iter fuel (Config d s fc fcs) = ((Config d' s' fc' fcs'), res)"
   shows "(\<exists>v_sres f esfc f'.
             res = RValue v_sres \<and>
             es_s_frame_contexts_to_config [] s fc fcs = (s,f,esfc) \<and>
@@ -1848,249 +1872,157 @@ theorem run_iter_sound:
             reduce_trans (s,f,esfc) (s',f',[Trap])) \<or>
          (\<exists>str. res = RCrash str)"
   using assms
-proof (induction fuel "(d, s, fc, fcs)" arbitrary: d s fc fcs rule: run_iter.induct)
-  case (1 n s v_s nf f)
+proof (induction fuel "(Config d s fc fcs)" arbitrary: d s fc fcs rule: run_iter.induct)
+  case (1 n)
+  consider
+      (a) v_s nf f where "fc = (Frame_context (Redex v_s [] []) [] nf f)" "fcs = []"
+    | (b) v_s nf f fc_hd fcs_tl where "fc =(Frame_context (Redex v_s [] []) [] nf f)" "fcs = fc_hd#fcs_tl"
+    | (c) v_s v_ls b_els nl b_elcs lcs nf f where "fc = (Frame_context (Redex v_s [] []) ((Label_context v_ls b_els nl b_elcs)#lcs) nf f)"
+    | (d) v_s b_e b_es lcs nf f where "fc = (Frame_context (Redex v_s [] (b_e#b_es)) lcs nf f)"
+    | (e) v_s e es b_es lcs nf f where "fc = (Frame_context (Redex v_s (e#es) b_es) lcs nf f)"
+    by (metis frame_context.exhaust label_context.exhaust list.exhaust redex.exhaust)
   thus ?case
-    by (fastforce simp add: reduce_trans_def)
-next
-  case (2 n d s v_s nf f fc_old fcs)
-  obtain af bf cf df ef ff where fc_old_is:"fc_old = ((af,bf,cf),df,ef,ff)"
-    by (metis prod.exhaust)
-  have fc_red1:"\<lparr>s;ff;es_label_contexts_to_es (es_redex_to_es [Frame nf f (v_stack_to_es v_s)] (af,bf,cf)) df\<rparr> \<leadsto>
-          \<lparr>s;ff;es_label_contexts_to_es (es_redex_to_es (v_stack_to_es v_s) (af,bf,cf)) df\<rparr>"
-    using es_label_contexts_to_es_LN[OF es_redex_to_es_LN[OF reduce.basic[OF reduce_simple.local_const[of nf f "rev v_s"]]], of s ff "(af,bf,cf)" df]
-    by simp
-  hence fc_red2:"\<And>ff. \<lparr>s;ff;[es_frame_context_to_e ([Frame nf f (v_stack_to_es v_s)]) fc_old]\<rparr> \<leadsto> \<lparr>s;ff;[es_frame_context_to_e [] (update_fc_return fc_old v_s)]\<rparr>"
-    using fc_old_is
-    by (simp add: reduce.local)
-  obtain f'' esfc'' where 0:
-    "es_s_frame_contexts_to_config [] s ((v_s, [], []), [], nf, f) (fc_old # fcs) = (s,f'',esfc'')"
-    using es_s_frame_contexts_to_config_s[of "[]" s "((v_s, [], []), [], nf, f)" "fc_old # fcs"]
-    by metis
-  obtain f''' esfc''' where f'''_is:
-    "es_s_frame_contexts_to_config [] s (update_fc_return fc_old v_s) fcs = (s, f''', esfc''')"
-    using es_s_frame_contexts_to_config_s 2
-    by simp blast
-  hence "\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s;f''';esfc'''\<rparr>"
-    using 0 fc_red1 es_s_frame_contexts_to_config_ctx[OF fc_red2] fc_old_is
-    apply (cases fcs)
-    apply simp_all
-    apply fastforce
-    done
-  thus ?case
-    using 0 f'''_is 2 assms
-    by simp (metis reduce_trans_app)
-next
-  case (3 d n s v_s v_ls b_els nl b_elcs lcs nf f fcs)
-  have fc_red1:"\<lparr>s;f;es_label_contexts_to_es (es_label_context_to_es (v_stack_to_es v_s) (v_ls, b_els, nl, b_elcs)) lcs\<rparr> \<leadsto>
-          \<lparr>s;f;es_label_contexts_to_es (es_redex_to_es [] (v_s@v_ls, [], b_els)) lcs\<rparr>"
-    using es_label_contexts_to_es_LN[OF progress_L0[OF reduce.basic[OF reduce_simple.label_const]]]
-    by simp
-  hence fc_red2:"\<And>ff. \<lparr>s;ff;[es_frame_context_to_e [] ((v_s, [], []), (v_ls, b_els, nl, b_elcs) # lcs, nf, f)]\<rparr> \<leadsto> \<lparr>s;ff;[es_frame_context_to_e [] (((v_s@v_ls, [], b_els), lcs, nf, f))]\<rparr>"
-    using reduce.local[OF fc_red1]
-    by fastforce
-  obtain f'' esfc'' where 0:
-    "es_s_frame_contexts_to_config [] s ((v_s, [], []), (v_ls, b_els, nl, b_elcs)#lcs, nf, f) fcs = (s,f'',esfc'')"
-    using es_s_frame_contexts_to_config_s[of "[]" s "((v_s, [], []), (v_ls, b_els, nl, b_elcs)#lcs, nf, f)" "fcs"]
-    by metis
-  obtain f''' esfc''' where f'''_is:
-    "es_s_frame_contexts_to_config [] s ((v_s@v_ls, [], b_els), lcs, nf, f) fcs = (s, f''', esfc''')"
-    using es_s_frame_contexts_to_config_s 3(2)
-    by simp blast
-  hence "\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s;f''';esfc'''\<rparr>"
-    using 0 fc_red1 es_s_frame_contexts_to_config_ctx[OF fc_red2]
-    apply (cases fcs)
-    apply simp_all
-    apply fastforce
-    done
-  thus ?case
-    using 0 f'''_is 3 assms
-    by simp (metis reduce_trans_app)
-next
-  case (4 n d s v_s e es b_es lcs nf f fcs)
-  obtain d_step s_step fc_step fcs_step res_step where run_step_e_is:
-    "run_step_e e (d, s, ((v_s, es, b_es), lcs, nf, f), fcs) = ((d_step, s_step, fc_step, fcs_step), res_step)"
-    by (metis prod.exhaust)
-  show ?case
-  proof (cases res_step)
-    case (Res_crash x1)
+  proof (cases)
+    case a
     thus ?thesis
-      using 4(2) run_step_e_is
+      using 1(6)
+      by (fastforce simp add: reduce_trans_def)
+  next
+    case b
+    obtain af bf cf df ef ff where fc_old_is:"fc_hd = (Frame_context (Redex af bf cf) df ef ff)"
+      by (metis frame_context.exhaust redex.exhaust)
+    have fc_red1:"\<lparr>s;ff;es_label_contexts_to_es (es_redex_to_es [Frame nf f (v_stack_to_es v_s)] (Redex af bf cf)) df\<rparr> \<leadsto>
+            \<lparr>s;ff;es_label_contexts_to_es (es_redex_to_es (v_stack_to_es v_s) (Redex af bf cf)) df\<rparr>"
+      using es_label_contexts_to_es_LN[OF es_redex_to_es_LN[OF reduce.basic[OF reduce_simple.local_const[of nf f "rev v_s"]]], of s ff "Redex af bf cf" df]
+      by simp
+    hence fc_red2:"\<And>ff. \<lparr>s;ff;[es_frame_context_to_e ([Frame nf f (v_stack_to_es v_s)]) fc_hd]\<rparr> \<leadsto> \<lparr>s;ff;[es_frame_context_to_e [] (update_fc_return fc_hd v_s)]\<rparr>"
+      using fc_old_is
+      by (simp add: reduce.local)
+    obtain f'' esfc'' where 0:
+      "es_s_frame_contexts_to_config [] s (Frame_context (Redex v_s [] []) [] nf f) (fc_hd # fcs_tl) = (s,f'',esfc'')"
+      using es_s_frame_contexts_to_config_s[of "[]" s "(Frame_context (Redex v_s [] []) [] nf f)" "fc_hd # fcs_tl"]
+      by metis
+    obtain f''' esfc''' where f'''_is:
+      "es_s_frame_contexts_to_config [] s (update_fc_return fc_hd v_s) fcs_tl = (s, f''', esfc''')"
+      using es_s_frame_contexts_to_config_s
+      by (fastforce simp del: run_iter.simps)
+    have red_is:"\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s;f''';esfc'''\<rparr>"
+    proof (cases fcs_tl)
+      case Nil
+      thus ?thesis
+      using f'''_is 0 fc_red1 fc_old_is
+      by simp
+    next
+      case (Cons a list)
+      thus ?thesis
+      using f'''_is 0 es_s_frame_contexts_to_config_ctx[OF fc_red2] fc_old_is
+      by (cases a) fastforce
+    qed
+    thus ?thesis
+      using 0 f'''_is 1(1,6) b
+      by simp (metis reduce_trans_app)
+  next
+    case c
+    have fc_red1:"\<lparr>s;f;es_label_contexts_to_es (es_label_context_to_es (v_stack_to_es v_s) (Label_context v_ls b_els nl b_elcs)) lcs\<rparr> \<leadsto>
+            \<lparr>s;f;es_label_contexts_to_es (es_redex_to_es [] (Redex (v_s@v_ls) [] b_els)) lcs\<rparr>"
+      using es_label_contexts_to_es_LN[OF progress_L0[OF reduce.basic[OF reduce_simple.label_const]]]
+      by simp
+    hence fc_red2:"\<And>ff. \<lparr>s;ff;[es_frame_context_to_e [] (Frame_context (Redex v_s [] []) ((Label_context v_ls b_els nl b_elcs) # lcs) nf f)]\<rparr> \<leadsto> \<lparr>s;ff;[es_frame_context_to_e [] (Frame_context (Redex (v_s@v_ls) [] b_els) lcs nf f)]\<rparr>"
+      using reduce.local[OF fc_red1]
       by fastforce
-  next
-    case (Res_trap x2)
+    obtain f'' esfc'' where 0:
+      "es_s_frame_contexts_to_config [] s (Frame_context (Redex v_s [] []) ((Label_context v_ls b_els nl b_elcs)#lcs) nf f) fcs = (s,f'',esfc'')"
+      using es_s_frame_contexts_to_config_s[of "[]" s "(Frame_context (Redex v_s [] []) ((Label_context v_ls b_els nl b_elcs)#lcs) nf f)" "fcs"]
+      by metis
+    obtain f''' esfc''' where f'''_is:
+      "es_s_frame_contexts_to_config [] s (Frame_context (Redex (v_s@v_ls) [] b_els) lcs nf f) fcs = (s, f''', esfc''')"
+      using es_s_frame_contexts_to_config_s
+      by blast
+    have "\<lparr>s;f'';esfc''\<rparr> \<leadsto> \<lparr>s;f''';esfc'''\<rparr>"
+    proof (cases fcs)
+      case Nil
+      thus ?thesis
+        using f'''_is 0 fc_red1
+        by simp
+    next
+      case (Cons a list)
+      thus ?thesis
+        using f'''_is 0 es_s_frame_contexts_to_config_ctx[OF fc_red2]
+      by (cases a) fastforce
+    qed
     thus ?thesis
-        using run_step_e_sound[OF run_step_e_is] 4(1)[OF run_step_e_is[symmetric]]
-              4(2) run_step_e_is es_s_frame_contexts_to_config_e_one
-              es_s_frame_contexts_to_config_trap_reduce_trans
-        by (simp del: run_step_e.simps) (metis (full_types) reduce_trans_app)
+      using 0 f'''_is 1(2,6) c
+      by simp (metis reduce_trans_app)
   next
-    case Step_normal
-    thus ?thesis
-      using run_step_e_sound[OF run_step_e_is] 4(1)[OF run_step_e_is[symmetric]]
-            4(2) run_step_e_is es_s_frame_contexts_to_config_e_one
-      apply (simp del: run_step_e.simps)
-      apply (metis (mono_tags, lifting) reduce_trans_app)
-      done
-  qed
-next
-  case ("5_1" n d s v_s v va lcs nf f fcs)
-  obtain v_s' b_es' where b_es'_is:"split_v_s_b_s (v # va) = (v_s', b_es')"
-    by (metis prod.exhaust)
-  show ?case
-  proof (cases b_es')
-    case Nil
-    thus ?thesis
-      using b_es'_is "5_1"(1)[OF b_es'_is[symmetric] Nil] "5_1"(3)
-            es_s_frame_contexts_to_config_b_e_split_v_s_b_s split_v_s_b_s_conv_app
-      by fastforce
-  next
-    case (Cons b_e'' b_es'')
-    obtain d_step s_step fc_step fcs_step res_step where run_step_b_e_is:
-      "run_step_b_e b_e'' (d, s, ((v_s' @ v_s, [], b_es''), lcs, nf, f), fcs) = ((d_step, s_step, fc_step, fcs_step), res_step)"
+    case d
+    obtain v_s' b_es' where b_es'_is:"split_v_s_b_s (b_e#b_es) = (v_s', b_es')"
       by (metis prod.exhaust)
+    show ?thesis
+    proof (cases b_es')
+      case Nil
+      thus ?thesis
+        using b_es'_is 1(3,6) d
+              es_s_frame_contexts_to_config_b_e_split_v_s_b_s split_v_s_b_s_conv_app
+        by fastforce
+    next
+      case (Cons b_e'' b_es'')
+      obtain d_step s_step fc_step fcs_step res_step where run_step_b_e_is:
+        "run_step_b_e b_e'' (Config d s (Frame_context (Redex (v_s' @ v_s) [] b_es'') lcs nf f) fcs) = ((Config d_step s_step fc_step fcs_step), res_step)"
+        by (metis config.exhaust prod.exhaust)
+      show ?thesis
+      proof (cases res_step)
+        case (Res_crash x1)
+        thus ?thesis
+          using 1(4,6) d run_step_b_e_is b_es'_is Cons
+          by (fastforce simp del: run_step_b_e.simps)
+      next
+        case (Res_trap x2)
+        thus ?thesis
+          using run_step_b_e_sound[OF run_step_b_e_is] 1(6) Cons d
+                b_es'_is run_step_b_e_is es_s_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
+                es_s_frame_contexts_to_config_trap_reduce_trans reduce_trans_app
+          by (fastforce simp del: run_step_b_e.simps split_v_s_b_s.simps)
+      next
+        case Step_normal
+        thus ?thesis
+          using run_step_b_e_sound[OF run_step_b_e_is] 1(4,6) Cons d
+                b_es'_is run_step_b_e_is es_s_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
+                es_s_frame_contexts_to_config_trap_reduce_trans reduce_trans_app
+          by (fastforce simp del: run_step_b_e.simps split_v_s_b_s.simps)
+      qed
+    qed
+  next
+    case e
+    obtain d_step s_step fc_step fcs_step res_step where run_step_e_is:
+      "run_step_e e (Config d s (Frame_context (Redex v_s es b_es) lcs nf f) fcs) = ((Config d_step s_step fc_step fcs_step), res_step)"
+      by (metis prod.exhaust config.exhaust)
     show ?thesis
     proof (cases res_step)
       case (Res_crash x1)
       thus ?thesis
-        using "5_1"(3) run_step_b_e_is b_es'_is Cons
-        by (fastforce simp del: run_step_b_e.simps)
+        using 1(6) e run_step_e_is
+        by fastforce
     next
       case (Res_trap x2)
       thus ?thesis
-        using run_step_b_e_sound[OF run_step_b_e_is] "5_1"(2)[OF b_es'_is[symmetric] Cons run_step_b_e_is[symmetric]]
-              "5_1"(3) b_es'_is Cons run_step_b_e_is es_s_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
-              es_s_frame_contexts_to_config_trap_reduce_trans
-        by (simp del: run_step_b_e.simps split_v_s_b_s.simps) (metis (full_types) reduce_trans_app)
+          using run_step_e_sound[OF run_step_e_is] 1(5)[OF _ _ _ _ run_step_e_is[symmetric]]
+                run_step_e_is es_s_frame_contexts_to_config_e_one
+                es_s_frame_contexts_to_config_trap_reduce_trans 1(6) e
+          apply (simp del: run_step_e.simps)
+          apply (metis reduce_trans_app)
+          done
     next
       case Step_normal
       thus ?thesis
-        using run_step_b_e_sound[OF run_step_b_e_is] "5_1"(2)[OF b_es'_is[symmetric] Cons run_step_b_e_is[symmetric]]
-              "5_1"(3) b_es'_is Cons run_step_b_e_is es_s_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
-        apply (simp del: run_step_b_e.simps split_v_s_b_s.simps)
+        using run_step_e_sound[OF run_step_e_is] 1(5)[OF _ _ _ _ run_step_e_is[symmetric]]
+              run_step_e_is es_s_frame_contexts_to_config_e_one 1(6) e
+        apply (simp del: run_step_e.simps)
         apply (metis (mono_tags, lifting) reduce_trans_app)
         done
     qed
   qed
 next
-  case ("5_2" n d s v_s vb vc lc lcs nf f fcs)
-  obtain v_s' b_es' where b_es'_is:"split_v_s_b_s (vb # vc) = (v_s', b_es')"
-    by (metis prod.exhaust)
-  show ?case
-  proof (cases b_es')
-    case Nil
-    thus ?thesis
-      using b_es'_is "5_2"(1)[OF b_es'_is[symmetric] Nil] "5_2"(3)
-            es_s_frame_contexts_to_config_b_e_split_v_s_b_s split_v_s_b_s_conv_app
-      by fastforce
-  next
-    case (Cons b_e'' b_es'')
-    obtain d_step s_step fc_step fcs_step res_step where run_step_b_e_is:
-      "run_step_b_e b_e'' (d, s, ((v_s' @ v_s, [], b_es''), lc#lcs, nf, f), fcs) = ((d_step, s_step, fc_step, fcs_step), res_step)"
-      by (metis prod.exhaust)
-    show ?thesis
-    proof (cases res_step)
-      case (Res_crash x1)
-      thus ?thesis
-        using "5_2"(3) run_step_b_e_is b_es'_is Cons
-        by (fastforce simp del: run_step_b_e.simps)
-    next
-      case (Res_trap x2)
-      thus ?thesis
-        using run_step_b_e_sound[OF run_step_b_e_is] "5_2"(2)[OF b_es'_is[symmetric] Cons run_step_b_e_is[symmetric]]
-              "5_2"(3) b_es'_is Cons run_step_b_e_is es_s_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
-              es_s_frame_contexts_to_config_trap_reduce_trans
-        by (simp del: run_step_b_e.simps split_v_s_b_s.simps) (metis (full_types) reduce_trans_app)
-    next
-      case Step_normal
-      thus ?thesis
-        using run_step_b_e_sound[OF run_step_b_e_is] "5_2"(2)[OF b_es'_is[symmetric] Cons run_step_b_e_is[symmetric]]
-              "5_2"(3) b_es'_is Cons run_step_b_e_is es_s_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
-        apply (simp del: run_step_b_e.simps split_v_s_b_s.simps)
-        apply (metis (mono_tags, lifting) reduce_trans_app)
-        done
-    qed
-  qed
-next
-  case ("5_3" n d s v_s vb vc lcs nf f fc' fcs')
-  obtain v_s' b_es' where b_es'_is:"split_v_s_b_s (vb # vc) = (v_s', b_es')"
-    by (metis prod.exhaust)
-  show ?case
-  proof (cases b_es')
-    case Nil
-    thus ?thesis
-      using b_es'_is "5_3"(1)[OF b_es'_is[symmetric] Nil] "5_3"(3)
-            es_s_frame_contexts_to_config_b_e_split_v_s_b_s split_v_s_b_s_conv_app
-      by fastforce
-  next
-    case (Cons b_e'' b_es'')
-    obtain d_step s_step fc_step fcs_step res_step where run_step_b_e_is:
-      "run_step_b_e b_e'' (d, s, ((v_s' @ v_s, [], b_es''), lcs, nf, f), fc'#fcs') = ((d_step, s_step, fc_step, fcs_step), res_step)"
-      by (metis prod.exhaust)
-    show ?thesis
-    proof (cases res_step)
-      case (Res_crash x1)
-      thus ?thesis
-        using "5_3"(3) run_step_b_e_is b_es'_is Cons
-        by (fastforce simp del: run_step_b_e.simps)
-    next
-      case (Res_trap x2)
-      thus ?thesis
-        using run_step_b_e_sound[OF run_step_b_e_is] "5_3"(2)[OF b_es'_is[symmetric] Cons run_step_b_e_is[symmetric]]
-              "5_3"(3) b_es'_is Cons run_step_b_e_is es_s_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
-              es_s_frame_contexts_to_config_trap_reduce_trans
-        by (simp del: run_step_b_e.simps split_v_s_b_s.simps es_s_frame_contexts_to_config.simps) (metis (full_types) reduce_trans_app)
-    next
-      case Step_normal
-      thus ?thesis
-        using run_step_b_e_sound[OF run_step_b_e_is] "5_3"(2)[OF b_es'_is[symmetric] Cons run_step_b_e_is[symmetric]]
-              "5_3"(3) b_es'_is Cons run_step_b_e_is es_s_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
-        apply (simp del: run_step_b_e.simps split_v_s_b_s.simps es_s_frame_contexts_to_config.simps)
-        apply (metis (mono_tags, lifting) reduce_trans_app)
-        done
-    qed
-  qed
-next
-  case ("5_4" n d s v_s vd ve lc' lcs' nf f fc' fcs')
-  obtain v_s' b_es' where b_es'_is:"split_v_s_b_s (vd # ve) = (v_s', b_es')"
-    by (metis prod.exhaust)
-  show ?case
-  proof (cases b_es')
-    case Nil
-    thus ?thesis
-      using b_es'_is "5_4"(1)[OF b_es'_is[symmetric] Nil] "5_4"(3)
-            es_s_frame_contexts_to_config_b_e_split_v_s_b_s split_v_s_b_s_conv_app
-      by fastforce
-  next
-    case (Cons b_e'' b_es'')
-    obtain d_step s_step fc_step fcs_step res_step where run_step_b_e_is:
-      "run_step_b_e b_e'' (d, s, ((v_s' @ v_s, [], b_es''), lc'#lcs', nf, f), fc'#fcs') = ((d_step, s_step, fc_step, fcs_step), res_step)"
-      by (metis prod.exhaust)
-    show ?thesis
-    proof (cases res_step)
-      case (Res_crash x1)
-      thus ?thesis
-        using "5_4"(3) run_step_b_e_is b_es'_is Cons
-        by (fastforce simp del: run_step_b_e.simps)
-    next
-      case (Res_trap x2)
-      thus ?thesis
-        using run_step_b_e_sound[OF run_step_b_e_is] "5_4"(2)[OF b_es'_is[symmetric] Cons run_step_b_e_is[symmetric]]
-              "5_4"(3) b_es'_is Cons run_step_b_e_is es_s_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
-              es_s_frame_contexts_to_config_trap_reduce_trans
-        by (simp del: run_step_b_e.simps split_v_s_b_s.simps es_s_frame_contexts_to_config.simps) (metis (full_types) reduce_trans_app)
-    next
-      case Step_normal
-      thus ?thesis
-        using run_step_b_e_sound[OF run_step_b_e_is] "5_4"(2)[OF b_es'_is[symmetric] Cons run_step_b_e_is[symmetric]]
-              "5_4"(3) b_es'_is Cons run_step_b_e_is es_s_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
-        apply (simp del: run_step_b_e.simps split_v_s_b_s.simps es_s_frame_contexts_to_config.simps)
-        apply (metis (mono_tags, lifting) reduce_trans_app)
-        done
-    qed
-  qed
-next
-  case 6
+  case 2
   thus ?case
     by fastforce
 qed
@@ -2098,6 +2030,6 @@ qed
 theorem run_v_sound:
   assumes "run_v fuel d s f b_es = (s', RValue vs)"
   shows "(\<exists>f'. reduce_trans (s,f,$*b_es) (s',f',v_stack_to_es vs))"
-  using assms run_iter_sound[of fuel d s "(([], [], b_es), [], 0, f)" "[]"]
-  by (fastforce split: prod.splits)
+  using assms run_iter_sound[of fuel d s "(Frame_context (Redex [] [] b_es) [] 0 f)" "[]"]
+  by (fastforce split: prod.splits config.splits)
 end
