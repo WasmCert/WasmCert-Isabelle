@@ -81,7 +81,7 @@ export_code open nat_of_byte byte_of_nat
                  isabelle_int64_to_ocaml_int64
                  ocaml_char_to_isabelle_byte
                  isabelle_byte_to_ocaml_char
-                 m_imports module_type_checker interp_instantiate typing run
+                 m_imports module_type_checker interp_instantiate typing run run_invoke
   in OCaml module_name WasmRef_Isa file_prefix WasmRef_Isa
 
 end

@@ -2,6 +2,8 @@ theory Wasm_Interpreter_Printing imports "Wasm_Interpreter_Properties" begin
 
 definition "run = run_v (2^63) 300"
 
+definition "run_invoke = run_invoke_v (2^63) 300"
+
 (* host *)
 
 axiomatization

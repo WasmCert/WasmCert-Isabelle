@@ -2008,12 +2008,23 @@ theorem run_v_sound:
   assumes "run_v fuel d (s, f, b_es) = (s', RValue vs)"
   shows "(\<exists>f'. reduce_trans (s,f,$*b_es) (s',f',v_stack_to_es vs))"
   using assms run_iter_sound[of fuel d s "(Frame_context (Redex [] [] b_es) [] 0 f)" "[]"]
-  by (fastforce split: prod.splits config.splits)
+  by (simp split: prod.splits config.splits)
 
 theorem run_v_sound_trap:
   assumes "run_v fuel d (s, f, b_es) = (s', RTrap str)"
   shows "(\<exists>f'. reduce_trans (s,f,$*b_es) (s',f',[Trap]))"
   using assms run_iter_sound[of fuel d s "(Frame_context (Redex [] [] b_es) [] 0 f)" "[]"]
-  by (fastforce split: prod.splits config.splits)
+  by (simp split: prod.splits config.splits)
 
+theorem run_invoke_v_sound:
+  assumes "run_invoke_v fuel d (s, vargs, i_cl) = (s', RValue vs)"
+  shows "(\<exists>f'. reduce_trans (s,empty_frame,($C* vargs)@[Invoke i_cl]) (s',f',v_stack_to_es vs))"
+  using assms run_iter_sound[of fuel d s "(Frame_context (Redex (rev vargs) [Invoke i_cl] []) [] 0 empty_frame)" "[]"]
+  by (simp split: prod.splits config.splits)
+
+theorem run_invoke_v_sound_trap:
+  assumes "run_invoke_v fuel d (s, vargs, i_cl) = (s', RTrap str)"
+  shows "(\<exists>f'. reduce_trans (s,empty_frame,($C* vargs)@[Invoke i_cl]) (s',f',[Trap]))"
+  using assms run_iter_sound[of fuel d s "(Frame_context (Redex (rev vargs) [Invoke i_cl] []) [] 0 empty_frame)" "[]"]
+  by (simp split: prod.splits config.splits)
 end

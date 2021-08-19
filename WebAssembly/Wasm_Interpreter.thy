@@ -274,7 +274,7 @@ fun split_vals_e :: "e list \<Rightarrow> v list \<times> e list" where
 | "split_vals_e es = ([], es)"
 
 fun split_v_s_b_s_aux :: "v_stack \<Rightarrow> b_e list \<Rightarrow> v_stack \<times> b_e list" where
-  "split_v_s_b_s_aux v_s ((C v)#b_es) = (v#v_s, b_es)"
+  "split_v_s_b_s_aux v_s ((C v)#b_es) = split_v_s_b_s_aux (v#v_s) b_es"
 | "split_v_s_b_s_aux v_s es = (v_s, es)"
 
 fun split_v_s_b_s :: "b_e list \<Rightarrow> v_stack \<times> b_e list" where
@@ -637,6 +637,13 @@ termination
 fun run_v :: "fuel \<Rightarrow> depth \<Rightarrow> (s \<times> f \<times> b_e list) \<Rightarrow> (s \<times> res)" where
   "run_v n d (s, f, b_es) =
      (let (cfg',res) = run_iter n (Config d s (Frame_context (Redex [] [] b_es) [] 0 f) []) in
+      case cfg' of (Config d s fc fcs) \<Rightarrow> (s,res))"
+
+definition "empty_frame \<equiv> \<lparr>f_locs = [],f_inst = \<lparr> types = [], funcs = [], tabs = [], mems = [], globs = []\<rparr>\<rparr>"
+
+fun run_invoke_v :: "fuel \<Rightarrow> depth \<Rightarrow> (s \<times> v list \<times> i) \<Rightarrow> (s \<times> res)" where
+  "run_invoke_v n d (s, vs, i) =
+     (let (cfg',res) = run_iter n (Config d s (Frame_context (Redex (rev vs) [Invoke i] []) [] 0 empty_frame) []) in
       case cfg' of (Config d s fc fcs) \<Rightarrow> (s,res))"
 
 end
