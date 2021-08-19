@@ -12,21 +12,26 @@ definition name :: "'a :: typerep \<Rightarrow> String.literal" where
 
 type_synonym v_stack = "v list"
 
+datatype res_error =
+  Error_invalid String.literal
+| Error_invariant String.literal
+| Error_exhaustion String.literal
+
 datatype res_step =
-  Res_crash String.literal
+  Res_crash res_error
 | Res_trap String.literal
 | Step_normal
 
 datatype res =
-  RCrash String.literal
+  RCrash res_error
 | RTrap String.literal
 | RValue "v_stack"
 
-definition crash_invalid where "crash_invalid \<equiv> Res_crash (STR ''type system violation'')"
-definition crash_invariant where "crash_invariant \<equiv> Res_crash (STR ''interpreter invariant violation'')"
-definition crash_exhaustion where "crash_exhaustion \<equiv> Res_crash (STR ''call stack exhausted'')"
+definition crash_invalid where "crash_invalid \<equiv> Res_crash (Error_invalid (STR ''type system violation''))"
+definition crash_invariant where "crash_invariant \<equiv> Res_crash (Error_invariant (STR ''interpreter invariant violation''))"
+definition crash_exhaustion where "crash_exhaustion \<equiv> Res_crash (Error_exhaustion (STR ''call stack exhausted''))"
 
-definition res_crash_fuel where "res_crash_fuel \<equiv> RCrash (STR ''fuel exhausted'')"
+definition res_crash_fuel where "res_crash_fuel \<equiv> RCrash (Error_invariant (STR ''fuel exhausted''))"
 
 lemmas[simp] = crash_invalid_def crash_invariant_def crash_exhaustion_def res_crash_fuel_def
 
