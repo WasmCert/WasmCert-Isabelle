@@ -645,7 +645,9 @@ module WasmRef_Isa : sig
         unit limit_t_ext list * unit module_glob_ext list *
         unit module_elem_ext list * unit module_data_ext list * nat option *
         unit module_import_ext list * unit module_export_ext list * 'a
-  type res = RCrash of string | RTrap of string | RValue of v list
+  type res_error = Error_invalid of string | Error_invariant of string |
+    Error_exhaustion of string
+  type res = RCrash of res_error | RTrap of string | RValue of v list
   type extern_t = Te_func of tf | Te_tab of unit limit_t_ext |
     Te_mem of unit limit_t_ext | Te_glob of unit tg_ext
   type ct = TAny | TSome of t
@@ -654,7 +656,7 @@ module WasmRef_Isa : sig
   type frame_context =
     Frame_context of redex * label_context list * nat * unit f_ext
   type config = Config of nat * unit s_ext * frame_context * frame_context list
-  type res_step = Res_crash of string | Res_trap of string | Step_normal
+  type res_step = Res_crash of res_error | Res_trap of string | Step_normal
   type checker_type = TopType of ct list | Typea of t list | Bot
   type 'a t_context_ext =
     T_context_ext of
@@ -3140,7 +3142,10 @@ type 'a m_ext =
       unit module_elem_ext list * unit module_data_ext list * nat option *
       unit module_import_ext list * unit module_export_ext list * 'a;;
 
-type res = RCrash of string | RTrap of string | RValue of v list;;
+type res_error = Error_invalid of string | Error_invariant of string |
+  Error_exhaustion of string;;
+
+type res = RCrash of res_error | RTrap of string | RValue of v list;;
 
 type extern_t = Te_func of tf | Te_tab of unit limit_t_ext |
   Te_mem of unit limit_t_ext | Te_glob of unit tg_ext;;
@@ -3156,7 +3161,7 @@ type frame_context =
 
 type config = Config of nat * unit s_ext * frame_context * frame_context list;;
 
-type res_step = Res_crash of string | Res_trap of string | Step_normal;;
+type res_step = Res_crash of res_error | Res_trap of string | Step_normal;;
 
 type checker_type = TopType of ct list | Typea of t list | Bot;;
 
@@ -4054,7 +4059,7 @@ let rec update_fc_return
   (Frame_context (rdx, lcs, nf, f)) v_s =
     Frame_context (update_redex_return rdx v_s, lcs, nf, f);;
 
-let res_crash_fuel : res = RCrash "fuel exhausted";;
+let res_crash_fuel : res = RCrash (Error_invariant "fuel exhausted");;
 
 let rec split_v_s_b_s_aux
   v_s x1 = match v_s, x1 with
@@ -4090,7 +4095,8 @@ let rec split_v_s_b_s_aux
 
 let rec split_v_s_b_s es = split_v_s_b_s_aux [] es;;
 
-let crash_invalid : res_step = Res_crash "type system violation";;
+let crash_invalid : res_step
+  = Res_crash (Error_invalid "type system violation");;
 
 let rec store_packed x = store x;;
 
@@ -4355,7 +4361,8 @@ let rec app_v_s_br_table
       | ConstFloat32 _ :: _ -> (v_s, ([], crash_invalid))
       | ConstFloat64 _ :: _ -> (v_s, ([], crash_invalid)));;
 
-let crash_invariant : res_step = Res_crash "interpreter invariant violation";;
+let crash_invariant : res_step
+  = Res_crash (Error_invariant "interpreter invariant violation");;
 
 let rec update_redex_step
   (Redex (v_sa, es, b_es)) v_s es_cont = Redex (v_s, es_cont @ es, b_es);;
@@ -4780,7 +4787,8 @@ let rec run_step_b_e
            let (v_sa, aa) = a in
             (Config (d, s, update_fc_step fc v_sa [], fcs), aa))));;
 
-let crash_exhaustion : res_step = Res_crash "call stack exhausted";;
+let crash_exhaustion : res_step
+  = Res_crash (Error_exhaustion "call stack exhausted");;
 
 let rec rep_host (Abs_host x) = x;;
 
