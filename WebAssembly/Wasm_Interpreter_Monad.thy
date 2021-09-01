@@ -122,7 +122,7 @@ definition app_s_f_v_s_call_indirect_m :: "nat \<Rightarrow> tabinst_m array \<R
                  j \<leftarrow> Array.nth (inst_m.tabs inst_m) 0;
                  tab_j \<leftarrow> Array.nth tinsts j;
                  tab_j_len \<leftarrow> Array.len (fst tab_j);
-                 if (tab_j_len \<le> (nat_of_int c)) then do {
+                 if (tab_j_len > (nat_of_int c)) then do {
                    cl_maybe \<leftarrow> Array.nth (fst tab_j) (nat_of_int c);
                    case (cl_maybe) of
                      Some i_cl \<Rightarrow> do {

@@ -4753,7 +4753,7 @@ let rec app_s_f_v_s_call_indirect_m
                tinsts j ()
              in
            let tab_j_len = len (heap_option heap_nat) (fst tab_j) () in
-            (if less_eq_nat tab_j_len (nat_of_int_i32 c)
+            (if less_nat (nat_of_int_i32 c) tab_j_len
               then (fun f_ () -> f_
                      ((array_nth (heap_option heap_nat) (fst tab_j)
                         (nat_of_int_i32 c))
