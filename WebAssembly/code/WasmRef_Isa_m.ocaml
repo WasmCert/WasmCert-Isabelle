@@ -1098,6 +1098,7 @@ module WasmRef_Isa_m : sig
   val module_type_checker : unit m_ext -> (extern_t list * extern_t list) option
   val interp_get_i32_m :
     unit s_m_ext -> unit inst_m_ext -> b_e list -> (unit -> i32)
+  val make_empty_store_m : (unit -> unit s_m_ext)
   val external_typing_m : unit s_m_ext -> v_ext -> extern_t -> (unit -> bool)
   val export_get_v_ext_m : unit inst_m_ext -> v_ext -> (unit -> v_ext)
   val run_invoke_m :
@@ -5641,6 +5642,14 @@ let rec interp_get_i32_m
           | ConstFloat32 _ -> (fun () -> zero_i32a)
           | ConstFloat64 _ -> (fun () -> zero_i32a))
           ()));;
+
+let make_empty_store_m : (unit -> unit s_m_ext)
+  = (fun () ->
+      (let s_funcs = (fun () -> Array.of_list []) () in
+       let s_tabs = (fun () -> Array.of_list []) () in
+       let s_mems = (fun () -> Array.of_list []) () in
+       let s_globs = (fun () -> Array.of_list []) () in
+        S_m_ext (s_funcs, s_tabs, s_mems, s_globs, ())));;
 
 let rec external_typing_m
   s_m x1 x2 = match s_m, x1, x2 with
