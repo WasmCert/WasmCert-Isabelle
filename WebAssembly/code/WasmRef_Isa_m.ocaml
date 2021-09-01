@@ -4853,7 +4853,7 @@ let rec array_blit _A
 let rec app_s_f_v_s_mem_grow_m
   ms i_m v_s =
     (match v_s with [] -> (fun () -> (v_s, crash_invalid))
-      | ConstInt32 c :: _ ->
+      | ConstInt32 c :: v_sa ->
         (fun () ->
           (let j = array_nth heap_nat (memsa i_m) zero_nat () in
            let m =
@@ -4874,7 +4874,7 @@ let rec app_s_f_v_s_mem_grow_m
              upd (heap_prod (heap_array typerep_byte) (heap_option heap_nat)) j
                (m_new_fst, snd m) ms ()
              in
-            (ConstInt32 (int_of_nat_i32 (divide_nat m_len ki64)) :: v_s,
+            (ConstInt32 (int_of_nat_i32 (divide_nat m_len ki64)) :: v_sa,
               Step_normal)))
       | ConstInt64 _ :: _ -> (fun () -> (v_s, crash_invalid))
       | ConstFloat32 _ :: _ -> (fun () -> (v_s, crash_invalid))

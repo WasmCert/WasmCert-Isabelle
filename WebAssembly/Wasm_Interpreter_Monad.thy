@@ -336,7 +336,7 @@ definition app_s_f_v_s_mem_grow_m :: "mem_m array \<Rightarrow> inst_m \<Rightar
              m_new_fst \<leftarrow> Array.new (m_len + ((nat_of_int c)*Ki64)) (zero_byte);
              array_blit (fst m) 0 m_new_fst 0 m_len;
              Array.upd j (m_new_fst, snd m) ms;
-             return (((ConstInt32 (int_of_nat (m_len div Ki64)))#v_s), Step_normal)
+             return (((ConstInt32 (int_of_nat (m_len div Ki64)))#v_s'), Step_normal)
            }
      | _ \<Rightarrow> return (v_s, crash_invalid))"
 
