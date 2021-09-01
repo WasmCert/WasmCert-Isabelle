@@ -4642,7 +4642,7 @@ let rec app_s_f_v_s_store_packed_m
                   let a =
                     store_m m (nat_of_int_i32 c) off (bits v) (tp_length tp) ()
                     in
-                   (match a with None -> (fun () -> (v_sa, Res_trap "load"))
+                   (match a with None -> (fun () -> (v_sa, Res_trap "store"))
                      | Some _ -> (fun () -> (v_sa, Step_normal)))
                      ()))
           else (fun () -> (v_s, crash_invalid)))
@@ -4666,7 +4666,7 @@ let rec app_s_f_v_s_store_m
                     in
                   let a =
                     store_m m (nat_of_int_i32 c) off (bits v) (t_length t) () in
-                   (match a with None -> (fun () -> (v_sa, Res_trap "load"))
+                   (match a with None -> (fun () -> (v_sa, Res_trap "store"))
                      | Some _ -> (fun () -> (v_sa, Step_normal)))
                      ()))
           else (fun () -> (v_s, crash_invalid)))
@@ -5910,7 +5910,8 @@ let rec interp_alloc_module_m
            (heap_prod (heap_array typerep_byte) (heap_option heap_nat))
            (m_mems m)
            (fun mt ->
-             (fun f_ () -> f_ ((newa heap_byte (l_min mt) zero_byte) ()) ())
+             (fun f_ () -> f_
+               ((newa heap_byte (times_nata (l_min mt) ki64) zero_byte) ()) ())
                (fun ma -> (fun () -> (ma, l_max mt))))
            s_mems length_mems_s)
         ()) ())

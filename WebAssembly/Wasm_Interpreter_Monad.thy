@@ -248,7 +248,7 @@ definition app_s_f_v_s_store_m :: "t \<Rightarrow> nat \<Rightarrow> mem_m array
                     u_maybe \<leftarrow> store_m m (nat_of_int c) off (bits v) (t_length t);
                     (case u_maybe of
                        Some bs \<Rightarrow> return (v_s', Step_normal)
-                     | None \<Rightarrow> return (v_s', (Res_trap (STR ''load'')))) }
+                     | None \<Rightarrow> return (v_s', (Res_trap (STR ''store'')))) }
                 else return (v_s, crash_invalid))
            | _ \<Rightarrow> return (v_s, crash_invalid))"
 
@@ -263,7 +263,7 @@ definition app_s_f_v_s_store_packed_m :: "t \<Rightarrow> tp \<Rightarrow> nat \
                     u_maybe \<leftarrow> store_m m (nat_of_int c) off (bits v) (tp_length tp);
                     (case u_maybe of
                        Some bs \<Rightarrow> return (v_s', Step_normal)
-                     | None \<Rightarrow> return (v_s', (Res_trap (STR ''load'')))) }
+                     | None \<Rightarrow> return (v_s', (Res_trap (STR ''store'')))) }
                 else return (v_s, crash_invalid))
            | _ \<Rightarrow> return (v_s, crash_invalid))"
 

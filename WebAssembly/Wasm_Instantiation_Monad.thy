@@ -107,7 +107,7 @@ definition interp_alloc_module_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext lis
       s_tabs
       length_tabs_s;
     array_blit_map (m_mems m)
-      (\<lambda>mt. do { m' \<leftarrow> Array.new (l_min mt) zero_byte; return (m', (l_max mt)) })
+      (\<lambda>mt. do { m' \<leftarrow> Array.new (l_min mt * Ki64) zero_byte; return (m', (l_max mt)) })
       s_mems
       length_mems_s;
     array_blit_map (zip (m_globs m) gvs)
