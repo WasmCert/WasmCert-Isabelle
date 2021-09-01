@@ -613,6 +613,13 @@ fun run_v_m :: "fuel \<Rightarrow> depth \<Rightarrow> (s_m \<times> v array \<t
      (cfg',res) \<leftarrow> run_iter_m n (Config_m d s (Frame_context_m (Redex [] [] b_es) [] 0 f_locs1 f_inst2) []);
      case cfg' of (Config_m d' s' fc' fcs') \<Rightarrow> return (s',res) }"
 
+definition "make_empty_store_m \<equiv> do {
+  s_funcs \<leftarrow> Array.of_list [];
+  s_tabs \<leftarrow> Array.of_list [];
+  s_mems \<leftarrow> Array.of_list [];
+  s_globs \<leftarrow> Array.of_list [];
+  return \<lparr>s_m.funcs=s_funcs, s_m.tabs=s_tabs, s_m.mems=s_mems, s_m.globs=s_globs \<rparr> }"
+
 definition "make_empty_frame_m \<equiv> do {
   f_locs1 \<leftarrow> Array.of_list [];
   f_inst2 \<leftarrow> make_empty_inst_m;
