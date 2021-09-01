@@ -69,7 +69,7 @@ definition interp_alloc_module_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext lis
    length_tabs_s \<leftarrow> Array.len (s_m.tabs s_m);
    length_mems_s \<leftarrow> Array.len (s_m.mems s_m);
    length_globs_s \<leftarrow> Array.len (s_m.globs s_m);
-   let i_fs = [length_funcs_s ..< (length_tabs_s + length (m_funcs m))];
+   let i_fs = [length_funcs_s ..< (length_funcs_s + length (m_funcs m))];
    let i_ts = [length_tabs_s ..< (length_tabs_s + length (m_tabs m))];
    let i_ms = [length_mems_s ..< (length_mems_s + length (m_mems m))];
    let i_gs = [length_globs_s ..< (length_globs_s + min (length (m_globs m)) (length gvs))];

@@ -1,4 +1,4 @@
-module WasmRef_Isa_m : sig
+module WasmRef_Isa : sig
   type num = One | Bit0 of num | Bit1 of num
   val equal_num : num -> num -> bool
   type int = Zero_int | Pos of num | Nega of num
@@ -722,7 +722,7 @@ module WasmRef_Isa_m : sig
   val zip : 'a list -> 'b list -> ('a * 'b) list
   val len : 'a heap -> 'a array -> (unit -> nat)
   val newa : 'a heap -> nat -> 'a -> (unit -> ('a array))
-  val ntha : 'a heap -> 'a array -> nat -> (unit -> 'a)
+  val array_nth : 'a heap -> 'a array -> nat -> (unit -> 'a)
   val upd : 'a heap -> nat -> 'a -> 'a array -> (unit -> ('a array))
   val drop : nat -> 'a list -> 'a list
   val null : 'a list -> bool
@@ -3371,7 +3371,8 @@ let rec len _A
 let rec newa _A
   = comp (fun a b -> (fun () -> Array.make (Z.to_int a) b)) integer_of_nat;;
 
-let rec ntha _A a n = (fun () -> Array.get a (Z.to_int (integer_of_nat n)));;
+let rec array_nth _A
+  a n = (fun () -> Array.get a (Z.to_int (integer_of_nat n)));;
 
 let rec upd _A
   i x a =
@@ -4462,7 +4463,7 @@ let rec read_bytes_m
   m off l =
     (if equal_nat l zero_nat then (fun () -> [])
       else (fun () ->
-             (let b = ntha heap_byte (fst m) off () in
+             (let b = array_nth heap_byte (fst m) off () in
               let bs =
                 read_bytes_m m (plus_nat off one_nata) (minus_nat l one_nata) ()
                 in
@@ -4631,10 +4632,11 @@ let rec app_s_f_v_s_store_packed_m
       | v :: ConstInt32 c :: v_sa ->
         (if types_agree t v
           then (fun () ->
-                 (let j = ntha heap_nat (memsa i_m) zero_nat () in
+                 (let j = array_nth heap_nat (memsa i_m) zero_nat () in
                   let m =
-                    ntha (heap_prod (heap_array typerep_byte)
-                           (heap_option heap_nat))
+                    array_nth
+                      (heap_prod (heap_array typerep_byte)
+                        (heap_option heap_nat))
                       ms j ()
                     in
                   let a =
@@ -4655,10 +4657,11 @@ let rec app_s_f_v_s_store_m
       | v :: ConstInt32 c :: v_sa ->
         (if types_agree t v
           then (fun () ->
-                 (let j = ntha heap_nat (memsa i_m) zero_nat () in
+                 (let j = array_nth heap_nat (memsa i_m) zero_nat () in
                   let m =
-                    ntha (heap_prod (heap_array typerep_byte)
-                           (heap_option heap_nat))
+                    array_nth
+                      (heap_prod (heap_array typerep_byte)
+                        (heap_option heap_nat))
                       ms j ()
                     in
                   let a =
@@ -4687,10 +4690,11 @@ let rec app_s_f_v_s_load_packed_m
     (match v_s with [] -> (fun () -> (v_s, crash_invalid))
       | ConstInt32 c :: v_sa ->
         (fun () ->
-          (let j = ntha heap_nat (memsa i_m) zero_nat () in
+          (let j = array_nth heap_nat (memsa i_m) zero_nat () in
            let m =
-             ntha (heap_prod (heap_array typerep_byte) (heap_option heap_nat))
-               ms j ()
+             array_nth
+               (heap_prod (heap_array typerep_byte) (heap_option heap_nat)) ms j
+               ()
              in
            let a =
              load_packed_m sx m (nat_of_int_i32 c) off (tp_length tp)
@@ -4709,10 +4713,11 @@ let rec app_s_f_v_s_load_m
     (match v_s with [] -> (fun () -> (v_s, crash_invalid))
       | ConstInt32 c :: v_sa ->
         (fun () ->
-          (let j = ntha heap_nat (memsa i_m) zero_nat () in
+          (let j = array_nth heap_nat (memsa i_m) zero_nat () in
            let m =
-             ntha (heap_prod (heap_array typerep_byte) (heap_option heap_nat))
-               ms j ()
+             array_nth
+               (heap_prod (heap_array typerep_byte) (heap_option heap_nat)) ms j
+               ()
              in
            let a = load_m m (nat_of_int_i32 c) off (t_length t) () in
             (match a with None -> (fun () -> (v_sa, Res_trap "load"))
@@ -4740,16 +4745,17 @@ let rec app_s_f_v_s_call_indirect_m
     (match v_s with [] -> (fun () -> (v_s, ([], crash_invalid)))
       | ConstInt32 c :: v_sa ->
         (fun () ->
-          (let j = ntha heap_nat (tabsa inst_m) zero_nat () in
+          (let j = array_nth heap_nat (tabsa inst_m) zero_nat () in
            let tab_j =
-             ntha (heap_prod (heap_array (typerep_option typerep_nat))
-                    (heap_option heap_nat))
+             array_nth
+               (heap_prod (heap_array (typerep_option typerep_nat))
+                 (heap_option heap_nat))
                tinsts j ()
              in
            let tab_j_len = len (heap_option heap_nat) (fst tab_j) () in
             (if less_eq_nat tab_j_len (nat_of_int_i32 c)
               then (fun f_ () -> f_
-                     ((ntha (heap_option heap_nat) (fst tab_j)
+                     ((array_nth (heap_option heap_nat) (fst tab_j)
                         (nat_of_int_i32 c))
                      ()) ())
                      (fun a ->
@@ -4757,10 +4763,11 @@ let rec app_s_f_v_s_call_indirect_m
                          with None ->
                            (fun () -> (v_sa, ([], Res_trap "call_indirect")))
                          | Some i_cl ->
-                           (fun f_ () -> f_ ((ntha heap_cl_m cls i_cl) ()) ())
+                           (fun f_ () -> f_ ((array_nth heap_cl_m cls i_cl) ())
+                             ())
                              (fun cl_i ->
-                               (fun f_ () -> f_ ((ntha heap_tf (types inst_m) k)
-                                 ()) ())
+                               (fun f_ () -> f_
+                                 ((array_nth heap_tf (types inst_m) k) ()) ())
                                  (fun t_k ->
                                    (if equal_tfa t_k (cl_m_type cl_i)
                                      then (fun () ->
@@ -4780,8 +4787,8 @@ let rec app_s_f_v_s_set_global_m
     (match v_s with [] -> (fun () -> (v_s, crash_invalid))
       | v1 :: v_sa ->
         (fun () ->
-          (let g_ind = ntha heap_nat (globsa inst_m) k () in
-           let g = ntha (heap_global_ext heap_unit) gs g_ind () in
+          (let g_ind = array_nth heap_nat (globsa inst_m) k () in
+           let g = array_nth (heap_global_ext heap_unit) gs g_ind () in
            let _ =
              upd (heap_global_ext heap_unit) g_ind
                (g_val_update (fun _ -> v1) g) gs ()
@@ -4791,8 +4798,8 @@ let rec app_s_f_v_s_set_global_m
 let rec app_s_f_v_s_get_global_m
   k gs inst_m v_s =
     (fun () ->
-      (let g_ind = ntha heap_nat (globsa inst_m) k () in
-       let g = ntha (heap_global_ext heap_unit) gs g_ind () in
+      (let g_ind = array_nth heap_nat (globsa inst_m) k () in
+       let g = array_nth (heap_global_ext heap_unit) gs g_ind () in
         (g_val g :: v_s, Step_normal)));;
 
 let rec divide_integer k l = fst (divmod_integer k l);;
@@ -4803,10 +4810,10 @@ let rec divide_nat
 let rec app_s_f_v_s_mem_size_m
   ms i_m v_s =
     (fun () ->
-      (let j = ntha heap_nat (memsa i_m) zero_nat () in
+      (let j = array_nth heap_nat (memsa i_m) zero_nat () in
        let m =
-         ntha (heap_prod (heap_array typerep_byte) (heap_option heap_nat)) ms j
-           ()
+         array_nth (heap_prod (heap_array typerep_byte) (heap_option heap_nat))
+           ms j ()
          in
        let m_len = len heap_byte (fst m) () in
         (ConstInt32 (int_of_nat_i32 (divide_nat m_len ki64)) :: v_s,
@@ -4816,7 +4823,7 @@ let rec array_blit_lt _A
   src src_pos dst dst_pos len =
     (if equal_nat len zero_nat then (fun () -> ())
       else (fun () ->
-             (let x = ntha _A src src_pos () in
+             (let x = array_nth _A src src_pos () in
               let _ = upd _A dst_pos x dst () in
               let _ =
                 array_blit_lt _A src (minus_nat src_pos one_nata) dst
@@ -4828,7 +4835,7 @@ let rec array_blit_ge _A
   src src_pos dst dst_pos len =
     (if equal_nat len zero_nat then (fun () -> ())
       else (fun () ->
-             (let x = ntha _A src src_pos () in
+             (let x = array_nth _A src src_pos () in
               let _ = upd _A dst_pos x dst () in
               let _ =
                 array_blit_ge _A src (plus_nat src_pos one_nata) dst
@@ -4848,10 +4855,11 @@ let rec app_s_f_v_s_mem_grow_m
     (match v_s with [] -> (fun () -> (v_s, crash_invalid))
       | ConstInt32 c :: _ ->
         (fun () ->
-          (let j = ntha heap_nat (memsa i_m) zero_nat () in
+          (let j = array_nth heap_nat (memsa i_m) zero_nat () in
            let m =
-             ntha (heap_prod (heap_array typerep_byte) (heap_option heap_nat))
-               ms j ()
+             array_nth
+               (heap_prod (heap_array typerep_byte) (heap_option heap_nat)) ms j
+               ()
              in
            let m_len = len heap_byte (fst m) () in
            let m_new_fst =
@@ -4881,7 +4889,8 @@ let rec app_f_v_s_set_local_m
 
 let rec app_f_v_s_get_local_m
   k loc_arr v_s =
-    (fun () -> (let v = ntha heap_v loc_arr k () in (v :: v_s, Step_normal)));;
+    (fun () ->
+      (let v = array_nth heap_v loc_arr k () in (v :: v_s, Step_normal)));;
 
 let rec update_redex_step
   (Redex (v_sa, es, b_es)) v_s es_cont = Redex (v_s, es_cont @ es, b_es);;
@@ -4895,7 +4904,7 @@ let rec funcsa (Inst_m_ext (types, funcs, tabs, mems, globs, more)) = funcs;;
 let rec app_f_call_m
   k inst_m =
     (fun () ->
-      (let i_cl = ntha heap_nat (funcsa inst_m) k () in
+      (let i_cl = array_nth heap_nat (funcsa inst_m) k () in
         ([Invoke i_cl], Step_normal)));;
 
 let rec app_v_s_tee_local
@@ -5156,7 +5165,7 @@ let rec run_step_e_m
         | Trap -> (fun () -> (Config_m (d, s, fc, fcs), crash_invariant))
         | Invoke i_cl ->
           (fun () ->
-            (let a = ntha heap_cl_m (funcs s) i_cl () in
+            (let a = array_nth heap_cl_m (funcs s) i_cl () in
               (match a
                 with Func_native (i, Tf (t1s, t2s), ts, es_f) ->
                   (if equal_nat d zero_nat
@@ -5369,9 +5378,9 @@ let rec i_desc (Module_import_ext (i_module, i_name, i_desc, more)) = i_desc;;
 let rec init_mem_m
   s inst d_ind d =
     (fun () ->
-      (let m_ind = ntha heap_nat (memsa inst) (d_data d) () in
+      (let m_ind = array_nth heap_nat (memsa inst) (d_data d) () in
        let mem =
-         ntha (heap_prod (heap_array typerep_byte) (heap_option heap_nat))
+         array_nth (heap_prod (heap_array typerep_byte) (heap_option heap_nat))
            (mems s) m_ind ()
          in
         write_bytes_m mem d_ind (d_init d) ()));;
@@ -5390,16 +5399,17 @@ let rec array_blit_map _B
 let rec init_tab_m
   s inst e_ind e =
     (fun () ->
-      (let t_ind = ntha heap_nat (tabsa inst) (e_tab e) () in
+      (let t_ind = array_nth heap_nat (tabsa inst) (e_tab e) () in
        let a =
-         ntha (heap_prod (heap_array (typerep_option typerep_nat))
-                (heap_option heap_nat))
+         array_nth
+           (heap_prod (heap_array (typerep_option typerep_nat))
+             (heap_option heap_nat))
            (tabs s) t_ind ()
          in
         (let (tab_e, _) = a in
           array_blit_map (heap_option heap_nat) (e_init e)
             (fun i ->
-              (fun f_ () -> f_ ((ntha heap_nat (funcsa inst) i) ()) ())
+              (fun f_ () -> f_ ((array_nth heap_nat (funcsa inst) i) ()) ())
                 (fun i_cl -> (fun () -> (Some i_cl))))
             tab_e e_ind)
           ()));;
@@ -5414,7 +5424,8 @@ let rec get_start_m
     (match i_s with None -> (fun () -> None)
       | Some i_sa ->
         (fun () ->
-          (let i_s_s = ntha heap_nat (funcsa inst) i_sa () in Some i_s_s)));;
+          (let i_s_s = array_nth heap_nat (funcsa inst) i_sa () in
+            Some i_s_s)));;
 
 let rec init_mems_m
   s inst d_inds ds =
@@ -5657,7 +5668,7 @@ let rec external_typing_m
       (fun () ->
         (let f_len = len heap_cl_m (funcs s_m) () in
           (if less_nat i f_len
-            then (fun f_ () -> f_ ((ntha heap_cl_m (funcs s_m) i) ()) ())
+            then (fun f_ () -> f_ ((array_nth heap_cl_m (funcs s_m) i) ()) ())
                    (fun f -> (fun () -> (equal_tfa (cl_m_type f) tf)))
             else (fun () -> false))
             ()))
@@ -5670,8 +5681,9 @@ let rec external_typing_m
              in
             (if less_nat i t_len
               then (fun f_ () -> f_
-                     ((ntha (heap_prod (heap_array (typerep_option typerep_nat))
-                              (heap_option heap_nat))
+                     ((array_nth
+                        (heap_prod (heap_array (typerep_option typerep_nat))
+                          (heap_option heap_nat))
                         (tabs s_m) i)
                      ()) ())
                      (fun t -> tab_typing_m t tt)
@@ -5685,8 +5697,9 @@ let rec external_typing_m
              in
             (if less_nat i m_len
               then (fun f_ () -> f_
-                     ((ntha (heap_prod (heap_array typerep_byte)
-                              (heap_option heap_nat))
+                     ((array_nth
+                        (heap_prod (heap_array typerep_byte)
+                          (heap_option heap_nat))
                         (mems s_m) i)
                      ()) ())
                      (fun m -> mem_typing_m m mt)
@@ -5697,7 +5710,8 @@ let rec external_typing_m
           (let g_len = len (heap_global_ext heap_unit) (globs s_m) () in
             (if less_nat i g_len
               then (fun f_ () -> f_
-                     ((ntha (heap_global_ext heap_unit) (globs s_m) i) ()) ())
+                     ((array_nth (heap_global_ext heap_unit) (globs s_m) i) ())
+                     ())
                      (fun g -> (fun () -> (glob_typing g gt)))
               else (fun () -> false))
               ()))
@@ -5718,13 +5732,15 @@ let rec export_get_v_ext_m
   inst exp =
     (match exp
       with Ext_func i ->
-        (fun () -> (let x = ntha heap_nat (funcsa inst) i () in Ext_func x))
+        (fun () ->
+          (let x = array_nth heap_nat (funcsa inst) i () in Ext_func x))
       | Ext_tab i ->
-        (fun () -> (let x = ntha heap_nat (tabsa inst) i () in Ext_tab x))
+        (fun () -> (let x = array_nth heap_nat (tabsa inst) i () in Ext_tab x))
       | Ext_mem i ->
-        (fun () -> (let x = ntha heap_nat (memsa inst) i () in Ext_mem x))
+        (fun () -> (let x = array_nth heap_nat (memsa inst) i () in Ext_mem x))
       | Ext_glob i ->
-        (fun () -> (let x = ntha heap_nat (globsa inst) i () in Ext_glob x)));;
+        (fun () ->
+          (let x = array_nth heap_nat (globsa inst) i () in Ext_glob x)));;
 
 let rec run_invoke_m
   x = run_invoke_v_m
@@ -5747,7 +5763,7 @@ let rec interp_alloc_module_m
          in
        let length_globs_s = len (heap_global_ext heap_unit) (globs s_m) () in
         (let i_fs =
-           upt length_funcs_s (plus_nat length_tabs_s (size_list (m_funcs m)))
+           upt length_funcs_s (plus_nat length_funcs_s (size_list (m_funcs m)))
            in
          let i_ts =
            upt length_tabs_s (plus_nat length_tabs_s (size_list (m_tabs m))) in
@@ -5873,7 +5889,7 @@ let rec interp_alloc_module_m
                                       (fun f_ () -> f_
 ((array_blit_map heap_cl_m (m_funcs m)
    (fun (i, (tlocs, b_es)) ->
-     (fun f_ () -> f_ ((ntha heap_tf inst_types i) ()) ())
+     (fun f_ () -> f_ ((array_nth heap_tf inst_types i) ()) ())
        (fun ft -> (fun () -> (Func_native (inst_m, ft, tlocs, b_es)))))
    s_funcs length_funcs_s)
 ()) ())
@@ -5991,4 +6007,4 @@ let rec interp_instantiate_m
               else (fun () -> None))
               ())));;
 
-end;; (*struct WasmRef_Isa_m*)
+end;; (*struct WasmRef_Isa*)
