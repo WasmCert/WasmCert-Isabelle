@@ -4825,11 +4825,8 @@ let rec array_blit_lt _A
       else (fun () ->
              (let x = array_nth _A src src_pos () in
               let _ = upd _A dst_pos x dst () in
-              let _ =
-                array_blit_lt _A src (minus_nat src_pos one_nata) dst
-                  (minus_nat dst_pos one_nata) (minus_nat len one_nata) ()
-                in
-               ())));;
+               array_blit_lt _A src (minus_nat src_pos one_nata) dst
+                 (minus_nat dst_pos one_nata) (minus_nat len one_nata) ())));;
 
 let rec array_blit_ge _A
   src src_pos dst dst_pos len =
@@ -4837,11 +4834,8 @@ let rec array_blit_ge _A
       else (fun () ->
              (let x = array_nth _A src src_pos () in
               let _ = upd _A dst_pos x dst () in
-              let _ =
-                array_blit_ge _A src (plus_nat src_pos one_nata) dst
-                  (plus_nat dst_pos one_nata) (minus_nat len one_nata) ()
-                in
-               ())));;
+               array_blit_ge _A src (plus_nat src_pos one_nata) dst
+                 (plus_nat dst_pos one_nata) (minus_nat len one_nata) ())));;
 
 let rec array_blit _A
   src src_pos dst dst_pos len =
@@ -5392,9 +5386,7 @@ let rec array_blit_map _B
         (fun () ->
           (let x = src_f y () in
            let _ = upd _B dst_pos x dst () in
-           let _ = array_blit_map _B ys src_f dst (plus_nat dst_pos one_nata) ()
-             in
-            ())));;
+            array_blit_map _B ys src_f dst (plus_nat dst_pos one_nata) ())));;
 
 let rec init_tab_m
   s inst e_ind e =

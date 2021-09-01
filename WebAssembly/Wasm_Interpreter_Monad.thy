@@ -290,8 +290,7 @@ fun array_blit_ge :: "('a::heap) array \<Rightarrow> nat \<Rightarrow> 'a array 
         do {
           x \<leftarrow> Array.nth src src_pos;
           Array.upd dst_pos x dst;
-          array_blit_ge src (src_pos+1) dst (dst_pos+1) len';
-          return ()
+          array_blit_ge src (src_pos+1) dst (dst_pos+1) len'
         })"
 
 fun array_blit_lt :: "('a::heap) array \<Rightarrow> nat \<Rightarrow> 'a array \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> unit Heap" where
@@ -302,8 +301,7 @@ fun array_blit_lt :: "('a::heap) array \<Rightarrow> nat \<Rightarrow> 'a array 
         do {
           x \<leftarrow> Array.nth src src_pos;
           Array.upd dst_pos x dst;
-          array_blit_lt src (src_pos-1) dst (dst_pos-1) len';
-          return ()
+          array_blit_lt src (src_pos-1) dst (dst_pos-1) len'
         })"
 
 fun array_blit_map :: "'b list \<Rightarrow> ('b \<Rightarrow> ('a::heap) Heap) \<Rightarrow> 'a array \<Rightarrow> nat \<Rightarrow> unit Heap" where
@@ -314,8 +312,7 @@ fun array_blit_map :: "'b list \<Rightarrow> ('b \<Rightarrow> ('a::heap) Heap) 
         do {
           x \<leftarrow> src_f y;
           Array.upd dst_pos x dst;
-          array_blit_map ys src_f dst (dst_pos+1);
-          return ()
+          array_blit_map ys src_f dst (dst_pos+1)
         })"
 
 fun array_blit :: "('a::heap) array \<Rightarrow> nat \<Rightarrow> 'a array \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> unit Heap" where
