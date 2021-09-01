@@ -330,10 +330,14 @@ definition app_s_f_v_s_mem_grow_m :: "mem_m array \<Rightarrow> inst_m \<Rightar
              j \<leftarrow> Array.nth (inst_m.mems i_m) 0;
              m \<leftarrow> Array.nth ms j;
              m_len \<leftarrow> Array.len (fst m);
-             m_new_fst \<leftarrow> Array.new (m_len + ((nat_of_int c)*Ki64)) (zero_byte);
-             array_blit (fst m) 0 m_new_fst 0 m_len;
-             Array.upd j (m_new_fst, snd m) ms;
-             return (((ConstInt32 (int_of_nat (m_len div Ki64)))#v_s'), Step_normal)
+             let new_m_len = (m_len div Ki64) + (nat_of_int c);
+             if (new_m_len \<le> 2^16 \<and> pred_option (\<lambda>max. new_m_len \<le> max) (snd m)) then do {
+               m_new_fst \<leftarrow> Array.new (new_m_len * Ki64) (zero_byte);
+               array_blit (fst m) 0 m_new_fst 0 m_len;
+               Array.upd j (m_new_fst, snd m) ms;
+               return (((ConstInt32 (int_of_nat (m_len div Ki64)))#v_s'), Step_normal) }
+             else
+               return (((ConstInt32 (int32_minus_one))#v_s'), Step_normal)
            }
      | _ \<Rightarrow> return (v_s, crash_invalid))"
 

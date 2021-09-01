@@ -928,6 +928,7 @@ module WasmRef_Isa : sig
   val deserialise_i32 : byte list -> i32
   val deserialise_i64_aux : num1 bit0 bit0 bit0 word list -> i64
   val deserialise_i64 : byte list -> i64
+  val int32_minus_one : i32
   val app_v_s_binop : binop -> v list -> v list * res_step
   val app_v_s_br_if : nat -> v list -> v list * (e list * res_step)
   val wasm_deserialise : byte list -> t -> v
@@ -4514,6 +4515,13 @@ let rec deserialise_i64_aux
 
 let rec deserialise_i64 xa = deserialise_i64_aux (map rep_byte xa);;
 
+let int32_minus_one : i32
+  = Abs_i32
+      (uminus_word
+        (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+        (one_worda
+          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))));;
+
 let rec app_v_s_binop
   binop v_s =
     (match v_s with [] -> (v_s, crash_invalid) | [_] -> (v_s, crash_invalid)
@@ -4856,20 +4864,36 @@ let rec app_s_f_v_s_mem_grow_m
                ()
              in
            let m_len = len heap_byte (fst m) () in
-           let m_new_fst =
-             newa heap_byte
-               (plus_nat m_len (times_nata (nat_of_int_i32 c) ki64)) zero_byte
-               ()
-             in
-           let _ =
-             array_blit heap_byte (fst m) zero_nat m_new_fst zero_nat m_len ()
-             in
-           let _ =
-             upd (heap_prod (heap_array typerep_byte) (heap_option heap_nat)) j
-               (m_new_fst, snd m) ms ()
-             in
-            (ConstInt32 (int_of_nat_i32 (divide_nat m_len ki64)) :: v_sa,
-              Step_normal)))
+            (let new_m_len = plus_nat (divide_nat m_len ki64) (nat_of_int_i32 c)
+               in
+              (if less_eq_nat new_m_len
+                    (power power_nat (nat_of_integer (Z.of_int 2))
+                      (nat_of_integer (Z.of_int 16))) &&
+                    pred_option (less_eq_nat new_m_len) (snd m)
+                then (fun f_ () -> f_
+                       ((newa heap_byte (times_nata new_m_len ki64) zero_byte)
+                       ()) ())
+                       (fun m_new_fst ->
+                         (fun f_ () -> f_
+                           ((array_blit heap_byte (fst m) zero_nat m_new_fst
+                              zero_nat m_len)
+                           ()) ())
+                           (fun _ ->
+                             (fun f_ () -> f_
+                               ((upd (heap_prod (heap_array typerep_byte)
+                                       (heap_option heap_nat))
+                                  j (m_new_fst, snd m) ms)
+                               ()) ())
+                               (fun _ ->
+                                 (fun () ->
+                                   (ConstInt32
+                                      (int_of_nat_i32
+(divide_nat m_len ki64)) ::
+                                      v_sa,
+                                     Step_normal)))))
+                else (fun () ->
+                       (ConstInt32 int32_minus_one :: v_sa, Step_normal))))
+              ()))
       | ConstInt64 _ :: _ -> (fun () -> (v_s, crash_invalid))
       | ConstFloat32 _ :: _ -> (fun () -> (v_s, crash_invalid))
       | ConstFloat64 _ :: _ -> (fun () -> (v_s, crash_invalid)));;
