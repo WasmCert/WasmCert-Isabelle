@@ -256,6 +256,9 @@ next
     using Cons by auto
   finally show ?case by auto
 qed
+
+
+lemma temp:"(\<And>x. P x \<Longrightarrow> Q x) \<Longrightarrow> list_all P xs \<Longrightarrow> list_all Q xs" 
    
 theorem instantiation_sound:
   assumes "store_typing s"
@@ -291,21 +294,31 @@ proof -
     using \<open>module_typing m t_imps t_exps\<close> module_typing.simps
     by auto 
 
-  have "inst_typing s1 inst \<C>" sorry
+  have "inst_typing s' inst \<C>" sorry
 
   show "store_typing s'"
   proof -
     have 1:"list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) (funcs s')" 
     proof -
-      have s1_cl_typing:"list_all (\<lambda>cl. \<exists>tf. cl_typing s1 cl tf) (funcs s1)" 
-      proof - 
-        obtain fs where "funcs s1 = funcs s @ fs" using alloc_module_ext_arb[OF s_alloc_module]
+        have "funcs s1 = funcs s2" using init_tabs_preserve_funcs s_init_tabs by auto
+        also have "... = funcs s'" using init_mems_preserve_funcs s_init_mems by auto
+        finally have "funcs s1 = funcs s'" by -
+
+        obtain fs where "funcs s @ fs = funcs s1" using alloc_module_ext_arb[OF s_alloc_module]
           by metis
+        then have "funcs s @ fs = funcs s'" using \<open>funcs s1 = funcs s'\<close> by auto
 
         have "list_all (\<lambda>cl. \<exists>tf. cl_typing s1 cl tf) (funcs s)" 
           using cl_typing_store_extension_inv[OF \<open>store_extension s s1\<close>] store_typing.simps assms(1)
           by (smt (verit, ccfv_threshold) list_all_length) 
-        moreover have "list_all (\<lambda>cl. \<exists>tf. cl_typing s1 cl tf) fs" 
+        then have "list_all (\<lambda>cl. \<exists>tf. cl_typing s2 cl tf) (funcs s)" 
+          using  cl_typing_store_extension_inv[OF \<open>store_extension s1 s2\<close>] list.pred_mono_strong
+          by (smt (verit, best)) 
+        then have "list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) (funcs s)" 
+          using  cl_typing_store_extension_inv[OF \<open>store_extension s2 s'\<close>] list.pred_mono_strong
+          by (smt (verit, best))
+
+        moreover have "list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) fs" 
         proof -
           {
             fix f
@@ -315,7 +328,7 @@ proof -
             then have "funcs s1 = funcs s_mid" 
               using alloc_module_funcs_only_alloc_func[OF s_alloc_module]
               by (metis eq_fst_iff) 
-            then have "funcs s_mid = funcs s @ fs" using \<open>funcs s1 = funcs s @ fs\<close> by auto
+            then have "funcs s_mid = funcs s @ fs" using \<open>funcs s @ fs = funcs s1\<close> by auto
             then have 0:"alloc_funcs_fs (m_funcs m) inst = fs" 
               using alloc_funcs_equiv s_mid_def by auto
             
@@ -332,31 +345,19 @@ proof -
               unfolding module_func_typing.simps by auto 
 
             have 3:"(types inst)!i_t = (types_t \<C>)!i_t"
-              using store_typing_imp_types_eq[OF \<open>inst_typing s1 inst \<C>\<close> 2(1)] by auto
+              using store_typing_imp_types_eq[OF \<open>inst_typing s' inst \<C>\<close> 2(1)] by auto
 
-            have "cl_typing s1 f (tn _> tm)" 
+            have "cl_typing s' f (tn _> tm)" 
               using 1(1) 2 3 
-              cl_typing.intros(1)[OF \<open>inst_typing s1 inst \<C>\<close>]
+              cl_typing.intros(1)[OF \<open>inst_typing s' inst \<C>\<close>]
               by presburger 
-            then have "\<exists>tf. cl_typing s1 f tf" by auto
+            then have "\<exists>tf. cl_typing s' f tf" by auto
           }
           then show ?thesis by (simp add: list_all_iff) 
         qed
-        ultimately show ?thesis using \<open>funcs s1 = funcs s @ fs\<close> by auto
+        ultimately show ?thesis using \<open>funcs s @ fs = funcs s'\<close>
+          by (metis list_all_append) 
       qed 
-      have s2_cl_typing:"list_all (\<lambda>cl. \<exists>tf. cl_typing s2 cl tf) (funcs s2)"
-      proof -
-        have "funcs s1 = funcs s2" using init_tabs_preserve_funcs s_init_tabs by auto
-        then show ?thesis using cl_typing_store_extension_inv[OF \<open>store_extension s1 s2\<close>] s1_cl_typing 
-          by (smt (verit, best) list_all_length)
-      qed  
-      show  "list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) (funcs s')" 
-      proof -
-        have "funcs s2 = funcs s'" using init_mems_preserve_funcs s_init_mems by auto
-        then show ?thesis using cl_typing_store_extension_inv[OF \<open>store_extension s2 s'\<close>] s2_cl_typing 
-          by (smt (verit, best) list_all_length)
-      qed 
-    qed
     have 2:"list_all (tab_agree s') (tabs s')"
       sorry
     have 3:"list_all mem_agree (mems s')"
@@ -366,16 +367,7 @@ proof -
       by blast
   qed
 
-  show "\<exists>\<C>. inst_typing s' inst \<C>"
-  proof -
-    have "inst_typing s2 inst \<C>" 
-      using inst_typing_store_extension_inv[OF \<open>inst_typing s1 inst \<C>\<close>  \<open>store_extension s1 s2\<close>]
-      by simp 
-    then have "inst_typing s' inst \<C>" 
-      using inst_typing_store_extension_inv  \<open>store_extension s2 s'\<close>
-      by simp
-    then show ?thesis by auto
-  qed
+  show "\<exists>\<C>. inst_typing s' inst \<C>" using \<open>inst_typing s' inst \<C>\<close> by auto
 
   show "\<exists>tes. list_all2 (\<lambda>v_exp te. external_typing s' (E_desc v_exp) te) v_exps tes"
   proof -
