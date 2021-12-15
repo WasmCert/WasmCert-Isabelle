@@ -45,6 +45,7 @@ lemma init_tab_form:
   assumes "s' = init_tab s inst e_ind e" 
   shows "list_all2 tab_extension (tabs s) (tabs s')" 
         "\<exists>tabs'. s' = s\<lparr>tabs := tabs'\<rparr>"
+        "list_all2 (\<lambda>t t'. tab_agree s t \<longrightarrow> tab_agree s' t') (tabs s) (tabs s')"
 proof -
   obtain t_ind tab_e max e_pay tab'_e where init_tab_is:
     "t_ind = ((inst.tabs inst)!(e_tab e))" 
@@ -57,36 +58,54 @@ proof -
     unfolding init_tab_def by(fastforce simp add: Let_def split: prod.splits)
   then have 1:"s' = s\<lparr>tabs := (tabs s)[t_ind := (tab'_e,max)]\<rparr>" using assms by auto 
 
+  have 2: "tabs s' = (tabs s)[t_ind := (tab'_e,max)]" using 1 by auto
+
+  have 3: "\<And>P. P (tab_e,max) (tab'_e, max) \<Longrightarrow> (\<And>a. P a a) \<Longrightarrow> list_all2 P (tabs s) (tabs s')"
+    using init_tab_is(2) unfolding 1 list_all2_conv_all_nth  
+    by (simp, metis nth_list_update_eq nth_list_update_neq)
+
   have "length tab_e \<le> length tab'_e" using init_tab_is
     by simp 
-  then have "tab_extension ((tabs s)!t_ind) (tab'_e, max)" 
+  then have "tab_extension (tab_e,max) (tab'_e, max)" 
     unfolding tab_extension_def using init_tab_is
     by (metis fst_conv snd_conv) 
   then show "list_all2 tab_extension (tabs s) (tabs s')"  
-    using init_tab_is  tab_extension_refl unfolding 1 list_all2_conv_all_nth  
-    by (simp, metis nth_list_update_eq nth_list_update_neq)
+    using 3 tab_extension_refl by auto
 
   show "\<exists>tabs'. s' = s\<lparr>tabs := tabs'\<rparr>" unfolding assms init_tab_def
     by(simp add: Let_def exI split:prod.splits)
+
+  {
+    assume "tab_agree s (tab_e,max)"               
+    have "tab_agree s' (tab'_e, max)" sorry
+  } 
+  then have 4:"tab_agree s (tab_e,max) \<longrightarrow> tab_agree s' (tab'_e, max)" by auto
+
+  have "funcs s = funcs s'" unfolding 1 by auto 
+  then have 5:"\<And>t. tab_agree s t \<longrightarrow> tab_agree s' t" unfolding tab_agree_def by auto  
+
+  show "list_all2 (\<lambda>t t'. tab_agree s t \<longrightarrow> tab_agree s' t') (tabs s) (tabs s')"
+    using 3[OF 4 5] by -  
 qed
 
 lemma tab_extension_trans:"tab_extension a b \<Longrightarrow> tab_extension b c \<Longrightarrow> tab_extension a c" 
   unfolding tab_extension_def by auto
 
 
-lemma init_tabs_form:
+lemma init_tabs_trans_pred: 
   assumes "s' = init_tabs s inst e_inds es" 
-  shows "list_all2 tab_extension (tabs s) (tabs s')" 
-        "\<exists>tabs'. s' = s\<lparr>tabs := tabs'\<rparr>"
+          "\<And>a b c. P a b \<Longrightarrow> P b c \<Longrightarrow> P a c"
+          "\<And>a. P a a"
+          "\<And>s1 s2 inst e_ind e. s2 = init_tab s1 inst e_ind e \<Longrightarrow> P s1 s2"
+  shows "P s s'" 
 proof -
   {
     fix a
-    have "s' = foldl (\<lambda>s' (e_ind,e). init_tab s' inst e_ind e) s a \<Longrightarrow> 
-          list_all2 tab_extension (tabs s) (tabs s') \<and> (\<exists>tabs'. s' = s\<lparr>tabs := tabs'\<rparr>)"
+    have "s' = foldl (\<lambda>s' (e_ind,e). init_tab s' inst e_ind e) s a \<Longrightarrow> P s s'"
     proof (induction a arbitrary:s)
       case Nil
-      show ?case using Nil exI[where x="tabs s"] unfolding foldl_Nil 
-        by(simp add: list_all2_refl tab_extension_refl)  
+      show ?case using Nil assms(3) unfolding foldl_Nil 
+        by(simp)  
     next
       case (Cons a1 a2)
       define s_mid where "s_mid = init_tab s inst (fst a1) (snd a1)" 
@@ -94,34 +113,73 @@ proof -
         using Cons foldl_Cons
         by(simp add: case_prod_beta')
 
-      note ind_assms = init_tab_form[OF s_mid_def] Cons(1)[OF 1]
-
-      have "list_all2 tab_extension (tabs s) (tabs s')" using ind_assms
-        list_all2_trans tab_extension_trans
-        by blast
-      moreover have "\<exists>tabs'. s' = s\<lparr>tabs := tabs'\<rparr>" using ind_assms
-        by auto
-      ultimately show ?case by auto
-    qed 
+      show ?case using assms(2)[OF assms(4)[OF s_mid_def] Cons(1)[OF 1]] by auto
+      qed 
   }
-  note helper = this
-  show "list_all2 tab_extension (tabs s) (tabs s')" using helper assms unfolding init_tabs_def
+  then show "P s s'" using assms(1) unfolding init_tabs_def
     by presburger 
-  show "\<exists>tabs'. s' = s\<lparr>tabs := tabs'\<rparr>" using helper assms unfolding init_tabs_def
-    by presburger
 qed
+
+lemma init_tabs_trans_list_pred: 
+  assumes "s' = init_tabs s inst e_inds es" 
+          "\<And>a b c. P a b \<Longrightarrow> P b c \<Longrightarrow> P a c"
+          "\<And>a. P a a" 
+          "\<And>s1 s2 inst e_ind e. s2 = init_tab s1 inst e_ind e \<Longrightarrow> list_all2 P (tabs s1) (tabs s2)"
+  shows "list_all2 P (tabs s) (tabs s')" 
+  using init_tabs_trans_pred[OF assms(1), where P="\<lambda>s1 s2. list_all2 P (tabs s1) (tabs s2)"] 
+    assms list_all2_trans list_all2_refl
+  by (smt (verit, best)) 
+
+lemma init_tabs_tab_extension:
+  assumes "s' = init_tabs s inst e_inds es" 
+  shows "list_all2 tab_extension (tabs s) (tabs s')" 
+  using init_tabs_trans_list_pred[OF assms, where P=tab_extension] tab_extension_trans
+      tab_extension_refl init_tab_form(1) by blast
+
+lemma init_tabs_only_modify_tabs: 
+  assumes "s' = init_tabs s inst e_inds es" 
+  shows "\<exists>tabs'. s' = s\<lparr>tabs := tabs'\<rparr>" 
+proof -
+  define only_modify_tabs ::  "s \<Rightarrow> s \<Rightarrow> bool"
+    where "only_modify_tabs = (\<lambda>s1 s2. \<exists>tabs'. s2 = s1\<lparr>tabs := tabs'\<rparr>)" 
+  have 1:"\<And>a b c. only_modify_tabs a b \<Longrightarrow> only_modify_tabs b c \<Longrightarrow> only_modify_tabs a c"
+    unfolding only_modify_tabs_def by force 
+  have 2:"\<And>a. only_modify_tabs a a" unfolding only_modify_tabs_def
+    by (metis s.cases s.update_convs(2)) 
+  show ?thesis using init_tabs_trans_pred[OF assms, where P=only_modify_tabs] 1 2 init_tab_form(2)
+    unfolding only_modify_tabs_def by metis
+qed 
+
+lemma init_tabs_tab_agree:
+  assumes "s' = init_tabs s inst e_inds es" 
+  shows "list_all2 (\<lambda>t t'. tab_agree s t \<longrightarrow> tab_agree s' t') (tabs s) (tabs s')"
+proof -
+  define tab_agree_all2 ::  "s \<Rightarrow> s \<Rightarrow> bool"
+    where "tab_agree_all2 = (\<lambda>s1 s2. list_all2 (\<lambda>t t'. tab_agree s1 t \<longrightarrow> tab_agree s2 t') (tabs s1) (tabs s2))" 
+  have 1:"\<And>a b c. tab_agree_all2 a b \<Longrightarrow> tab_agree_all2 b c \<Longrightarrow> tab_agree_all2 a c"
+    unfolding tab_agree_all2_def using list_all2_trans
+    by (smt (verit, best)) 
+  have 2:"\<And>a. tab_agree_all2 a a" unfolding tab_agree_all2_def 
+    using list_all2_refl by (smt (verit, best)) 
+  show ?thesis using init_tabs_trans_pred[OF assms, where P=tab_agree_all2] 1 2 init_tab_form(3)
+    unfolding tab_agree_all2_def by metis
+qed 
+
+  
+  
 
 lemma init_tabs_preserve_funcs:
   assumes "s' = init_tabs s inst e_inds es" 
   shows "funcs s' = funcs s"
-  using init_tabs_form(2)[OF assms]
+  using init_tabs_only_modify_tabs[OF assms]
   by auto
 
 
 lemma init_tabs_preserve_store_extension: 
   assumes "s' = init_tabs s inst e_inds es" 
   shows "store_extension s s'"
-  using init_tabs_form[OF assms] store_extension_intros_with_refl
+  using init_tabs_tab_extension[OF assms] init_tabs_only_modify_tabs[OF assms] 
+      store_extension_intros_with_refl
   by (metis append_Nil2 s.ext_inject s.surjective s.update_convs(2))   
 
 lemma init_mem_form:
@@ -258,7 +316,6 @@ next
 qed
 
 
-lemma temp:"(\<And>x. P x \<Longrightarrow> Q x) \<Longrightarrow> list_all P xs \<Longrightarrow> list_all Q xs" 
    
 theorem instantiation_sound:
   assumes "store_typing s"
@@ -279,8 +336,8 @@ proof -
     "list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s1)!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m)"
     "list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s1)!((inst.mems inst)!(d_data d)))) d_offs (m_data m)"
     "map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) (m_start m) = start"
-    and s_init_tabs:"init_tabs s1 inst (map nat_of_int e_offs) (m_elem m) = s2"
-    and s_init_mems:"init_mems s2 inst (map nat_of_int d_offs) (m_data m) = s'" 
+    and s_init_tabs:"s2 = init_tabs s1 inst (map nat_of_int e_offs) (m_elem m)"
+    and s_init_mems:"s' = init_mems s2 inst (map nat_of_int d_offs) (m_data m)" 
     using assms(2) instantiate.simps by auto
 
   have "store_extension s s1" using alloc_module_preserve_store_extension s_alloc_module by auto
@@ -294,15 +351,17 @@ proof -
     using \<open>module_typing m t_imps t_exps\<close> module_typing.simps
     by auto 
 
+  have "funcs s1 = funcs s2" using init_tabs_preserve_funcs s_init_tabs by auto
+  also have "... = funcs s'" using init_mems_preserve_funcs s_init_mems by auto
+  finally have "funcs s1 = funcs s'" by -
+
   have "inst_typing s' inst \<C>" sorry
 
   show "store_typing s'"
   proof -
     have 1:"list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) (funcs s')" 
     proof -
-        have "funcs s1 = funcs s2" using init_tabs_preserve_funcs s_init_tabs by auto
-        also have "... = funcs s'" using init_mems_preserve_funcs s_init_mems by auto
-        finally have "funcs s1 = funcs s'" by -
+        
 
         obtain fs where "funcs s @ fs = funcs s1" using alloc_module_ext_arb[OF s_alloc_module]
           by metis
@@ -359,7 +418,15 @@ proof -
           by (metis list_all_append) 
       qed 
     have 2:"list_all (tab_agree s') (tabs s')"
-      sorry
+    proof -
+      have "tabs s2 = tabs s'" using init_mems_form(2)[OF s_init_mems] by auto 
+
+      have "list_all (tab_agree s1) (tabs s1)" sorry 
+      then have "list_all (tab_agree s2) (tabs s2)" using init_tabs_tab_agree[OF s_init_tabs]
+        by (simp add: list_all2_conv_all_nth list_all_length) 
+      then show ?thesis using \<open>funcs s2 = funcs s'\<close> \<open>tabs s2 = tabs s'\<close> 
+        unfolding tab_agree_def by auto
+    qed
     have 3:"list_all mem_agree (mems s')"
       sorry
     show ?thesis
