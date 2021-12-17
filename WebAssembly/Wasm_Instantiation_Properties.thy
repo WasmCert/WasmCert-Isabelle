@@ -398,6 +398,42 @@ next
   finally show ?case by auto
 qed
 
+lemma ext_typing_imp_funci_agree:
+  assumes "list_all2 (external_typing s) v_imps t_imps"
+  shows "list_all2 (funci_agree (funcs s)) (ext_funcs v_imps) (ext_t_funcs t_imps)" 
+proof -
+  {
+    fix a
+    have "list_all2 (external_typing s) (map fst a) (map snd a) 
+    \<Longrightarrow> list_all2 (funci_agree (funcs s)) (ext_funcs (map fst a)) (ext_t_funcs (map snd a))"
+    proof(induct a)
+      case Nil
+      then show ?case by (simp add: map_filter_simps(2)) 
+    next
+      case (Cons a1 a2)
+      have 1:"list_all2 (funci_agree (s.funcs s)) (ext_funcs (map fst a2)) (ext_t_funcs (map snd a2))" 
+        using Cons by auto 
+      have 2:"external_typing s (fst a1) (snd a1)" using Cons(2) by auto
+      show ?case
+      proof(cases "\<exists>i. fst a1 = Ext_func i")
+        case True
+        then obtain i where i_def:"fst a1 = Ext_func i" by auto
+        then obtain tf where tf_def:"snd a1 = Te_func tf" using 2 
+          unfolding external_typing.simps by auto
+        have "funci_agree (funcs s) i tf" using i_def tf_def 2 
+          unfolding external_typing.simps funci_agree_def by auto
+        then show ?thesis using 1 i_def tf_def by(simp add: List.map_filter_simps)
+      next
+        case False
+        then have no_tf:"\<nexists>tf. snd a1 = Te_func tf" using 2 unfolding external_typing.simps by auto 
+        show ?thesis using False no_tf 1 
+          by(simp add: List.map_filter_simps split:v_ext.splits extern_t.splits) 
+      qed
+    qed
+  }
+  then show ?thesis using assms
+    by (metis list.in_rel) 
+qed
 
    
 theorem instantiation_sound:
@@ -409,8 +445,8 @@ theorem instantiation_sound:
         "pred_option (\<lambda>i. i < length (s.funcs s')) start"
 proof -
   obtain s1 s2 t_imps t_exps g_inits f e_offs d_offs where 
-    "module_typing m t_imps t_exps"
-    and "list_all2 (external_typing s) v_imps t_imps"
+    "module_typing m t_imps t_exps"  
+    and s_ext_typing:"list_all2 (external_typing s) v_imps t_imps"
     and s_alloc_module:"alloc_module s m v_imps g_inits (s1, inst, v_exps)"
     and "f = \<lparr> f_locs = [], f_inst = inst \<rparr>"
     "list_all2 (\<lambda>g v. reduce_trans (s1,f,$*(g_init g)) (s1,f,[$C v])) (m_globs m) g_inits"
@@ -428,11 +464,12 @@ proof -
   have "store_extension s1 s2" using init_tabs_preserve_store_extension s_init_tabs by auto 
   have "store_extension s2 s'" using init_mems_preserve_store_extension s_init_mems by auto 
 
-  obtain \<C> fts ds i_opt  ifts igs gts its ts ims ms
+  obtain \<C> fts ds i_opt ifts igs gts its ts ims ms
     where c_is:"list_all2 (module_func_typing \<C>) (m_funcs m) fts"
     "list_all (module_elem_typing \<C>) (m_elem m)"
     "list_all (module_data_typing \<C>) ds"
     "pred_option (module_start_typing \<C>) i_opt"
+    "ifts = ext_t_funcs t_imps"
     "\<C> = \<lparr>types_t=(m_types m), func_t=ifts@fts, global=igs@gts, table=its@ts, memory=ims@ms, 
           local=[], label=[], return=None\<rparr>"
     using \<open>module_typing m t_imps t_exps\<close> module_typing.simps
@@ -441,10 +478,31 @@ proof -
   have "funcs s1 = funcs s2" using init_tabs_preserve_funcs s_init_tabs by auto
   also have "... = funcs s'" using init_mems_preserve_funcs s_init_mems by auto
   finally have "funcs s1 = funcs s'" by -
+  obtain fs where "funcs s @ fs = funcs s1" using alloc_module_ext_arb[OF s_alloc_module]
+    by metis
+  then have "funcs s'= funcs s @ fs" using \<open>funcs s1 = funcs s'\<close> by auto
 
-  have "list_all2 (funci_agree (funcs s')) (inst.funcs inst) (func_t \<C>)" sorry
+
+  have inst_typing_func:"list_all2 (funci_agree (funcs s')) (inst.funcs inst) (func_t \<C>)"
+  proof -
+    define allocd_funcs where "allocd_funcs = snd (alloc_funcs s (m_funcs m) inst)"  
+
+    have "inst.funcs inst = (ext_funcs v_imps)@allocd_funcs" 
+      using s_alloc_module unfolding alloc_module.simps allocd_funcs_def by auto
+
+    moreover have "list_all2 (funci_agree (funcs s')) (ext_funcs v_imps) (ext_t_funcs t_imps)"
+    proof -
+      have "list_all2 (funci_agree (funcs s)) (ext_funcs v_imps) (ext_t_funcs t_imps)" 
+        using ext_typing_imp_funci_agree[OF s_ext_typing] by -
+
+      then show ?thesis unfolding funci_agree_def  \<open>funcs s' =funcs s @ fs\<close>
+        by (simp add: list_all2_mono nth_append) 
+    qed 
+    moreover have "list_all2 (funci_agree (funcs s')) allocd_funcs fts" sorry
+    ultimately show ?thesis using c_is by (simp add: list_all2_appendI) 
+  qed 
   moreover have "list_all2 (globi_agree (globs s')) (inst.globs inst) (global \<C>)" sorry 
-  moreover have "list_all2 (tabi_agree (tabs s')) (inst.tabs inst) (table \<C>)" sorry
+  moreover have inst_typing_tab:"list_all2 (tabi_agree (tabs s')) (inst.tabs inst) (table \<C>)" sorry
   moreover have "list_all2 (memi_agree (mems s')) (inst.mems inst) (memory \<C>)" sorry
   moreover have "types inst = types_t \<C>" 
   proof -
@@ -461,11 +519,6 @@ proof -
   proof -
     have 1:"list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) (funcs s')" 
     proof -
-        
-
-        obtain fs where "funcs s @ fs = funcs s1" using alloc_module_ext_arb[OF s_alloc_module]
-          by metis
-        then have "funcs s @ fs = funcs s'" using \<open>funcs s1 = funcs s'\<close> by auto
 
         have "list_all (\<lambda>cl. \<exists>tf. cl_typing s1 cl tf) (funcs s)" 
           using cl_typing_store_extension_inv[OF \<open>store_extension s s1\<close>] store_typing.simps assms(1)
@@ -514,17 +567,15 @@ proof -
           }
           then show ?thesis by (simp add: list_all_iff) 
         qed
-        ultimately show ?thesis using \<open>funcs s @ fs = funcs s'\<close>
+        ultimately show ?thesis using \<open>funcs s' = funcs s @ fs\<close>
           by (metis list_all_append) 
       qed 
     have 2:"list_all (tab_agree s') (tabs s')"
     proof -
       have "tabs s2 = tabs s'" using init_mems_form(2)[OF s_init_mems] by auto 
 
-      have "list_all2 (funci_agree (funcs s')) (inst.funcs inst) (func_t \<C>)" 
-        using \<open>inst_typing s' inst \<C>\<close> unfolding inst_typing.simps by auto
-      then have 1:"list_all (\<lambda>i. i< length (funcs s1)) (inst.funcs inst)" 
-        using \<open>funcs s1 = funcs s'\<close> unfolding funci_agree_def
+      have 1:"list_all (\<lambda>i. i< length (funcs s1)) (inst.funcs inst)" 
+        using inst_typing_func \<open>funcs s1 = funcs s'\<close> unfolding funci_agree_def
         by (simp add: list_all2_conv_all_nth list_all_length) 
       
       {
