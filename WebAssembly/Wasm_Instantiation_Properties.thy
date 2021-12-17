@@ -365,7 +365,7 @@ lemma alloc_module_funcs_only_alloc_func:
 
 lemma list_all2_in_set:
   assumes "x\<in>set xs" "list_all2 f xs ys" 
-  shows "\<exists>y. f x y" 
+  shows "\<exists>y. f x y \<and> y\<in>set ys" 
   using assms 
   by (smt (verit, best) list_all2_conv_all_nth mem_Collect_eq set_conv_nth)
 
@@ -389,10 +389,8 @@ next
   case (Cons a m_fs)
   have "fst (alloc_funcs s (a # m_fs) i) = fst (alloc_funcs (fst (alloc_func s a i)) m_fs i)"
     using alloc_Xs.simps(2) by(simp split:prod.splits)
-
   also have "... = fst (alloc_funcs (s\<lparr>funcs := funcs s @ [alloc_func_fs a i]\<rparr>) m_fs i)" 
     using alloc_func_equiv by simp
-
   also have "... = s\<lparr>funcs := funcs s @ alloc_funcs_fs (a#m_fs) i\<rparr> " 
     using Cons by auto
   finally show ?case by auto
@@ -435,6 +433,24 @@ proof -
     by (metis list.in_rel) 
 qed
 
+lemma alloc_module_funcs_form:
+  assumes "alloc_module s m v_imps g_inits (s', inst, v_exps)" "funcs s' = funcs s @ fs"
+  shows "alloc_funcs_fs (m_funcs m) inst = fs"
+        "list_all2 (\<lambda>f (i_t, loc_ts, b_es).  f = Func_native inst ((types inst)!i_t) loc_ts b_es) 
+            fs (m_funcs m)"
+proof -
+  define s_mid where s_mid_def:"s_mid = fst (alloc_funcs s (m_funcs m) inst)"
+  then have "funcs s' = funcs s_mid" 
+    using alloc_module_funcs_only_alloc_func[OF assms(1)]
+    by (metis eq_fst_iff) 
+  then have "funcs s_mid = funcs s @ fs" using assms(2) by auto
+  then show 1:"alloc_funcs_fs (m_funcs m) inst = fs" 
+              using alloc_funcs_equiv s_mid_def by auto
+  then show "list_all2 (\<lambda>f (i_t, loc_ts, b_es).  f = Func_native inst ((types inst)!i_t) loc_ts b_es) 
+            fs (m_funcs m)" unfolding alloc_func_fs_def
+    using list_all2_conv_all_nth by fastforce
+    
+qed
    
 theorem instantiation_sound:
   assumes "store_typing s"
@@ -478,12 +494,18 @@ proof -
   have "funcs s1 = funcs s2" using init_tabs_preserve_funcs s_init_tabs by auto
   also have "... = funcs s'" using init_mems_preserve_funcs s_init_mems by auto
   finally have "funcs s1 = funcs s'" by -
-  obtain fs where "funcs s @ fs = funcs s1" using alloc_module_ext_arb[OF s_alloc_module]
+  obtain fs where "funcs s1 = funcs s @ fs" using alloc_module_ext_arb[OF s_alloc_module]
     by metis
   then have "funcs s'= funcs s @ fs" using \<open>funcs s1 = funcs s'\<close> by auto
 
-
-  have inst_typing_func:"list_all2 (funci_agree (funcs s')) (inst.funcs inst) (func_t \<C>)"
+  have "types inst = types_t \<C>" 
+  proof -
+    have "types inst = m_types m" using s_alloc_module unfolding alloc_module.simps 
+      by(auto)
+    also have "... = types_t \<C>" using c_is by auto
+    finally show ?thesis by -
+  qed                                         
+  moreover have inst_typing_func:"list_all2 (funci_agree (funcs s')) (inst.funcs inst) (func_t \<C>)"
   proof -
     define allocd_funcs where "allocd_funcs = snd (alloc_funcs s (m_funcs m) inst)"  
 
@@ -498,19 +520,38 @@ proof -
       then show ?thesis unfolding funci_agree_def  \<open>funcs s' =funcs s @ fs\<close>
         by (simp add: list_all2_mono nth_append) 
     qed 
-    moreover have "list_all2 (funci_agree (funcs s')) allocd_funcs fts" sorry
+    moreover have "list_all2 (funci_agree (funcs s')) allocd_funcs fts" 
+    proof - 
+      have "alloc_funcs_fs (m_funcs m) inst = fs" 
+          "list_all2 (\<lambda>f (i_t, loc_ts, b_es).  f = Func_native inst ((types inst)!i_t) loc_ts b_es) 
+            fs (m_funcs m)"
+        using alloc_module_funcs_form[OF s_alloc_module \<open>funcs s1 = funcs s @ fs\<close>] by -
+      then have 1:"list_all2 (\<lambda>f i. cl_type f = (types inst)!(fst i)) fs (m_funcs m)" 
+        unfolding cl_type_def using list_all2_mono by fastforce 
+
+      then have "length fs = length (m_funcs m)" using list_all2_conv_all_nth by auto
+      then have 3:"allocd_funcs = [length (funcs s) ..< (length (funcs s) + length fs)]" 
+        using allocd_funcs_def alloc_funcs_range surjective_pairing by metis  
+
+      have "\<And>f ft. module_func_typing \<C> f ft \<Longrightarrow> (fst f) < length (types_t \<C>)\<and> (types_t \<C>)!(fst f) = ft"
+        unfolding module_func_typing.simps by auto
+      then have 2:"list_all2 (\<lambda>f ft. (fst f) < length (types_t \<C>)\<and> (types_t \<C>)!(fst f) = ft) 
+          (m_funcs m) fts"
+        using list_all2_mono[OF c_is(1)] by auto
+
+      have "list_all2 (\<lambda>f ft. cl_type f = ft) fs fts" using 1 2 \<open>types inst = types_t \<C>\<close> 
+        list_all2_trans[where as=fs and bs="(m_funcs m)" and cs=fts]
+        by (metis (mono_tags, lifting))
+
+      then have "list_all2 (funci_agree (funcs s@fs)) allocd_funcs fts" unfolding 3 funci_agree_def
+        by (simp add: list_all2_conv_all_nth) 
+      then show ?thesis using \<open>funcs s' = funcs s @ fs\<close> by auto
+    qed 
     ultimately show ?thesis using c_is by (simp add: list_all2_appendI) 
   qed 
   moreover have "list_all2 (globi_agree (globs s')) (inst.globs inst) (global \<C>)" sorry 
   moreover have inst_typing_tab:"list_all2 (tabi_agree (tabs s')) (inst.tabs inst) (table \<C>)" sorry
   moreover have "list_all2 (memi_agree (mems s')) (inst.mems inst) (memory \<C>)" sorry
-  moreover have "types inst = types_t \<C>" 
-  proof -
-    have "types inst = m_types m" using s_alloc_module unfolding alloc_module.simps 
-      by(auto)
-    also have "... = types_t \<C>" using c_is by auto
-    finally show ?thesis by -
-  qed
   moreover have "local \<C> = [] \<and> label \<C> = [] \<and> return \<C> = None" using c_is by auto
   ultimately have "inst_typing s' inst \<C>" using inst_typing.simps
     by (metis (full_types) inst.surjective old.unit.exhaust t_context.surjective) 
@@ -535,19 +576,13 @@ proof -
           {
             fix f
             assume "f\<in>set fs" 
-
-            define s_mid where s_mid_def:"s_mid = fst (alloc_funcs s (m_funcs m) inst)"
-            then have "funcs s1 = funcs s_mid" 
-              using alloc_module_funcs_only_alloc_func[OF s_alloc_module]
-              by (metis eq_fst_iff) 
-            then have "funcs s_mid = funcs s @ fs" using \<open>funcs s @ fs = funcs s1\<close> by auto
-            then have 0:"alloc_funcs_fs (m_funcs m) inst = fs" 
-              using alloc_funcs_equiv s_mid_def by auto
             
             obtain i_t loc_ts b_es where 1:
               "f = Func_native inst ((types inst)!i_t) loc_ts b_es"  
               "(i_t, loc_ts, b_es) \<in> set (m_funcs m)"
-              using 0 \<open>f\<in> set fs\<close> unfolding alloc_func_fs_def by auto
+              using list_all2_in_set[OF \<open>f\<in>set fs\<close> 
+                  alloc_module_funcs_form(2)[OF s_alloc_module \<open>funcs s1 = funcs s @ fs\<close>]] 
+              by auto 
 
             obtain tn tm where 2:
               "i_t < length (types_t \<C>)"
