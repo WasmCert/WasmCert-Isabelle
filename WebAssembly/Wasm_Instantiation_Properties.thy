@@ -355,13 +355,7 @@ lemma alloc_module_preserve_store_extension:
   store_extension_intros_with_refl list_all2_refl tab_extension_refl mem_extension_refl global_extension_refl
   by metis
 
-lemma alloc_module_funcs_only_alloc_func:
-  assumes "alloc_module s m imps gvs (s',inst,exps)"
-    "alloc_funcs s (m_funcs m) inst = (s1,i_fs)"
-  shows "funcs s' = funcs s1" 
-  using assms alloc_tabs_range alloc_mems_range alloc_globs_range 
-  unfolding alloc_module.simps 
-  by force 
+
 
 lemma list_all2_in_set:
   assumes "x\<in>set xs" "list_all2 f xs ys" 
@@ -396,42 +390,97 @@ next
   finally show ?case by auto
 qed
 
-lemma ext_typing_imp_funci_agree:
-  assumes "list_all2 (external_typing s) v_imps t_imps"
-  shows "list_all2 (funci_agree (funcs s)) (ext_funcs v_imps) (ext_t_funcs t_imps)" 
+lemma alloc_module_funcs_only_alloc_func:
+  assumes "alloc_module s m imps gvs (s',inst,exps)"
+    "alloc_funcs s (m_funcs m) inst = (s1,i_fs)"
+  shows "funcs s' = funcs s1" 
+  using assms alloc_tabs_range alloc_mems_range alloc_globs_range 
+  unfolding alloc_module.simps 
+  by force 
+
+definition alloc_glob_fs :: "(module_glob \<times> v) \<Rightarrow> global" where 
+  "alloc_glob_fs m_g_v = 
+    (case m_g_v of (m_g, v) \<Rightarrow> \<lparr>g_mut=(tg_mut (module_glob.g_type m_g)), g_val=v\<rparr>)"
+
+lemma alloc_glob_equiv:"fst (alloc_glob s m_g_v) = s\<lparr>globs := globs s @ [alloc_glob_fs m_g_v]\<rparr>"
+  using alloc_glob_def alloc_glob_fs_def by(simp split:prod.splits)
+
+abbreviation "alloc_globs_fs m_g_vs \<equiv> map (\<lambda>m_g_v. alloc_glob_fs m_g_v) m_g_vs"
+
+
+lemma ext_typing_imp_helper:
+  assumes "list_all2 (external_typing s) v_imps t_imps" 
+          "\<And>v t. external_typing s v t \<Longrightarrow> (\<exists>v'. f v = Some v') \<longleftrightarrow> (\<exists>e'. g t = Some e')"
+          "\<And>v t v' t'. external_typing s v t \<Longrightarrow> f v = Some v' \<Longrightarrow> g t = Some t' \<Longrightarrow> P v' t'"
+        shows "list_all2 P (List.map_filter f v_imps) (List.map_filter g t_imps)"
 proof -
   {
     fix a
     have "list_all2 (external_typing s) (map fst a) (map snd a) 
-    \<Longrightarrow> list_all2 (funci_agree (funcs s)) (ext_funcs (map fst a)) (ext_t_funcs (map snd a))"
+    \<Longrightarrow> list_all2 P (List.map_filter f (map fst a)) (List.map_filter g (map snd a))"
     proof(induct a)
       case Nil
       then show ?case by (simp add: map_filter_simps(2)) 
     next
       case (Cons a1 a2)
-      have 1:"list_all2 (funci_agree (s.funcs s)) (ext_funcs (map fst a2)) (ext_t_funcs (map snd a2))" 
+      have 1:"list_all2 P (List.map_filter f (map fst a2)) (List.map_filter g (map snd a2))" 
         using Cons by auto 
       have 2:"external_typing s (fst a1) (snd a1)" using Cons(2) by auto
       show ?case
-      proof(cases "\<exists>i. fst a1 = Ext_func i")
+      proof(cases "\<exists>v'. f (fst a1) = Some v'")
         case True
-        then obtain i where i_def:"fst a1 = Ext_func i" by auto
-        then obtain tf where tf_def:"snd a1 = Te_func tf" using 2 
-          unfolding external_typing.simps by auto
-        have "funci_agree (funcs s) i tf" using i_def tf_def 2 
-          unfolding external_typing.simps funci_agree_def by auto
-        then show ?thesis using 1 i_def tf_def by(simp add: List.map_filter_simps)
+        then obtain v' where v'_def:"f (fst a1) = Some v'" by auto
+        then obtain t' where t'_def:"g (snd a1) = Some t'" using assms(2)[OF 2]
+          by force
+        have "P v' t'" using assms(3)[OF 2 v'_def t'_def]  by -
+        then show ?thesis using 1 v'_def t'_def by(simp add: List.map_filter_simps)
       next
         case False
-        then have no_tf:"\<nexists>tf. snd a1 = Te_func tf" using 2 unfolding external_typing.simps by auto 
-        show ?thesis using False no_tf 1 
-          by(simp add: List.map_filter_simps split:v_ext.splits extern_t.splits) 
+        then have no_t':"g (snd a1) = None" using assms(2)[OF 2] by auto 
+        show ?thesis using False no_t' 1 by(simp add: List.map_filter_simps) 
       qed
     qed
   }
   then show ?thesis using assms
     by (metis list.in_rel) 
 qed
+
+
+lemma ext_typing_imp_funci_agree:
+  assumes "list_all2 (external_typing s) v_imps t_imps"
+  shows "list_all2 (funci_agree (funcs s)) (ext_funcs v_imps) (ext_t_funcs t_imps)" 
+  apply(rule ext_typing_imp_helper[OF assms])  
+   apply(simp add: external_typing.simps)
+   apply auto
+  apply(simp split:v_ext.splits extern_t.splits add: external_typing.simps funci_agree_def) 
+  done 
+
+lemma ext_typing_imp_globi_agree:
+  assumes "list_all2 (external_typing s) v_imps t_imps"
+  shows "list_all2 (globi_agree (globs s)) (ext_globs v_imps) (ext_t_globs t_imps)" 
+  apply(rule ext_typing_imp_helper[OF assms])  
+   apply(simp add: external_typing.simps)
+   apply auto
+  apply(simp split:v_ext.splits extern_t.splits add: external_typing.simps globi_agree_def) 
+  done 
+
+lemma ext_typing_imp_tabi_agree:
+  assumes "list_all2 (external_typing s) v_imps t_imps"
+  shows "list_all2 (tabi_agree (tabs s)) (ext_tabs v_imps) (ext_t_tabs t_imps)" 
+  apply(rule ext_typing_imp_helper[OF assms])  
+   apply(simp add: external_typing.simps)
+   apply auto
+  apply(simp split:v_ext.splits extern_t.splits add: external_typing.simps tabi_agree_def) 
+  done 
+
+lemma ext_typing_imp_memi_agree:
+  assumes "list_all2 (external_typing s) v_imps t_imps"
+  shows "list_all2 (memi_agree (mems s)) (ext_mems v_imps) (ext_t_mems t_imps)" 
+  apply(rule ext_typing_imp_helper[OF assms])  
+   apply(simp add: external_typing.simps)
+   apply auto
+  apply(simp split:v_ext.splits extern_t.splits add: external_typing.simps memi_agree_def) 
+  done 
 
 lemma alloc_module_funcs_form:
   assumes "alloc_module s m v_imps g_inits (s', inst, v_exps)" "funcs s' = funcs s @ fs"
