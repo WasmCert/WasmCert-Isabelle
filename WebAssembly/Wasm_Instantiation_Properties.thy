@@ -568,7 +568,15 @@ lemma ext_typing_imp_memi_agree:
   apply(simp split:v_ext.splits extern_t.splits add: external_typing.simps memi_agree_def) 
   done 
 
-   
+
+lemma tab_agree_store_extension_inv2:
+  assumes "store_extension s s'"
+          "tab_agree s t"
+  shows "tab_agree s' t"
+  using assms
+  unfolding tab_agree_def list_all_length store_extension.simps
+  by (fastforce split: option.splits)
+
 theorem instantiation_sound:
   assumes "store_typing s"
           "(instantiate s m v_imps ((s', inst, v_exps), start))"
@@ -621,6 +629,9 @@ proof -
     using alloc_module_ext_arb[OF s_alloc_module]
     by metis
   then have "funcs s'= funcs s @ fs" using \<open>funcs s1 = funcs s'\<close> by auto
+
+  have ts_alloc:"ts = alloc_tabs_simple (m_tabs m)" 
+        using alloc_module_tabs_form[OF s_alloc_module \<open>tabs s1 = tabs s @ ts\<close>] by -
 
   have "types inst = types_t \<C>" 
   proof -
@@ -686,19 +697,14 @@ proof -
         by (simp add: list_all2_mono nth_append)
     qed 
     moreover have "list_all2 (tabi_agree (tabs s1)) allocd_tabs (m_tabs m)"
-    proof - 
-      have ts_alloc:"ts = alloc_tabs_simple (m_tabs m)" 
-        using alloc_module_tabs_form[OF s_alloc_module \<open>tabs s1 = tabs s @ ts\<close>] by -
-      then have "length ts = length (m_tabs m)" by auto
+    proof -
+      have "length ts = length (m_tabs m)" using ts_alloc by auto
       then have allocd_interval:"allocd_tabs = [length (tabs s) ..< (length (tabs s) + length ts)]" 
         using allocd_tabs_def alloc_tabs_range surjective_pairing by metis  
 
-
       have "list_all2 tab_typing ts (m_tabs m)" 
         unfolding ts_alloc alloc_tab_simple_def tab_typing_def list.rel_map(1) limits_compat_def
-        apply(rule list_all2_refl)
-        apply(simp)
-        by (metis le_simps(2) lessI not_None_eq option.case(2) option.pred_inject)
+        by(simp add:list_all2_refl pred_option_def)
 
       then have "list_all2 (tabi_agree (tabs s@ts)) allocd_tabs (m_tabs m)" 
         unfolding tabi_agree_def allocd_interval 
@@ -791,7 +797,22 @@ proof -
       have 2:"list_all2 (element_in_bounds s1 inst) (map nat_of_int e_offs) (m_elem m)"  
         using s_element_in_bounds
         by (smt (verit, best) list_all2_map1 list_all2_mono) 
-      have "list_all (tab_agree s1) (tabs s1)" sorry 
+
+      have "list_all (tab_agree s) (tabs s)" using assms(1) unfolding store_typing.simps by auto
+      then have "list_all (tab_agree s1) (tabs s)" 
+        using tab_agree_store_extension_inv2[OF \<open>store_extension s s1\<close>] 
+        by (simp add: list_all_length) 
+
+
+      moreover have "list_all (tab_agree s1) ts" 
+        using \<open>list_all (module_tab_typing) (m_tabs m)\<close> 
+        unfolding ts_alloc alloc_tab_simple_def tab_agree_def list.pred_map(1) comp_def 
+        limit_typing.simps
+        by(simp add:list.pred_set, auto)
+
+      ultimately have "list_all (tab_agree s1) (tabs s1)" using \<open>tabs s1 = tabs s @ ts\<close>
+        by simp 
+        
       moreover have "list_all2 (\<lambda>t t'. tab_agree s1 t \<longrightarrow> tab_agree s2 t') (tabs s1) (tabs s2)"
         using init_tabs_tab_agree[OF s_init_tabs 1 2] by -
       ultimately have "list_all (tab_agree s2) (tabs s2)" 
