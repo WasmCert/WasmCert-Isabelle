@@ -568,7 +568,6 @@ lemma ext_typing_imp_memi_agree:
   apply(simp split:v_ext.splits extern_t.splits add: external_typing.simps memi_agree_def) 
   done 
 
-
    
 theorem instantiation_sound:
   assumes "store_typing s"
@@ -598,16 +597,16 @@ proof -
   have "store_extension s1 s2" using init_tabs_preserve_store_extension s_init_tabs by auto 
   have "store_extension s2 s'" using init_mems_preserve_store_extension s_init_mems by auto 
 
-  obtain \<C> fts ds i_opt gts cts ms
+  obtain \<C> fts ds i_opt gts ms
     where c_is:"list_all2 (module_func_typing \<C>) (m_funcs m) fts"
-    "list_all (module_tab_typing) cts"
+    "list_all (module_tab_typing) (m_tabs m)"
     "list_all (module_elem_typing \<C>) (m_elem m)"
     "list_all (module_data_typing \<C>) ds"
     "pred_option (module_start_typing \<C>) i_opt"
     "\<C> = \<lparr>types_t=(m_types m), 
           func_t=ext_t_funcs t_imps @ fts, 
           global=ext_t_globs t_imps @ gts, 
-          table=ext_t_tabs t_imps @ cts, 
+          table=ext_t_tabs t_imps @ (m_tabs m), 
           memory=ext_t_mems t_imps @ ms, 
           local=[], label=[], return=None\<rparr>"
     using \<open>module_typing m t_imps t_exps\<close> module_typing.simps
@@ -645,28 +644,27 @@ proof -
     qed 
     moreover have "list_all2 (funci_agree (funcs s')) allocd_funcs fts" 
     proof - 
-      have "fs = alloc_funcs_simple (m_funcs m) inst" 
+      have fs_alloc:"fs = alloc_funcs_simple (m_funcs m) inst" 
         using alloc_module_funcs_form[OF s_alloc_module \<open>funcs s1 = funcs s @ fs\<close>] by -
-          
-      then have 1:"list_all2 (\<lambda>f i. cl_type f = (types inst)!(fst i)) fs (m_funcs m)" 
-        unfolding cl_type_def alloc_func_simple_def 
-        by (smt (z3) case_prod_beta' cl.simps(5) list_all2_map1 list_all2_refl)  
-
-      then have "length fs = length (m_funcs m)" using list_all2_conv_all_nth by auto
-      then have 3:"allocd_funcs = [length (funcs s) ..< (length (funcs s) + length fs)]" 
+      then have "length fs = length (m_funcs m)" by auto
+      then have allocd_interval:"allocd_funcs = [length (funcs s) ..< (length (funcs s) + length fs)]" 
         using allocd_funcs_def alloc_funcs_range surjective_pairing by metis  
 
-      have "\<And>f ft. module_func_typing \<C> f ft \<Longrightarrow> (fst f) < length (types_t \<C>)\<and> (types_t \<C>)!(fst f) = ft"
-        unfolding module_func_typing.simps by auto
-      then have 2:"list_all2 (\<lambda>f ft. (fst f) < length (types_t \<C>)\<and> (types_t \<C>)!(fst f) = ft) 
-          (m_funcs m) fts"
-        using list_all2_mono[OF c_is(1)] by auto
+      have "list_all2 (\<lambda>f i. cl_type f = (types inst)!(fst i)) fs (m_funcs m)" 
+        unfolding cl_type_def alloc_func_simple_def fs_alloc list.rel_map(1) 
+        by(simp add: list_all2_refl split:prod.splits)
 
-      have "list_all2 (\<lambda>f ft. cl_type f = ft) fs fts" using 1 2 \<open>types inst = types_t \<C>\<close> 
+      moreover have "list_all2 (\<lambda>f ft. (fst f) < length (types_t \<C>)\<and> (types_t \<C>)!(fst f) = ft) 
+          (m_funcs m) fts"
+        using list_all2_mono[OF c_is(1)] unfolding module_func_typing.simps 
+        by (smt (z3) fst_conv) 
+
+      ultimately have "list_all2 (\<lambda>f ft. cl_type f = ft) fs fts" using \<open>types inst = types_t \<C>\<close> 
         list_all2_trans[where as=fs and bs="(m_funcs m)" and cs=fts]
         by (metis (mono_tags, lifting))
 
-      then have "list_all2 (funci_agree (funcs s@fs)) allocd_funcs fts" unfolding 3 funci_agree_def
+      then have "list_all2 (funci_agree (funcs s@fs)) allocd_funcs fts" 
+        unfolding funci_agree_def allocd_interval
         by (simp add: list_all2_conv_all_nth) 
       then show ?thesis using \<open>funcs s' = funcs s @ fs\<close> by auto
     qed 
@@ -679,21 +677,40 @@ proof -
     then have "inst.tabs inst = (ext_tabs v_imps)@allocd_tabs" 
       using alloc_module_tabs_only_alloc_tabs[OF s_alloc_module]
       by (metis prod.collapse) 
-    moreover have "list_all2 (tabi_agree (tabs s')) (ext_tabs v_imps) (ext_t_tabs t_imps)"
+    moreover have "list_all2 (tabi_agree (tabs s1)) (ext_tabs v_imps) (ext_t_tabs t_imps)"
     proof -
       have "list_all2 (tabi_agree (tabs s)) (ext_tabs v_imps) (ext_t_tabs t_imps)" 
         using ext_typing_imp_tabi_agree[OF s_ext_typing] by -
-      then have "list_all2 (tabi_agree (tabs s1)) (ext_tabs v_imps) (ext_t_tabs t_imps)"
+      then show ?thesis
         unfolding tabi_agree_def \<open>tabs s1 = tabs s @ ts\<close>
         by (simp add: list_all2_mono nth_append)
-      then have "list_all2 (tabi_agree (tabs s2)) (ext_tabs v_imps) (ext_t_tabs t_imps)" 
-        using init_tabs_tabi_agree[OF s_init_tabs] list_all2_mono by metis
-      then show ?thesis using init_mems_form(2)[OF s_init_mems]
-        by auto 
     qed 
-    moreover have "list_all2 (tabi_agree (tabs s')) allocd_tabs cts"
-      sorry
-    ultimately show ?thesis using c_is by (simp add: list_all2_appendI) 
+    moreover have "list_all2 (tabi_agree (tabs s1)) allocd_tabs (m_tabs m)"
+    proof - 
+      have ts_alloc:"ts = alloc_tabs_simple (m_tabs m)" 
+        using alloc_module_tabs_form[OF s_alloc_module \<open>tabs s1 = tabs s @ ts\<close>] by -
+      then have "length ts = length (m_tabs m)" by auto
+      then have allocd_interval:"allocd_tabs = [length (tabs s) ..< (length (tabs s) + length ts)]" 
+        using allocd_tabs_def alloc_tabs_range surjective_pairing by metis  
+
+
+      have "list_all2 tab_typing ts (m_tabs m)" 
+        unfolding ts_alloc alloc_tab_simple_def tab_typing_def list.rel_map(1) limits_compat_def
+        apply(rule list_all2_refl)
+        apply(simp)
+        by (metis le_simps(2) lessI not_None_eq option.case(2) option.pred_inject)
+
+      then have "list_all2 (tabi_agree (tabs s@ts)) allocd_tabs (m_tabs m)" 
+        unfolding tabi_agree_def allocd_interval 
+        by (simp add: list_all2_conv_all_nth) 
+      then show ?thesis using \<open>tabs s1 = tabs s @ ts\<close> by auto
+    qed
+    ultimately have "list_all2 (tabi_agree (tabs s1)) (inst.tabs inst) (table \<C>)" 
+      using c_is by (simp add: list_all2_appendI) 
+    then have "list_all2 (tabi_agree (tabs s2)) (inst.tabs inst) (table \<C>)" 
+      using init_tabs_tabi_agree[OF s_init_tabs] list_all2_mono by metis
+    then show ?thesis using init_mems_form(2)[OF s_init_mems]
+      by auto  
   qed 
   moreover have "list_all2 (memi_agree (mems s')) (inst.mems inst) (memory \<C>)" sorry
   moreover have "local \<C> = [] \<and> label \<C> = [] \<and> return \<C> = None" using c_is by auto
