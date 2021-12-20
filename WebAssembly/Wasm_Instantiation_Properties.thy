@@ -16,32 +16,6 @@ proof (induction xs)
 qed auto
 
 
-lemma store_extension_intros_with_refl: 
-  assumes "funcs s = funcs s' \<or> (\<exists> fs. funcs s @ fs = funcs s')" 
-  "tabs s = tabs s' \<or> (\<exists> t1 t2. t1 @ t2 = tabs s' \<and> list_all2 tab_extension (tabs s) t1)"
-  "mems s = mems s' \<or> (\<exists> m1 m2. m1 @ m2 = mems s' \<and> list_all2 mem_extension (mems s) m1)" 
-  "globs s = globs s' \<or> (\<exists> g1 g2. g1 @ g2 = globs s' \<and> list_all2 global_extension (globs s) g1)" 
-  shows "store_extension s s'"
-proof -         
-  have funcs:"\<exists> fs. funcs s @ fs = funcs s'" using assms(1) by auto
-
-  have tabs: "\<exists> t1 t2. t1 @ t2 = tabs s' \<and> list_all2 tab_extension (tabs s) t1" 
-    using assms(2) tab_extension_refl list_all2_refl
-    by (metis append_Nil2) 
-
-  have mems: "\<exists> m1 m2. m1 @ m2 = mems s' \<and> list_all2 mem_extension (mems s) m1" 
-    using assms(3) mem_extension_refl list_all2_refl
-    by (metis append_Nil2) 
-
-  have globs: "\<exists> g1 g2. g1 @ g2 = globs s' \<and> list_all2 global_extension (globs s) g1"  
-    using assms(4) global_extension_refl list_all2_refl
-    by (metis append_Nil2) 
-  
-  show ?thesis using funcs mems tabs globs unfolding store_extension.simps
-    by (metis (full_types) unit.exhaust s.surjective) 
-qed
-
-
 definition element_in_bounds where 
 "element_in_bounds s inst e_ind e \<equiv>
    let i = inst.tabs inst ! e_tab e 
@@ -145,7 +119,7 @@ lemma init_tabs_trans_pred:
 proof -
   {
     fix a
-    have "set a \<subseteq> set (zip e_inds es) \<Longrightarrow> s' = foldl (\<lambda>s' (e_ind,e). init_tab s' inst e_ind e) s a \<Longrightarrow> P s s'"
+    have "s' = foldl (\<lambda>s' (e_ind,e). init_tab s' inst e_ind e) s a \<Longrightarrow> P s s'"
     proof (induction a arbitrary:s)
       case Nil
       show ?case using Nil assms(3) unfolding foldl_Nil 
@@ -156,10 +130,7 @@ proof -
       then have 1:"s' = foldl (\<lambda>s' (e_ind,e). init_tab s' inst e_ind e) s_mid a2" 
         using Cons foldl_Cons
         by(simp add: case_prod_beta')
-
-      have 2:"a1 \<in> set (zip e_inds es)" using Cons(2) by auto
-      have 3:"set a2 \<subseteq> set (zip e_inds es)" using Cons(2) by auto 
-      show ?case using assms(2)[OF assms(4)[OF s_mid_def] Cons(1)[OF 3 1]] by auto
+      show ?case using assms(2)[OF assms(4)[OF s_mid_def] Cons(1)[OF 1]] by auto
       qed 
   }
   then show "P s s'" using assms(1) unfolding init_tabs_def
@@ -172,7 +143,7 @@ lemma init_tabs_trans_list_pred:
           "\<And>a b c. P a b \<Longrightarrow> P b c \<Longrightarrow> P a c"
           "\<And>a. P a a" 
           "\<And>s1 s2 inst e_ind e. s2 = init_tab s1 inst e_ind e \<Longrightarrow> list_all2 P (tabs s1) (tabs s2)"
-  shows "list_all2 P (tabs s) (tabs s')" 
+        shows "list_all2 P (tabs s) (tabs s')" 
   using init_tabs_trans_pred[OF assms(1), where P="\<lambda>s1 s2. list_all2 P (tabs s1) (tabs s2)"] 
     assms list_all2_trans list_all2_refl
   by (smt (verit, best)) 
@@ -186,17 +157,10 @@ lemma init_tabs_tab_extension:
 lemma init_tabs_only_modify_tabs: 
   assumes "s' = init_tabs s inst e_inds es" 
   shows "\<exists>tabs'. s' = s\<lparr>tabs := tabs'\<rparr>" 
-proof -
-  define only_modify_tabs ::  "s \<Rightarrow> s \<Rightarrow> bool"
-    where "only_modify_tabs = (\<lambda>s1 s2. \<exists>tabs'. s2 = s1\<lparr>tabs := tabs'\<rparr>)" 
-  have 1:"\<And>a b c. only_modify_tabs a b \<Longrightarrow> only_modify_tabs b c \<Longrightarrow> only_modify_tabs a c"
-    unfolding only_modify_tabs_def by force 
-  have 2:"\<And>a. only_modify_tabs a a" unfolding only_modify_tabs_def
-    by (metis s.cases s.update_convs(2)) 
-  show ?thesis using init_tabs_trans_pred[OF assms, where P=only_modify_tabs] 1 2 init_tab_form(2)
-    unfolding only_modify_tabs_def by metis
-qed 
-
+  apply(rule init_tabs_trans_pred[OF assms], auto)
+   apply(metis s.cases s.update_convs(2))
+  apply(simp add: init_tab_form(2))
+  done
 
 
 lemma init_tabs_tab_typing:
@@ -205,14 +169,12 @@ lemma init_tabs_tab_typing:
   apply(rule init_tabs_trans_list_pred[OF assms], auto)
   by (simp add: init_tab_form(4)) 
 
-
 lemma init_tabs_tabi_agree:
   assumes "s' = init_tabs s inst e_inds es" 
         "tabi_agree (tabs s) n tt"
   shows "tabi_agree (tabs s') n tt"
   using init_tabs_tab_typing[OF assms(1)] assms(2) unfolding tabi_agree_def
   by (smt (verit, best) list_all2_conv_all_nth) 
-
 
 
 lemma init_tabs_tab_agree:
@@ -280,13 +242,6 @@ lemma init_tabs_preserve_funcs:
   by auto
 
 
-lemma init_tabs_preserve_store_extension: 
-  assumes "s' = init_tabs s inst e_inds es" 
-  shows "store_extension s s'"
-  using init_tabs_tab_extension[OF assms] init_tabs_only_modify_tabs[OF assms] 
-      store_extension_intros_with_refl
-  by (metis append_Nil2 s.ext_inject s.surjective s.update_convs(2))   
-
 lemma init_mem_form:
   assumes "s' = init_mem s inst d_ind d" 
   shows "list_all2 mem_extension (mems s) (mems s')" 
@@ -321,6 +276,7 @@ qed
 lemma mem_extension_trans:"mem_extension a b \<Longrightarrow> mem_extension b c \<Longrightarrow> mem_extension a c" 
   unfolding mem_extension_def by auto
 
+(* todo: make it like init_tabs_form once the tabs proofs are done *)
 lemma init_mems_form:
   assumes "s' = init_mems s inst d_inds ds" 
   shows "list_all2 mem_extension (mems s) (mems s')" 
@@ -364,6 +320,33 @@ lemma init_mems_preserve_funcs:
   using init_mems_form(2)[OF assms]
   by auto
 
+
+(* while mathematically superfluous, this form makes the following lemmas easier to prove *)
+lemma store_extension_intros_with_refl: 
+  assumes "funcs s = funcs s' \<or> (\<exists> fs. funcs s @ fs = funcs s')" 
+  "tabs s = tabs s' \<or> (\<exists> t1 t2. t1 @ t2 = tabs s' \<and> list_all2 tab_extension (tabs s) t1)"
+  "mems s = mems s' \<or> (\<exists> m1 m2. m1 @ m2 = mems s' \<and> list_all2 mem_extension (mems s) m1)" 
+  "globs s = globs s' \<or> (\<exists> g1 g2. g1 @ g2 = globs s' \<and> list_all2 global_extension (globs s) g1)" 
+  shows "store_extension s s'"
+proof -         
+  have funcs:"\<exists> fs. funcs s @ fs = funcs s'" using assms(1) by auto
+  have tabs: "\<exists> t1 t2. t1 @ t2 = tabs s' \<and> list_all2 tab_extension (tabs s) t1" 
+    using assms(2) tab_extension_refl list_all2_refl by (metis append_Nil2) 
+  have mems: "\<exists> m1 m2. m1 @ m2 = mems s' \<and> list_all2 mem_extension (mems s) m1" 
+    using assms(3) mem_extension_refl list_all2_refl by (metis append_Nil2) 
+  have globs: "\<exists> g1 g2. g1 @ g2 = globs s' \<and> list_all2 global_extension (globs s) g1"  
+    using assms(4) global_extension_refl list_all2_refl by (metis append_Nil2) 
+  show ?thesis using funcs mems tabs globs unfolding store_extension.simps
+    by (metis (full_types) unit.exhaust s.surjective) 
+qed
+
+lemma init_tabs_preserve_store_extension: 
+  assumes "s' = init_tabs s inst e_inds es" 
+  shows "store_extension s s'"
+  using init_tabs_tab_extension[OF assms] init_tabs_only_modify_tabs[OF assms] 
+      store_extension_intros_with_refl
+  by (metis append_Nil2 s.ext_inject s.surjective s.update_convs(2))   
+
 lemma init_mems_preserve_store_extension: 
   assumes "s' = init_mems s inst d_inds ds" 
   shows "store_extension s s'"
@@ -376,15 +359,6 @@ lemma alloc_module_preserve_store_extension:
   using alloc_module_ext_arb[OF assms] 
   store_extension_intros_with_refl list_all2_refl tab_extension_refl mem_extension_refl global_extension_refl
   by metis
-
-
-
-lemma list_all2_in_set:
-  assumes "x\<in>set xs" "list_all2 f xs ys" 
-  shows "\<exists>y. f x y \<and> y\<in>set ys" 
-  using assms 
-  by (smt (verit, best) list_all2_conv_all_nth mem_Collect_eq set_conv_nth)
-
 
 
 definition alloc_func_simple :: "module_func \<Rightarrow> inst \<Rightarrow> cl" where
@@ -404,12 +378,8 @@ proof(induct m_fs arbitrary: s)
 next
   case (Cons a m_fs)
   have "fst (alloc_funcs s (a # m_fs) i) = fst (alloc_funcs (fst (alloc_func s a i)) m_fs i)"
-    using alloc_Xs.simps(2) by(simp split:prod.splits)
-  also have "... = fst (alloc_funcs (s\<lparr>funcs := funcs s @ [alloc_func_simple a i]\<rparr>) m_fs i)" 
-    using alloc_func_equiv by simp
-  also have "... = s\<lparr>funcs := funcs s @ alloc_funcs_simple (a#m_fs) i\<rparr> " 
-    using Cons by auto
-  finally show ?case by auto
+    by(simp split:prod.splits)
+  then show ?case unfolding alloc_func_equiv Cons by simp
 qed
 
 
@@ -450,7 +420,7 @@ next
   case (Cons a m_ts)
   have "fst (alloc_tabs s (a # m_ts)) = fst (alloc_tabs (fst (alloc_tab s a)) m_ts)"
     by(simp split:prod.splits)
-  then show ?case using alloc_tab_equiv Cons by simp
+  then show ?case unfolding alloc_tab_equiv Cons by simp
 qed
 
 lemma alloc_tabs_store_agnostic: 
@@ -470,7 +440,6 @@ lemma alloc_module_tabs_only_alloc_tabs:
     alloc_tabs_store_agnostic alloc_mems_range alloc_globs_range 
   unfolding alloc_module.simps
   by(smt (z3) Pair_inject inst.select_convs(3))
-   
   (*todo: takes like 10 seconds to run*)
 
 
@@ -577,6 +546,12 @@ lemma tab_agree_store_extension_inv2:
   using assms
   unfolding tab_agree_def list_all_length store_extension.simps
   by (fastforce split: option.splits)
+
+lemma list_all2_in_set:
+  assumes "x\<in>set xs" "list_all2 f xs ys" 
+  shows "\<exists>y. f x y \<and> y\<in>set ys" 
+  using assms 
+  by (smt (verit, best) list_all2_conv_all_nth mem_Collect_eq set_conv_nth)
 
 theorem instantiation_sound:
   assumes "store_typing s"
@@ -797,8 +772,6 @@ proof -
           by (metis list_all_length)
       }
       then have 1:"list_all (element_funcs_in_bounds s1 inst) (m_elem m)" by (metis list_all_iff) 
-
-
 
       have 2:"list_all2 (element_in_bounds s1 inst) (map nat_of_int e_offs) (m_elem m)"  
       proof -
