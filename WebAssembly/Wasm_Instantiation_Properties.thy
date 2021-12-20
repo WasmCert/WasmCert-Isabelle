@@ -42,8 +42,10 @@ proof -
 qed
 
 
-abbreviation "element_in_bounds s inst e_ind e 
-\<equiv> e_ind + (length (e_init e)) \<le> length (fst ((tabs s)!((inst.tabs inst)!(e_tab e))))"
+definition element_in_bounds where 
+"element_in_bounds s inst e_ind e \<equiv>
+   let i = inst.tabs inst ! e_tab e 
+   in i < length (tabs s) \<and>  e_ind + length (e_init e) \<le> length (fst (tabs s ! i))"
 
 abbreviation "element_funcs_in_bounds s inst e 
 \<equiv>list_all (\<lambda>i. (inst.funcs inst)!i < length (s.funcs s)) (e_init e)" 
@@ -54,7 +56,8 @@ lemma init_tab_form:
         "\<exists>tabs'. s' = s\<lparr>tabs := tabs'\<rparr>"
         "element_funcs_in_bounds s inst e
         \<Longrightarrow> element_in_bounds s inst e_ind e
-        \<Longrightarrow> list_all2 (\<lambda>t t'. tab_agree s t \<longrightarrow> tab_agree s' t') (tabs s) (tabs s')"
+        \<Longrightarrow> list_all (tab_agree s) (tabs s) 
+        \<Longrightarrow> list_all (tab_agree s') (tabs s')"
         "list_all2 (\<lambda>t t'. tab_typing t tt \<longrightarrow> tab_typing t' tt) (tabs s) (tabs s')"
 proof -
   obtain t_ind tab_e max e_pay tab'_e where init_tab_is:
@@ -94,13 +97,14 @@ proof -
 
     assume "element_in_bounds s inst e_ind e"
     then have "e_ind + (length e_pay) \<le> length tab_e" 
-      using init_tab_is
+      using init_tab_is unfolding element_in_bounds_def
       by (metis fst_conv length_map) 
     then have same_length:"length tab'_e = length tab_e" using init_tab_is by auto
 
     have set_inclusion:"set tab'_e \<subseteq> set tab_e \<union> set e_pay " using init_tab_is
       (* ugly sledgehammer *)
-      by (smt (z3) set_append set_drop_subset set_take_subset subset_trans sup.boundedI sup_ge1 sup_ge2) 
+      by (smt (z3) set_append set_drop_subset set_take_subset subset_trans sup.boundedI sup_ge1 sup_ge2)
+
     {
       assume "tab_agree s (tab_e,max)"  
       then have "tab_agree s' (tab_e,max)" 
@@ -110,14 +114,16 @@ proof -
         using same_length within_funcs_bounds set_inclusion
         by (metis append_take_drop_id fst_conv init_tab_is(4) list_all_append snd_conv) 
     } 
-    then have 4:"tab_agree s (tab_e,max) \<longrightarrow> tab_agree s' (tab'_e, max)" by auto  
-    have 5:"\<And>t. tab_agree s t \<longrightarrow> tab_agree s' t" unfolding tab_agree_def 
-      using \<open>funcs s = funcs s'\<close> by auto  
-    have "list_all2 (\<lambda>t t'. tab_agree s t \<longrightarrow> tab_agree s' t') (tabs s) (tabs s')"
-      using 3[OF 4 5] by -  
+    then have "list_all (tab_agree s) (tabs s) 
+        \<Longrightarrow> list_all (tab_agree s') (tabs s')"
+      using init_tab_is(2) length_list_update nth_list_update_eq nth_list_update_neq
+      unfolding list_all_length by (metis "2" \<open>s.funcs s = s.funcs s'\<close> tab_agree_def) 
+      
   }
-  then show "element_funcs_in_bounds s inst e \<Longrightarrow> element_in_bounds s inst e_ind e
-        \<Longrightarrow> list_all2 (\<lambda>t t'. tab_agree s t \<longrightarrow> tab_agree s' t') (tabs s) (tabs s')" 
+  then show "element_funcs_in_bounds s inst e
+        \<Longrightarrow> element_in_bounds s inst e_ind e
+        \<Longrightarrow> list_all (tab_agree s) (tabs s) 
+        \<Longrightarrow> list_all (tab_agree s') (tabs s')"
     using init_tab_is by (simp add: list_all_length)
 
   have "tab_typing (tab_e, max) tt \<longrightarrow> tab_typing (tab'_e, max) tt" 
@@ -207,28 +213,26 @@ lemma init_tabs_tabi_agree:
   using init_tabs_tab_typing[OF assms(1)] assms(2) unfolding tabi_agree_def
   by (smt (verit, best) list_all2_conv_all_nth) 
 
+
+
 lemma init_tabs_tab_agree:
   assumes "s' = init_tabs s inst e_inds es" 
 "list_all (element_funcs_in_bounds s inst) es"
 "list_all2 (element_in_bounds s inst) e_inds es"
-  shows "list_all2 (\<lambda>t t'. tab_agree s t \<longrightarrow> tab_agree s' t') (tabs s) (tabs s')"
+"list_all (tab_agree s) (tabs s)"
+  shows "list_all (tab_agree s') (tabs s')"
 proof - 
-  define tab_agree_all2 ::  "s \<Rightarrow> s \<Rightarrow> bool"
-    where "tab_agree_all2 = (\<lambda>s1 s2. list_all2 (\<lambda>t t'. tab_agree s1 t \<longrightarrow> tab_agree s2 t') (tabs s1) (tabs s2))" 
-  have tab_agree_all2_trans:"\<And>a b c. tab_agree_all2 a b \<Longrightarrow> tab_agree_all2 b c \<Longrightarrow> tab_agree_all2 a c"
-    unfolding tab_agree_all2_def using list_all2_trans
-    by (smt (verit, best)) 
-  have tab_agree_all2_refl:"\<And>a. tab_agree_all2 a a" unfolding tab_agree_all2_def 
-    using list_all2_refl by (smt (verit, best)) 
 
   {
     fix a 
     have "list_all (element_funcs_in_bounds s inst) (map snd a)
       \<Longrightarrow> list_all2 (element_in_bounds s inst) (map fst a) (map snd a)
-      \<Longrightarrow> s' = foldl (\<lambda>s' (e_ind,e). init_tab s' inst e_ind e) s a \<Longrightarrow> tab_agree_all2 s s'"
+      \<Longrightarrow> list_all (tab_agree s) (tabs s)
+      \<Longrightarrow> s' = foldl (\<lambda>s' (e_ind,e). init_tab s' inst e_ind e) s a
+      \<Longrightarrow> list_all (tab_agree s') (tabs s')"
     proof(induct a arbitrary: s)
       case Nil
-      then show ?case using tab_agree_all2_refl by auto 
+      then show ?case by simp 
     next
       case (Cons a1 a2)
       define s_mid where "s_mid = init_tab s inst (fst a1) (snd a1)" 
@@ -242,32 +246,29 @@ proof -
       {
         fix x 
         assume "x \<in> set (zip (map fst a2) (map snd a2))" 
-        then have 1:"element_in_bounds s inst (fst x) (snd x)" 
+        then have "element_in_bounds s inst (fst x) (snd x)" 
           using Cons(3) case_prod_unfold zip_map_fst_snd unfolding list_all2_iff
           by (metis (no_types, lifting) set_subset_Cons subset_code(1))
 
-        have "list_all2 tab_extension (tabs s) (tabs s_mid)" using init_tab_form(1)[OF s_mid_def] by -
-        then have 2:"tab_size (s.tabs s ! (inst.tabs inst ! e_tab (snd x))) 
-        \<le> tab_size (s.tabs s_mid ! (inst.tabs inst ! e_tab (snd x)))" 
-          sorry
+        moreover have "list_all2 tab_extension (tabs s) (tabs s_mid)" 
+          using init_tab_form(1)[OF s_mid_def] by -
          
-        have "element_in_bounds s_mid inst (fst x) (snd x)" using 1 2 by auto 
+        ultimately have "element_in_bounds s_mid inst (fst x) (snd x)" 
+          unfolding element_in_bounds_def tab_extension_def Let_def 
+          by (metis (no_types, lifting) le_trans list_all2_conv_all_nth)
       }
       then have 3:"list_all2 (element_in_bounds s_mid inst) (map fst a2) (map snd a2)"
         unfolding list_all2_iff by auto
 
       have "element_funcs_in_bounds s inst (snd a1)" using Cons(2) by auto 
       moreover have "element_in_bounds s inst (fst a1) (snd a1)" using Cons(3) by auto 
-      ultimately have 4:"tab_agree_all2 s s_mid" 
-        using init_tab_form(3)[OF s_mid_def] unfolding tab_agree_all2_def by auto
-      
-      show ?case using Cons(1)[OF 2 3 1] using 4 tab_agree_all2_trans
-        by metis 
+      ultimately have 4:"list_all (tab_agree s_mid) (tabs s_mid)" 
+        using init_tab_form(3)[OF s_mid_def] Cons(4)  by auto
+      then show ?case using Cons(1)[OF 2 3 4 1] by -
     qed
   }
-  then have "tab_agree_all2 s s'" using assms unfolding init_tabs_def
+  then show ?thesis using assms unfolding init_tabs_def
     by (metis (no_types, lifting) list_all2_lengthD map_fst_zip map_snd_zip) 
-  then show ?thesis unfolding tab_agree_all2_def by -
 qed
 
   
@@ -631,7 +632,42 @@ proof -
   then have "funcs s'= funcs s @ fs" using \<open>funcs s1 = funcs s'\<close> by auto
 
   have ts_alloc:"ts = alloc_tabs_simple (m_tabs m)" 
-        using alloc_module_tabs_form[OF s_alloc_module \<open>tabs s1 = tabs s @ ts\<close>] by -
+    using alloc_module_tabs_form[OF s_alloc_module \<open>tabs s1 = tabs s @ ts\<close>] by -
+
+
+  have inst_typing_tabs:"list_all2 (tabi_agree (tabs s1)) (inst.tabs inst) (table \<C>)" 
+  proof -
+    define allocd_tabs where "allocd_tabs = snd (alloc_tabs s (m_tabs m))" 
+    then have "inst.tabs inst = (ext_tabs v_imps)@allocd_tabs" 
+      using alloc_module_tabs_only_alloc_tabs[OF s_alloc_module]
+      by (metis prod.collapse) 
+    moreover have "list_all2 (tabi_agree (tabs s1)) (ext_tabs v_imps) (ext_t_tabs t_imps)"
+    proof -
+      have "list_all2 (tabi_agree (tabs s)) (ext_tabs v_imps) (ext_t_tabs t_imps)" 
+        using ext_typing_imp_tabi_agree[OF s_ext_typing] by -
+      then show ?thesis
+        unfolding tabi_agree_def \<open>tabs s1 = tabs s @ ts\<close>
+        by (simp add: list_all2_mono nth_append)
+    qed 
+    moreover have "list_all2 (tabi_agree (tabs s1)) allocd_tabs (m_tabs m)"
+    proof -
+      have "length ts = length (m_tabs m)" using ts_alloc by auto
+      then have allocd_interval:"allocd_tabs = [length (tabs s) ..< (length (tabs s) + length ts)]" 
+        using allocd_tabs_def alloc_tabs_range surjective_pairing by metis  
+
+      have "list_all2 tab_typing ts (m_tabs m)" 
+        unfolding ts_alloc alloc_tab_simple_def tab_typing_def list.rel_map(1) limits_compat_def
+        by(simp add:list_all2_refl pred_option_def)
+
+      then have "list_all2 (tabi_agree (tabs s@ts)) allocd_tabs (m_tabs m)" 
+        unfolding tabi_agree_def allocd_interval 
+        by (simp add: list_all2_conv_all_nth) 
+      then show ?thesis using \<open>tabs s1 = tabs s @ ts\<close> by auto
+    qed
+    ultimately show ?thesis
+      using c_is by (simp add: list_all2_appendI)
+  qed
+
 
   have "types inst = types_t \<C>" 
   proof -
@@ -682,42 +718,9 @@ proof -
     ultimately show ?thesis using c_is by (simp add: list_all2_appendI) 
   qed 
   moreover have "list_all2 (globi_agree (globs s')) (inst.globs inst) (global \<C>)" sorry 
-  moreover have inst_typing_tab:"list_all2 (tabi_agree (tabs s')) (inst.tabs inst) (table \<C>)" 
-  proof -
-    define allocd_tabs where "allocd_tabs = snd (alloc_tabs s (m_tabs m))" 
-    then have "inst.tabs inst = (ext_tabs v_imps)@allocd_tabs" 
-      using alloc_module_tabs_only_alloc_tabs[OF s_alloc_module]
-      by (metis prod.collapse) 
-    moreover have "list_all2 (tabi_agree (tabs s1)) (ext_tabs v_imps) (ext_t_tabs t_imps)"
-    proof -
-      have "list_all2 (tabi_agree (tabs s)) (ext_tabs v_imps) (ext_t_tabs t_imps)" 
-        using ext_typing_imp_tabi_agree[OF s_ext_typing] by -
-      then show ?thesis
-        unfolding tabi_agree_def \<open>tabs s1 = tabs s @ ts\<close>
-        by (simp add: list_all2_mono nth_append)
-    qed 
-    moreover have "list_all2 (tabi_agree (tabs s1)) allocd_tabs (m_tabs m)"
-    proof -
-      have "length ts = length (m_tabs m)" using ts_alloc by auto
-      then have allocd_interval:"allocd_tabs = [length (tabs s) ..< (length (tabs s) + length ts)]" 
-        using allocd_tabs_def alloc_tabs_range surjective_pairing by metis  
-
-      have "list_all2 tab_typing ts (m_tabs m)" 
-        unfolding ts_alloc alloc_tab_simple_def tab_typing_def list.rel_map(1) limits_compat_def
-        by(simp add:list_all2_refl pred_option_def)
-
-      then have "list_all2 (tabi_agree (tabs s@ts)) allocd_tabs (m_tabs m)" 
-        unfolding tabi_agree_def allocd_interval 
-        by (simp add: list_all2_conv_all_nth) 
-      then show ?thesis using \<open>tabs s1 = tabs s @ ts\<close> by auto
-    qed
-    ultimately have "list_all2 (tabi_agree (tabs s1)) (inst.tabs inst) (table \<C>)" 
-      using c_is by (simp add: list_all2_appendI) 
-    then have "list_all2 (tabi_agree (tabs s2)) (inst.tabs inst) (table \<C>)" 
-      using init_tabs_tabi_agree[OF s_init_tabs] list_all2_mono by metis
-    then show ?thesis using init_mems_form(2)[OF s_init_mems]
-      by auto  
-  qed 
+  moreover have "list_all2 (tabi_agree (tabs s')) (inst.tabs inst) (table \<C>)" 
+    using tabi_agree_store_extension init_tabs_tabi_agree[OF s_init_tabs] 
+      list_all2_mono[OF inst_typing_tabs] \<open>store_extension s2 s'\<close> by blast
   moreover have "list_all2 (memi_agree (mems s')) (inst.mems inst) (memory \<C>)" sorry
   moreover have "local \<C> = [] \<and> label \<C> = [] \<and> return \<C> = None" using c_is by auto
   ultimately have "inst_typing s' inst \<C>" using inst_typing.simps
@@ -794,29 +797,34 @@ proof -
           by (metis list_all_length)
       }
       then have 1:"list_all (element_funcs_in_bounds s1 inst) (m_elem m)" by (metis list_all_iff) 
+
+
+
       have 2:"list_all2 (element_in_bounds s1 inst) (map nat_of_int e_offs) (m_elem m)"  
-        using s_element_in_bounds
-        by (smt (verit, best) list_all2_map1 list_all2_mono) 
+      proof -
+        have "list_all (\<lambda>i. i < length (tabs s1)) (inst.tabs inst)" 
+          using inst_typing_tabs unfolding tabi_agree_def
+          by (simp add: less_imp_le_nat list_all2_conv_all_nth list_all_length) 
+        moreover have "list_all (\<lambda>e. e_tab e < length (inst.tabs inst)) (m_elem m)"
+          using inst_typing_tabs c_is(3) unfolding list_all2_conv_all_nth module_elem_typing.simps
+          by (smt (verit, best) list_all_iff module_elem.select_convs(1)) 
+        ultimately show ?thesis using s_element_in_bounds unfolding element_in_bounds_def
+          by (smt (verit, best) list.rel_map(1) list_all2_conv_all_nth list_all_length)
+      qed 
 
       have "list_all (tab_agree s) (tabs s)" using assms(1) unfolding store_typing.simps by auto
       then have "list_all (tab_agree s1) (tabs s)" 
         using tab_agree_store_extension_inv2[OF \<open>store_extension s s1\<close>] 
         by (simp add: list_all_length) 
-
-
       moreover have "list_all (tab_agree s1) ts" 
         using \<open>list_all (module_tab_typing) (m_tabs m)\<close> 
         unfolding ts_alloc alloc_tab_simple_def tab_agree_def list.pred_map(1) comp_def 
         limit_typing.simps
         by(simp add:list.pred_set, auto)
-
       ultimately have "list_all (tab_agree s1) (tabs s1)" using \<open>tabs s1 = tabs s @ ts\<close>
         by simp 
-        
-      moreover have "list_all2 (\<lambda>t t'. tab_agree s1 t \<longrightarrow> tab_agree s2 t') (tabs s1) (tabs s2)"
-        using init_tabs_tab_agree[OF s_init_tabs 1 2] by -
-      ultimately have "list_all (tab_agree s2) (tabs s2)" 
-        by (metis (mono_tags, lifting) list_all2_conv_all_nth list_all_length)
+      then have "list_all (tab_agree s2) (tabs s2)" using init_tabs_tab_agree[OF s_init_tabs 1 2]
+        by simp
       then show ?thesis using \<open>funcs s2 = funcs s'\<close> \<open>tabs s2 = tabs s'\<close> 
         unfolding tab_agree_def by auto
     qed
