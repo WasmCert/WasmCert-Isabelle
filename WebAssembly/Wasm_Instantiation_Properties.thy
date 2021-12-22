@@ -2,27 +2,139 @@ theory Wasm_Instantiation_Properties
   imports Wasm_Instantiation Wasm_Properties Wasm_Instantiation_Properties_Aux
 begin
 
-lemma list_all_ex_list_all2:
-  assumes "\<And>i. i < length xs \<Longrightarrow> \<exists>y. P (xs!i) y"
-  shows "\<exists>ys. list_all2 P xs ys"
-  using assms
-proof (induction xs)
-  case (Cons x xs)
-  have "\<exists>y. P x y"
-       "\<And>i. i < length xs \<Longrightarrow> (\<exists>a. P (xs ! i) a)"
-    using Cons(2)
-    by fastforce+
-  thus ?case
-    using Cons(1)
-    by blast
-qed auto
-
+lemma ex_list_all2: 
+  assumes "\<forall>x \<in> set xs. \<exists>y. P x y" 
+  shows "\<exists>ys. list_all2 P xs ys" 
+proof -
+  have "list_all2 P xs (map (\<lambda>x. SOME y. P x y) xs)" 
+    unfolding list.rel_map(2) using assms
+    by (simp add: list.rel_refl_strong someI_ex)
+  then show ?thesis by (rule exI)
+qed
 
 lemma list_all2_in_set:
   assumes "x\<in>set xs" "list_all2 f xs ys" 
   shows "\<exists>y. f x y \<and> y\<in>set ys" 
   using assms 
   by (smt (verit, best) list_all2_conv_all_nth mem_Collect_eq set_conv_nth)
+
+lemma list_all2_forget:
+  assumes "list_all2 P xs ys"
+  shows "list_all (\<lambda>x. \<exists>y. P x y) xs" 
+  using assms
+  by (metis Ball_set list_all2_in_set) 
+
+lemma limits_compat_refl:"limits_compat l l" 
+  unfolding limits_compat_def by(simp add: pred_option_def)
+
+lemma tab_typing_exists:"\<exists>tt. tab_typing t tt" 
+  using limits_compat_refl tab_typing_def
+  by (metis limit_t.select_convs(1,2) limits_compat_def) 
+
+lemma mem_typing_exists:"\<exists>mt. mem_typing m mt" 
+  using limits_compat_refl mem_typing_def
+  by (metis limit_t.select_convs(1,2) limits_compat_def) 
+
+lemma glob_typing_exists:"\<exists>gt. glob_typing g gt" 
+  unfolding glob_typing_def typeof_def
+  by (metis tg.select_convs(1,2))
+
+lemma instantiation_external_typing:
+  assumes "alloc_module s m v_imps g_inits (s1, inst, v_exps)"
+          "inst_typing s' inst \<C>" 
+          "list_all2 (\<lambda>exp. module_export_typing \<C> (E_desc exp)) (m_exports m) t_exps"
+  shows "\<exists>tes. list_all2 (\<lambda>v_exp te. external_typing s' (E_desc v_exp) te) v_exps tes"
+proof -
+  have 1:"map E_desc v_exps = map (\<lambda>m_exp. export_get_v_ext inst (E_desc m_exp)) (m_exports m)"
+    using assms(1) unfolding alloc_module.simps by auto
+  {
+    have funci_agree_s':"list_all2 (funci_agree (funcs s')) (inst.funcs inst) (func_t \<C>)"
+      using assms(2) inst_typing.simps by auto
+
+    fix i 
+    assume "Ext_func i \<in> set (map E_desc v_exps)"
+    then obtain j where "Ext_func j \<in> set (map E_desc (m_exports m))"  
+                   "i = inst.funcs inst ! j"
+      unfolding 1 export_get_v_ext_def 
+      by(simp add: image_iff split:v_ext.splits, metis v_ext.exhaust)
+    then have "j < length (inst.funcs inst)" 
+      using list_all2_forget[OF assms(3)] funci_agree_s'
+      unfolding list_all2_conv_all_nth module_export_typing.simps list_all_iff by fastforce  
+    moreover have "list_all (\<lambda>x. x < length (funcs s')) (inst.funcs inst)" 
+      using funci_agree_s' unfolding funci_agree_def
+      by (simp add: list_all2_conv_all_nth list_all_length) 
+    ultimately have "i < length (funcs s')" using \<open>i = inst.funcs inst ! j\<close>
+      unfolding list_all_length by auto
+    then have "\<exists> tf. external_typing s' (Ext_func i) tf" 
+      unfolding external_typing.simps by auto
+  }
+  moreover {
+    have tabi_agree_s':"list_all2 (tabi_agree (tabs s')) (inst.tabs inst) (table \<C>)"
+      using assms(2) inst_typing.simps by auto
+
+    fix i 
+    assume "Ext_tab i \<in> set (map E_desc v_exps)"
+    then obtain j where "Ext_tab j \<in> set (map E_desc (m_exports m))"  
+                   "i = inst.tabs inst ! j"
+      unfolding 1 export_get_v_ext_def 
+      by(simp add: image_iff split:v_ext.splits, metis v_ext.exhaust)
+    then have "j < length (inst.tabs inst)" 
+      using list_all2_forget[OF assms(3)] tabi_agree_s'
+      unfolding list_all2_conv_all_nth module_export_typing.simps list_all_iff by fastforce  
+    moreover have "list_all (\<lambda>x. x < length (tabs s')) (inst.tabs inst)" 
+      using tabi_agree_s' unfolding tabi_agree_def 
+      by (simp add: list_all2_conv_all_nth list_all_length) 
+    ultimately have "i < length (tabs s')" using \<open>i = inst.tabs inst ! j\<close>
+      unfolding list_all_length by auto
+    then have "\<exists> tt. external_typing s' (Ext_tab i) tt" 
+      unfolding external_typing.simps by (simp add: tab_typing_exists)  
+  }
+  moreover {
+    have memi_agree_s':"list_all2 (memi_agree (mems s')) (inst.mems inst) (memory \<C>)"
+      using assms(2) inst_typing.simps by auto
+                        
+    fix i 
+    assume "Ext_mem i \<in> set (map E_desc v_exps)"
+    then obtain j where "Ext_mem j \<in> set (map E_desc (m_exports m))"  
+                   "i = inst.mems inst ! j"
+      unfolding 1 export_get_v_ext_def 
+      by(simp add: image_iff split:v_ext.splits, metis v_ext.exhaust)
+    then have "j < length (inst.mems inst)" 
+      using list_all2_forget[OF assms(3)] memi_agree_s'
+      unfolding list_all2_conv_all_nth module_export_typing.simps list_all_iff by fastforce
+    moreover have "list_all (\<lambda>x. x < length (mems s')) (inst.mems inst)" 
+      using memi_agree_s' unfolding memi_agree_def 
+      by (simp add: list_all2_conv_all_nth list_all_length) 
+    ultimately have "i < length (mems s')" using \<open>i = inst.mems inst ! j\<close>
+      unfolding list_all_length by auto
+    then have "\<exists> tm. external_typing s' (Ext_mem i) tm" 
+      unfolding external_typing.simps by (simp add: mem_typing_exists)  
+  }
+  moreover {
+    have globi_agree_s':"list_all2 (globi_agree (globs s')) (inst.globs inst) (global \<C>)"
+      using assms(2) inst_typing.simps by auto
+
+    fix i 
+    assume "Ext_glob i \<in> set (map E_desc v_exps)"
+    then obtain j where "Ext_glob j \<in> set (map E_desc (m_exports m))"  
+                   "i = inst.globs inst ! j"
+      unfolding 1 export_get_v_ext_def 
+      by(simp add: image_iff split:v_ext.splits, metis v_ext.exhaust)
+    then have "j < length (inst.globs inst)" 
+      using list_all2_forget[OF assms(3)] globi_agree_s'
+      unfolding list_all2_conv_all_nth module_export_typing.simps list_all_iff by fastforce
+    moreover have "list_all (\<lambda>x. x < length (globs s')) (inst.globs inst)" 
+      using globi_agree_s' unfolding globi_agree_def 
+      by (simp add: list_all2_conv_all_nth list_all_length)
+    ultimately have "i < length (globs s')" using \<open>i = inst.globs inst ! j\<close>
+      unfolding list_all_length by auto
+    then have "\<exists> tg. external_typing s' (Ext_glob i) tg" 
+      unfolding external_typing.simps by(simp add: glob_typing_exists)
+  }
+  ultimately have "\<And>ext. ext \<in> set (map E_desc v_exps) \<Longrightarrow> \<exists> te. external_typing s' ext te"
+    using v_ext.exhaust by metis 
+  then show ?thesis by (simp add: ex_list_all2) 
+qed
 
 theorem instantiation_sound:
   assumes "store_typing s"
@@ -57,6 +169,7 @@ proof -
     "list_all (module_tab_typing) (m_tabs m)"
     "list_all (module_elem_typing \<C>) (m_elem m)"
     "list_all (module_data_typing \<C>) ds"
+    "list_all2 (\<lambda>exp. module_export_typing \<C> (E_desc exp)) (m_exports m) t_exps"
     "pred_option (module_start_typing \<C>) i_opt"
     "\<C> = \<lparr>types_t=(m_types m), 
           func_t=ext_t_funcs t_imps @ fts, 
@@ -81,7 +194,7 @@ proof -
     using alloc_module_tabs_form[OF s_alloc_module \<open>tabs s1 = tabs s @ ts\<close>] by -
 
 
-  have inst_typing_tabs:"list_all2 (tabi_agree (tabs s1)) (inst.tabs inst) (table \<C>)" 
+  have tabi_agree_s1:"list_all2 (tabi_agree (tabs s1)) (inst.tabs inst) (table \<C>)" 
   proof -
     define allocd_tabs where "allocd_tabs = snd (alloc_tabs s (m_tabs m))" 
     then have "inst.tabs inst = (ext_tabs v_imps)@allocd_tabs" 
@@ -122,7 +235,7 @@ proof -
     also have "... = types_t \<C>" using c_is by auto
     finally show ?thesis by -
   qed                                         
-  moreover have inst_typing_func:"list_all2 (funci_agree (funcs s')) (inst.funcs inst) (func_t \<C>)"
+  moreover have funci_agree_s':"list_all2 (funci_agree (funcs s')) (inst.funcs inst) (func_t \<C>)"
   proof -
     define allocd_funcs where "allocd_funcs = snd (alloc_funcs s (m_funcs m) inst)"  
     then have "inst.funcs inst = (ext_funcs v_imps)@allocd_funcs" 
@@ -163,11 +276,11 @@ proof -
     qed 
     ultimately show ?thesis using c_is by (simp add: list_all2_appendI) 
   qed 
-  moreover have "list_all2 (globi_agree (globs s')) (inst.globs inst) (global \<C>)" sorry 
-  moreover have "list_all2 (tabi_agree (tabs s')) (inst.tabs inst) (table \<C>)" 
+  moreover have globi_agree_s':"list_all2 (globi_agree (globs s')) (inst.globs inst) (global \<C>)" sorry 
+  moreover have tabi_agree_s':"list_all2 (tabi_agree (tabs s')) (inst.tabs inst) (table \<C>)" 
     using tabi_agree_store_extension init_tabs_tabi_agree[OF s_init_tabs] 
-      list_all2_mono[OF inst_typing_tabs] \<open>store_extension s2 s'\<close> by blast
-  moreover have "list_all2 (memi_agree (mems s')) (inst.mems inst) (memory \<C>)" sorry
+      list_all2_mono[OF tabi_agree_s1] \<open>store_extension s2 s'\<close> by blast
+  moreover have memi_agree_s':"list_all2 (memi_agree (mems s')) (inst.mems inst) (memory \<C>)" sorry
   moreover have "local \<C> = [] \<and> label \<C> = [] \<and> return \<C> = None" using c_is by auto
   ultimately have "inst_typing s' inst \<C>" using inst_typing.simps
     by (metis (full_types) inst.surjective old.unit.exhaust t_context.surjective) 
@@ -282,12 +395,7 @@ proof -
   show "\<exists>\<C>. inst_typing s' inst \<C>" using \<open>inst_typing s' inst \<C>\<close> by auto
 
   show "\<exists>tes. list_all2 (\<lambda>v_exp te. external_typing s' (E_desc v_exp) te) v_exps tes"
-  proof -
-  have "\<And>i. i < length v_exps \<Longrightarrow> (\<exists>te. external_typing s' (E_desc (v_exps!i)) te)"
-    sorry
-  thus ?thesis
-    by (simp add: list_all_ex_list_all2)
-  qed
+    using instantiation_external_typing[OF s_alloc_module \<open>inst_typing s' inst \<C>\<close> c_is(5)] by -
 
   show "pred_option (\<lambda>i. i < length (s.funcs s')) start"
     sorry
