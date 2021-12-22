@@ -340,7 +340,7 @@ proof -
     proof -
       have "tabs s2 = tabs s'" using init_mems_form(2)[OF s_init_mems] by auto 
       have 1:"list_all (\<lambda>i. i< length (funcs s1)) (inst.funcs inst)" 
-        using inst_typing_func \<open>funcs s1 = funcs s'\<close> unfolding funci_agree_def
+        using funci_agree_s' \<open>funcs s1 = funcs s'\<close> unfolding funci_agree_def
         by (simp add: list_all2_conv_all_nth list_all_length) 
       {
         fix e 
@@ -361,10 +361,10 @@ proof -
       have 2:"list_all2 (element_in_bounds s1 inst) (map nat_of_int e_offs) (m_elem m)"  
       proof -
         have "list_all (\<lambda>i. i < length (tabs s1)) (inst.tabs inst)" 
-          using inst_typing_tabs unfolding tabi_agree_def
+          using tabi_agree_s1 unfolding tabi_agree_def
           by (simp add: less_imp_le_nat list_all2_conv_all_nth list_all_length) 
         moreover have "list_all (\<lambda>e. e_tab e < length (inst.tabs inst)) (m_elem m)"
-          using inst_typing_tabs c_is(3) unfolding list_all2_conv_all_nth module_elem_typing.simps
+          using tabi_agree_s1 c_is(3) unfolding list_all2_conv_all_nth module_elem_typing.simps
           by (smt (verit, best) list_all_iff module_elem.select_convs(1)) 
         ultimately show ?thesis using s_element_in_bounds unfolding element_in_bounds_def
           by (smt (verit, best) list.rel_map(1) list_all2_conv_all_nth list_all_length)
