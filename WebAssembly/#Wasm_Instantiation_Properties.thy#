@@ -404,10 +404,11 @@ proof -
     then show ?thesis using s_start by simp
   next
     case (Some a)
-    have "start = Some (inst.funcs inst ! a)" using s_start Some by simp 
-    have "a < length (func_t \<C>)" using c_is(6) Some unfolding module_start_typing.simps by simp
-    
-    then show ?thesis sorry
+    have "a < length (inst.funcs inst)" using c_is(6) Some funci_agree_s' 
+      unfolding module_start_typing.simps list_all2_conv_all_nth by simp
+    then have "inst.funcs inst ! a < length (funcs s')" using list_all2_forget[OF funci_agree_s']
+      unfolding funci_agree_def list_all_length by simp
+    then show ?thesis using s_start Some by auto
   qed
 (*
     using s_start funci_agree_s' c_is(6) unfolding module_start_typing.simps funci_agree_def 
