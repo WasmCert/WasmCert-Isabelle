@@ -208,7 +208,7 @@ proof -
   proof -
     define allocd_tabs where "allocd_tabs = snd (alloc_tabs s (m_tabs m))" 
     then have "inst.tabs inst = (ext_tabs v_imps)@allocd_tabs" 
-      using alloc_module_tabs_only_alloc_tabs[OF s_alloc_module]
+      using alloc_module_allocated_form(2)[OF s_alloc_module]
       by (metis prod.collapse) 
     moreover have "list_all2 (tabi_agree (tabs s1)) (ext_tabs v_imps) (ext_t_tabs t_imps)"
     proof -
@@ -294,7 +294,7 @@ proof -
   proof - 
     define allocd_globs where "allocd_globs = snd (alloc_globs s (m_globs m) g_inits)" 
     then have "inst.globs inst = (ext_globs v_imps)@allocd_globs" 
-      using alloc_module_globs_only_alloc_globs[OF s_alloc_module]
+      using alloc_module_allocated_form(4)[OF s_alloc_module]
       by (metis prod.collapse)
     moreover have "list_all2 (globi_agree (globs s')) (ext_globs v_imps) (ext_t_globs t_imps)"
     proof -
@@ -428,7 +428,7 @@ proof -
     qed 
     have 2:"list_all (tab_agree s') (tabs s')"
     proof -
-      have "tabs s2 = tabs s'" using init_mems_form(2)[OF s_init_mems] by auto 
+      have "tabs s2 = tabs s'" using init_mems_only_modify_mems[OF s_init_mems] by auto 
       have 1:"list_all (\<lambda>i. i< length (funcs s1)) (inst.funcs inst)" 
         using funci_agree_s' \<open>funcs s1 = funcs s'\<close> unfolding funci_agree_def
         by (simp add: list_all2_conv_all_nth list_all_length) 
