@@ -1787,7 +1787,6 @@ qed (auto simp add: e_typing_l_typing.intros)
 lemma tab_agree_store_extension_inv:
   assumes "store_extension s s'"
           "tab_agree s t"
-          "(tabs s) = (tabs s')"
   shows "tab_agree s' t"
   using assms
   unfolding tab_agree_def list_all_length store_extension.simps

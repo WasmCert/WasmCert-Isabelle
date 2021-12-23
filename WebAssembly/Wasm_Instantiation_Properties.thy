@@ -290,52 +290,47 @@ proof -
   proof -
     have 1:"list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) (funcs s')" 
     proof -
+      have "list_all (\<lambda>cl. \<exists>tf. cl_typing s cl tf) (funcs s)" 
+        using store_typing_imp_cl_typing[OF assms(1)] unfolding list_all_length by blast
+      then have "list_all (\<lambda>cl. \<exists>tf. cl_typing s1 cl tf) (funcs s)" 
+        using cl_typing_store_extension_inv[OF \<open>store_extension s s1\<close>] 
+        unfolding list_all_length by blast 
+      then have "list_all (\<lambda>cl. \<exists>tf. cl_typing s2 cl tf) (funcs s)" 
+        using cl_typing_store_extension_inv[OF \<open>store_extension s1 s2\<close>] 
+        unfolding list_all_length by blast
+      then have "list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) (funcs s)" 
+        using cl_typing_store_extension_inv[OF \<open>store_extension s2 s'\<close>]
+        unfolding list_all_length by blast
 
-        have "list_all (\<lambda>cl. \<exists>tf. cl_typing s1 cl tf) (funcs s)" 
-          using cl_typing_store_extension_inv[OF \<open>store_extension s s1\<close>] store_typing.simps assms(1)
-          by (smt (verit, ccfv_threshold) list_all_length) 
-        then have "list_all (\<lambda>cl. \<exists>tf. cl_typing s2 cl tf) (funcs s)" 
-          using  cl_typing_store_extension_inv[OF \<open>store_extension s1 s2\<close>] list.pred_mono_strong
-          by (smt (verit, best)) 
-        then have "list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) (funcs s)" 
-          using  cl_typing_store_extension_inv[OF \<open>store_extension s2 s'\<close>] list.pred_mono_strong
-          by (smt (verit, best))
+      moreover have "list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) fs" 
+      proof -
+        {
+          fix f
+          assume "f\<in>set fs"
+          then obtain i_t loc_ts b_es where 1:
+            "f = Func_native inst ((types inst)!i_t) loc_ts b_es"  
+            "(i_t, loc_ts, b_es) \<in> set (m_funcs m)"
+            unfolding alloc_module_funcs_form[OF s_alloc_module \<open>funcs s1 = funcs s @ fs\<close>]
+             alloc_func_simple_def by fastforce 
+          obtain tn tm where 2:
+            "i_t < length (types_t \<C>)"
+            "(types_t \<C>)!i_t = (tn _> tm)"
+            "\<C>\<lparr>local := tn @ loc_ts, label := ([tm] @ (label \<C>)), return := Some tm\<rparr> \<turnstile> b_es : ([] _> tm)"
+            using list_all2_in_set[OF 1(2) c_is(1)]
+            unfolding module_func_typing.simps by auto 
+          have 3:"(types_t \<C>)!i_t = (types inst)!i_t"
+            using store_typing_imp_types_eq[OF \<open>inst_typing s' inst \<C>\<close> 2(1)] by -
 
-        moreover have "list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) fs" 
-        proof -
-          {
-            fix f
-            assume "f\<in>set fs" 
-            
-            obtain i_t loc_ts b_es where 1:
-              "f = Func_native inst ((types inst)!i_t) loc_ts b_es"  
-              "(i_t, loc_ts, b_es) \<in> set (m_funcs m)"
-              using \<open>f\<in>set fs\<close> 
-                  alloc_module_funcs_form[OF s_alloc_module \<open>funcs s1 = funcs s @ fs\<close>]
-              unfolding alloc_func_simple_def
-              by fastforce 
-             
-            obtain tn tm where 2:
-              "i_t < length (types_t \<C>)"
-              "(types_t \<C>)!i_t = (tn _> tm)"
-              "\<C>\<lparr>local := tn @ loc_ts, label := ([tm] @ (label \<C>)), return := Some tm\<rparr> \<turnstile> b_es : ([] _> tm)"
-              using list_all2_in_set[OF 1(2) c_is(1)]
-              unfolding module_func_typing.simps by auto 
-
-            have 3:"(types inst)!i_t = (types_t \<C>)!i_t"
-              using store_typing_imp_types_eq[OF \<open>inst_typing s' inst \<C>\<close> 2(1)] by auto
-
-            have "cl_typing s' f (tn _> tm)" 
-              using 1(1) 2 3 
-              cl_typing.intros(1)[OF \<open>inst_typing s' inst \<C>\<close>]
-              by presburger 
-            then have "\<exists>tf. cl_typing s' f tf" by auto
-          }
-          then show ?thesis by (simp add: list_all_iff) 
-        qed
-        ultimately show ?thesis using \<open>funcs s' = funcs s @ fs\<close>
-          by (metis list_all_append) 
-      qed 
+          have "cl_typing s' f (tn _> tm)" 
+            using cl_typing.intros(1)[OF \<open>inst_typing s' inst \<C>\<close> 2(2) 2(3)]
+            unfolding 1(1) 3 by -
+          then have "\<exists>tf. cl_typing s' f tf" by auto
+        }
+        then show ?thesis by (simp add: list_all_iff) 
+      qed
+      ultimately show ?thesis using \<open>funcs s' = funcs s @ fs\<close>
+        by (metis list_all_append) 
+    qed 
     have 2:"list_all (tab_agree s') (tabs s')"
     proof -
       have "tabs s2 = tabs s'" using init_mems_form(2)[OF s_init_mems] by auto 
@@ -372,7 +367,7 @@ proof -
 
       have "list_all (tab_agree s) (tabs s)" using assms(1) unfolding store_typing.simps by auto
       then have "list_all (tab_agree s1) (tabs s)" 
-        using tab_agree_store_extension_inv2[OF \<open>store_extension s s1\<close>] 
+        using tab_agree_store_extension_inv[OF \<open>store_extension s s1\<close>] 
         by (simp add: list_all_length) 
       moreover have "list_all (tab_agree s1) ts" 
         using \<open>list_all (module_tab_typing) (m_tabs m)\<close> 

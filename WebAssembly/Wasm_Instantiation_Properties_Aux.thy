@@ -515,14 +515,4 @@ lemma ext_typing_imp_memi_agree:
   apply(simp split:v_ext.splits extern_t.splits add: external_typing.simps memi_agree_def) 
   done 
 
-
-lemma tab_agree_store_extension_inv2:
-  assumes "store_extension s s'"
-          "tab_agree s t"
-  shows "tab_agree s' t"
-  using assms
-  unfolding tab_agree_def list_all_length store_extension.simps
-  by (fastforce split: option.splits)
-
-
 end
