@@ -17,7 +17,6 @@ lemma init_tab_form:
         \<Longrightarrow> element_in_bounds s inst e_ind e
         \<Longrightarrow> list_all (tab_agree s) (tabs s) 
         \<Longrightarrow> list_all (tab_agree s') (tabs s')"
-        "list_all2 (\<lambda>t t'. tab_typing t tt \<longrightarrow> tab_typing t' tt) (tabs s) (tabs s')"
 proof -
   obtain t_ind tab_e max e_pay tab'_e where init_tab_is:
     "t_ind = ((inst.tabs inst)!(e_tab e))" 
@@ -84,11 +83,6 @@ proof -
         \<Longrightarrow> list_all (tab_agree s) (tabs s) 
         \<Longrightarrow> list_all (tab_agree s') (tabs s')"
     using init_tab_is by (simp add: list_all_length)
-
-  have "tab_typing (tab_e, max) tt \<longrightarrow> tab_typing (tab'_e, max) tt" 
-    using init_tab_is(4) unfolding tab_typing_def limits_compat_def by (simp, auto)
-  then show "list_all2 (\<lambda>t t'. tab_typing t tt \<longrightarrow> tab_typing t' tt) (tabs s) (tabs s')" 
-    using 3 by simp
 qed
 
 lemma init_mem_form:
@@ -236,8 +230,9 @@ lemma init_mems_only_modify_mems:
 lemma init_tabs_tab_typing:
   assumes "s' = init_tabs s inst e_inds es" 
   shows "list_all2 (\<lambda>t t'. tab_typing t tt \<longrightarrow> tab_typing t' tt) (tabs s) (tabs s')"
-  apply(rule init_tabs_trans_list_pred[OF assms], auto)
-  by (simp add: init_tab_form(4)) 
+  apply(rule list_all2_mono[of tab_extension, OF init_tabs_tab_extension[OF assms]])
+  unfolding tab_extension_def tab_typing_def limits_compat_def
+  by(simp add:pred_option_def)
 
 lemma init_tabs_tabi_agree:
   assumes "s' = init_tabs s inst e_inds es" 
@@ -246,11 +241,20 @@ lemma init_tabs_tabi_agree:
   using init_tabs_tab_typing[OF assms(1)] assms(2) unfolding tabi_agree_def list_all2_conv_all_nth
   by auto
 
+
+lemma init_mems_mem_typing:
+  assumes "s' = init_mems s inst e_inds es" 
+  shows "list_all2 (\<lambda>m m'. mem_typing m mt \<longrightarrow> mem_typing m' mt) (mems s) (mems s')"
+  apply(rule list_all2_mono[of mem_extension, OF init_mems_mem_extension[OF assms]])
+  unfolding mem_extension_def mem_typing_def limits_compat_def
+  by(simp add:pred_option_def)
+
 lemma init_mems_memi_agree:
   assumes "s' = init_mems s inst e_inds es" 
         "memi_agree (mems s) n tt"
   shows "memi_agree (mems s') n tt"
-  sorry
+  using init_mems_mem_typing[OF assms(1)] assms(2) unfolding memi_agree_def list_all2_conv_all_nth
+  by auto
 
 lemma init_tabs_tab_agree:
   assumes "s' = init_tabs s inst e_inds es" 
