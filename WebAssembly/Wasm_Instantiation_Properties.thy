@@ -166,11 +166,11 @@ proof -
   have "store_extension s1 s2" using init_tabs_preserve_store_extension s_init_tabs by auto 
   have "store_extension s2 s'" using init_mems_preserve_store_extension s_init_mems by auto 
 
-  obtain \<C> \<C>' fts ds gts 
+  obtain \<C> \<C>' fts gts 
     where c_is:"list_all2 (module_func_typing \<C>) (m_funcs m) fts"
     "list_all (module_tab_typing) (m_tabs m)"
     "list_all (module_elem_typing \<C>) (m_elem m)"
-    "list_all (module_data_typing \<C>) ds"
+    "list_all (module_data_typing \<C>) (m_data m)"
     "list_all2 (\<lambda>exp. module_export_typing \<C> (E_desc exp)) (m_exports m) t_exps"
     "pred_option (module_start_typing \<C>) (m_start m)"
     "\<C> = \<lparr>types_t=(m_types m), 
@@ -182,6 +182,7 @@ proof -
     "list_all2 (module_glob_typing \<C>') (m_globs m) gts"
     "\<C>' = \<lparr>types_t=[], func_t=[], global=ext_t_globs t_imps, table=[], memory=[], 
         local=[], label=[], return=None\<rparr>"
+    "list_all (module_mem_typing) (m_mems m)"
     using \<open>module_typing m t_imps t_exps\<close> module_typing.simps
     by auto 
 
@@ -425,7 +426,8 @@ proof -
     by (metis (full_types) inst.surjective old.unit.exhaust t_context.surjective) 
 
 
-
+  have "length (inst.mems inst) = length (memory \<C>)" using memi_agree_s1 
+    unfolding list_all2_conv_all_nth by simp
 
 
   show "store_typing s'"
@@ -475,7 +477,6 @@ proof -
     qed 
     have 2:"list_all (tab_agree s') (tabs s')"
     proof -
-      have "tabs s2 = tabs s'" using init_mems_only_modify_mems[OF s_init_mems] by auto 
       have 1:"list_all (\<lambda>i. i< length (funcs s1)) (inst.funcs inst)" 
         using funci_agree_s' \<open>funcs s1 = funcs s'\<close> unfolding funci_agree_def
         by (simp add: list_all2_conv_all_nth list_all_length) 
@@ -520,11 +521,40 @@ proof -
         by simp 
       then have "list_all (tab_agree s2) (tabs s2)" using init_tabs_tab_agree[OF s_init_tabs 1 2]
         by simp
-      then show ?thesis using \<open>funcs s2 = funcs s'\<close> \<open>tabs s2 = tabs s'\<close> 
+      moreover have "tabs s2 = tabs s'" using init_mems_only_modify_mems[OF s_init_mems] by auto
+      ultimately show ?thesis using \<open>funcs s2 = funcs s'\<close> 
         unfolding tab_agree_def by auto
     qed
     have 3:"list_all mem_agree (mems s')"
-      sorry
+    proof -
+      have "list_all2 (data_in_bounds s1 inst) (map nat_of_int d_offs) (m_data m)"
+      proof -
+        have "list_all (\<lambda>i. i < length (mems s1)) (inst.mems inst)" 
+          using list_all2_forget[OF memi_agree_s1] list.pred_mono_strong unfolding memi_agree_def
+          by fastforce 
+        moreover have "list_all (\<lambda>d. d_data d < length (inst.mems inst)) (m_data m)"
+          using c_is(4) unfolding \<open>length (inst.mems inst) = length (memory \<C>)\<close> 
+            module_data_typing.simps  list_all_length by auto
+        ultimately show ?thesis using s_data_in_bounds unfolding data_in_bounds_def
+          Let_def list.rel_map(1) list_all2_conv_all_nth list_all_length by(simp)
+      qed
+      then have 1:"list_all2 (data_in_bounds s2 inst) (map nat_of_int d_offs) (m_data m)" 
+        using init_tabs_only_modify_tabs[OF s_init_tabs] unfolding data_in_bounds_def
+        by auto
+
+      have "list_all mem_agree (mems s)" using assms(1) unfolding store_typing.simps by auto
+      moreover have "list_all mem_agree ms" 
+        using \<open>list_all (module_mem_typing) (m_mems m)\<close> 
+        unfolding ms_alloc alloc_mem_simple_def limit_typing.simps list.pred_map(1) comp_def
+        mem_mk_def mem_rep_mk_def 
+        by(simp add:list.pred_set bytes_replicate_def 
+            mem_size_def mem_length_def mem_rep_length.abs_eq Ki64_def mem_max_def, fastforce)
+
+      ultimately have "list_all mem_agree (mems s1)" unfolding \<open>mems s1 = mems s @ ms\<close> by simp
+      then have "list_all mem_agree (mems s2)" 
+        using init_tabs_only_modify_tabs[OF s_init_tabs] by auto
+      then show ?thesis using init_mems_mem_agree[OF s_init_mems 1] by simp
+    qed
     show ?thesis
       using 1 2 3 store_typing.intros
       by blast

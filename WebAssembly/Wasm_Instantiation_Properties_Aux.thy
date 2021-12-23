@@ -6,6 +6,11 @@ definition element_in_bounds where
    let i = inst.tabs inst ! e_tab e 
    in i < length (tabs s) \<and>  e_ind + length (e_init e) \<le> length (fst (tabs s ! i))"
 
+definition data_in_bounds where 
+"data_in_bounds s inst d_ind d \<equiv> 
+  let i = inst.mems inst ! d_data d
+  in i < length (mems s) \<and> d_ind + length (d_init d) \<le> mem_length (mems s ! i)"
+
 abbreviation "element_funcs_in_bounds s inst e 
 \<equiv>list_all (\<lambda>i. (inst.funcs inst)!i < length (s.funcs s)) (e_init e)" 
 
@@ -89,6 +94,11 @@ lemma init_mem_form:
   assumes "s' = init_mem s inst d_ind d" 
   shows "list_all2 mem_extension (mems s) (mems s')" 
         "\<exists>mems'. s' = s\<lparr>mems := mems'\<rparr>"
+        "data_in_bounds s inst d_ind d 
+        \<Longrightarrow> list_all mem_agree (mems s) 
+        \<Longrightarrow> list_all mem_agree (mems s')"
+        "data_in_bounds s inst d_ind d 
+        \<Longrightarrow> list_all2 (\<lambda>m1 m2. mem_length m1 = mem_length m2) (mems s) (mems s')"
 proof -
   obtain m_ind mem mem' where init_mem_is: "m_ind = ((inst.mems inst)!(d_data d))"
                                "mem = (mems s)!m_ind"
@@ -113,6 +123,44 @@ proof -
 
   show "\<exists>mems'. s' = s\<lparr>mems := mems'\<rparr>" unfolding assms init_mem_def
     by(simp add: Let_def exI split:prod.splits)
+
+  {
+    assume "data_in_bounds s inst d_ind d" 
+    then have "d_ind + length (d_init d) \<le> mem_length mem" 
+      unfolding init_mem_is(2,1) data_in_bounds_def Let_def 
+      by simp
+    then have "mem_length mem = mem_length mem'" 
+      unfolding init_mem_is(3) 
+      by(simp add:write_bytes_def mem_length_def mem_rep_length_def 
+          mem_rep_write_bytes.rep_eq)
+  }
+  note same_length = this
+
+  {
+    assume "data_in_bounds s inst d_ind d" 
+
+    then have "mem_size mem = mem_size mem'" 
+      using same_length unfolding init_mem_is(3) 
+      by(simp add:mem_size_def)
+  
+    assume "mem_agree mem"
+
+    then have "mem_agree mem'" 
+      using \<open>mem_size mem = mem_size mem'\<close> \<open>mem_max mem = mem_max mem'\<close>
+      by auto
+  }
+  then show "data_in_bounds s inst d_ind d 
+        \<Longrightarrow> list_all mem_agree (mems s) 
+        \<Longrightarrow> list_all mem_agree (mems s')"
+    unfolding init_mem_is(4) list_all_length using nth_list_update_eq nth_list_update_neq
+    (*todo: ugly sledgehammer*)
+    by (metis (no_types, lifting) init_mem_is(2) length_list_update s.select_convs(3) 
+        s.surjective s.update_convs(3))
+  
+  show "data_in_bounds s inst d_ind d 
+        \<Longrightarrow> list_all2 (\<lambda>m1 m2. mem_length m1 = mem_length m2) (mems s) (mems s')" 
+    using init_mem_is same_length unfolding init_mem_is(4) list_all2_conv_all_nth  
+    by (simp, metis nth_list_update_eq nth_list_update_neq)
 qed
 
 
@@ -312,6 +360,57 @@ proof -
     by (metis (no_types, lifting) list_all2_lengthD map_fst_zip map_snd_zip) 
 qed
 
+
+
+lemma init_mems_mem_agree:
+  assumes "s' = init_mems s inst d_inds ds" 
+"list_all2 (data_in_bounds s inst) d_inds ds"
+"list_all mem_agree (mems s)"
+  shows "list_all mem_agree (mems s')"
+proof - 
+  {
+    fix a 
+    have "list_all2 (data_in_bounds s inst) (map fst a) (map snd a)
+      \<Longrightarrow> list_all mem_agree (mems s)
+      \<Longrightarrow> s' = foldl (\<lambda>s' (d_ind,d). init_mem s' inst d_ind d) s a
+      \<Longrightarrow> list_all mem_agree (mems s')"
+    proof(induct a arbitrary: s)
+      case Nil
+      then show ?case by simp 
+    next
+      case (Cons a1 a2)
+      define s_mid where "s_mid = init_mem s inst (fst a1) (snd a1)" 
+      then have 1:"s' = foldl (\<lambda>s' (d_ind,d). init_mem s' inst d_ind d) s_mid a2" 
+        using Cons foldl_Cons
+        by(simp add: case_prod_beta')
+
+      have 2:"data_in_bounds s inst (fst a1) (snd a1)" using Cons(2) by auto
+
+      {
+        fix x 
+        assume "x \<in> set (zip (map fst a2) (map snd a2))" 
+        then have "data_in_bounds s inst (fst x) (snd x)" 
+          using Cons(2) case_prod_unfold zip_map_fst_snd unfolding list_all2_iff
+          by (metis (no_types, lifting) set_subset_Cons subset_code(1))
+
+        moreover have "list_all2 (\<lambda>m1 m2. mem_length m1 = mem_length m2) (mems s) (mems s_mid)" 
+          using init_mem_form(4)[OF s_mid_def 2] by -
+         
+        ultimately have "data_in_bounds s_mid inst (fst x) (snd x)" 
+          unfolding data_in_bounds_def Let_def list_all2_conv_all_nth
+          by force
+      }
+      then have 3:"list_all2 (data_in_bounds s_mid inst) (map fst a2) (map snd a2)"
+        unfolding list_all2_iff by auto
+
+      have 4:"list_all mem_agree (mems s_mid)" 
+        using init_mem_form(3)[OF s_mid_def 2 Cons(3)] by -
+      then show ?case using Cons(1)[OF 3 4 1] by -
+    qed
+  }
+  then show ?thesis using assms unfolding init_mems_def
+    by (metis (no_types, lifting) list_all2_lengthD map_fst_zip map_snd_zip) 
+qed
 
 (* while mathematically superfluous, this form makes the following lemmas easier to prove *)
 lemma store_extension_intros_with_refl: 
