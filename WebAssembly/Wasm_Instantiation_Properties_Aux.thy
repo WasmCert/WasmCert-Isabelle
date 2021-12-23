@@ -246,6 +246,12 @@ lemma init_tabs_tabi_agree:
   using init_tabs_tab_typing[OF assms(1)] assms(2) unfolding tabi_agree_def list_all2_conv_all_nth
   by auto
 
+lemma init_mems_memi_agree:
+  assumes "s' = init_mems s inst e_inds es" 
+        "memi_agree (mems s) n tt"
+  shows "memi_agree (mems s') n tt"
+  sorry
+
 lemma init_tabs_tab_agree:
   assumes "s' = init_tabs s inst e_inds es" 
 "list_all (element_funcs_in_bounds s inst) es"

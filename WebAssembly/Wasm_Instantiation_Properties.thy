@@ -166,7 +166,7 @@ proof -
   have "store_extension s1 s2" using init_tabs_preserve_store_extension s_init_tabs by auto 
   have "store_extension s2 s'" using init_mems_preserve_store_extension s_init_mems by auto 
 
-  obtain \<C> \<C>' fts ds gts ms
+  obtain \<C> \<C>' fts ds gts 
     where c_is:"list_all2 (module_func_typing \<C>) (m_funcs m) fts"
     "list_all (module_tab_typing) (m_tabs m)"
     "list_all (module_elem_typing \<C>) (m_elem m)"
@@ -177,7 +177,7 @@ proof -
           func_t=ext_t_funcs t_imps @ fts, 
           global=ext_t_globs t_imps @ gts, 
           table=ext_t_tabs t_imps @ (m_tabs m), 
-          memory=ext_t_mems t_imps @ ms, 
+          memory=ext_t_mems t_imps @ (m_mems m), 
           local=[], label=[], return=None\<rparr>"
     "list_all2 (module_glob_typing \<C>') (m_globs m) gts"
     "\<C>' = \<lparr>types_t=[], func_t=[], global=ext_t_globs t_imps, table=[], memory=[], 
@@ -188,9 +188,10 @@ proof -
   have "funcs s1 = funcs s2" using init_tabs_only_modify_tabs[OF s_init_tabs] by auto
   also have "... = funcs s'" using init_mems_only_modify_mems[OF s_init_mems] by auto
   finally have "funcs s1 = funcs s'" by -
-  obtain fs ts gs where 
+  obtain fs ts ms gs where 
     "funcs s1 = funcs s @ fs" 
     "tabs s1 = tabs s @ ts"
+    "mems s1 = mems s @ ms"
     "globs s1 = globs s @ gs"
     using alloc_module_ext_arb[OF s_alloc_module]
     by metis
@@ -202,7 +203,8 @@ proof -
 
   have ts_alloc:"ts = alloc_tabs_simple (m_tabs m)" 
     using alloc_module_tabs_form[OF s_alloc_module \<open>tabs s1 = tabs s @ ts\<close>] by -
-
+  have ms_alloc:"ms = alloc_mems_simple (m_mems m)" 
+    using alloc_module_mems_form[OF s_alloc_module \<open>mems s1 = mems s @ ms\<close>] by -
 
   have tabi_agree_s1:"list_all2 (tabi_agree (tabs s1)) (inst.tabs inst) (table \<C>)" 
   proof -
@@ -237,6 +239,41 @@ proof -
       using c_is by (simp add: list_all2_appendI)
   qed
 
+
+  have memi_agree_s1:"list_all2 (memi_agree (mems s1)) (inst.mems inst) (memory \<C>)" 
+  proof -
+    define allocd_mems where "allocd_mems = snd (alloc_mems s (m_mems m))" 
+    then have "inst.mems inst = (ext_mems v_imps)@allocd_mems" 
+      using alloc_module_allocated_form(3)[OF s_alloc_module]
+      by (metis prod.collapse) 
+    moreover have "list_all2 (memi_agree (mems s1)) (ext_mems v_imps) (ext_t_mems t_imps)"
+    proof -
+      have "list_all2 (memi_agree (mems s)) (ext_mems v_imps) (ext_t_mems t_imps)" 
+        using ext_typing_imp_memi_agree[OF s_ext_typing] by -
+      then show ?thesis
+        unfolding memi_agree_def \<open>mems s1 = mems s @ ms\<close>
+        by (simp add: list_all2_mono nth_append)
+    qed 
+    moreover have "list_all2 (memi_agree (mems s1)) allocd_mems (m_mems m)"
+    proof -
+      have "length ms = length (m_mems m)" using ms_alloc by auto
+      then have allocd_interval:"allocd_mems = [length (mems s) ..< (length (mems s) + length ms)]" 
+        using allocd_mems_def alloc_mems_range surjective_pairing by metis  
+
+      have "list_all2 mem_typing ms (m_mems m)" 
+        unfolding ms_alloc alloc_mem_simple_def mem_typing_def list.rel_map(1) limits_compat_def
+          mem_mk_def mem_rep_mk_def mem_size_def mem_length_def mem_rep_length_def bytes_replicate_def
+          mem_max_def 
+        by(rule list_all2_refl, simp add: pred_option_def mem_rep.Abs_mem_rep_inverse Ki64_def)        
+
+      then have "list_all2 (memi_agree (mems s@ms)) allocd_mems (m_mems m)" 
+        unfolding memi_agree_def allocd_interval 
+        by (simp add: list_all2_conv_all_nth) 
+      then show ?thesis using \<open>mems s1 = mems s @ ms\<close> by auto
+    qed
+    ultimately show ?thesis
+      using c_is by(simp add: list_all2_appendI)
+  qed
 
   have "types inst = types_t \<C>" 
   proof -
@@ -286,10 +323,16 @@ proof -
     qed 
     ultimately show ?thesis using c_is by (simp add: list_all2_appendI) 
   qed 
+
+
   moreover have tabi_agree_s':"list_all2 (tabi_agree (tabs s')) (inst.tabs inst) (table \<C>)" 
     using tabi_agree_store_extension init_tabs_tabi_agree[OF s_init_tabs] 
       list_all2_mono[OF tabi_agree_s1] \<open>store_extension s2 s'\<close> by blast
-  moreover have memi_agree_s':"list_all2 (memi_agree (mems s')) (inst.mems inst) (memory \<C>)" sorry
+  moreover have memi_agree_s':"list_all2 (memi_agree (mems s')) (inst.mems inst) (memory \<C>)"
+    using memi_agree_store_extension init_mems_memi_agree[OF s_init_mems] 
+      list_all2_mono[OF memi_agree_s1] \<open>store_extension s1 s2\<close> \<open>store_extension s2 s'\<close> by blast
+
+
   moreover have globi_agree_s':"list_all2 (globi_agree (globs s')) (inst.globs inst) (global \<C>)"
   proof - 
     define allocd_globs where "allocd_globs = snd (alloc_globs s (m_globs m) g_inits)" 
@@ -380,6 +423,10 @@ proof -
   moreover have "local \<C> = [] \<and> label \<C> = [] \<and> return \<C> = None" using c_is by auto
   ultimately have "inst_typing s' inst \<C>" using inst_typing.simps
     by (metis (full_types) inst.surjective old.unit.exhaust t_context.surjective) 
+
+
+
+
 
   show "store_typing s'"
   proof -
@@ -482,6 +529,8 @@ proof -
       using 1 2 3 store_typing.intros
       by blast
   qed
+
+
 
   show "\<exists>\<C>. inst_typing s' inst \<C>" using \<open>inst_typing s' inst \<C>\<close> by auto
 
