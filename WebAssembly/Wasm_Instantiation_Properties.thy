@@ -148,9 +148,10 @@ proof -
     "module_typing m t_imps t_exps"  
     and s_ext_typing:"list_all2 (external_typing s) v_imps t_imps"
     and s_alloc_module:"alloc_module s m v_imps g_inits (s1, inst, v_exps)"
-    and "f = \<lparr> f_locs = [], f_inst = inst \<rparr>"
+    and f_def:"f = \<lparr> f_locs = [], f_inst = inst \<rparr>"
+    and g_inits_def:
     "list_all2 (\<lambda>g v. reduce_trans (s1,f,$*(g_init g)) (s1,f,[$C v])) (m_globs m) g_inits"
-    "list_all2 (\<lambda>e c. reduce_trans (s1,f,$*(e_off e)) (s1,f,[$C ConstInt32 c])) (m_elem m) e_offs"
+    and "list_all2 (\<lambda>e c. reduce_trans (s1,f,$*(e_off e)) (s1,f,[$C ConstInt32 c])) (m_elem m) e_offs"
     "list_all2 (\<lambda>d c. reduce_trans (s1,f,$*(d_off d)) (s1,f,[$C ConstInt32 c])) (m_data m) d_offs"
     and s_element_in_bounds:
     "list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s1)!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m)"
@@ -165,7 +166,7 @@ proof -
   have "store_extension s1 s2" using init_tabs_preserve_store_extension s_init_tabs by auto 
   have "store_extension s2 s'" using init_mems_preserve_store_extension s_init_mems by auto 
 
-  obtain \<C> fts ds gts ms
+  obtain \<C> \<C>' fts ds gts ms
     where c_is:"list_all2 (module_func_typing \<C>) (m_funcs m) fts"
     "list_all (module_tab_typing) (m_tabs m)"
     "list_all (module_elem_typing \<C>) (m_elem m)"
@@ -178,18 +179,26 @@ proof -
           table=ext_t_tabs t_imps @ (m_tabs m), 
           memory=ext_t_mems t_imps @ ms, 
           local=[], label=[], return=None\<rparr>"
+    "list_all2 (module_glob_typing \<C>') (m_globs m) gts"
+    "\<C>' = \<lparr>types_t=[], func_t=[], global=ext_t_globs t_imps, table=[], memory=[], 
+        local=[], label=[], return=None\<rparr>"
     using \<open>module_typing m t_imps t_exps\<close> module_typing.simps
     by auto 
 
   have "funcs s1 = funcs s2" using init_tabs_only_modify_tabs[OF s_init_tabs] by auto
-  also have "... = funcs s'" using init_mems_preserve_funcs s_init_mems by auto
+  also have "... = funcs s'" using init_mems_only_modify_mems[OF s_init_mems] by auto
   finally have "funcs s1 = funcs s'" by -
-  obtain fs ts where 
+  obtain fs ts gs where 
     "funcs s1 = funcs s @ fs" 
     "tabs s1 = tabs s @ ts"
+    "globs s1 = globs s @ gs"
     using alloc_module_ext_arb[OF s_alloc_module]
     by metis
   then have "funcs s'= funcs s @ fs" using \<open>funcs s1 = funcs s'\<close> by auto
+
+  have "globs s' =  globs s @ gs" using \<open>globs s1 = globs s @ gs\<close>
+      init_tabs_only_modify_tabs[OF s_init_tabs] init_mems_only_modify_mems[OF s_init_mems] 
+    by auto
 
   have ts_alloc:"ts = alloc_tabs_simple (m_tabs m)" 
     using alloc_module_tabs_form[OF s_alloc_module \<open>tabs s1 = tabs s @ ts\<close>] by -
@@ -277,11 +286,97 @@ proof -
     qed 
     ultimately show ?thesis using c_is by (simp add: list_all2_appendI) 
   qed 
-  moreover have globi_agree_s':"list_all2 (globi_agree (globs s')) (inst.globs inst) (global \<C>)" sorry 
   moreover have tabi_agree_s':"list_all2 (tabi_agree (tabs s')) (inst.tabs inst) (table \<C>)" 
     using tabi_agree_store_extension init_tabs_tabi_agree[OF s_init_tabs] 
       list_all2_mono[OF tabi_agree_s1] \<open>store_extension s2 s'\<close> by blast
   moreover have memi_agree_s':"list_all2 (memi_agree (mems s')) (inst.mems inst) (memory \<C>)" sorry
+  moreover have globi_agree_s':"list_all2 (globi_agree (globs s')) (inst.globs inst) (global \<C>)"
+  proof - 
+    define allocd_globs where "allocd_globs = snd (alloc_globs s (m_globs m) g_inits)" 
+    then have "inst.globs inst = (ext_globs v_imps)@allocd_globs" 
+      using alloc_module_globs_only_alloc_globs[OF s_alloc_module]
+      by (metis prod.collapse)
+    moreover have "list_all2 (globi_agree (globs s')) (ext_globs v_imps) (ext_t_globs t_imps)"
+    proof -
+      have "list_all2 (globi_agree (globs s)) (ext_globs v_imps) (ext_t_globs t_imps)" 
+        using ext_typing_imp_globi_agree[OF s_ext_typing] by -
+
+      then show ?thesis unfolding globi_agree_def \<open>globs s' = globs s @ gs\<close>
+        by (simp add: list_all2_mono nth_append) 
+    qed 
+    moreover have "list_all2 (globi_agree (globs s')) allocd_globs gts" 
+    proof - 
+      have zip_agree:"length (m_globs m) = length g_inits" 
+        using g_inits_def unfolding list_all2_conv_all_nth by simp
+      have gs_alloc:"gs = alloc_globs_simple (m_globs m) g_inits" 
+        using alloc_module_globs_form[OF s_alloc_module \<open>globs s1 = globs s @ gs\<close>] by -
+      then have "length gs = length (m_globs m)" using \<open>length (m_globs m) = length g_inits\<close>
+        by auto
+      then have allocd_interval:"allocd_globs = [length (globs s) ..< (length (globs s) + length gs)]" 
+        using allocd_globs_def alloc_globs_range surjective_pairing \<open>length (m_globs m) = length g_inits\<close>
+        by (metis min.idem)   
+
+      have "list_all2 (\<lambda>g gt. gt = g_type g) (m_globs m) gts" 
+        using c_is(8)  unfolding module_glob_typing.simps 
+        by (smt (verit, best) list_all2_mono module_glob.select_convs(1))
+      then have "gts = map g_type (m_globs m)"
+        unfolding list_all2_conv_all_nth 
+        by (metis map_intro_length) 
+
+      have "map tg_t gts = map typeof g_inits" (*from typing preservation*)
+      proof - 
+        {
+          fix g v
+          assume assm:"(g, v) \<in> set (zip (m_globs m) g_inits)"
+
+          have 1:"const_exprs \<C>' (g_init g)" using c_is(8) zip_agree assm
+            unfolding module_glob_typing.simps list_all2_conv_all_nth
+            by (metis in_set_conv_nth module_glob.select_convs(2) set_zip_leftD) 
+          have 2:"\<C>' \<turnstile> g_init g : ([] _> [tg_t (g_type g)])" using c_is(8) zip_agree assm
+            unfolding module_glob_typing.simps list_all2_conv_all_nth
+            by (metis in_set_conv_nth module_glob.select_convs(1,2) set_zip_leftD) 
+          have 3:"reduce_trans (s1,f,$*(g_init g)) (s1,f,[$C v])" 
+            using g_inits_def assm zip_agree unfolding list_all2_conv_all_nth in_set_conv_nth
+            by fastforce 
+          have 4:"global \<C>' = ext_t_globs t_imps" unfolding c_is(9) by simp 
+
+          have "tg_t (g_type g) = typeof v"
+            using const_exprs_reduce_trans[OF 1 2 3 4
+                list_all2_external_typing_glob_alloc[OF s_ext_typing] \<open>globs s1 = globs s @ gs\<close>]
+            \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close> f_def by force 
+        }
+        then have "list_all2 (\<lambda>g g_init. tg_t (g_type g) = typeof g_init) (m_globs m) g_inits"
+          using \<open>length (m_globs m) = length g_inits\<close> unfolding list_all2_conv_all_nth 
+          (*todo: I have no idea why gs gets involved but whatever*)
+          by (metis \<open>length gs = length (m_globs m)\<close> gs_alloc length_map nth_mem nth_zip) 
+  
+        then show ?thesis unfolding \<open>gts = map g_type (m_globs m)\<close> list_all2_conv_all_nth
+          by (simp add: map_intro_length)
+      qed
+
+      moreover have "map g_val gs = g_inits"
+        unfolding gs_alloc alloc_glob_simple_def using \<open>length (m_globs m) = length g_inits\<close>
+        by(simp add:comp_def prod.case_eq_if)
+
+      ultimately have "list_all2 (\<lambda>g gt. typeof (g_val g) = tg_t gt) gs gts"
+        using length_map nth_map unfolding list_all2_conv_all_nth
+        by metis 
+
+      moreover have "list_all2 (\<lambda>g gt. g_mut g = tg_mut gt) gs gts"
+        unfolding \<open>gts = map g_type (m_globs m)\<close> list_all2_map2 
+        gs_alloc list_all2_map1 alloc_glob_simple_def list_all2_conv_all_nth
+        using \<open>length (m_globs m) = length g_inits\<close> 
+        by(simp add:prod.case_eq_if) 
+
+      ultimately have "list_all2 glob_typing gs gts" unfolding glob_typing_def
+        by (simp add: list_all2_conv_all_nth) 
+      then have "list_all2 (globi_agree (globs s@gs)) allocd_globs gts" 
+        unfolding globi_agree_def allocd_interval
+        by (simp add: list_all2_conv_all_nth) 
+      then show ?thesis using \<open>globs s' = globs s @ gs\<close> by auto
+    qed 
+    ultimately show ?thesis using c_is by (simp add: list_all2_appendI) 
+  qed
   moreover have "local \<C> = [] \<and> label \<C> = [] \<and> return \<C> = None" using c_is by auto
   ultimately have "inst_typing s' inst \<C>" using inst_typing.simps
     by (metis (full_types) inst.surjective old.unit.exhaust t_context.surjective) 

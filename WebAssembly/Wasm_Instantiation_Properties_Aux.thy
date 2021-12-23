@@ -291,11 +291,10 @@ proof -
     by presburger
 qed
 
-lemma init_mems_preserve_funcs:
-  assumes "s' = init_mems s inst d_inds ds" 
-  shows "funcs s' = funcs s"
-  using init_mems_form(2)[OF assms]
-  by auto
+lemma init_mems_only_modify_mems: 
+  assumes "s' = init_mems s inst e_inds es" 
+  shows "\<exists>mems'. s' = s\<lparr>mems := mems'\<rparr>"
+  using init_mems_form(2)[OF assms] by -
 
 
 (* while mathematically superfluous, this form makes the following lemmas easier to prove *)
@@ -438,7 +437,54 @@ definition alloc_glob_simple :: "(module_glob \<times> v) \<Rightarrow> global" 
 lemma alloc_glob_equiv:"fst (alloc_glob s m_g_v) = s\<lparr>globs := globs s @ [alloc_glob_simple m_g_v]\<rparr>"
   using alloc_glob_def alloc_glob_simple_def by(simp split:prod.splits)
 
-abbreviation "alloc_globs_simple m_g_vs \<equiv> map (\<lambda>m_g_v. alloc_glob_simple m_g_v) m_g_vs"
+abbreviation "alloc_globs_simple m_gs vs \<equiv> map (\<lambda>m_g_v. alloc_glob_simple m_g_v) (zip m_gs vs)"
+
+lemma alloc_globs_equiv:
+  "fst (alloc_globs s m_gs vs) = s\<lparr>globs := globs s @ alloc_globs_simple m_gs vs\<rparr>"
+proof(induct "zip m_gs vs" arbitrary:s m_gs vs)
+  case Nil
+  then show ?case by auto
+next
+  case (Cons a m_g_vs)
+  have 1:"m_g_vs = zip (map fst m_g_vs) (map snd m_g_vs)"
+    by (simp add: zip_map_fst_snd) 
+  have "fst (alloc_globs s (map fst (a#m_g_vs)) (map snd (a#m_g_vs))) 
+      = fst (alloc_globs (fst (alloc_glob s a)) (map fst m_g_vs) (map snd m_g_vs))"
+    by(simp split:prod.splits)
+  also have "... = s\<lparr>globs := globs s @ alloc_globs_simple (map fst (a#m_g_vs)) (map snd (a#m_g_vs))\<rparr>"
+    unfolding alloc_glob_equiv Cons(1)[OF 1] by(simp)
+  finally show ?case by(simp add: zip_map_fst_snd Cons(2)) 
+qed
+
+lemma alloc_globs_store_agnostic: 
+  assumes "globs s1 = globs s2"
+         "(s1', i1) = alloc_globs s1 (m_globs m) gvs"
+         "(s2', i2) = alloc_globs s2 (m_globs m) gvs"
+  shows "globs s1' = globs s2' \<and> i1 = i2"
+  using alloc_globs_range(1) assms alloc_globs_equiv
+  by (metis (no_types, lifting))
+
+lemma alloc_module_globs_only_alloc_globs:
+  assumes "alloc_module s m imps gvs (s',inst,exps)"
+    "alloc_globs s (m_globs m) gvs = (s1,i_gs)"
+  shows "globs s' = globs s1 \<and> inst.globs inst = (ext_globs imps)@i_gs"
+  using assms alloc_funcs_range fst_conv
+    alloc_tabs_range alloc_mems_range alloc_globs_store_agnostic
+  unfolding alloc_module.simps
+  by (smt (z3) Pair_inject inst.select_convs(5))
+  (*todo: takes like 10 seconds to run*)
+
+
+lemma alloc_module_globs_form: 
+  assumes "alloc_module s m v_imps g_inits (s', inst, v_exps)" 
+          "globs s' = globs s @ gs" 
+  shows "gs = alloc_globs_simple (m_globs m) g_inits"
+proof - 
+  have "globs s' = globs (fst (alloc_globs s (m_globs m) g_inits))" 
+    using alloc_module_globs_only_alloc_globs[OF assms(1)]
+    by (metis eq_fst_iff) 
+  then show ?thesis using alloc_globs_equiv assms(2) by auto
+qed
 
 
 lemma ext_typing_imp_helper:
@@ -514,5 +560,6 @@ lemma ext_typing_imp_memi_agree:
    apply auto
   apply(simp split:v_ext.splits extern_t.splits add: external_typing.simps memi_agree_def) 
   done 
+
 
 end
