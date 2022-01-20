@@ -1675,34 +1675,30 @@ qed
 lemma trap_no_progress:
   assumes "es = [Trap]"
   shows "\<not>\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
-proof -
-  {
-    assume "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
-    hence False
-      using assms
-    proof (induction rule: reduce.induct)
-      case (basic e e' s vs)
-      thus ?case
-      by (induction rule: reduce_simple.induct) auto
+proof (rule notI)
+  assume "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
+  thus False
+    unfolding assms
+  proof (induction s f "[Trap]" s' f' es' rule: reduce.induct)
+    case (basic e' s vs)
+    thus ?case
+      by (cases rule: reduce_simple.cases) simp_all
+  next
+    case (label s f es s' f' es' k lholed les')
+    show ?case
+      using label.hyps(3)
+    proof (cases rule: Lfilled.cases)
+      case (L0 vs es')
+      show ?thesis
+        using L0(2) label.hyps(1,2) empty_no_progress
+        by (auto simp add: Cons_eq_append_conv)
     next
-      case (label s f es s' f' es' k lholed les les')
-      show ?case
-        using label(2)
-        proof (cases rule: Lfilled.cases)
-          case (L0 vs es')
-          show ?thesis
-            using L0(2) label(1,4,5) empty_no_progress
-            by (auto simp add: Cons_eq_append_conv)
-        next
-          case (LN vs n es' l es'' k' lfilledk)
-          show ?thesis
-            using LN(2) label(5)
-            by (simp add: Cons_eq_append_conv)
-        qed
-    qed auto
-  }
-  thus ?thesis
-    by blast
+      case (LN vs n es' l es'' k' lfilledk)
+      show ?thesis
+        using LN(2) label.hyps(4)
+        by (simp add: Cons_eq_append_conv)
+    qed
+  qed auto
 qed
 
 lemma terminal_no_progress:
