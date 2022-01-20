@@ -1,6 +1,5 @@
 session WebAssembly_Dev = "HOL-Library" +
   description "WebAssembly"
-  options [quick_and_dirty]
   sessions
     Native_Word
   theories
