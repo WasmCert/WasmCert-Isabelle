@@ -1,4 +1,4 @@
-section {* Augmented Type Syntax for Concrete Checker *}
+section \<open>Augmented Type Syntax for Concrete Checker\<close>
 
 theory Wasm_Checker_Types imports Wasm "HOL-Library.Sublist" begin
 
@@ -1035,7 +1035,7 @@ proof (cases c1)
       using ct_suffix_cons_ct_list[of "take (length cts - 3) cts" "[TSome x2]"]
             assms(3) c_types_agree.simps(2)[of ctm cm] ct_list_compat_ts_conv_eq
       unfolding ct_list_compat_def to_ct_list_def
-      by (metis (no_types, hide_lams) list.simps(8,9))
+      by (metis (no_types, opaque_lifting) list.simps(8,9))
     thus ?thesis
       using TSome outer_TAny
       by simp
@@ -1054,7 +1054,7 @@ next
       using ct_suffix_cons_ct_list[of "take (length cts - 3) cts" "[TSome x2]"]
             assms(3) c_types_agree.simps(2)[of ctm cm] ct_list_compat_ts_conv_eq
       unfolding ct_list_compat_def to_ct_list_def
-      by (metis (no_types, hide_lams) list.simps(8,9))
+      by (metis (no_types, opaque_lifting) list.simps(8,9))
     thus ?thesis
       using TSome TAny
       by simp
@@ -1071,7 +1071,7 @@ next
       using ct_suffix_cons_ct_list[of "take (length cts - 3) cts" "[TSome x2]"]
             assms(3) c_types_agree.simps(2)[of ctm cm] ct_list_compat_ts_conv_eq
       unfolding ct_list_compat_def to_ct_list_def
-      by (metis (no_types, hide_lams) list.simps(8,9))
+      by (metis (no_types, opaque_lifting) list.simps(8,9))
     thus ?thesis
       using TSome outer_TSome x_eq
       by simp

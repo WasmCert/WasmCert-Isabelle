@@ -1,4 +1,4 @@
-section {* WebAssembly Base Definitions *}
+section \<open>WebAssembly Base Definitions\<close>
 
 theory Wasm_Base_Defs
   imports
@@ -202,7 +202,7 @@ definition word_rsplit_rev :: "'a::len word \<Rightarrow> 'b::len word list"
 lemma word_rsplit_rev_is: "word_rsplit_rev = rev \<circ> word_rsplit"
   using bin_rsplit_rev_is
   unfolding word_rsplit_def bin_rsplit_def word_rsplit_rev_def comp_def
-  by (metis (no_types, hide_lams) append_Nil fst_conv rev.simps(1) rev_map snd_conv)
+  by (metis (no_types, opaque_lifting) append_Nil fst_conv rev.simps(1) rev_map snd_conv)
 
 lift_definition serialise_i32 :: "i32 \<Rightarrow> bytes" is "word_rsplit_rev" .
 lift_definition serialise_i64 :: "i64 \<Rightarrow> bytes" is "word_rsplit_rev" .

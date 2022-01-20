@@ -27,6 +27,11 @@ Repeat all code equations explicitly again because the ones like @{const I32.int
 in export_code. Most of these are simply the original definitions, but we can also do some minor
 optimizations like in @{const int_shl} and others below.
 \<close>
+
+context
+  includes bit_operations_syntax
+begin
+
 lemma[code]: "int_clz (Abs_i32 x) = Abs_i32 (of_nat (word_clz x))"
   by (simp add: I32.int_clz_def int_clz_i32.abs_eq)
 lemma[code]: "int_ctz (Abs_i32 x) = Abs_i32 (of_nat (word_ctz x))"
@@ -170,6 +175,8 @@ lemma[code]: "int_ge_u (Abs_i64 x) (Abs_i64 y) \<longleftrightarrow> x \<ge> y"
   by (simp add: I64.int_ge_u_def int_ge_u_i64.abs_eq)
 lemma[code]: "int_ge_s (Abs_i64 x) (Abs_i64 y) \<longleftrightarrow> signed.greater_eq x y"
   by (simp add: I64.int_ge_s_def int_ge_s_i64.abs_eq)
+
+end
 
 (* Sometimes to implement conversions we need to indirect through OCaml int types *)
 typedecl ocaml_i32

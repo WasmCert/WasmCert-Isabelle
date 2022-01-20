@@ -1,4 +1,4 @@
-section {* Host Properties *}
+section \<open>Host Properties\<close>
 
 theory Wasm_Axioms imports Wasm begin
 
