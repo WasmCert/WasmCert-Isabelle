@@ -162,7 +162,8 @@ definition "inst_m_assn i ii \<equiv>
   * inst_m.mems  ii \<mapsto>\<^sub>a inst.mems  i 
   * inst_m.globs ii \<mapsto>\<^sub>a inst.globs i"
      
-lemma [sep_heap_rules]: "<mem_m_assn m mi> len_byte_array (fst mi) <\<lambda>r. mem_m_assn m mi * \<up>(r=length (Rep_mem_rep (fst m)))>"
+lemma [sep_heap_rules]: "<mem_m_assn m mi> len_byte_array (fst mi) 
+<\<lambda>r. mem_m_assn m mi * \<up>(r=length (Rep_mem_rep (fst m)))>"
   unfolding mem_m_assn_def
   by (sep_auto split: prod.splits)
 
@@ -186,7 +187,8 @@ lemma "< mi \<mapsto>\<^sub>a mis * (list_assn mem_m_assn) ms mis * inst_m_assn 
   apply (sep_auto)
   apply (reinsert_list_idx "inst.mems (f_inst i) ! 0")
   apply (sep_auto)
-  subgoal by (auto simp add: app_s_f_v_s_mem_size_def smem_ind_def mem_size_def mem_length_def mem_rep_length_def split: option.split list.split)  
+  subgoal by (auto simp add: app_s_f_v_s_mem_size_def smem_ind_def mem_size_def 
+        mem_length_def mem_rep_length_def split: option.split list.split)  
   apply (sep_auto)
   done
     
@@ -194,23 +196,138 @@ find_theorems app_s_f_v_s_mem_size
 
 lemma run_step_b_e_m_run_step_b_e_Unreachable:
   assumes "execute (run_step_b_e_m Unreachable cfg_m) h = Some ((cfg_m', res), h')"
-  shows "run_step_b_e Unreachable (config_m_to_config h cfg_m) = ((config_m_to_config h' cfg_m'), res)"
+  shows "run_step_b_e Unreachable (config_m_to_config h cfg_m) = 
+    ((config_m_to_config h' cfg_m'), res)"
   using assms
-  by (auto simp add: Heap_Monad.return_def Heap_Monad.heap_def config_m_to_config_def split: frame_context_m.splits frame_context.splits config_m.splits redex.splits prod.splits)
+  by (auto simp add: Heap_Monad.return_def Heap_Monad.heap_def config_m_to_config_def 
+      split: frame_context_m.splits frame_context.splits config_m.splits redex.splits prod.splits)
+
+lemmas splits = 
+  frame_context_m.splits frame_context.splits config_m.splits redex.splits prod.splits
+
+lemmas defs =  
+  Heap_Monad.return_def Heap_Monad.heap_def 
+  config_m_to_config_def frame_context_m_to_frame_context_def
 
 lemma run_step_b_e_m_run_step_b_e:
   assumes "execute (run_step_b_e_m b_e cfg_m) h = Some ((cfg_m', res), h')"
   shows "run_step_b_e b_e (config_m_to_config h cfg_m) = ((config_m_to_config h' cfg_m'), res)"
   using assms
-  sorry
+proof(cases b_e)
+  case Unreachable show ?thesis using assms by (auto simp add: defs Unreachable split: splits)
+next
+  case Nop show ?thesis using assms by (auto simp add: defs Nop split: splits)
+next
+  case Drop show ?thesis using assms by (auto simp add: defs Drop split: splits)
+next
+  case Select show ?thesis using assms by (auto simp add: defs Select split: splits)
+next
+  case (Block tf b_ebs)
+  show ?thesis using assms unfolding Block by (auto simp add: defs Let_def split: splits tf.split)
+next
+  case (Loop tf b_els)
+  show ?thesis using assms unfolding Loop by (auto simp add: defs Let_def split: splits tf.split)
+next
+  case (If tf es1 es2) show ?thesis using assms by (auto simp add: defs If split: splits)
+next
+  case (Br_if k) show ?thesis using assms by (auto simp add: defs Br_if split: splits)
+next
+  case (Br_table ks k) show ?thesis using assms by (auto simp add: defs Br_table split: splits)
+next
+  case (Tee_local k) show ?thesis using assms by (auto simp add: defs Tee_local split: splits)
+next
+  case (EConst k) show ?thesis using assms by (auto simp add: defs EConst split: splits)
+next
+  case (Unop t op) show ?thesis using assms by (auto simp add: defs Unop split: splits)
+next
+  case (Binop t op) show ?thesis using assms by (auto simp add: defs Binop split: splits)
+next
+  case (Testop t op) show ?thesis using assms by(auto simp add: defs Testop split: splits)
+next
+  case (Relop t op) show ?thesis using assms by(auto simp add: defs Relop split: splits)
+next
+  case (Cvtop t2 op t1 sx) show ?thesis using assms by (auto simp add: defs Cvtop split: splits)
+next
+  case Return
+  (* why are those defined twice? *)
+  have 1:"\<And>r v. Wasm_Interpreter.update_redex_return r v 
+    = Wasm_Interpreter_Monad.update_redex_return r v"
+    by (metis Wasm_Interpreter.update_redex_return.elims 
+        Wasm_Interpreter_Monad.update_redex_return.simps)
+  show ?thesis using assms unfolding Return 
+    by (auto simp add: defs 1 split: splits frame_context_m.split list.split)
+next
+  case (Br k)
+  show ?thesis using assms unfolding Br
+    apply (auto simp add: defs Let_def split: splits label_context.split) sorry
+next
+  case (Call k)
+  show ?thesis using assms unfolding Call 
+    apply (auto simp add: defs split: splits) sorry
+next
+  case (Call_indirect k)
+  show ?thesis using assms unfolding Call_indirect 
+    apply (auto simp add: defs split: splits) sorry
+next
+  case (Get_local k)
+  then show ?thesis sorry
+next
+  case (Set_local k)
+  then show ?thesis sorry
+next
+  case (Get_global k)
+  then show ?thesis sorry
+next
+  case (Set_global k)
+  then show ?thesis sorry
+next
+  case (Load x191 x192 x193 x194)
+  then show ?thesis sorry
+next
+  case (Store x201 x202 x203 x204)
+  then show ?thesis sorry
+next
+  case Current_memory
+  then show ?thesis sorry
+next
+  case Grow_memory
+  then show ?thesis sorry
+qed
 
 lemma run_step_e_m_run_step_e:
-  assumes "execute (run_step_e_m e cfg_m) h = Some ((cgf_m', res), h')"
+  assumes "execute (run_step_e_m e cfg_m) h = Some ((cfg_m', res), h')"
   shows "run_step_e e (config_m_to_config h cfg_m) = ((config_m_to_config h' cfg_m'), res)"
-  sorry
+proof(cases e)
+  case (Basic b_e)
+  have 1:"run_step_e_m e cfg_m = run_step_b_e_m b_e cfg_m" unfolding Basic
+    by(rule config_m.induct, auto simp add: defs split: splits)
+  have "run_step_e e (config_m_to_config h cfg_m) = run_step_b_e b_e (config_m_to_config h cfg_m)"
+    unfolding Basic by(rule config.induct, auto simp add: defs split: splits) 
+  also have "... = ((config_m_to_config h' cfg_m'), res)" 
+    using assms run_step_b_e_m_run_step_b_e unfolding 1 by simp
+  finally show ?thesis by -
+next
+  case (Invoke i_cl)
+  then show ?thesis sorry
+next
+  case Trap
+  show ?thesis using assms by (auto simp add: defs Trap split: splits)
+next
+  case (Label x41 x42 x43)
+  show ?thesis using assms by (auto simp add: defs Label split: splits)
+next
+  case (Frame x51 x52 x53)
+  show ?thesis using assms by (auto simp add: defs Frame split: splits)
+qed
 
 lemma run_iter_m_run_iter:
-  assumes "execute (run_iter_m n cfg_m) h = Some ((cgf_m', res), h')"
-  shows "run_iter n (config_m_to_config h cfg_m) = ((config_m_to_config h' cfg_m'), res)"
-  sorry
+  "execute (run_iter_m n cfg_m) h = Some ((cfg_m', res), h')
+ \<Longrightarrow> run_iter n (config_m_to_config h cfg_m) = ((config_m_to_config h' cfg_m'), res)"
+proof(induct n)
+  case 0
+  show ?case using 0 by (auto simp add: defs split: splits)
+next
+  case (Suc n)
+  then show ?case sorry
+qed
 end
