@@ -155,7 +155,7 @@ term app_s_f_v_s_mem_size
 
 definition "mem_m_assn \<equiv> \<lambda>(mr,mm) (mri,mmi). mri \<mapsto>\<^sub>b\<^sub>a Rep_mem_rep mr * \<up>(mmi=mm)"
 
-definition "inst_m_assn i ii \<equiv> 
+definition "inst_m_assn' i ii \<equiv> 
     inst_m.types ii \<mapsto>\<^sub>a inst.types i
   * inst_m.funcs ii \<mapsto>\<^sub>a inst.funcs i  
   * inst_m.tabs  ii \<mapsto>\<^sub>a inst.tabs  i 
@@ -176,11 +176,11 @@ method reinsert_list_idx for i :: nat =
   (simp;fail),
   (simp;fail)
   
-lemma "< mi \<mapsto>\<^sub>a mis * (list_assn mem_m_assn) ms mis * inst_m_assn (f_inst i) ii > 
+lemma mem_size_triple:"< mi \<mapsto>\<^sub>a mis * list_assn mem_m_assn ms mis * inst_m_assn' (f_inst i) ii > 
     app_s_f_v_s_mem_size_m mi ii vs 
   <\<lambda>r. \<up>(r = app_s_f_v_s_mem_size ms i vs) *
-   mi \<mapsto>\<^sub>a mis * (list_assn mem_m_assn) ms mis * inst_m_assn (f_inst i) ii>"
-  unfolding app_s_f_v_s_mem_size_m_def inst_m_assn_def list_assn_conv_idx
+   mi \<mapsto>\<^sub>a mis * (list_assn mem_m_assn) ms mis * inst_m_assn' (f_inst i) ii>"
+  unfolding app_s_f_v_s_mem_size_m_def inst_m_assn'_def list_assn_conv_idx
   apply extract_pre_pure
   apply sep_auto
   apply (extract_list_idx "inst.mems (f_inst i) ! 0")
@@ -194,13 +194,170 @@ lemma "< mi \<mapsto>\<^sub>a mis * (list_assn mem_m_assn) ms mis * inst_m_assn 
     
 find_theorems app_s_f_v_s_mem_size
 
-lemma run_step_b_e_m_run_step_b_e_Unreachable:
-  assumes "execute (run_step_b_e_m Unreachable cfg_m) h = Some ((cfg_m', res), h')"
-  shows "run_step_b_e Unreachable (config_m_to_config h cfg_m) = 
-    ((config_m_to_config h' cfg_m'), res)"
+
+record s_m_vals = 
+  mems_p :: "(byte array \<times> nat option) list"
+  mems_data :: "(byte list \<times> nat option) list" 
+
+definition s_m_vals_agree :: "s_m_vals \<Rightarrow> s \<Rightarrow> bool" where 
+ "s_m_vals_agree v s = list_all2 (\<lambda> (bl, n1) (m, n2). bl = Rep_mem_rep m \<and> n1 = n2) 
+    (mems_data v) (s.mems s)" 
+
+definition s_m_assn :: "s_m_vals \<Rightarrow> s_m \<Rightarrow> assn" where
+  "s_m_assn v s_m = s_m.mems s_m \<mapsto>\<^sub>a mems_p v 
+* list_assn (\<lambda> (ba, _) (bl, _ ). ba  \<mapsto>\<^sub>a bl) (mems_p v) (mems_data v)"
+
+definition vals_of_s_m :: "heap \<Rightarrow> s_m \<Rightarrow> s_m_vals \<times> addr set" where 
+ "vals_of_s_m h s_m = (let mems_p = Array.get h (s_m.mems s_m) in 
+  (\<lparr>mems_p = mems_p, mems_data = map (\<lambda> (ba, n). (Array.get h ba, n)) mems_p\<rparr>,
+  {addr_of_array (s_m.mems s_m)} \<union> set (map (\<lambda> (ba, _). addr_of_array ba) mems_p)))
+"
+
+lemma s_m_vals_sound_assn: 
+  assumes "(v, as) = vals_of_s_m h s_m"
+  shows "(h, as) \<Turnstile> s_m_assn v s_m" 
+  sorry
+
+lemma s_m_vals_sound_agree: 
+  assumes "(v, as) = vals_of_s_m h s_m"
+  shows "s_m_vals_agree v (s_m_to_s h s_m)"
+  sorry
+
+lemma s_m_preservation:
+  assumes "s_m_vals_agree v s" "(h, as) \<Turnstile> s_m_assn v s_m " 
+  shows "s = s_m_to_s h s_m" 
+  sorry
+
+type_synonym inst_m_vals = inst 
+
+definition inst_m_vals_agree :: "inst_m_vals \<Rightarrow> inst \<Rightarrow> bool" where 
+ "inst_m_vals_agree v i = (v = i)" 
+
+definition inst_m_assn :: "inst_m_vals \<Rightarrow> inst_m \<Rightarrow> assn" where
+  "inst_m_assn v i_m = 
+    inst_m.types i_m \<mapsto>\<^sub>a inst.types v
+  * inst_m.funcs i_m \<mapsto>\<^sub>a inst.funcs v  
+  * inst_m.tabs  i_m \<mapsto>\<^sub>a inst.tabs  v 
+  * inst_m.mems  i_m \<mapsto>\<^sub>a inst.mems  v 
+  * inst_m.globs i_m \<mapsto>\<^sub>a inst.globs v"
+
+definition vals_of_inst_m :: "heap \<Rightarrow> inst_m \<Rightarrow> inst_m_vals \<times> addr set" where 
+ "vals_of_inst_m h i_m = (\<lparr>
+  inst.types = Array.get h (inst_m.types i_m), 
+  funcs = Array.get h (inst_m.funcs i_m),
+  tabs  = Array.get h (inst_m.tabs i_m), 
+  mems  = Array.get h (inst_m.mems i_m), 
+  globs = Array.get h (inst_m.globs i_m) \<rparr>,
+ {addr_of_array (inst_m.types i_m), 
+  addr_of_array (inst_m.funcs i_m),
+  addr_of_array (inst_m.tabs  i_m),
+  addr_of_array (inst_m.mems  i_m),
+  addr_of_array (inst_m.globs i_m)} )
+"
+
+lemma inst_m_vals_sound_assn: 
+  assumes "(v, as) = vals_of_inst_m h i_m"
+  shows "(h, as) \<Turnstile> inst_m_assn v i_m" 
+  sorry
+
+lemma inst_m_vals_sound_agree: 
+  assumes "(v, as) = vals_of_inst_m h i_m"
+  shows "inst_m_vals_agree v (inst_m_to_inst h i_m)"
+  sorry
+
+lemma inst_m_preservation:
+  assumes "inst_m_vals_agree v i" "(h, as) \<Turnstile> inst_m_assn v i_m " 
+  shows "i = inst_m_to_inst h i_m" 
+  sorry
+
+record fc_m_vals = 
+  inst_m_vals :: "inst_m_vals" 
+
+definition fc_m_vals_agree :: "fc_m_vals \<Rightarrow> frame_context \<Rightarrow> bool" where 
+ "fc_m_vals_agree v fc = (case fc of Frame_context redex lcs nf f \<Rightarrow>
+  inst_m_vals_agree (inst_m_vals v) (f_inst f)
+ )" 
+
+definition fc_m_assn :: "fc_m_vals \<Rightarrow> frame_context_m \<Rightarrow> assn" where
+ "fc_m_assn v fc_m = (case fc_m of Frame_context_m redex lcs nf f_locs1 f_inst2 \<Rightarrow> 
+  inst_m_assn (inst_m_vals v) f_inst2
+)" 
+
+definition vals_of_fc_m :: "heap \<Rightarrow> frame_context_m \<Rightarrow> fc_m_vals \<times> addr set" where 
+ "vals_of_fc_m h fc_m = (case fc_m of Frame_context_m redex lcs nf f_locs1 f_inst2 \<Rightarrow>
+  let (inst_m_vals, addrs) = vals_of_inst_m h f_inst2 in 
+  (\<lparr>inst_m_vals = inst_m_vals\<rparr>, addrs)
+)"
+
+lemma fc_m_vals_sound_assn: 
+  assumes "(v, as) = vals_of_fc_m h fc_m"
+  shows "(h, as) \<Turnstile> fc_m_assn v fc_m" 
+  sorry
+
+lemma fc_m_vals_sound_agree: 
+  assumes "(v, as) = vals_of_fc_m h fc_m"
+  shows "fc_m_vals_agree v (frame_context_m_to_frame_context h fc_m)"
+  sorry
+
+lemma fc_m_preservation:
+  assumes "fc_m_vals_agree v fc" "(h, as) \<Turnstile> fc_m_assn v fc_m " 
+  shows "fc = fc_m_to_fc h fc_m" 
+  sorry
+
+record config_m_vals = 
+  s_m_vals :: "s_m_vals"
+  fc_m_vals :: "fc_m_vals"
+  fcs_m_vals :: "fc_m_vals list"
+
+definition config_m_vals_agree :: "config_m_vals \<Rightarrow> config \<Rightarrow> bool" where
+ "config_m_vals_agree v cfg = (case cfg of Config d s fc fcs \<Rightarrow> 
+    s_m_vals_agree (s_m_vals v) s 
+  \<and> fc_m_vals_agree (fc_m_vals v) fc 
+  \<and> list_all2 fc_m_vals_agree (fcs_m_vals v) fcs 
+)"
+
+definition config_m_assn :: "config_m_vals \<Rightarrow> config_m \<Rightarrow> assn" where 
+ "config_m_assn v cfg_m = (case cfg_m of Config_m d s_m fc_m fcs_m \<Rightarrow> 
+    s_m_assn (s_m_vals v) s_m 
+  * fc_m_assn (fc_m_vals v) fc_m 
+  * list_assn fc_m_assn (fcs_m_vals v) fcs_m
+)" 
+
+definition vals_of_config_m :: "heap \<Rightarrow> config_m \<Rightarrow> config_m_vals \<times> addr set" where 
+ "vals_of_config_m h cfg_m = (case cfg_m of Config_m d s_m fc_m fcs_m \<Rightarrow>
+  let (s_m_vals, s_addrs) = vals_of_s_m h s_m in 
+  let (fc_m_vals, fc_addrs) = vals_of_fc_m h fc_m in
+  let fcs_m_vals = map (fst \<circ> vals_of_fc_m h) fcs_m in
+  let fcs_addrs = map (snd \<circ> vals_of_fc_m h) fcs_m in
+  (\<lparr>s_m_vals = s_m_vals, fc_m_vals = fc_m_vals, fcs_m_vals = fcs_m_vals\<rparr>, 
+   s_addrs \<union> fc_addrs \<union> (\<Union> (set fcs_addrs)))
+)"
+
+lemma config_m_vals_sound_assn: 
+  assumes "(v, as) = vals_of_config_m h cfg_m" 
+  shows "(h, as) \<Turnstile> config_m_assn v cfg_m" 
+  using assms s_m_vals_sound_assn fc_m_vals_sound_assn 
+  unfolding config_m_assn_def vals_of_config_m_def 
+  apply(simp split:config_m.splits prod.splits) sorry
+
+lemma config_m_vals_sound_agree: 
+  assumes "(v, as) = vals_of_config_m h cfg_m" 
+  shows "config_m_vals_agree v (config_m_to_config h cfg_m)"
+  using assms s_m_vals_sound_agree 
+  unfolding vals_of_config_m_def config_m_vals_agree_def config_m_to_config_def
+  apply(simp split: config_m.splits prod.splits config.splits) sorry
+
+lemma config_m_preservation:
+  assumes "config_m_vals_agree v cfg" "(h, as) \<Turnstile> config_m_assn v cfg_m " 
+  shows "cfg = config_m_to_config h cfg_m" 
+  sorry
+
+lemma insert_pure: 
+  assumes "<P> f <\<lambda>r. \<up>(Q r) * true>" "<P> f <\<lambda>r. R r>"
+  shows "<P> f <\<lambda>r.  \<up>(Q r) * R r>"
   using assms
-  by (auto simp add: Heap_Monad.return_def Heap_Monad.heap_def config_m_to_config_def 
-      split: frame_context_m.splits frame_context.splits config_m.splits redex.splits prod.splits)
+  by (smt (verit, ccfv_threshold) hoare_triple_def lambda_one pure_false pure_true star_false_left) 
+
 
 lemmas splits = 
   frame_context_m.splits frame_context.splits config_m.splits redex.splits prod.splits
@@ -209,91 +366,198 @@ lemmas defs =
   Heap_Monad.return_def Heap_Monad.heap_def 
   config_m_to_config_def frame_context_m_to_frame_context_def
 
+
+lemma nth_emp:"<emp> Array.nth a i <\<lambda>r. emp>" 
+  unfolding hoare_triple_def
+  using in_range.simps relH_def run_nth by fastforce
+
+lemma len_emp:"<emp> Array.len a <\<lambda>r. emp>" 
+  unfolding hoare_triple_def
+  using in_range.simps relH_def run_length by fastforce
+
 lemma run_step_b_e_m_run_step_b_e:
   assumes "execute (run_step_b_e_m b_e cfg_m) h = Some ((cfg_m', res), h')"
   shows "run_step_b_e b_e (config_m_to_config h cfg_m) = ((config_m_to_config h' cfg_m'), res)"
   using assms
-proof(cases b_e)
-  case Unreachable show ?thesis using assms by (auto simp add: defs Unreachable split: splits)
-next
-  case Nop show ?thesis using assms by (auto simp add: defs Nop split: splits)
-next
-  case Drop show ?thesis using assms by (auto simp add: defs Drop split: splits)
-next
-  case Select show ?thesis using assms by (auto simp add: defs Select split: splits)
-next
-  case (Block tf b_ebs)
-  show ?thesis using assms unfolding Block by (auto simp add: defs Let_def split: splits tf.split)
-next
-  case (Loop tf b_els)
-  show ?thesis using assms unfolding Loop by (auto simp add: defs Let_def split: splits tf.split)
-next
-  case (If tf es1 es2) show ?thesis using assms by (auto simp add: defs If split: splits)
-next
-  case (Br_if k) show ?thesis using assms by (auto simp add: defs Br_if split: splits)
-next
-  case (Br_table ks k) show ?thesis using assms by (auto simp add: defs Br_table split: splits)
-next
-  case (Tee_local k) show ?thesis using assms by (auto simp add: defs Tee_local split: splits)
-next
-  case (EConst k) show ?thesis using assms by (auto simp add: defs EConst split: splits)
-next
-  case (Unop t op) show ?thesis using assms by (auto simp add: defs Unop split: splits)
-next
-  case (Binop t op) show ?thesis using assms by (auto simp add: defs Binop split: splits)
-next
-  case (Testop t op) show ?thesis using assms by(auto simp add: defs Testop split: splits)
-next
-  case (Relop t op) show ?thesis using assms by(auto simp add: defs Relop split: splits)
-next
-  case (Cvtop t2 op t1 sx) show ?thesis using assms by (auto simp add: defs Cvtop split: splits)
-next
-  case Return
-  (* why are those defined twice? *)
-  have 1:"\<And>r v. Wasm_Interpreter.update_redex_return r v 
-    = Wasm_Interpreter_Monad.update_redex_return r v"
-    by (metis Wasm_Interpreter.update_redex_return.elims 
-        Wasm_Interpreter_Monad.update_redex_return.simps)
-  show ?thesis using assms unfolding Return 
-    by (auto simp add: defs 1 split: splits frame_context_m.split list.split)
-next
-  case (Br k)
-  show ?thesis using assms unfolding Br
-    apply (auto simp add: defs Let_def split: splits label_context.split) sorry
-next
-  case (Call k)
-  show ?thesis using assms unfolding Call 
-    apply (auto simp add: defs split: splits) sorry
-next
-  case (Call_indirect k)
-  show ?thesis using assms unfolding Call_indirect 
-    apply (auto simp add: defs split: splits) sorry
-next
-  case (Get_local k)
-  then show ?thesis sorry
-next
-  case (Set_local k)
-  then show ?thesis sorry
-next
-  case (Get_global k)
-  then show ?thesis sorry
-next
-  case (Set_global k)
-  then show ?thesis sorry
-next
-  case (Load x191 x192 x193 x194)
-  then show ?thesis sorry
-next
-  case (Store x201 x202 x203 x204)
-  then show ?thesis sorry
-next
-  case Current_memory
-  then show ?thesis sorry
-next
-  case Grow_memory
-  then show ?thesis sorry
-qed
+proof - 
+  define cfg where "cfg = config_m_to_config h cfg_m"
+  obtain d s fc fcs where config:"config_m_to_config h cfg_m = Config d s fc fcs"
+    using config.exhaust by blast
+  obtain redex lcs nf f where frame:"fc = Frame_context redex lcs nf f" 
+    using frame_context.exhaust by blast
+  obtain v_s es b_es where redex:"redex = Redex v_s es b_es" 
+    using redex.exhaust by blast
 
+  obtain s_m fc_m fcs_m where config_m:"cfg_m = Config_m d s_m fc_m fcs_m"
+    using config unfolding config_m_to_config_def 
+    by (simp split: config_m.splits)
+  obtain f_locs1 f_inst2 where frame_m:"fc_m = Frame_context_m redex lcs nf f_locs1 f_inst2" 
+    using config frame unfolding config_m config_m_to_config_def 
+       frame_context_m_to_frame_context_def
+    by (simp split: config_m.splits frame_context_m.splits)
+
+  show ?thesis
+  proof(cases b_e)
+    case Current_memory
+    obtain v_s' res' where mem_size:"(v_s', res') = app_s_f_v_s_mem_size (s.mems s) f v_s"
+      by (metis surjective_pairing) 
+    have step_b_e:"run_step_b_e Current_memory (config_m_to_config h cfg_m) =
+        (Config d s (update_fc_step fc v_s' []) fcs, res') "
+      using config frame redex mem_size by (auto simp add: defs split: splits) 
+
+    have 1:"run_step_b_e_m Current_memory cfg_m = (do {
+        (v_s', res) \<leftarrow> (app_s_f_v_s_mem_size_m (s_m.mems s_m) f_inst2 v_s);
+        Heap_Monad.return (Config_m d s_m (update_fc_step_m fc_m v_s' []) fcs_m, res) }) "
+      using config_m frame_m redex by (auto simp add: defs split: splits) 
+
+    obtain v_s'_m where
+      mem_size_m:"execute (app_s_f_v_s_mem_size_m (s_m.mems s_m) f_inst2 v_s) h = Some ((v_s'_m, res), h')"
+      and cfg_m':"cfg_m' = Config_m d s_m (update_fc_step_m fc_m v_s'_m []) fcs_m" 
+      using assms unfolding Current_memory 1 execute_bind_case 
+      by(simp add:execute_simps split: option.splits prod.splits)
+
+    obtain v as where v_def:"(v, as) = vals_of_config_m h cfg_m"
+      by (metis surj_pair)  
+
+    have pre1:"(h, as) \<Turnstile> config_m_assn v cfg_m" using config_m_vals_sound_assn[OF v_def] by -
+
+    have pre2:"config_m_vals_agree v cfg" using config_m_vals_sound_agree[OF v_def] cfg_def by auto
+
+    have mem_size_triple1:"<config_m_assn v cfg_m * \<up>(config_m_vals_agree v cfg)> 
+          app_s_f_v_s_mem_size_m (s_m.mems s_m) f_inst2 v_s 
+          <\<lambda>r. \<up>(r = app_s_f_v_s_mem_size (s.mems s) f v_s) * true>"
+      apply(rule hoare_triple_preI) 
+      sorry
+
+    have mem_size_triple15:"<emp> app_s_f_v_s_mem_size_m (s_m.mems s_m) f_inst2 v_s <\<lambda>r. emp>"
+    proof - 
+      show ?thesis
+        unfolding app_s_f_v_s_mem_size_m_def
+        apply(rule bind_rule[OF nth_emp])
+        apply(rule bind_rule[OF nth_emp])
+        apply(rule bind_rule[OF len_emp])
+        by(rule Hoare_Triple.return_wp_rule)
+    qed
+
+    have mem_size_triple2:"<config_m_assn v cfg_m * \<up>(config_m_vals_agree v cfg)> 
+          app_s_f_v_s_mem_size_m (s_m.mems s_m) f_inst2 v_s 
+          <\<lambda>r. config_m_assn v cfg_m * \<up>(config_m_vals_agree v cfg)>"
+      using frame_rule[OF mem_size_triple15] by auto
+
+    have "(h', new_addrs h as h') \<Turnstile> \<up>((v_s'_m, res) = app_s_f_v_s_mem_size (s.mems s) f v_s) * true"
+      using hoare_triple_effect[OF mem_size_triple1] pre1 pre2 mem_size_m 
+      unfolding success_def effect_def
+      by force
+
+    then have "(v_s'_m, res) = app_s_f_v_s_mem_size (s.mems s) f v_s" by auto 
+    then have 2:"v_s' = v_s'_m \<and> res = res'" using mem_size prod.inject by metis
+
+    have "(h', new_addrs h as h') \<Turnstile> config_m_assn v cfg_m * \<up>(config_m_vals_agree v cfg)"
+      using hoare_triple_effect[OF mem_size_triple2] pre1 pre2 mem_size_m 
+      unfolding success_def effect_def
+      by force
+
+    then have 3:"cfg = config_m_to_config h' cfg_m" using config_m_preservation by auto
+
+    have 4:"fc = frame_context_m_to_frame_context h' fc_m" 
+      using 3 config config_m unfolding cfg_def config_m_to_config_def 
+      by (simp split: config_m.splits)
+
+    have "Config d s (update_fc_step fc v_s' []) fcs = config_m_to_config h' cfg_m'"
+    proof -
+      have "s = s_m_to_s h' s_m" using 3 config config_m unfolding cfg_def config_m_to_config_def 
+        by (simp split: config_m.splits)
+      moreover have "update_fc_step fc v_s' [] 
+        = frame_context_m_to_frame_context h' (update_fc_step_m fc_m v_s'_m [])" 
+        using 4 2 unfolding frame_context_m_to_frame_context_def 
+        by(simp split: frame_context.splits frame_context_m.splits)
+      moreover have "fcs = map (frame_context_m_to_frame_context h') fcs_m" 
+        using 3 config config_m unfolding cfg_def config_m_to_config_def 
+        by (simp split: config_m.splits, auto)
+      ultimately show ?thesis unfolding config_m_to_config_def cfg_m'
+        by(simp split: config_m.splits)
+    qed
+    moreover have "res' = res" using 2 by auto
+    ultimately show ?thesis using step_b_e Current_memory by auto
+  next
+    case (Call k)
+    show ?thesis using assms unfolding Call 
+      apply (auto simp add: defs split: splits) sorry
+  next
+    case (Call_indirect k)
+    show ?thesis using assms unfolding Call_indirect 
+      apply (auto simp add: defs split: splits) sorry
+  next
+    case (Get_local k)
+    then show ?thesis sorry
+  next
+    case (Set_local k)
+    then show ?thesis sorry
+  next
+    case (Get_global k)
+    then show ?thesis sorry
+  next
+    case (Set_global k)
+    then show ?thesis sorry
+  next
+    case (Load x191 x192 x193 x194)
+    then show ?thesis sorry
+  next
+    case (Store x201 x202 x203 x204)
+    then show ?thesis sorry
+  next
+    case Grow_memory
+    then show ?thesis sorry
+  next
+    case Unreachable show ?thesis using assms by (auto simp add: defs Unreachable split: splits)
+  next
+    case Nop show ?thesis using assms by (auto simp add: defs Nop split: splits)
+  next
+    case Drop show ?thesis using assms by (auto simp add: defs Drop split: splits)
+  next
+    case Select show ?thesis using assms by (auto simp add: defs Select split: splits)
+  next
+    case (Block tf b_ebs)
+    show ?thesis using assms unfolding Block by (auto simp add: defs Let_def split: splits tf.split)
+  next
+    case (Loop tf b_els)
+    show ?thesis using assms unfolding Loop by (auto simp add: defs Let_def split: splits tf.split)
+  next
+    case (If tf es1 es2) show ?thesis using assms by (auto simp add: defs If split: splits)
+  next
+    case (Br_if k) show ?thesis using assms by (auto simp add: defs Br_if split: splits)
+  next
+    case (Br_table ks k) show ?thesis using assms by (auto simp add: defs Br_table split: splits)
+  next
+    case (Tee_local k) show ?thesis using assms by (auto simp add: defs Tee_local split: splits)
+  next
+    case (EConst k) show ?thesis using assms by (auto simp add: defs EConst split: splits)
+  next
+    case (Unop t op) show ?thesis using assms by (auto simp add: defs Unop split: splits)
+  next
+    case (Binop t op) show ?thesis using assms by (auto simp add: defs Binop split: splits)
+  next
+    case (Testop t op) show ?thesis using assms by(auto simp add: defs Testop split: splits)
+  next
+    case (Relop t op) show ?thesis using assms by(auto simp add: defs Relop split: splits)
+  next
+    case (Cvtop t2 op t1 sx) show ?thesis using assms by (auto simp add: defs Cvtop split: splits)
+  next
+    case Return
+    (* why are those defined twice? *)
+    have 1:"\<And>r v. Wasm_Interpreter.update_redex_return r v 
+      = Wasm_Interpreter_Monad.update_redex_return r v"
+      by (metis Wasm_Interpreter.update_redex_return.elims 
+          Wasm_Interpreter_Monad.update_redex_return.simps)
+    show ?thesis using assms unfolding Return 
+      by (auto simp add: defs 1 split: splits frame_context_m.split list.split)
+  next
+    case (Br k)
+    show ?thesis using assms unfolding Br
+      by (auto simp add: defs Let_def split: splits label_context.splits if_splits) 
+
+  qed
+qed 
 lemma run_step_e_m_run_step_e:
   assumes "execute (run_step_e_m e cfg_m) h = Some ((cfg_m', res), h')"
   shows "run_step_e e (config_m_to_config h cfg_m) = ((config_m_to_config h' cfg_m'), res)"
