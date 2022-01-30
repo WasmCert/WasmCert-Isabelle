@@ -1,3 +1,102 @@
+module Uint32 : sig
+  val less : int32 -> int32 -> bool
+  val less_eq : int32 -> int32 -> bool
+  val set_bit : int32 -> Z.t -> bool -> int32
+  val shiftl : int32 -> Z.t -> int32
+  val shiftr : int32 -> Z.t -> int32
+  val shiftr_signed : int32 -> Z.t -> int32
+  val test_bit : int32 -> Z.t -> bool
+end = struct
+
+(* negative numbers have their highest bit set, 
+   so they are greater than positive ones *)
+let less x y =
+  if Int32.compare x Int32.zero < 0 then
+    Int32.compare y Int32.zero < 0 && Int32.compare x y < 0
+  else Int32.compare y Int32.zero < 0 || Int32.compare x y < 0;;
+
+let less_eq x y =
+  if Int32.compare x Int32.zero < 0 then
+    Int32.compare y Int32.zero < 0 && Int32.compare x y <= 0
+  else Int32.compare y Int32.zero < 0 || Int32.compare x y <= 0;;
+
+let set_bit x n b =
+  let mask = Int32.shift_left Int32.one (Z.to_int n)
+  in if b then Int32.logor x mask
+     else Int32.logand x (Int32.lognot mask);;
+
+let shiftl x n = Int32.shift_left x (Z.to_int n);;
+
+let shiftr x n = Int32.shift_right_logical x (Z.to_int n);;
+
+let shiftr_signed x n = Int32.shift_right x (Z.to_int n);;
+
+let test_bit x n =
+  Int32.compare 
+    (Int32.logand x (Int32.shift_left Int32.one (Z.to_int n)))
+    Int32.zero
+  <> 0;;
+
+end;; (*struct Uint32*)
+
+module Uint64 : sig
+  val less : int64 -> int64 -> bool
+  val less_eq : int64 -> int64 -> bool
+  val set_bit : int64 -> Z.t -> bool -> int64
+  val shiftl : int64 -> Z.t -> int64
+  val shiftr : int64 -> Z.t -> int64
+  val shiftr_signed : int64 -> Z.t -> int64
+  val test_bit : int64 -> Z.t -> bool
+end = struct
+
+(* negative numbers have their highest bit set, 
+   so they are greater than positive ones *)
+let less x y =
+  if Int64.compare x Int64.zero < 0 then
+    Int64.compare y Int64.zero < 0 && Int64.compare x y < 0
+  else Int64.compare y Int64.zero < 0 || Int64.compare x y < 0;;
+
+let less_eq x y =
+  if Int64.compare x Int64.zero < 0 then
+    Int64.compare y Int64.zero < 0 && Int64.compare x y <= 0
+  else Int64.compare y Int64.zero < 0 || Int64.compare x y <= 0;;
+
+let set_bit x n b =
+  let mask = Int64.shift_left Int64.one (Z.to_int n)
+  in if b then Int64.logor x mask
+     else Int64.logand x (Int64.lognot mask);;
+
+let shiftl x n = Int64.shift_left x (Z.to_int n);;
+
+let shiftr x n = Int64.shift_right_logical x (Z.to_int n);;
+
+let shiftr_signed x n = Int64.shift_right x (Z.to_int n);;
+
+let test_bit x n =
+  Int64.compare 
+    (Int64.logand x (Int64.shift_left Int64.one (Z.to_int n)))
+    Int64.zero
+  <> 0;;
+
+end;; (*struct Uint64*)
+
+module Bits_Integer : sig
+  val shiftl : Z.t -> Z.t -> Z.t
+  val shiftr : Z.t -> Z.t -> Z.t
+  val test_bit : Z.t -> Z.t -> bool
+end = struct
+
+(* We do not need an explicit range checks here,
+   because Big_int.int_of_big_int raises Failure
+   if the argument does not fit into an int. *)
+let shiftl x n = Z.shift_left x (Z.to_int n);;
+
+let shiftr x n = Z.shift_right x (Z.to_int n);;
+
+let test_bit x n =  Z.testbit x (Z.to_int n);;
+
+end;; (*struct Bits_Integer*)
+
 module WasmRef_Isa : sig
   type num = One | Bit0 of num | Bit1 of num
   val equal_num : num -> num -> bool
@@ -214,8 +313,13 @@ module WasmRef_Isa : sig
   val equal_nat : nat -> nat -> bool
   val zero_nat : nat
   val one_nata : nat
-  val power : 'a power -> 'a -> nat -> 'a
-  val eq : 'a equal -> 'a -> 'a -> bool
+  val inc : num -> num
+  val bit_int : int -> nat -> bool
+  type 'a semiring_bits =
+    {semiring_parity_semiring_bits : 'a semiring_parity;
+      bit : 'a -> nat -> bool}
+  val bit : 'a semiring_bits -> 'a -> nat -> bool
+  val semiring_bits_int : int semiring_bits
   type 'a semiring_no_zero_divisors_cancel =
     {semiring_no_zero_divisors_semiring_no_zero_divisors_cancel :
        'a semiring_no_zero_divisors}
@@ -223,23 +327,17 @@ module WasmRef_Isa : sig
     {divide_semidom_divide : 'a divide; semidom_semidom_divide : 'a semidom;
       semiring_no_zero_divisors_cancel_semidom_divide :
         'a semiring_no_zero_divisors_cancel}
+  val semiring_no_zero_divisors_cancel_int :
+    int semiring_no_zero_divisors_cancel
+  val semidom_divide_int : int semidom_divide
   type 'a algebraic_semidom =
     {semidom_divide_algebraic_semidom : 'a semidom_divide}
   type 'a semidom_modulo =
     {algebraic_semidom_semidom_modulo : 'a algebraic_semidom;
       semiring_modulo_semidom_modulo : 'a semiring_modulo}
-  val dvd : 'a equal * 'a semidom_modulo -> 'a -> 'a -> bool
-  val semiring_no_zero_divisors_cancel_int :
-    int semiring_no_zero_divisors_cancel
-  val semidom_divide_int : int semidom_divide
   val algebraic_semidom_int : int algebraic_semidom
   val semidom_modulo_int : int semidom_modulo
-  val bit_int : int -> nat -> bool
-  type 'a semiring_bits =
-    {semiring_parity_semiring_bits : 'a semiring_parity;
-      bit : 'a -> nat -> bool}
-  val bit : 'a semiring_bits -> 'a -> nat -> bool
-  val semiring_bits_int : int semiring_bits
+  val power : 'a power -> 'a -> nat -> 'a
   val take_bit_int : nat -> int -> int
   val push_bit_int : nat -> int -> int
   val drop_bit_int : nat -> int -> int
@@ -252,17 +350,18 @@ module WasmRef_Isa : sig
   val take_bit : 'a semiring_bit_shifts -> nat -> 'a -> 'a
   val semiring_bit_shifts : int semiring_bit_shifts
   val mask_int : nat -> int
-  type 'a set = Set of 'a list | Coset of 'a list
-  val bot_set : 'a set
-  val membera : 'a equal -> 'a list -> 'a -> bool
-  val member : 'a equal -> 'a -> 'a set -> bool
-  val removeAll : 'a equal -> 'a -> 'a list -> 'a list
-  val inserta : 'a equal -> 'a -> 'a list -> 'a list
-  val insert : 'a equal -> 'a -> 'a set -> 'a set
-  val and_int : int -> int -> int
+  val numeral : 'a numeral -> num -> 'a
+  val suba : 'a neg_numeral -> num -> num -> 'a
   val not_int : int -> int
-  val or_int : int -> int -> int
+  val map_option : ('a -> 'b) -> 'a option -> 'b option
+  val bitXOR_num : num -> num -> num option
   val xor_int : int -> int -> int
+  val bitANDN_num : num -> num -> num option
+  val bitOR_num : num -> num -> num
+  val bitORN_num : num -> num -> num
+  val bitAND_num : num -> num -> num option
+  val and_int : int -> int -> int
+  val or_int : int -> int -> int
   type 'a semiring_bit_operations =
     {semiring_bit_shifts_semiring_bit_operations : 'a semiring_bit_shifts;
       anda : 'a -> 'a -> 'a; ora : 'a -> 'a -> 'a; xor : 'a -> 'a -> 'a;
@@ -289,26 +388,17 @@ module WasmRef_Isa : sig
   val len_of : 'a len0 -> 'a itself -> nat
   type 'a len = {len0_len : 'a len0}
   type 'a word = Word of int
-  val the_int : 'a len -> 'a word -> int
-  val of_int : 'a len -> int -> 'a word
-  val times_worda : 'a len -> 'a word -> 'a word -> 'a word
-  val times_word : 'a len -> 'a word times
-  val dvd_word : 'a len -> 'a word dvd
   val one_worda : 'a len -> 'a word
   val one_word : 'a len -> 'a word one
+  val the_int : 'a len -> 'a word -> int
+  val of_int : 'a len -> int -> 'a word
   val plus_worda : 'a len -> 'a word -> 'a word -> 'a word
   val plus_word : 'a len -> 'a word plus
   val zero_worda : 'a len -> 'a word
   val zero_word : 'a len -> 'a word zero
+  val times_worda : 'a len -> 'a word -> 'a word -> 'a word
+  val times_word : 'a len -> 'a word times
   val semigroup_add_word : 'a len -> 'a word semigroup_add
-  val numeral_word : 'a len -> 'a word numeral
-  val power_word : 'a len -> 'a word power
-  val minus_worda : 'a len -> 'a word -> 'a word -> 'a word
-  val minus_word : 'a len -> 'a word minus
-  val divide_worda : 'a len -> 'a word -> 'a word -> 'a word
-  val divide_word : 'a len -> 'a word divide
-  val modulo_worda : 'a len -> 'a word -> 'a word -> 'a word
-  val modulo_word : 'a len -> 'a word modulo
   val ab_semigroup_add_word : 'a len -> 'a word ab_semigroup_add
   val semigroup_mult_word : 'a len -> 'a word semigroup_mult
   val semiring_word : 'a len -> 'a word semiring
@@ -316,38 +406,14 @@ module WasmRef_Isa : sig
   val monoid_add_word : 'a len -> 'a word monoid_add
   val comm_monoid_add_word : 'a len -> 'a word comm_monoid_add
   val semiring_0_word : 'a len -> 'a word semiring_0
-  val monoid_mult_word : 'a len -> 'a word monoid_mult
-  val semiring_numeral_word : 'a len -> 'a word semiring_numeral
   val zero_neq_one_word : 'a len -> 'a word zero_neq_one
-  val semiring_1_word : 'a len -> 'a word semiring_1
   val ab_semigroup_mult_word : 'a len -> 'a word ab_semigroup_mult
   val comm_semiring_word : 'a len -> 'a word comm_semiring
-  val drop_bit_word : 'a len -> nat -> 'a word -> 'a word
-  val and_word : 'a len -> 'a word -> 'a word -> 'a word
-  val equal_word : 'a len -> 'a word -> 'a word -> bool
-  val bit_word : 'a len -> 'a word -> nat -> bool
-  val cancel_semigroup_add_word : 'a len -> 'a word cancel_semigroup_add
-  val cancel_ab_semigroup_add_word : 'a len -> 'a word cancel_ab_semigroup_add
-  val cancel_comm_monoid_add_word : 'a len -> 'a word cancel_comm_monoid_add
-  val semiring_0_cancel_word : 'a len -> 'a word semiring_0_cancel
   val comm_semiring_0_word : 'a len -> 'a word comm_semiring_0
-  val comm_semiring_0_cancel_word : 'a len -> 'a word comm_semiring_0_cancel
-  val semiring_1_cancel_word : 'a len -> 'a word semiring_1_cancel
-  val comm_monoid_mult_word : 'a len -> 'a word comm_monoid_mult
-  val comm_semiring_1_word : 'a len -> 'a word comm_semiring_1
-  val comm_semiring_1_cancel_word : 'a len -> 'a word comm_semiring_1_cancel
-  val semiring_modulo_word : 'a len -> 'a word semiring_modulo
-  val semiring_parity_word : 'a len -> 'a word semiring_parity
-  val semiring_bits_word : 'a len -> 'a word semiring_bits
-  val take_bit_word : 'a len -> nat -> 'a word -> 'a word
-  val push_bit_word : 'a len -> nat -> 'a word -> 'a word
-  val semiring_bit_shifts_word : 'a len -> 'a word semiring_bit_shifts
-  type 'a semiring_bit_syntax =
-    {semiring_bit_shifts_semiring_bit_syntax : 'a semiring_bit_shifts}
-  val semiring_bit_syntax_word : 'a len -> 'a word semiring_bit_syntax
   type t = T_i32 | T_i64 | T_f32 | T_f64
   val equal_ta : t -> t -> bool
   val equal_t : t equal
+  val eq : 'a equal -> 'a -> 'a -> bool
   val equal_list : 'a equal -> 'a list -> 'a list -> bool
   type tf = Tf of t list * t list
   val equal_tfa : tf -> tf -> bool
@@ -388,36 +454,27 @@ module WasmRef_Isa : sig
   val zero_f64 : F64Wrapper.t zero
   val wasm_base_f64 : F64Wrapper.t wasm_base
   val wasm_float_f64 : F64Wrapper.t wasm_float
-  type num1 = One_num1
-  type 'a finite = unit
-  type 'a bit0 = Abs_bit0 of int
-  type i32 = Abs_i32 of num1 bit0 bit0 bit0 bit0 bit0 word
-  val apsnd : ('a -> 'b) -> 'c * 'a -> 'c * 'b
-  val divmod_integer : Z.t -> Z.t -> Z.t * Z.t
-  val int_of_integer : Z.t -> int
-  val int_of_nat : nat -> int
-  val of_nat : 'a len -> nat -> 'a word
-  val len_of_num1 : num1 itself -> nat
-  val len0_num1 : num1 len0
-  val len_num1 : num1 len
-  val nat_of_integer : Z.t -> nat
-  val len_of_bit0 : 'a len0 -> 'a bit0 itself -> nat
-  val len0_bit0 : 'a len0 -> 'a bit0 len0
-  val len_bit0 : 'a len -> 'a bit0 len
+  type i32 = I32_impl of int32
   val zero_i32a : i32
   val zero_i32 : i32 zero
+  val nat_of_integer : Z.t -> nat
   val len_of_i32 : i32 itself -> nat
   val len0_i32 : i32 len0
   val len_i32 : i32 len
-  val less_int : int -> int -> bool
-  val integer_of_int : int -> Z.t
-  val nat : int -> nat
-  val the_nat : 'a len -> 'a word -> nat
+  val bit_uint32 : int32 -> nat -> bool
+  val bit_integer : Z.t -> nat -> bool
+  val uint32 : Z.t -> int32
+  val integer_of_uint32 : int32 -> Z.t
+  val nat_of_uint32 : int32 -> nat
   val nat_of_int_i32 : i32 -> nat
   val plus_nat : nat -> nat -> nat
   val suc : nat -> nat
   val gen_length : nat -> 'a list -> nat
   val size_list : 'a list -> nat
+  val drop_bit_word : 'a len -> nat -> 'a word -> 'a word
+  val and_word : 'a len -> 'a word -> 'a word -> 'a word
+  val equal_word : 'a len -> 'a word -> 'a word -> bool
+  val bit_word : 'a len -> 'a word -> nat -> bool
   val map : ('a -> 'b) -> 'a list -> 'b list
   val upt : nat -> nat -> nat list
   val fold : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
@@ -426,38 +483,106 @@ module WasmRef_Isa : sig
   val filter : ('a -> bool) -> 'a list -> 'a list
   val id : 'a -> 'a
   val pop_count : 'a len -> 'a word -> nat
+  val comp : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
+  val foldr : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
+  val horner_sum : 'b comm_semiring_0 -> ('a -> 'b) -> 'b -> 'a list -> 'b
+  val set_bits_word : 'a len -> (nat -> bool) -> 'a word
+  type num1 = One_num1
+  type 'a finite = unit
+  type 'a bit0 = Abs_bit0 of int
+  val len_of_num1 : num1 itself -> nat
+  val len0_num1 : num1 len0
+  val len_num1 : num1 len
+  val len_of_bit0 : 'a len0 -> 'a bit0 itself -> nat
+  val len0_bit0 : 'a len0 -> 'a bit0 len0
+  val len_bit0 : 'a len -> 'a bit0 len
+  val rep_uint32 : int32 -> num1 bit0 bit0 bit0 bit0 bit0 word
+  val less_int : int -> int -> bool
+  val integer_of_int : int -> Z.t
+  val abs_uint32 : num1 bit0 bit0 bit0 bit0 bit0 word -> int32
+  val apsnd : ('a -> 'b) -> 'c * 'a -> 'c * 'b
+  val divmod_integer : Z.t -> Z.t -> Z.t * Z.t
+  val int_of_integer : Z.t -> int
+  val int_of_nat : nat -> int
+  val of_nat : 'a len -> nat -> 'a word
   val int_popcnt_i32 : i32 -> i32
+  val uint32_of_int : int -> int32
+  val uint32_of_nat : nat -> int32
   val int_of_nat_i32 : nat -> i32
-  val shiftr : 'a semiring_bit_syntax -> 'a -> nat -> 'a
-  val and_nat : nat -> nat -> nat
+  val modulo_integer : Z.t -> Z.t -> Z.t
   val int_shr_u_i32 : i32 -> i32 -> i32
+  val int_shr_s_i32 : i32 -> i32 -> i32
+  type 'a semiring_bit_syntax =
+    {semiring_bit_shifts_semiring_bit_syntax : 'a semiring_bit_shifts}
+  val shiftl : 'a semiring_bit_syntax -> 'a -> nat -> 'a
+  val drop_bit_uint32 : nat -> int32 -> int32
+  val mod0_uint32 : int32 -> int32
+  val div0_uint32 : int32 -> int32
+  val push_bit_uint32 : nat -> int32 -> int32
+  val mask_uint32 : nat -> int32
+  val take_bit_uint32 : nat -> int32 -> int32
+  val plus_uint32 : int32 plus
+  val semigroup_add_uint32 : int32 semigroup_add
+  val cancel_semigroup_add_uint32 : int32 cancel_semigroup_add
+  val ab_semigroup_add_uint32 : int32 ab_semigroup_add
+  val minus_uint32 : int32 minus
+  val cancel_ab_semigroup_add_uint32 : int32 cancel_ab_semigroup_add
+  val zero_uint32 : int32 zero
+  val monoid_add_uint32 : int32 monoid_add
+  val comm_monoid_add_uint32 : int32 comm_monoid_add
+  val cancel_comm_monoid_add_uint32 : int32 cancel_comm_monoid_add
+  val times_uint32 : int32 times
+  val mult_zero_uint32 : int32 mult_zero
+  val semigroup_mult_uint32 : int32 semigroup_mult
+  val semiring_uint32 : int32 semiring
+  val semiring_0_uint32 : int32 semiring_0
+  val semiring_0_cancel_uint32 : int32 semiring_0_cancel
+  val ab_semigroup_mult_uint32 : int32 ab_semigroup_mult
+  val comm_semiring_uint32 : int32 comm_semiring
+  val comm_semiring_0_uint32 : int32 comm_semiring_0
+  val comm_semiring_0_cancel_uint32 : int32 comm_semiring_0_cancel
+  val one_uint32 : int32 one
+  val power_uint32 : int32 power
+  val monoid_mult_uint32 : int32 monoid_mult
+  val numeral_uint32 : int32 numeral
+  val semiring_numeral_uint32 : int32 semiring_numeral
+  val zero_neq_one_uint32 : int32 zero_neq_one
+  val semiring_1_uint32 : int32 semiring_1
+  val semiring_1_cancel_uint32 : int32 semiring_1_cancel
+  val dvd_uint32 : int32 dvd
+  val comm_monoid_mult_uint32 : int32 comm_monoid_mult
+  val comm_semiring_1_uint32 : int32 comm_semiring_1
+  val comm_semiring_1_cancel_uint32 : int32 comm_semiring_1_cancel
+  val uint32_mod : int32 -> int32 -> int32
+  val modulo_uint32a : int32 -> int32 -> int32
+  val semiring_bit_syntax_uint32 : int32 semiring_bit_syntax
+  val uint32_divmod : int32 -> int32 -> int32 * int32
+  val uint32_div : int32 -> int32 -> int32
+  val divide_uint32a : int32 -> int32 -> int32
+  val divide_uint32 : int32 divide
+  val modulo_uint32 : int32 modulo
+  val semiring_modulo_uint32 : int32 semiring_modulo
+  val semiring_parity_uint32 : int32 semiring_parity
+  val semiring_bits_uint32 : int32 semiring_bits
+  val semiring_bit_shifts_uint32 : int32 semiring_bit_shifts
+  val int_rem_u_i32 : i32 -> i32 -> i32 option
+  val abs_int : int -> int
   val signed_take_bit : 'a ring_bit_operations -> nat -> 'a -> 'a
   val the_signed_int : 'a len -> 'a word -> int
-  val signed_drop_bit : 'a len -> nat -> 'a word -> 'a word
-  val sshiftr : 'a len -> 'a word -> nat -> 'a word
-  val int_shr_s_i32 : i32 -> i32 -> i32
-  val int_rem_u_i32 : i32 -> i32 -> i32 option
-  val sgn_int : int -> int
-  val abs_int : int -> int
-  val signed_divide_int : int -> int -> int
-  val signed_modulo_int : int -> int -> int
   val signed_modulo_word : 'a len -> 'a word -> 'a word -> 'a word
   val int_rem_s_i32 : i32 -> i32 -> i32 option
   val int_div_u_i32 : i32 -> i32 -> i32 option
-  val signed_divide_word : 'a len -> 'a word -> 'a word -> 'a word
   val int_div_s_i32 : i32 -> i32 -> i32 option
-  val modulo_integer : Z.t -> Z.t -> Z.t
+  val take_bit_word : 'a len -> nat -> 'a word -> 'a word
   val modulo_nat : nat -> nat -> nat
   val concat_bit : nat -> int -> int -> int
   val word_rotr : 'a len -> nat -> 'a word -> 'a word
   val int_rotr_i32 : i32 -> i32 -> i32
   val word_rotl : 'a len -> nat -> 'a word -> 'a word
   val int_rotl_i32 : i32 -> i32 -> i32
-  val less_word : 'a len -> 'a word -> 'a word -> bool
   val int_lt_u_i32 : i32 -> i32 -> bool
   val word_sless : 'a len -> 'a word -> 'a word -> bool
   val int_lt_s_i32 : i32 -> i32 -> bool
-  val less_eq_word : 'a len -> 'a word -> 'a word -> bool
   val int_le_u_i32 : i32 -> i32 -> bool
   val word_sle : 'a len -> 'a word -> 'a word -> bool
   val int_le_s_i32 : i32 -> i32 -> bool
@@ -465,10 +590,8 @@ module WasmRef_Isa : sig
   val int_gt_s_i32 : i32 -> i32 -> bool
   val int_ge_u_i32 : i32 -> i32 -> bool
   val int_ge_s_i32 : i32 -> i32 -> bool
-  val xor_word : 'a len -> 'a word -> 'a word -> 'a word
   val int_xor_i32 : i32 -> i32 -> i32
   val int_sub_i32 : i32 -> i32 -> i32
-  val shiftl : 'a semiring_bit_syntax -> 'a -> nat -> 'a
   val int_shl_i32 : i32 -> i32 -> i32
   val int_mul_i32 : i32 -> i32 -> i32
   val int_eqz_i32 : i32 -> bool
@@ -479,7 +602,6 @@ module WasmRef_Isa : sig
   val int_clz_i32 : i32 -> i32
   val int_and_i32 : i32 -> i32 -> i32
   val int_add_i32 : i32 -> i32 -> i32
-  val or_word : 'a len -> 'a word -> 'a word -> 'a word
   val int_or_i32 : i32 -> i32 -> i32
   val int_eq_i32 : i32 -> i32 -> bool
   type 'a wasm_int_ops =
@@ -533,19 +655,34 @@ module WasmRef_Isa : sig
   val wasm_base_i32 : i32 wasm_base
   val wasm_int_ops_i32 : i32 wasm_int_ops
   val wasm_int_i32 : i32 wasm_int
-  type i64 = Abs_i64 of num1 bit0 bit0 bit0 bit0 bit0 bit0 word
+  type i64 = I64_impl of int64
   val zero_i64a : i64
   val zero_i64 : i64 zero
   val len_of_i64 : i64 itself -> nat
   val len0_i64 : i64 len0
   val len_i64 : i64 len
+  val bit_uint64 : int64 -> nat -> bool
+  val uint64 : Z.t -> int64
+  val integer_of_uint64 : int64 -> Z.t
+  val nat_of_uint64 : int64 -> nat
   val nat_of_int_i64 : i64 -> nat
+  val rep_uint64 : int64 -> num1 bit0 bit0 bit0 bit0 bit0 bit0 word
+  val abs_uint64 : num1 bit0 bit0 bit0 bit0 bit0 bit0 word -> int64
   val int_popcnt_i64 : i64 -> i64
+  val uint64_of_int : int -> int64
+  val uint64_of_nat : nat -> int64
   val int_of_nat_i64 : nat -> i64
   val int_shr_u_i64 : i64 -> i64 -> i64
   val int_shr_s_i64 : i64 -> i64 -> i64
+  val push_bit_uint64 : nat -> int64 -> int64
+  val drop_bit_uint64 : nat -> int64 -> int64
+  val mod0_uint64 : int64 -> int64
+  val div0_uint64 : int64 -> int64
+  val uint64_divmod : int64 -> int64 -> int64 * int64
+  val uint64_mod : int64 -> int64 -> int64
   val int_rem_u_i64 : i64 -> i64 -> i64 option
   val int_rem_s_i64 : i64 -> i64 -> i64 option
+  val uint64_div : int64 -> int64 -> int64
   val int_div_u_i64 : i64 -> i64 -> i64 option
   val int_div_s_i64 : i64 -> i64 -> i64 option
   val int_rotr_i64 : i64 -> i64 -> i64
@@ -662,7 +799,7 @@ module WasmRef_Isa : sig
     T_context_ext of
       tf list * tf list * unit tg_ext list * unit limit_t_ext list *
         unit limit_t_ext list * t list * (t list) list * (t list) option * 'a
-  val comp : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
+  val nat : int -> nat
   val nth : 'a list -> nat -> 'a
   val zip : 'a list -> 'b list -> ('a * 'b) list
   val drop : nat -> 'a list -> 'a list
@@ -672,9 +809,9 @@ module WasmRef_Isa : sig
   val take : nat -> 'a list -> 'a list
   val cast : 'b len -> 'a len -> 'b word -> 'a word
   val foldl : ('a -> 'b -> 'a) -> 'a -> 'b list -> 'a
-  val foldr : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
-  val map_option : ('a -> 'b) -> 'a option -> 'b option
   val those : ('a option) list -> ('a list) option
+  val member : 'a equal -> 'a list -> 'a -> bool
+  val the_nat : 'a len -> 'a word -> nat
   val distinct : 'a equal -> 'a list -> bool
   val ki64 : nat
   val replicate_tr : nat -> 'a -> 'a list -> 'a list
@@ -684,7 +821,7 @@ module WasmRef_Isa : sig
   val apply : ('a -> 'b pred) -> 'a seq -> 'b seq
   val map_filter : ('a -> 'b option) -> 'a list -> 'b list
   val eval : 'a equal -> 'a pred -> 'a -> bool
-  val memberb : 'a equal -> 'a seq -> 'a -> bool
+  val membera : 'a equal -> 'a seq -> 'a -> bool
   val holds : unit pred -> bool
   val divide_integer : Z.t -> Z.t -> Z.t
   val divide_nat : nat -> nat -> nat
@@ -725,6 +862,7 @@ module WasmRef_Isa : sig
   val f_locs : 'a f_ext -> v list
   val msb_word : 'a len -> 'a word -> bool
   val msb_byte : byte -> bool
+  val dvd : 'a equal * 'a semidom_modulo -> 'a -> 'a -> bool
   val bin_split : nat -> int -> int * int
   val list_all : ('a -> bool) -> 'a list -> bool
   val memsa : 'a inst_ext -> nat list
@@ -888,7 +1026,6 @@ module WasmRef_Isa : sig
              (mem_rep * nat option) list ->
                unit f_ext ->
                  v list -> (mem_rep * nat option) list * (v list * res_step)
-  val horner_sum : 'b comm_semiring_0 -> ('a -> 'b) -> 'b -> 'a list -> 'b
   val word_rcat_rev : 'a len -> 'b len -> 'a word list -> 'b word
   val deserialise_i64_aux : num1 bit0 bit0 bit0 word list -> i64
   val deserialise_i64 : byte list -> i64
@@ -1649,11 +1786,35 @@ let zero_nat : nat = Nat Z.zero;;
 
 let one_nata : nat = Nat (Z.of_int 1);;
 
-let rec power _A
-  a n = (if equal_nat n zero_nat then one _A.one_power
-          else times _A.times_power a (power _A a (minus_nat n one_nata)));;
+let rec inc = function One -> Bit0 One
+              | Bit0 x -> Bit1 x
+              | Bit1 x -> Bit0 (inc x);;
 
-let rec eq _A a b = equal _A a b;;
+let rec bit_int
+  x0 n = match x0, n with Nega One, n -> true
+    | Zero_int, n -> false
+    | Nega (Bit1 m), n ->
+        (if equal_nat n zero_nat then true
+          else bit_int (Nega (inc m)) (minus_nat n one_nata))
+    | Nega (Bit0 m), n ->
+        (if equal_nat n zero_nat then false
+          else bit_int (Nega m) (minus_nat n one_nata))
+    | Pos (Bit1 m), n ->
+        (if equal_nat n zero_nat then true
+          else bit_int (Pos m) (minus_nat n one_nata))
+    | Pos (Bit0 m), n ->
+        (if equal_nat n zero_nat then false
+          else bit_int (Pos m) (minus_nat n one_nata))
+    | Pos One, n -> (if equal_nat n zero_nat then true else false);;
+
+type 'a semiring_bits =
+  {semiring_parity_semiring_bits : 'a semiring_parity;
+    bit : 'a -> nat -> bool};;
+let bit _A = _A.bit;;
+
+let semiring_bits_int =
+  ({semiring_parity_semiring_bits = semiring_parity_int; bit = bit_int} :
+    int semiring_bits);;
 
 type 'a semiring_no_zero_divisors_cancel =
   {semiring_no_zero_divisors_semiring_no_zero_divisors_cancel :
@@ -1663,18 +1824,6 @@ type 'a semidom_divide =
   {divide_semidom_divide : 'a divide; semidom_semidom_divide : 'a semidom;
     semiring_no_zero_divisors_cancel_semidom_divide :
       'a semiring_no_zero_divisors_cancel};;
-
-type 'a algebraic_semidom =
-  {semidom_divide_algebraic_semidom : 'a semidom_divide};;
-
-type 'a semidom_modulo =
-  {algebraic_semidom_semidom_modulo : 'a algebraic_semidom;
-    semiring_modulo_semidom_modulo : 'a semiring_modulo};;
-
-let rec dvd (_A1, _A2)
-  a b = eq _A1
-          (modulo _A2.semiring_modulo_semidom_modulo.modulo_semiring_modulo b a)
-          (zero _A2.algebraic_semidom_semidom_modulo.semidom_divide_algebraic_semidom.semidom_semidom_divide.comm_semiring_1_cancel_semidom.comm_semiring_1_comm_semiring_1_cancel.semiring_1_comm_semiring_1.semiring_0_semiring_1.mult_zero_semiring_0.zero_mult_zero);;
 
 let semiring_no_zero_divisors_cancel_int =
   ({semiring_no_zero_divisors_semiring_no_zero_divisors_cancel =
@@ -1687,6 +1836,13 @@ let semidom_divide_int =
        semiring_no_zero_divisors_cancel_int}
     : int semidom_divide);;
 
+type 'a algebraic_semidom =
+  {semidom_divide_algebraic_semidom : 'a semidom_divide};;
+
+type 'a semidom_modulo =
+  {algebraic_semidom_semidom_modulo : 'a algebraic_semidom;
+    semiring_modulo_semidom_modulo : 'a semiring_modulo};;
+
 let algebraic_semidom_int =
   ({semidom_divide_algebraic_semidom = semidom_divide_int} :
     int algebraic_semidom);;
@@ -1696,24 +1852,34 @@ let semidom_modulo_int =
      semiring_modulo_semidom_modulo = semiring_modulo_int}
     : int semidom_modulo);;
 
-let rec bit_int
-  k n = not (dvd (equal_int, semidom_modulo_int) (Pos (Bit0 One))
-              (divide_inta k (power power_int (Pos (Bit0 One)) n)));;
-
-type 'a semiring_bits =
-  {semiring_parity_semiring_bits : 'a semiring_parity;
-    bit : 'a -> nat -> bool};;
-let bit _A = _A.bit;;
-
-let semiring_bits_int =
-  ({semiring_parity_semiring_bits = semiring_parity_int; bit = bit_int} :
-    int semiring_bits);;
+let rec power _A
+  a n = (if equal_nat n zero_nat then one _A.one_power
+          else times _A.times_power a (power _A a (minus_nat n one_nata)));;
 
 let rec take_bit_int n k = modulo_inta k (power power_int (Pos (Bit0 One)) n);;
 
-let rec push_bit_int n k = times_inta k (power power_int (Pos (Bit0 One)) n);;
+let rec push_bit_int
+  n i = (if equal_nat n zero_nat then i
+          else push_bit_int (minus_nat n one_nata) (dup i));;
 
-let rec drop_bit_int n k = divide_inta k (power power_int (Pos (Bit0 One)) n);;
+let rec drop_bit_int
+  n x1 = match n, x1 with
+    n, Nega (Bit1 m) ->
+      (if equal_nat n zero_nat then Nega (Bit1 m)
+        else drop_bit_int (minus_nat n one_nata) (Nega (inc m)))
+    | n, Nega (Bit0 m) ->
+        (if equal_nat n zero_nat then Nega (Bit0 m)
+          else drop_bit_int (minus_nat n one_nata) (Nega m))
+    | n, Nega One ->
+        (if equal_nat n zero_nat then Nega One else uminus_inta one_inta)
+    | n, Pos (Bit1 m) ->
+        (if equal_nat n zero_nat then Pos (Bit1 m)
+          else drop_bit_int (minus_nat n one_nata) (Pos m))
+    | n, Pos (Bit0 m) ->
+        (if equal_nat n zero_nat then Pos (Bit0 m)
+          else drop_bit_int (minus_nat n one_nata) (Pos m))
+    | n, Pos One -> (if equal_nat n zero_nat then Pos One else Zero_int)
+    | n, Zero_int -> Zero_int;;
 
 type 'a semiring_bit_shifts =
   {semiring_bits_semiring_bit_shifts : 'a semiring_bits;
@@ -1730,56 +1896,137 @@ let semiring_bit_shifts =
 
 let rec mask_int n = minus_inta (power power_int (Pos (Bit0 One)) n) one_inta;;
 
-type 'a set = Set of 'a list | Coset of 'a list;;
+let rec numeral _A
+  = function
+    Bit1 n ->
+      (let m = numeral _A n in
+        plus _A.semigroup_add_numeral.plus_semigroup_add
+          (plus _A.semigroup_add_numeral.plus_semigroup_add m m)
+          (one _A.one_numeral))
+    | Bit0 n ->
+        (let m = numeral _A n in
+          plus _A.semigroup_add_numeral.plus_semigroup_add m m)
+    | One -> one _A.one_numeral;;
 
-let bot_set : 'a set = Set [];;
+let rec suba _A
+  k l = minus _A.group_add_neg_numeral.minus_group_add
+          (numeral _A.numeral_neg_numeral k)
+          (numeral _A.numeral_neg_numeral l);;
 
-let rec membera _A x0 y = match x0, y with [], y -> false
-                     | x :: xs, y -> eq _A x y || membera _A xs y;;
+let rec not_int = function Nega n -> suba neg_numeral_int n One
+                  | Pos n -> Nega (inc n)
+                  | Zero_int -> uminus_inta one_inta;;
 
-let rec member _A
-  x xa1 = match x, xa1 with x, Coset xs -> not (membera _A xs x)
-    | x, Set xs -> membera _A xs x;;
+let rec map_option f x1 = match f, x1 with f, None -> None
+                     | f, Some x2 -> Some (f x2);;
 
-let rec removeAll _A
-  x xa1 = match x, xa1 with x, [] -> []
-    | x, y :: xs ->
-        (if eq _A x y then removeAll _A x xs else y :: removeAll _A x xs);;
+let rec bitXOR_num
+  x0 x1 = match x0, x1 with One, One -> None
+    | One, Bit0 n -> Some (Bit1 n)
+    | One, Bit1 n -> Some (Bit0 n)
+    | Bit0 m, One -> Some (Bit1 m)
+    | Bit0 m, Bit0 n -> map_option (fun a -> Bit0 a) (bitXOR_num m n)
+    | Bit0 m, Bit1 n ->
+        Some (match bitXOR_num m n with None -> One | Some a -> Bit1 a)
+    | Bit1 m, One -> Some (Bit0 m)
+    | Bit1 m, Bit0 n ->
+        Some (match bitXOR_num m n with None -> One | Some a -> Bit1 a)
+    | Bit1 m, Bit1 n -> map_option (fun a -> Bit0 a) (bitXOR_num m n);;
 
-let rec inserta _A x xs = (if membera _A xs x then xs else x :: xs);;
+let rec xor_int
+  i j = match i, j with
+    Pos n, Nega m -> not_int (xor_int (Pos n) (suba neg_numeral_int m One))
+    | Nega n, Pos m -> not_int (xor_int (suba neg_numeral_int n One) (Pos m))
+    | Nega n, Nega m ->
+        xor_int (suba neg_numeral_int n One) (suba neg_numeral_int m One)
+    | Pos n, Pos m ->
+        (match bitXOR_num n m with None -> Zero_int | Some a -> Pos a)
+    | i, Zero_int -> i
+    | Zero_int, j -> j;;
 
-let rec insert _A
-  x xa1 = match x, xa1 with x, Coset xs -> Coset (removeAll _A x xs)
-    | x, Set xs -> Set (inserta _A x xs);;
+let rec bitANDN_num
+  x0 x1 = match x0, x1 with One, One -> None
+    | One, Bit0 n -> Some One
+    | One, Bit1 n -> None
+    | Bit0 m, One -> Some (Bit0 m)
+    | Bit0 m, Bit0 n -> map_option (fun a -> Bit0 a) (bitANDN_num m n)
+    | Bit0 m, Bit1 n -> map_option (fun a -> Bit0 a) (bitANDN_num m n)
+    | Bit1 m, One -> Some (Bit0 m)
+    | Bit1 m, Bit0 n ->
+        (match bitANDN_num m n with None -> Some One
+          | Some na -> Some (Bit1 na))
+    | Bit1 m, Bit1 n -> map_option (fun a -> Bit0 a) (bitANDN_num m n);;
+
+let rec bitOR_num x0 x1 = match x0, x1 with One, One -> One
+                    | One, Bit0 n -> Bit1 n
+                    | One, Bit1 n -> Bit1 n
+                    | Bit0 m, One -> Bit1 m
+                    | Bit0 m, Bit0 n -> Bit0 (bitOR_num m n)
+                    | Bit0 m, Bit1 n -> Bit1 (bitOR_num m n)
+                    | Bit1 m, One -> Bit1 m
+                    | Bit1 m, Bit0 n -> Bit1 (bitOR_num m n)
+                    | Bit1 m, Bit1 n -> Bit1 (bitOR_num m n);;
+
+let rec bitORN_num x0 x1 = match x0, x1 with One, One -> One
+                     | One, Bit0 m -> Bit1 m
+                     | One, Bit1 m -> Bit1 m
+                     | Bit0 n, One -> Bit0 One
+                     | Bit0 n, Bit0 m -> bitM (bitORN_num n m)
+                     | Bit0 n, Bit1 m -> Bit0 (bitORN_num n m)
+                     | Bit1 n, One -> One
+                     | Bit1 n, Bit0 m -> bitM (bitORN_num n m)
+                     | Bit1 n, Bit1 m -> bitM (bitORN_num n m);;
+
+let rec bitAND_num
+  x0 x1 = match x0, x1 with One, One -> Some One
+    | One, Bit0 n -> None
+    | One, Bit1 n -> Some One
+    | Bit0 m, One -> None
+    | Bit0 m, Bit0 n -> map_option (fun a -> Bit0 a) (bitAND_num m n)
+    | Bit0 m, Bit1 n -> map_option (fun a -> Bit0 a) (bitAND_num m n)
+    | Bit1 m, One -> Some One
+    | Bit1 m, Bit0 n -> map_option (fun a -> Bit0 a) (bitAND_num m n)
+    | Bit1 m, Bit1 n ->
+        (match bitAND_num m n with None -> Some One
+          | Some na -> Some (Bit1 na));;
 
 let rec and_int
-  k l = (if member equal_int k
-              (insert equal_int Zero_int
-                (insert equal_int (uminus_inta one_inta) bot_set)) &&
-              member equal_int l
-                (insert equal_int Zero_int
-                  (insert equal_int (uminus_inta one_inta) bot_set))
-          then uminus_inta
-                 (of_bool zero_neq_one_int
-                   (not (dvd (equal_int, semidom_modulo_int) (Pos (Bit0 One))
-                          k) &&
-                     not (dvd (equal_int, semidom_modulo_int) (Pos (Bit0 One))
-                           l)))
-          else plus_inta
-                 (of_bool zero_neq_one_int
-                   (not (dvd (equal_int, semidom_modulo_int) (Pos (Bit0 One))
-                          k) &&
-                     not (dvd (equal_int, semidom_modulo_int) (Pos (Bit0 One))
-                           l)))
-                 (times_inta (Pos (Bit0 One))
-                   (and_int (divide_inta k (Pos (Bit0 One)))
-                     (divide_inta l (Pos (Bit0 One))))));;
-
-let rec not_int k = minus_inta (uminus_inta k) one_inta;;
-
-let rec or_int k l = not_int (and_int (not_int k) (not_int l));;
-
-let rec xor_int k l = or_int (and_int k (not_int l)) (and_int (not_int k) l);;
+  i j = match i, j with
+    Nega (Bit1 n), Pos m -> suba neg_numeral_int (bitORN_num (Bit0 n) m) One
+    | Nega (Bit0 n), Pos m -> suba neg_numeral_int (bitORN_num (bitM n) m) One
+    | Nega One, Pos m -> Pos m
+    | Pos n, Nega (Bit1 m) -> suba neg_numeral_int (bitORN_num (Bit0 m) n) One
+    | Pos n, Nega (Bit0 m) -> suba neg_numeral_int (bitORN_num (bitM m) n) One
+    | Pos n, Nega One -> Pos n
+    | Nega n, Nega m ->
+        not_int
+          (or_int (suba neg_numeral_int n One) (suba neg_numeral_int m One))
+    | Pos n, Pos m ->
+        (match bitAND_num n m with None -> Zero_int | Some a -> Pos a)
+    | i, Zero_int -> Zero_int
+    | Zero_int, j -> Zero_int
+and or_int
+  i j = match i, j with
+    Nega (Bit1 n), Pos m ->
+      (match bitANDN_num (Bit0 n) m with None -> uminus_inta one_inta
+        | Some na -> Nega (inc na))
+    | Nega (Bit0 n), Pos m ->
+        (match bitANDN_num (bitM n) m with None -> uminus_inta one_inta
+          | Some na -> Nega (inc na))
+    | Nega One, Pos m -> Nega One
+    | Pos n, Nega (Bit1 m) ->
+        (match bitANDN_num (Bit0 m) n with None -> uminus_inta one_inta
+          | Some na -> Nega (inc na))
+    | Pos n, Nega (Bit0 m) ->
+        (match bitANDN_num (bitM m) n with None -> uminus_inta one_inta
+          | Some na -> Nega (inc na))
+    | Pos n, Nega One -> Nega One
+    | Nega n, Nega m ->
+        not_int
+          (and_int (suba neg_numeral_int n One) (suba neg_numeral_int m One))
+    | Pos n, Pos m -> Pos (bitOR_num n m)
+    | i, Zero_int -> i
+    | Zero_int, j -> j;;
 
 type 'a semiring_bit_operations =
   {semiring_bit_shifts_semiring_bit_operations : 'a semiring_bit_shifts;
@@ -1828,20 +2075,13 @@ type 'a len = {len0_len : 'a len0};;
 
 type 'a word = Word of int;;
 
-let rec the_int _A (Word x) = x;;
-
-let rec of_int _A k = Word (take_bit_int (len_of _A.len0_len Type) k);;
-
-let rec times_worda _A
-  a b = of_int _A (times_inta (the_int _A a) (the_int _A b));;
-
-let rec times_word _A = ({times = times_worda _A} : 'a word times);;
-
-let rec dvd_word _A = ({times_dvd = (times_word _A)} : 'a word dvd);;
-
 let rec one_worda _A = Word one_inta;;
 
 let rec one_word _A = ({one = one_worda _A} : 'a word one);;
+
+let rec the_int _A (Word x) = x;;
+
+let rec of_int _A k = Word (take_bit_int (len_of _A.len0_len Type) k);;
 
 let rec plus_worda _A
   a b = of_int _A (plus_inta (the_int _A a) (the_int _A b));;
@@ -1852,34 +2092,13 @@ let rec zero_worda _A = Word Zero_int;;
 
 let rec zero_word _A = ({zero = zero_worda _A} : 'a word zero);;
 
+let rec times_worda _A
+  a b = of_int _A (times_inta (the_int _A a) (the_int _A b));;
+
+let rec times_word _A = ({times = times_worda _A} : 'a word times);;
+
 let rec semigroup_add_word _A =
   ({plus_semigroup_add = (plus_word _A)} : 'a word semigroup_add);;
-
-let rec numeral_word _A =
-  ({one_numeral = (one_word _A);
-     semigroup_add_numeral = (semigroup_add_word _A)}
-    : 'a word numeral);;
-
-let rec power_word _A =
-  ({one_power = (one_word _A); times_power = (times_word _A)} : 'a word power);;
-
-let rec minus_worda _A
-  a b = of_int _A (minus_inta (the_int _A a) (the_int _A b));;
-
-let rec minus_word _A = ({minus = minus_worda _A} : 'a word minus);;
-
-let rec divide_worda _A
-  a b = of_int _A (divide_inta (the_int _A a) (the_int _A b));;
-
-let rec divide_word _A = ({divide = divide_worda _A} : 'a word divide);;
-
-let rec modulo_worda _A
-  a b = of_int _A (modulo_inta (the_int _A a) (the_int _A b));;
-
-let rec modulo_word _A =
-  ({divide_modulo = (divide_word _A); dvd_modulo = (dvd_word _A);
-     modulo = modulo_worda _A}
-    : 'a word modulo);;
 
 let rec ab_semigroup_add_word _A =
   ({semigroup_add_ab_semigroup_add = (semigroup_add_word _A)} :
@@ -1913,26 +2132,9 @@ let rec semiring_0_word _A =
      semiring_semiring_0 = (semiring_word _A)}
     : 'a word semiring_0);;
 
-let rec monoid_mult_word _A =
-  ({semigroup_mult_monoid_mult = (semigroup_mult_word _A);
-     power_monoid_mult = (power_word _A)}
-    : 'a word monoid_mult);;
-
-let rec semiring_numeral_word _A =
-  ({monoid_mult_semiring_numeral = (monoid_mult_word _A);
-     numeral_semiring_numeral = (numeral_word _A);
-     semiring_semiring_numeral = (semiring_word _A)}
-    : 'a word semiring_numeral);;
-
 let rec zero_neq_one_word _A =
   ({one_zero_neq_one = (one_word _A); zero_zero_neq_one = (zero_word _A)} :
     'a word zero_neq_one);;
-
-let rec semiring_1_word _A =
-  ({semiring_numeral_semiring_1 = (semiring_numeral_word _A);
-     semiring_0_semiring_1 = (semiring_0_word _A);
-     zero_neq_one_semiring_1 = (zero_neq_one_word _A)}
-    : 'a word semiring_1);;
 
 let rec ab_semigroup_mult_word _A =
   ({semigroup_mult_ab_semigroup_mult = (semigroup_mult_word _A)} :
@@ -1943,106 +2145,10 @@ let rec comm_semiring_word _A =
      semiring_comm_semiring = (semiring_word _A)}
     : 'a word comm_semiring);;
 
-let rec drop_bit_word _A n w = Word (drop_bit_int n (the_int _A w));;
-
-let rec and_word _A v w = Word (and_int (the_int _A v) (the_int _A w));;
-
-let rec equal_word _A v w = equal_inta (the_int _A v) (the_int _A w);;
-
-let rec bit_word _A
-  a n = equal_word _A (and_word _A (drop_bit_word _A n a) (one_worda _A))
-          (one_worda _A);;
-
-let rec cancel_semigroup_add_word _A =
-  ({semigroup_add_cancel_semigroup_add = (semigroup_add_word _A)} :
-    'a word cancel_semigroup_add);;
-
-let rec cancel_ab_semigroup_add_word _A =
-  ({ab_semigroup_add_cancel_ab_semigroup_add = (ab_semigroup_add_word _A);
-     cancel_semigroup_add_cancel_ab_semigroup_add =
-       (cancel_semigroup_add_word _A);
-     minus_cancel_ab_semigroup_add = (minus_word _A)}
-    : 'a word cancel_ab_semigroup_add);;
-
-let rec cancel_comm_monoid_add_word _A =
-  ({cancel_ab_semigroup_add_cancel_comm_monoid_add =
-      (cancel_ab_semigroup_add_word _A);
-     comm_monoid_add_cancel_comm_monoid_add = (comm_monoid_add_word _A)}
-    : 'a word cancel_comm_monoid_add);;
-
-let rec semiring_0_cancel_word _A =
-  ({cancel_comm_monoid_add_semiring_0_cancel = (cancel_comm_monoid_add_word _A);
-     semiring_0_semiring_0_cancel = (semiring_0_word _A)}
-    : 'a word semiring_0_cancel);;
-
 let rec comm_semiring_0_word _A =
   ({comm_semiring_comm_semiring_0 = (comm_semiring_word _A);
      semiring_0_comm_semiring_0 = (semiring_0_word _A)}
     : 'a word comm_semiring_0);;
-
-let rec comm_semiring_0_cancel_word _A =
-  ({comm_semiring_0_comm_semiring_0_cancel = (comm_semiring_0_word _A);
-     semiring_0_cancel_comm_semiring_0_cancel = (semiring_0_cancel_word _A)}
-    : 'a word comm_semiring_0_cancel);;
-
-let rec semiring_1_cancel_word _A =
-  ({semiring_0_cancel_semiring_1_cancel = (semiring_0_cancel_word _A);
-     semiring_1_semiring_1_cancel = (semiring_1_word _A)}
-    : 'a word semiring_1_cancel);;
-
-let rec comm_monoid_mult_word _A =
-  ({ab_semigroup_mult_comm_monoid_mult = (ab_semigroup_mult_word _A);
-     monoid_mult_comm_monoid_mult = (monoid_mult_word _A);
-     dvd_comm_monoid_mult = (dvd_word _A)}
-    : 'a word comm_monoid_mult);;
-
-let rec comm_semiring_1_word _A =
-  ({comm_monoid_mult_comm_semiring_1 = (comm_monoid_mult_word _A);
-     comm_semiring_0_comm_semiring_1 = (comm_semiring_0_word _A);
-     semiring_1_comm_semiring_1 = (semiring_1_word _A)}
-    : 'a word comm_semiring_1);;
-
-let rec comm_semiring_1_cancel_word _A =
-  ({comm_semiring_0_cancel_comm_semiring_1_cancel =
-      (comm_semiring_0_cancel_word _A);
-     comm_semiring_1_comm_semiring_1_cancel = (comm_semiring_1_word _A);
-     semiring_1_cancel_comm_semiring_1_cancel = (semiring_1_cancel_word _A)}
-    : 'a word comm_semiring_1_cancel);;
-
-let rec semiring_modulo_word _A =
-  ({comm_semiring_1_cancel_semiring_modulo = (comm_semiring_1_cancel_word _A);
-     modulo_semiring_modulo = (modulo_word _A)}
-    : 'a word semiring_modulo);;
-
-let rec semiring_parity_word _A =
-  ({semiring_modulo_semiring_parity = (semiring_modulo_word _A)} :
-    'a word semiring_parity);;
-
-let rec semiring_bits_word _A =
-  ({semiring_parity_semiring_bits = (semiring_parity_word _A);
-     bit = bit_word _A}
-    : 'a word semiring_bits);;
-
-let rec take_bit_word _A
-  n w = Word (if less_nat n (len_of _A.len0_len Type)
-               then take_bit_int n (the_int _A w) else the_int _A w);;
-
-let rec push_bit_word _A
-  n w = times_worda _A w
-          (power (power_word _A) (of_int _A (Pos (Bit0 One))) n);;
-
-let rec semiring_bit_shifts_word _A =
-  ({semiring_bits_semiring_bit_shifts = (semiring_bits_word _A);
-     push_bit = push_bit_word _A; drop_bit = drop_bit_word _A;
-     take_bit = take_bit_word _A}
-    : 'a word semiring_bit_shifts);;
-
-type 'a semiring_bit_syntax =
-  {semiring_bit_shifts_semiring_bit_syntax : 'a semiring_bit_shifts};;
-
-let rec semiring_bit_syntax_word _A =
-  ({semiring_bit_shifts_semiring_bit_syntax = (semiring_bit_shifts_word _A)} :
-    'a word semiring_bit_syntax);;
 
 type t = T_i32 | T_i64 | T_f32 | T_f64;;
 
@@ -2064,6 +2170,8 @@ let rec equal_ta x0 x1 = match x0, x1 with T_f32, T_f64 -> false
                    | T_i32, T_i32 -> true;;
 
 let equal_t = ({equal = equal_ta} : t equal);;
+
+let rec eq _A a b = equal _A a b;;
 
 let rec equal_list _A
   x0 x1 = match x0, x1 with [], x21 :: x22 -> false
@@ -2145,13 +2253,154 @@ let wasm_float_f64 =
      float_le = F64Wrapper.le; float_ge = F64Wrapper.ge}
     : F64Wrapper.t wasm_float);;
 
+type i32 = I32_impl of int32;;
+
+let zero_i32a : i32 = I32_impl Int32.zero;;
+
+let zero_i32 = ({zero = zero_i32a} : i32 zero);;
+
+let rec nat_of_integer k = Nat (max ord_integer Z.zero k);;
+
+let rec len_of_i32 uu = nat_of_integer (Z.of_int 32);;
+
+let len0_i32 = ({len_of = len_of_i32} : i32 len0);;
+
+let len_i32 = ({len0_len = len0_i32} : i32 len);;
+
+let rec bit_uint32
+  x n = less_nat n (nat_of_integer (Z.of_int 32)) &&
+          Uint32.test_bit x (integer_of_nat n);;
+
+let rec bit_integer x n = Bits_Integer.test_bit x (integer_of_nat n);;
+
+let rec uint32
+  i = (let ia = Z.logand i (Z.of_string "4294967295") in
+        (if bit_integer ia (nat_of_integer (Z.of_int 31))
+          then Z.to_int32 (Z.sub ia (Z.of_string "4294967296"))
+          else Z.to_int32 ia));;
+
+let rec integer_of_uint32
+  n = (if bit_uint32 n (nat_of_integer (Z.of_int 31))
+        then Z.logor
+               (Z.of_int32 (Int32.logand n (uint32 (Z.of_string "2147483647"))))
+               (Z.of_string "2147483648")
+        else Z.of_int32 n);;
+
+let rec nat_of_uint32 x = nat_of_integer (integer_of_uint32 x);;
+
+let rec nat_of_int_i32 (I32_impl x) = nat_of_uint32 x;;
+
+let rec plus_nat m n = Nat (Z.add (integer_of_nat m) (integer_of_nat n));;
+
+let rec suc n = plus_nat n one_nata;;
+
+let rec gen_length n x1 = match n, x1 with n, x :: xs -> gen_length (suc n) xs
+                     | n, [] -> n;;
+
+let rec size_list x = gen_length zero_nat x;;
+
+let rec drop_bit_word _A n w = Word (drop_bit_int n (the_int _A w));;
+
+let rec and_word _A v w = Word (and_int (the_int _A v) (the_int _A w));;
+
+let rec equal_word _A v w = equal_inta (the_int _A v) (the_int _A w);;
+
+let rec bit_word _A
+  a n = equal_word _A (and_word _A (drop_bit_word _A n a) (one_worda _A))
+          (one_worda _A);;
+
+let rec map f x1 = match f, x1 with f, [] -> []
+              | f, x21 :: x22 -> f x21 :: map f x22;;
+
+let rec upt i j = (if less_nat i j then i :: upt (suc i) j else []);;
+
+let rec fold f x1 s = match f, x1, s with f, x :: xs, s -> fold f xs (f x s)
+               | f, [], s -> s;;
+
+let rec rev xs = fold (fun a b -> a :: b) xs [];;
+
+let rec to_bl _A
+  w = map (bit_word _A w) (rev (upt zero_nat (len_of _A.len0_len Type)));;
+
+let rec filter
+  p x1 = match p, x1 with p, [] -> []
+    | p, x :: xs -> (if p x then x :: filter p xs else filter p xs);;
+
+let rec id x = (fun xa -> xa) x;;
+
+let rec pop_count _A w = size_list (filter id (to_bl _A w));;
+
+let rec comp f g = (fun x -> f (g x));;
+
+let rec foldr f x1 = match f, x1 with f, [] -> id
+                | f, x :: xs -> comp (f x) (foldr f xs);;
+
+let rec horner_sum _B
+  f a xs =
+    foldr (fun x b ->
+            plus _B.semiring_0_comm_semiring_0.comm_monoid_add_semiring_0.monoid_add_comm_monoid_add.semigroup_add_monoid_add.plus_semigroup_add
+              (f x)
+              (times
+                _B.semiring_0_comm_semiring_0.mult_zero_semiring_0.times_mult_zero
+                a b))
+      xs (zero _B.semiring_0_comm_semiring_0.mult_zero_semiring_0.zero_mult_zero);;
+
+let rec set_bits_word _A
+  p = horner_sum (comm_semiring_0_word _A) (of_bool (zero_neq_one_word _A))
+        (of_int _A (Pos (Bit0 One)))
+        (map p (upt zero_nat (len_of _A.len0_len Type)));;
+
 type num1 = One_num1;;
 
 type 'a finite = unit;;
 
 type 'a bit0 = Abs_bit0 of int;;
 
-type i32 = Abs_i32 of num1 bit0 bit0 bit0 bit0 bit0 word;;
+let rec len_of_num1 uu = one_nata;;
+
+let len0_num1 = ({len_of = len_of_num1} : num1 len0);;
+
+let len_num1 = ({len0_len = len0_num1} : num1 len);;
+
+let rec len_of_bit0 _A
+  uu = times_nata (nat_of_integer (Z.of_int 2)) (len_of _A Type);;
+
+let rec len0_bit0 _A = ({len_of = len_of_bit0 _A} : 'a bit0 len0);;
+
+let rec len_bit0 _A = ({len0_len = (len0_bit0 _A.len0_len)} : 'a bit0 len);;
+
+let rec rep_uint32
+  x = set_bits_word
+        (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+        (bit_uint32 x);;
+
+let rec less_int x0 x1 = match x0, x1 with Nega k, Nega l -> less_num l k
+                   | Nega k, Pos l -> true
+                   | Nega k, Zero_int -> true
+                   | Pos k, Nega l -> false
+                   | Pos k, Pos l -> less_num k l
+                   | Pos k, Zero_int -> false
+                   | Zero_int, Nega l -> false
+                   | Zero_int, Pos l -> true
+                   | Zero_int, Zero_int -> false;;
+
+let rec integer_of_int
+  k = (if less_int k Zero_int then Z.neg (integer_of_int (uminus_inta k))
+        else (if equal_inta k Zero_int then Z.zero
+               else (let l =
+                       Z.mul (Z.of_int 2)
+                         (integer_of_int (divide_inta k (Pos (Bit0 One))))
+                       in
+                     let j = modulo_inta k (Pos (Bit0 One)) in
+                      (if equal_inta j Zero_int then l
+                        else Z.add l (Z.of_int 1)))));;
+
+let rec abs_uint32
+  x = uint32
+        (integer_of_int
+          (the_int
+            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+            x));;
 
 let rec apsnd f (x, y) = (x, f y);;
 
@@ -2198,120 +2447,257 @@ let rec int_of_nat n = int_of_integer (integer_of_nat n);;
 let rec of_nat _A
   n = Word (take_bit_int (len_of _A.len0_len Type) (int_of_nat n));;
 
-let rec len_of_num1 uu = one_nata;;
-
-let len0_num1 = ({len_of = len_of_num1} : num1 len0);;
-
-let len_num1 = ({len0_len = len0_num1} : num1 len);;
-
-let rec nat_of_integer k = Nat (max ord_integer Z.zero k);;
-
-let rec len_of_bit0 _A
-  uu = times_nata (nat_of_integer (Z.of_int 2)) (len_of _A Type);;
-
-let rec len0_bit0 _A = ({len_of = len_of_bit0 _A} : 'a bit0 len0);;
-
-let rec len_bit0 _A = ({len0_len = (len0_bit0 _A.len0_len)} : 'a bit0 len);;
-
-let zero_i32a : i32
-  = Abs_i32
-      (of_nat (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-        zero_nat);;
-
-let zero_i32 = ({zero = zero_i32a} : i32 zero);;
-
-let rec len_of_i32 uu = nat_of_integer (Z.of_int 32);;
-
-let len0_i32 = ({len_of = len_of_i32} : i32 len0);;
-
-let len_i32 = ({len0_len = len0_i32} : i32 len);;
-
-let rec less_int x0 x1 = match x0, x1 with Nega k, Nega l -> less_num l k
-                   | Nega k, Pos l -> true
-                   | Nega k, Zero_int -> true
-                   | Pos k, Nega l -> false
-                   | Pos k, Pos l -> less_num k l
-                   | Pos k, Zero_int -> false
-                   | Zero_int, Nega l -> false
-                   | Zero_int, Pos l -> true
-                   | Zero_int, Zero_int -> false;;
-
-let rec integer_of_int
-  k = (if less_int k Zero_int then Z.neg (integer_of_int (uminus_inta k))
-        else (if equal_inta k Zero_int then Z.zero
-               else (let l =
-                       Z.mul (Z.of_int 2)
-                         (integer_of_int (divide_inta k (Pos (Bit0 One))))
-                       in
-                     let j = modulo_inta k (Pos (Bit0 One)) in
-                      (if equal_inta j Zero_int then l
-                        else Z.add l (Z.of_int 1)))));;
-
-let rec nat k = Nat (max ord_integer Z.zero (integer_of_int k));;
-
-let rec the_nat _A w = nat (the_int _A w);;
-
-let rec nat_of_int_i32
-  (Abs_i32 x) =
-    the_nat (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x;;
-
-let rec plus_nat m n = Nat (Z.add (integer_of_nat m) (integer_of_nat n));;
-
-let rec suc n = plus_nat n one_nata;;
-
-let rec gen_length n x1 = match n, x1 with n, x :: xs -> gen_length (suc n) xs
-                     | n, [] -> n;;
-
-let rec size_list x = gen_length zero_nat x;;
-
-let rec map f x1 = match f, x1 with f, [] -> []
-              | f, x21 :: x22 -> f x21 :: map f x22;;
-
-let rec upt i j = (if less_nat i j then i :: upt (suc i) j else []);;
-
-let rec fold f x1 s = match f, x1, s with f, x :: xs, s -> fold f xs (f x s)
-               | f, [], s -> s;;
-
-let rec rev xs = fold (fun a b -> a :: b) xs [];;
-
-let rec to_bl _A
-  w = map (bit_word _A w) (rev (upt zero_nat (len_of _A.len0_len Type)));;
-
-let rec filter
-  p x1 = match p, x1 with p, [] -> []
-    | p, x :: xs -> (if p x then x :: filter p xs else filter p xs);;
-
-let rec id x = (fun xa -> xa) x;;
-
-let rec pop_count _A w = size_list (filter id (to_bl _A w));;
-
 let rec int_popcnt_i32
-  (Abs_i32 x) =
-    Abs_i32
-      (of_nat (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-        (pop_count
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x));;
-
-let rec int_of_nat_i32
-  x = Abs_i32
+  (I32_impl x) =
+    I32_impl
+      (abs_uint32
         (of_nat (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-          x);;
+          (pop_count
+            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+            (rep_uint32 x))));;
 
-let rec shiftr _A
-  a n = drop_bit _A.semiring_bit_shifts_semiring_bit_syntax n a;;
+let rec uint32_of_int i = uint32 (integer_of_int i);;
 
-let rec and_nat m n = nat (and_int (int_of_nat m) (int_of_nat n));;
+let rec uint32_of_nat x = comp uint32_of_int int_of_nat x;;
+
+let rec int_of_nat_i32 n = I32_impl (uint32_of_nat n);;
+
+let rec modulo_integer k l = snd (divmod_integer k l);;
 
 let rec int_shr_u_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    Abs_i32
-      (shiftr
-        (semiring_bit_syntax_word
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        x (and_nat
-            (the_nat
-              (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) y)
-            (nat_of_integer (Z.of_int 31))));;
+  (I32_impl x) (I32_impl y) =
+    I32_impl
+      (Uint32.shiftr x (modulo_integer (integer_of_uint32 y) (Z.of_int 32)));;
+
+let rec int_shr_s_i32
+  (I32_impl x) (I32_impl y) =
+    I32_impl
+      (Uint32.shiftr_signed x
+        (modulo_integer (integer_of_uint32 y) (Z.of_int 32)));;
+
+type 'a semiring_bit_syntax =
+  {semiring_bit_shifts_semiring_bit_syntax : 'a semiring_bit_shifts};;
+
+let rec shiftl _A
+  a n = push_bit _A.semiring_bit_shifts_semiring_bit_syntax n a;;
+
+let rec drop_bit_uint32
+  n x = (if less_nat n (nat_of_integer (Z.of_int 32))
+          then Uint32.shiftr x (integer_of_nat n) else Int32.zero);;
+
+let mod0_uint32 _ = failwith "Uint32.mod0_uint32";;
+
+let div0_uint32 _ = failwith "Uint32.div0_uint32";;
+
+let rec push_bit_uint32
+  n x = (if less_nat n (nat_of_integer (Z.of_int 32))
+          then Uint32.shiftl x (integer_of_nat n) else Int32.zero);;
+
+let rec mask_uint32
+  n = (if equal_nat n zero_nat then Int32.zero
+        else Int32.logor (push_bit_uint32 (minus_nat n one_nata) Int32.one)
+               (mask_uint32 (minus_nat n one_nata)));;
+
+let rec take_bit_uint32 n a = Int32.logand a (mask_uint32 n);;
+
+let plus_uint32 = ({plus = Int32.add} : int32 plus);;
+
+let semigroup_add_uint32 =
+  ({plus_semigroup_add = plus_uint32} : int32 semigroup_add);;
+
+let cancel_semigroup_add_uint32 =
+  ({semigroup_add_cancel_semigroup_add = semigroup_add_uint32} :
+    int32 cancel_semigroup_add);;
+
+let ab_semigroup_add_uint32 =
+  ({semigroup_add_ab_semigroup_add = semigroup_add_uint32} :
+    int32 ab_semigroup_add);;
+
+let minus_uint32 = ({minus = Int32.sub} : int32 minus);;
+
+let cancel_ab_semigroup_add_uint32 =
+  ({ab_semigroup_add_cancel_ab_semigroup_add = ab_semigroup_add_uint32;
+     cancel_semigroup_add_cancel_ab_semigroup_add = cancel_semigroup_add_uint32;
+     minus_cancel_ab_semigroup_add = minus_uint32}
+    : int32 cancel_ab_semigroup_add);;
+
+let zero_uint32 = ({zero = Int32.zero} : int32 zero);;
+
+let monoid_add_uint32 =
+  ({semigroup_add_monoid_add = semigroup_add_uint32;
+     zero_monoid_add = zero_uint32}
+    : int32 monoid_add);;
+
+let comm_monoid_add_uint32 =
+  ({ab_semigroup_add_comm_monoid_add = ab_semigroup_add_uint32;
+     monoid_add_comm_monoid_add = monoid_add_uint32}
+    : int32 comm_monoid_add);;
+
+let cancel_comm_monoid_add_uint32 =
+  ({cancel_ab_semigroup_add_cancel_comm_monoid_add =
+      cancel_ab_semigroup_add_uint32;
+     comm_monoid_add_cancel_comm_monoid_add = comm_monoid_add_uint32}
+    : int32 cancel_comm_monoid_add);;
+
+let times_uint32 = ({times = Int32.mul} : int32 times);;
+
+let mult_zero_uint32 =
+  ({times_mult_zero = times_uint32; zero_mult_zero = zero_uint32} :
+    int32 mult_zero);;
+
+let semigroup_mult_uint32 =
+  ({times_semigroup_mult = times_uint32} : int32 semigroup_mult);;
+
+let semiring_uint32 =
+  ({ab_semigroup_add_semiring = ab_semigroup_add_uint32;
+     semigroup_mult_semiring = semigroup_mult_uint32}
+    : int32 semiring);;
+
+let semiring_0_uint32 =
+  ({comm_monoid_add_semiring_0 = comm_monoid_add_uint32;
+     mult_zero_semiring_0 = mult_zero_uint32;
+     semiring_semiring_0 = semiring_uint32}
+    : int32 semiring_0);;
+
+let semiring_0_cancel_uint32 =
+  ({cancel_comm_monoid_add_semiring_0_cancel = cancel_comm_monoid_add_uint32;
+     semiring_0_semiring_0_cancel = semiring_0_uint32}
+    : int32 semiring_0_cancel);;
+
+let ab_semigroup_mult_uint32 =
+  ({semigroup_mult_ab_semigroup_mult = semigroup_mult_uint32} :
+    int32 ab_semigroup_mult);;
+
+let comm_semiring_uint32 =
+  ({ab_semigroup_mult_comm_semiring = ab_semigroup_mult_uint32;
+     semiring_comm_semiring = semiring_uint32}
+    : int32 comm_semiring);;
+
+let comm_semiring_0_uint32 =
+  ({comm_semiring_comm_semiring_0 = comm_semiring_uint32;
+     semiring_0_comm_semiring_0 = semiring_0_uint32}
+    : int32 comm_semiring_0);;
+
+let comm_semiring_0_cancel_uint32 =
+  ({comm_semiring_0_comm_semiring_0_cancel = comm_semiring_0_uint32;
+     semiring_0_cancel_comm_semiring_0_cancel = semiring_0_cancel_uint32}
+    : int32 comm_semiring_0_cancel);;
+
+let one_uint32 = ({one = Int32.one} : int32 one);;
+
+let power_uint32 =
+  ({one_power = one_uint32; times_power = times_uint32} : int32 power);;
+
+let monoid_mult_uint32 =
+  ({semigroup_mult_monoid_mult = semigroup_mult_uint32;
+     power_monoid_mult = power_uint32}
+    : int32 monoid_mult);;
+
+let numeral_uint32 =
+  ({one_numeral = one_uint32; semigroup_add_numeral = semigroup_add_uint32} :
+    int32 numeral);;
+
+let semiring_numeral_uint32 =
+  ({monoid_mult_semiring_numeral = monoid_mult_uint32;
+     numeral_semiring_numeral = numeral_uint32;
+     semiring_semiring_numeral = semiring_uint32}
+    : int32 semiring_numeral);;
+
+let zero_neq_one_uint32 =
+  ({one_zero_neq_one = one_uint32; zero_zero_neq_one = zero_uint32} :
+    int32 zero_neq_one);;
+
+let semiring_1_uint32 =
+  ({semiring_numeral_semiring_1 = semiring_numeral_uint32;
+     semiring_0_semiring_1 = semiring_0_uint32;
+     zero_neq_one_semiring_1 = zero_neq_one_uint32}
+    : int32 semiring_1);;
+
+let semiring_1_cancel_uint32 =
+  ({semiring_0_cancel_semiring_1_cancel = semiring_0_cancel_uint32;
+     semiring_1_semiring_1_cancel = semiring_1_uint32}
+    : int32 semiring_1_cancel);;
+
+let dvd_uint32 = ({times_dvd = times_uint32} : int32 dvd);;
+
+let comm_monoid_mult_uint32 =
+  ({ab_semigroup_mult_comm_monoid_mult = ab_semigroup_mult_uint32;
+     monoid_mult_comm_monoid_mult = monoid_mult_uint32;
+     dvd_comm_monoid_mult = dvd_uint32}
+    : int32 comm_monoid_mult);;
+
+let comm_semiring_1_uint32 =
+  ({comm_monoid_mult_comm_semiring_1 = comm_monoid_mult_uint32;
+     comm_semiring_0_comm_semiring_1 = comm_semiring_0_uint32;
+     semiring_1_comm_semiring_1 = semiring_1_uint32}
+    : int32 comm_semiring_1);;
+
+let comm_semiring_1_cancel_uint32 =
+  ({comm_semiring_0_cancel_comm_semiring_1_cancel =
+      comm_semiring_0_cancel_uint32;
+     comm_semiring_1_comm_semiring_1_cancel = comm_semiring_1_uint32;
+     semiring_1_cancel_comm_semiring_1_cancel = semiring_1_cancel_uint32}
+    : int32 comm_semiring_1_cancel);;
+
+let rec uint32_mod x y = snd (uint32_divmod x y)
+and modulo_uint32a
+  x y = (if (Int32.compare y Int32.zero = 0) then x else uint32_mod x y)
+and semiring_bit_syntax_uint32 () =
+  ({semiring_bit_shifts_semiring_bit_syntax = (semiring_bit_shifts_uint32 ())} :
+    int32 semiring_bit_syntax)
+and uint32_divmod
+  x y = (if Uint32.less_eq (uint32 (Z.of_string "2147483648")) y
+          then (if Uint32.less x y then (Int32.zero, x)
+                 else (Int32.one, Int32.sub x y))
+          else (if (Int32.compare y Int32.zero = 0)
+                 then (div0_uint32 x, mod0_uint32 x)
+                 else (let q =
+                         shiftl (semiring_bit_syntax_uint32 ())
+                           (Int32.div (drop_bit_uint32 one_nata x) y) one_nata
+                         in
+                       let r = Int32.sub x (Int32.mul q y) in
+                        (if Uint32.less_eq y r
+                          then (Int32.add q Int32.one, Int32.sub r y)
+                          else (q, r)))))
+and uint32_div x y = fst (uint32_divmod x y)
+and divide_uint32a
+  x y = (if (Int32.compare y Int32.zero = 0) then Int32.zero
+          else uint32_div x y)
+and divide_uint32 () = ({divide = divide_uint32a} : int32 divide)
+and modulo_uint32 () =
+  ({divide_modulo = (divide_uint32 ()); dvd_modulo = dvd_uint32;
+     modulo = modulo_uint32a}
+    : int32 modulo)
+and semiring_modulo_uint32 () =
+  ({comm_semiring_1_cancel_semiring_modulo = comm_semiring_1_cancel_uint32;
+     modulo_semiring_modulo = (modulo_uint32 ())}
+    : int32 semiring_modulo)
+and semiring_parity_uint32 () =
+  ({semiring_modulo_semiring_parity = (semiring_modulo_uint32 ())} :
+    int32 semiring_parity)
+and semiring_bits_uint32 () =
+  ({semiring_parity_semiring_bits = (semiring_parity_uint32 ());
+     bit = bit_uint32}
+    : int32 semiring_bits)
+and semiring_bit_shifts_uint32 () =
+  ({semiring_bits_semiring_bit_shifts = (semiring_bits_uint32 ());
+     push_bit = push_bit_uint32; drop_bit = drop_bit_uint32;
+     take_bit = take_bit_uint32}
+    : int32 semiring_bit_shifts);;
+let semiring_bit_syntax_uint32 = semiring_bit_syntax_uint32 ();;
+let divide_uint32 = divide_uint32 ();;
+let modulo_uint32 = modulo_uint32 ();;
+let semiring_modulo_uint32 = semiring_modulo_uint32 ();;
+let semiring_parity_uint32 = semiring_parity_uint32 ();;
+let semiring_bits_uint32 = semiring_bits_uint32 ();;
+let semiring_bit_shifts_uint32 = semiring_bit_shifts_uint32 ();;
+
+let rec int_rem_u_i32
+  (I32_impl x) (I32_impl y) =
+    (if (Int32.compare y Int32.zero = 0) then None
+      else Some (I32_impl (uint32_mod x y)));;
+
+let rec abs_int i = (if less_int i Zero_int then uminus_inta i else i);;
 
 let rec signed_take_bit _A
   n a = (let l =
@@ -2334,107 +2720,39 @@ let rec the_signed_int _A
   w = signed_take_bit ring_bit_operations_int
         (minus_nat (len_of _A.len0_len Type) (suc zero_nat)) (the_int _A w);;
 
-let rec signed_drop_bit _A
-  n w = Word (take_bit_int (len_of _A.len0_len Type)
-               (drop_bit_int n (the_signed_int _A w)));;
-
-let rec sshiftr _A w n = signed_drop_bit _A n w;;
-
-let rec int_shr_s_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    Abs_i32
-      (sshiftr (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x
-        (and_nat
-          (the_nat
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) y)
-          (nat_of_integer (Z.of_int 31))));;
-
-let rec int_rem_u_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    (if equal_word
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) y
-          (zero_worda
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-      then None
-      else Some (Abs_i32
-                  (modulo_worda
-                    (len_bit0
-                      (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-                    x y)));;
-
-let rec sgn_int
-  i = (if equal_inta i Zero_int then Zero_int
-        else (if less_int Zero_int i then one_inta else uminus_inta one_inta));;
-
-let rec abs_int i = (if less_int i Zero_int then uminus_inta i else i);;
-
-let rec signed_divide_int
-  k l = times_inta (times_inta (sgn_int k) (sgn_int l))
-          (divide_inta (abs_int k) (abs_int l));;
-
-let rec signed_modulo_int
-  k l = minus_inta k (times_inta (signed_divide_int k l) l);;
-
 let rec signed_modulo_word _A
-  v w = of_int _A
-          (signed_modulo_int (the_signed_int _A v) (the_signed_int _A w));;
+  x y = (let xa = the_signed_int _A x in
+         let ya = the_signed_int _A y in
+         let negative = less_int xa Zero_int in
+         let result = modulo_inta (abs_int xa) (abs_int ya) in
+          of_int _A (if negative then uminus_inta result else result));;
 
 let rec int_rem_s_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    (if equal_word
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) y
-          (zero_worda
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-      then None
-      else Some (Abs_i32
-                  (signed_modulo_word
-                    (len_bit0
-                      (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-                    x y)));;
+  (I32_impl x) (I32_impl y) =
+    (if (Int32.compare y Int32.zero = 0) then None
+      else Some (I32_impl
+                  (abs_uint32
+                    (signed_modulo_word
+                      (len_bit0
+                        (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+                      (rep_uint32 x) (rep_uint32 y)))));;
 
 let rec int_div_u_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    (if equal_word
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) y
-          (zero_worda
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-      then None
-      else Some (Abs_i32
-                  (divide_worda
-                    (len_bit0
-                      (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-                    x y)));;
-
-let rec signed_divide_word _A
-  v w = of_int _A
-          (signed_divide_int (the_signed_int _A v) (the_signed_int _A w));;
+  (I32_impl x) (I32_impl y) =
+    (if (Int32.compare y Int32.zero = 0) then None
+      else Some (I32_impl (uint32_div x y)));;
 
 let rec int_div_s_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    (if equal_word
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) y
-          (zero_worda
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))) ||
-          equal_word
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x
-            (of_int
-              (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-              (uminus_inta
-                (power power_int (Pos (Bit0 One))
-                  (minus_nat (len_of_i32 Type) one_nata)))) &&
-            equal_word
-              (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) y
-              (of_int
-                (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-                (uminus_inta one_inta))
-      then None
-      else Some (Abs_i32
-                  (signed_divide_word
-                    (len_bit0
-                      (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-                    x y)));;
+  (I32_impl x) (I32_impl y) =
+    (if (Int32.compare y Int32.zero = 0) ||
+          (Int32.compare x (Int32.neg
+                             (uint32 (Z.of_string "2147483648"))) = 0) &&
+            (Int32.compare y (Int32.neg Int32.one) = 0)
+      then None else Some (I32_impl (Int32.div x y)));;
 
-let rec modulo_integer k l = snd (divmod_integer k l);;
+let rec take_bit_word _A
+  n w = Word (if less_nat n (len_of _A.len0_len Type)
+               then take_bit_int n (the_int _A w) else the_int _A w);;
 
 let rec modulo_nat
   m n = Nat (modulo_integer (integer_of_nat m) (integer_of_nat n));;
@@ -2452,12 +2770,12 @@ let rec word_rotr _A
                    w)));;
 
 let rec int_rotr_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    Abs_i32
-      (word_rotr (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-        (the_nat (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-          y)
-        x);;
+  (I32_impl x) (I32_impl y) =
+    I32_impl
+      (abs_uint32
+        (word_rotr
+          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+          (nat_of_uint32 y) (rep_uint32 x)));;
 
 let rec word_rotl _A
   n = word_rotr _A
@@ -2465,102 +2783,59 @@ let rec word_rotl _A
           (modulo_nat n (len_of _A.len0_len Type)));;
 
 let rec int_rotl_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    Abs_i32
-      (word_rotl (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-        (the_nat (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-          y)
-        x);;
+  (I32_impl x) (I32_impl y) =
+    I32_impl
+      (abs_uint32
+        (word_rotl
+          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+          (nat_of_uint32 y) (rep_uint32 x)));;
 
-let rec less_word _A a b = less_int (the_int _A a) (the_int _A b);;
-
-let rec int_lt_u_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    less_word (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x
-      y;;
+let rec int_lt_u_i32 (I32_impl x) (I32_impl y) = Uint32.less x y;;
 
 let rec word_sless _A
   a b = less_int (the_signed_int _A a) (the_signed_int _A b);;
 
 let rec int_lt_s_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    word_sless (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x
-      y;;
+  (I32_impl x) (I32_impl y) =
+    word_sless (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+      (rep_uint32 x) (rep_uint32 y);;
 
-let rec less_eq_word _A a b = less_eq_int (the_int _A a) (the_int _A b);;
-
-let rec int_le_u_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    less_eq_word (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-      x y;;
+let rec int_le_u_i32 (I32_impl x) (I32_impl y) = Uint32.less_eq x y;;
 
 let rec word_sle _A
   a b = less_eq_int (the_signed_int _A a) (the_signed_int _A b);;
 
 let rec int_le_s_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    word_sle (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x
-      y;;
+  (I32_impl x) (I32_impl y) =
+    word_sle (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+      (rep_uint32 x) (rep_uint32 y);;
 
-let rec int_gt_u_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    less_word (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) y
-      x;;
+let rec int_gt_u_i32 (I32_impl x) (I32_impl y) = Uint32.less y x;;
 
 let rec int_gt_s_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    word_sless (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) y
-      x;;
+  (I32_impl x) (I32_impl y) =
+    word_sless (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+      (rep_uint32 y) (rep_uint32 x);;
 
-let rec int_ge_u_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    less_eq_word (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-      y x;;
+let rec int_ge_u_i32 (I32_impl x) (I32_impl y) = Uint32.less_eq y x;;
 
 let rec int_ge_s_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    word_sle (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) y
-      x;;
+  (I32_impl x) (I32_impl y) =
+    word_sle (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+      (rep_uint32 y) (rep_uint32 x);;
 
-let rec xor_word _A v w = Word (xor_int (the_int _A v) (the_int _A w));;
+let rec int_xor_i32 (I32_impl x) (I32_impl y) = I32_impl (Int32.logxor x y);;
 
-let rec int_xor_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    Abs_i32
-      (xor_word (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-        x y);;
-
-let rec int_sub_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    Abs_i32
-      (minus_worda
-        (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x y);;
-
-let rec shiftl _A
-  a n = push_bit _A.semiring_bit_shifts_semiring_bit_syntax n a;;
+let rec int_sub_i32 (I32_impl x) (I32_impl y) = I32_impl (Int32.sub x y);;
 
 let rec int_shl_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    Abs_i32
-      (shiftl
-        (semiring_bit_syntax_word
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        x (and_nat
-            (the_nat
-              (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) y)
-            (nat_of_integer (Z.of_int 31))));;
+  (I32_impl x) (I32_impl y) =
+    I32_impl
+      (Uint32.shiftl x (modulo_integer (integer_of_uint32 y) (Z.of_int 32)));;
 
-let rec int_mul_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    Abs_i32
-      (times_worda
-        (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x y);;
+let rec int_mul_i32 (I32_impl x) (I32_impl y) = I32_impl (Int32.mul x y);;
 
-let rec int_eqz_i32
-  (Abs_i32 x) =
-    equal_word (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x
-      (zero_worda
-        (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))));;
+let rec int_eqz_i32 (I32_impl x) = (Int32.compare x Int32.zero = 0);;
 
 let rec takeWhile p x1 = match p, x1 with p, [] -> []
                     | p, x :: xs -> (if p x then x :: takeWhile p xs else []);;
@@ -2568,45 +2843,32 @@ let rec takeWhile p x1 = match p, x1 with p, [] -> []
 let rec word_ctz _A w = size_list (takeWhile not (rev (to_bl _A w)));;
 
 let rec int_ctz_i32
-  (Abs_i32 x) =
-    Abs_i32
-      (of_nat (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-        (word_ctz
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x));;
+  (I32_impl x) =
+    I32_impl
+      (abs_uint32
+        (of_nat (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+          (word_ctz
+            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+            (rep_uint32 x))));;
 
 let rec word_clz _A w = size_list (takeWhile not (to_bl _A w));;
 
 let rec int_clz_i32
-  (Abs_i32 x) =
-    Abs_i32
-      (of_nat (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-        (word_clz
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x));;
+  (I32_impl x) =
+    I32_impl
+      (abs_uint32
+        (of_nat (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+          (word_clz
+            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+            (rep_uint32 x))));;
 
-let rec int_and_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    Abs_i32
-      (and_word (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-        x y);;
+let rec int_and_i32 (I32_impl x) (I32_impl y) = I32_impl (Int32.logand x y);;
 
-let rec int_add_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    Abs_i32
-      (plus_worda
-        (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x y);;
+let rec int_add_i32 (I32_impl x) (I32_impl y) = I32_impl (Int32.add x y);;
 
-let rec or_word _A v w = Word (or_int (the_int _A v) (the_int _A w));;
+let rec int_or_i32 (I32_impl x) (I32_impl y) = I32_impl (Int32.logor x y);;
 
-let rec int_or_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    Abs_i32
-      (or_word (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x
-        y);;
-
-let rec int_eq_i32
-  (Abs_i32 x) (Abs_i32 y) =
-    equal_word (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x
-      y;;
+let rec int_eq_i32 (I32_impl x) (I32_impl y) = (Int32.compare x y = 0);;
 
 type 'a wasm_int_ops =
   {len_wasm_int_ops : 'a len; wasm_base_wasm_int_ops : 'a wasm_base;
@@ -2677,14 +2939,9 @@ let wasm_int_ops_i32 =
 
 let wasm_int_i32 = ({wasm_int_ops_wasm_int = wasm_int_ops_i32} : i32 wasm_int);;
 
-type i64 = Abs_i64 of num1 bit0 bit0 bit0 bit0 bit0 bit0 word;;
+type i64 = I64_impl of int64;;
 
-let zero_i64a : i64
-  = Abs_i64
-      (of_nat
-        (len_bit0
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        zero_nat);;
+let zero_i64a : i64 = I64_impl Int64.zero;;
 
 let zero_i64 = ({zero = zero_i64a} : i64 zero);;
 
@@ -2694,312 +2951,226 @@ let len0_i64 = ({len_of = len_of_i64} : i64 len0);;
 
 let len_i64 = ({len0_len = len0_i64} : i64 len);;
 
-let rec nat_of_int_i64
-  (Abs_i64 x) =
-    the_nat
-      (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-      x;;
+let rec bit_uint64
+  x n = less_nat n (nat_of_integer (Z.of_int 64)) &&
+          Uint64.test_bit x (integer_of_nat n);;
 
-let rec int_popcnt_i64
-  (Abs_i64 x) =
-    Abs_i64
-      (of_nat
+let rec uint64
+  i = (let ia = Z.logand i (Z.of_string "18446744073709551615") in
+        (if bit_integer ia (nat_of_integer (Z.of_int 63))
+          then Z.to_int64 (Z.sub ia (Z.of_string "18446744073709551616"))
+          else Z.to_int64 ia));;
+
+let rec integer_of_uint64
+  n = (if bit_uint64 n (nat_of_integer (Z.of_int 63))
+        then Z.logor
+               (Z.of_int64
+                 (Int64.logand n (uint64 (Z.of_string "9223372036854775807"))))
+               (Z.of_string "9223372036854775808")
+        else Z.of_int64 n);;
+
+let rec nat_of_uint64 x = nat_of_integer (integer_of_uint64 x);;
+
+let rec nat_of_int_i64 (I64_impl x) = nat_of_uint64 x;;
+
+let rec rep_uint64
+  x = set_bits_word
         (len_bit0
           (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        (pop_count
-          (len_bit0
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-          x));;
+        (bit_uint64 x);;
 
-let rec int_of_nat_i64
-  x = Abs_i64
+let rec abs_uint64
+  x = uint64
+        (integer_of_int
+          (the_int
+            (len_bit0
+              (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
+            x));;
+
+let rec int_popcnt_i64
+  (I64_impl x) =
+    I64_impl
+      (abs_uint64
         (of_nat
           (len_bit0
             (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-          x);;
-
-let rec int_shr_u_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    Abs_i64
-      (shiftr
-        (semiring_bit_syntax_word
-          (len_bit0
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))))
-        x (and_nat
-            (the_nat
-              (len_bit0
-                (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-              y)
-            (nat_of_integer (Z.of_int 63))));;
-
-let rec int_shr_s_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    Abs_i64
-      (sshiftr
-        (len_bit0
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        x (and_nat
-            (the_nat
-              (len_bit0
-                (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-              y)
-            (nat_of_integer (Z.of_int 63))));;
-
-let rec int_rem_u_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    (if equal_word
-          (len_bit0
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-          y (zero_worda
-              (len_bit0
-                (len_bit0
-                  (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))))
-      then None
-      else Some (Abs_i64
-                  (modulo_worda
-                    (len_bit0
-                      (len_bit0
-                        (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-                    x y)));;
-
-let rec int_rem_s_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    (if equal_word
-          (len_bit0
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-          y (zero_worda
-              (len_bit0
-                (len_bit0
-                  (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))))
-      then None
-      else Some (Abs_i64
-                  (signed_modulo_word
-                    (len_bit0
-                      (len_bit0
-                        (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-                    x y)));;
-
-let rec int_div_u_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    (if equal_word
-          (len_bit0
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-          y (zero_worda
-              (len_bit0
-                (len_bit0
-                  (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))))
-      then None
-      else Some (Abs_i64
-                  (divide_worda
-                    (len_bit0
-                      (len_bit0
-                        (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-                    x y)));;
-
-let rec int_div_s_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    (if equal_word
-          (len_bit0
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-          y (zero_worda
-              (len_bit0
-                (len_bit0
-                  (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))) ||
-          equal_word
+          (pop_count
             (len_bit0
               (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-            x (of_int
-                (len_bit0
-                  (len_bit0
-                    (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-                (uminus_inta
-                  (power power_int (Pos (Bit0 One))
-                    (minus_nat (len_of_i64 Type) one_nata)))) &&
-            equal_word
-              (len_bit0
-                (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-              y (of_int
-                  (len_bit0
-                    (len_bit0
-                      (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-                  (uminus_inta one_inta))
-      then None
-      else Some (Abs_i64
-                  (signed_divide_word
-                    (len_bit0
+            (rep_uint64 x))));;
+
+let rec uint64_of_int i = uint64 (integer_of_int i);;
+
+let rec uint64_of_nat x = comp uint64_of_int int_of_nat x;;
+
+let rec int_of_nat_i64 n = I64_impl (uint64_of_nat n);;
+
+let rec int_shr_u_i64
+  (I64_impl x) (I64_impl y) =
+    I64_impl
+      (Uint64.shiftr x (modulo_integer (integer_of_uint64 y) (Z.of_int 64)));;
+
+let rec int_shr_s_i64
+  (I64_impl x) (I64_impl y) =
+    I64_impl
+      (Uint64.shiftr_signed x
+        (modulo_integer (integer_of_uint64 y) (Z.of_int 64)));;
+
+let rec push_bit_uint64
+  n x = (if less_nat n (nat_of_integer (Z.of_int 64))
+          then Uint64.shiftl x (integer_of_nat n) else Int64.zero);;
+
+let rec drop_bit_uint64
+  n x = (if less_nat n (nat_of_integer (Z.of_int 64))
+          then Uint64.shiftr x (integer_of_nat n) else Int64.zero);;
+
+let mod0_uint64 _ = failwith "Uint64.mod0_uint64";;
+
+let div0_uint64 _ = failwith "Uint64.div0_uint64";;
+
+let rec uint64_divmod
+  x y = (if Uint64.less_eq (uint64 (Z.of_string "9223372036854775808")) y
+          then (if Uint64.less x y then (Int64.zero, x)
+                 else (Int64.one, Int64.sub x y))
+          else (if (Int64.compare y Int64.zero = 0)
+                 then (div0_uint64 x, mod0_uint64 x)
+                 else (let q =
+                         push_bit_uint64 one_nata
+                           (Int64.div (drop_bit_uint64 one_nata x) y)
+                         in
+                       let r = Int64.sub x (Int64.mul q y) in
+                        (if Uint64.less_eq y r
+                          then (Int64.add q Int64.one, Int64.sub r y)
+                          else (q, r)))));;
+
+let rec uint64_mod x y = snd (uint64_divmod x y);;
+
+let rec int_rem_u_i64
+  (I64_impl x) (I64_impl y) =
+    (if (Int64.compare y Int64.zero = 0) then None
+      else Some (I64_impl (uint64_mod x y)));;
+
+let rec int_rem_s_i64
+  (I64_impl x) (I64_impl y) =
+    (if (Int64.compare y Int64.zero = 0) then None
+      else Some (I64_impl
+                  (abs_uint64
+                    (signed_modulo_word
                       (len_bit0
-                        (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-                    x y)));;
+                        (len_bit0
+                          (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
+                      (rep_uint64 x) (rep_uint64 y)))));;
+
+let rec uint64_div x y = fst (uint64_divmod x y);;
+
+let rec int_div_u_i64
+  (I64_impl x) (I64_impl y) =
+    (if (Int64.compare y Int64.zero = 0) then None
+      else Some (I64_impl (uint64_div x y)));;
+
+let rec int_div_s_i64
+  (I64_impl x) (I64_impl y) =
+    (if (Int64.compare y Int64.zero = 0) ||
+          (Int64.compare x (Int64.neg
+                             (uint64
+                               (Z.of_string "9223372036854775808"))) = 0) &&
+            (Int64.compare y (Int64.neg Int64.one) = 0)
+      then None else Some (I64_impl (Int64.div x y)));;
 
 let rec int_rotr_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    Abs_i64
-      (word_rotr
-        (len_bit0
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        (the_nat
+  (I64_impl x) (I64_impl y) =
+    I64_impl
+      (abs_uint64
+        (word_rotr
           (len_bit0
             (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-          y)
-        x);;
+          (nat_of_uint64 y) (rep_uint64 x)));;
 
 let rec int_rotl_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    Abs_i64
-      (word_rotl
-        (len_bit0
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        (the_nat
+  (I64_impl x) (I64_impl y) =
+    I64_impl
+      (abs_uint64
+        (word_rotl
           (len_bit0
             (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-          y)
-        x);;
+          (nat_of_uint64 y) (rep_uint64 x)));;
 
-let rec int_lt_u_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    less_word
-      (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-      x y;;
+let rec int_lt_u_i64 (I64_impl x) (I64_impl y) = Uint64.less x y;;
 
 let rec int_lt_s_i64
-  (Abs_i64 x) (Abs_i64 y) =
+  (I64_impl x) (I64_impl y) =
     word_sless
       (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-      x y;;
+      (rep_uint64 x) (rep_uint64 y);;
 
-let rec int_le_u_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    less_eq_word
-      (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-      x y;;
+let rec int_le_u_i64 (I64_impl x) (I64_impl y) = Uint64.less_eq x y;;
 
 let rec int_le_s_i64
-  (Abs_i64 x) (Abs_i64 y) =
+  (I64_impl x) (I64_impl y) =
     word_sle
       (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-      x y;;
+      (rep_uint64 x) (rep_uint64 y);;
 
-let rec int_gt_u_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    less_word
-      (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-      y x;;
+let rec int_gt_u_i64 (I64_impl x) (I64_impl y) = Uint64.less y x;;
 
 let rec int_gt_s_i64
-  (Abs_i64 x) (Abs_i64 y) =
+  (I64_impl x) (I64_impl y) =
     word_sless
       (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-      y x;;
+      (rep_uint64 y) (rep_uint64 x);;
 
-let rec int_ge_u_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    less_eq_word
-      (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-      y x;;
+let rec int_ge_u_i64 (I64_impl x) (I64_impl y) = Uint64.less_eq y x;;
 
 let rec int_ge_s_i64
-  (Abs_i64 x) (Abs_i64 y) =
+  (I64_impl x) (I64_impl y) =
     word_sle
       (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-      y x;;
+      (rep_uint64 y) (rep_uint64 x);;
 
-let rec int_xor_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    Abs_i64
-      (xor_word
-        (len_bit0
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        x y);;
+let rec int_xor_i64 (I64_impl x) (I64_impl y) = I64_impl (Int64.logxor x y);;
 
-let rec int_sub_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    Abs_i64
-      (minus_worda
-        (len_bit0
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        x y);;
+let rec int_sub_i64 (I64_impl x) (I64_impl y) = I64_impl (Int64.sub x y);;
 
 let rec int_shl_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    Abs_i64
-      (shiftl
-        (semiring_bit_syntax_word
-          (len_bit0
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))))
-        x (and_nat
-            (the_nat
-              (len_bit0
-                (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-              y)
-            (nat_of_integer (Z.of_int 63))));;
+  (I64_impl x) (I64_impl y) =
+    I64_impl
+      (Uint64.shiftl x (modulo_integer (integer_of_uint64 y) (Z.of_int 64)));;
 
-let rec int_mul_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    Abs_i64
-      (times_worda
-        (len_bit0
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        x y);;
+let rec int_mul_i64 (I64_impl x) (I64_impl y) = I64_impl (Int64.mul x y);;
 
-let rec int_eqz_i64
-  (Abs_i64 x) =
-    equal_word
-      (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-      x (zero_worda
-          (len_bit0
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))));;
+let rec int_eqz_i64 (I64_impl x) = (Int64.compare x Int64.zero = 0);;
 
 let rec int_ctz_i64
-  (Abs_i64 x) =
-    Abs_i64
-      (of_nat
-        (len_bit0
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        (word_ctz
+  (I64_impl x) =
+    I64_impl
+      (abs_uint64
+        (of_nat
           (len_bit0
             (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-          x));;
+          (word_ctz
+            (len_bit0
+              (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
+            (rep_uint64 x))));;
 
 let rec int_clz_i64
-  (Abs_i64 x) =
-    Abs_i64
-      (of_nat
-        (len_bit0
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        (word_clz
+  (I64_impl x) =
+    I64_impl
+      (abs_uint64
+        (of_nat
           (len_bit0
             (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-          x));;
+          (word_clz
+            (len_bit0
+              (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
+            (rep_uint64 x))));;
 
-let rec int_and_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    Abs_i64
-      (and_word
-        (len_bit0
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        x y);;
+let rec int_and_i64 (I64_impl x) (I64_impl y) = I64_impl (Int64.logand x y);;
 
-let rec int_add_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    Abs_i64
-      (plus_worda
-        (len_bit0
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        x y);;
+let rec int_add_i64 (I64_impl x) (I64_impl y) = I64_impl (Int64.add x y);;
 
-let rec int_or_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    Abs_i64
-      (or_word
-        (len_bit0
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        x y);;
+let rec int_or_i64 (I64_impl x) (I64_impl y) = I64_impl (Int64.logor x y);;
 
-let rec int_eq_i64
-  (Abs_i64 x) (Abs_i64 y) =
-    equal_word
-      (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-      x y;;
+let rec int_eq_i64 (I64_impl x) (I64_impl y) = (Int64.compare x y = 0);;
 
 let wasm_base_i64 = ({zero_wasm_base = zero_i64} : i64 wasm_base);;
 
@@ -3170,7 +3341,7 @@ type 'a t_context_ext =
     tf list * tf list * unit tg_ext list * unit limit_t_ext list *
       unit limit_t_ext list * t list * (t list) list * (t list) option * 'a;;
 
-let rec comp f g = (fun x -> f (g x));;
+let rec nat k = Nat (max ord_integer Z.zero (integer_of_int k));;
 
 let rec nth
   x0 n = match x0, n with [], n -> failwith "nth"
@@ -3206,20 +3377,19 @@ let rec cast _B _A
 let rec foldl f a x2 = match f, a, x2 with f, a, [] -> a
                 | f, a, x :: xs -> foldl f (f a x) xs;;
 
-let rec foldr f x1 = match f, x1 with f, [] -> id
-                | f, x :: xs -> comp (f x) (foldr f xs);;
-
-let rec map_option f x1 = match f, x1 with f, None -> None
-                     | f, Some x2 -> Some (f x2);;
-
 let rec those
   = function [] -> Some []
     | x :: xs ->
         (match x with None -> None
           | Some y -> map_option (fun a -> y :: a) (those xs));;
 
+let rec member _A x0 y = match x0, y with [], y -> false
+                    | x :: xs, y -> eq _A x y || member _A xs y;;
+
+let rec the_nat _A w = nat (the_int _A w);;
+
 let rec distinct _A = function [] -> true
-                      | x :: xs -> not (membera _A xs x) && distinct _A xs;;
+                      | x :: xs -> not (member _A xs x) && distinct _A xs;;
 
 let ki64 : nat = nat_of_integer (Z.of_int 65536);;
 
@@ -3244,10 +3414,10 @@ let rec map_filter
         (match f x with None -> map_filter f xs
           | Some y -> y :: map_filter f xs);;
 
-let rec eval _A (Seq f) = memberb _A (f ())
-and memberb _A xa0 x = match xa0, x with Empty, x -> false
+let rec eval _A (Seq f) = membera _A (f ())
+and membera _A xa0 x = match xa0, x with Empty, x -> false
                  | Insert (y, p), x -> eq _A x y || eval _A p x
-                 | Join (p, xq), x -> eval _A p x || memberb _A xq x;;
+                 | Join (p, xq), x -> eval _A p x || membera _A xq x;;
 
 let rec holds p = eval equal_unit p ();;
 
@@ -3364,6 +3534,11 @@ let rec msb_word _A
 let rec msb_byte
   (Abs_byte x) = msb_word (len_bit0 (len_bit0 (len_bit0 len_num1))) x;;
 
+let rec dvd (_A1, _A2)
+  a b = eq _A1
+          (modulo _A2.semiring_modulo_semidom_modulo.modulo_semiring_modulo b a)
+          (zero _A2.algebraic_semidom_semidom_modulo.semidom_divide_algebraic_semidom.semidom_semidom_divide.comm_semiring_1_cancel_semidom.comm_semiring_1_comm_semiring_1_cancel.semiring_1_comm_semiring_1.semiring_0_semiring_1.mult_zero_semiring_0.zero_mult_zero);;
+
 let rec bin_split
   n w = (if equal_nat n zero_nat then (w, Zero_int)
           else (let (w1, w2) =
@@ -3403,21 +3578,23 @@ let rec si64_trunc_f64 x = isabelle_i64_trunc_u_f64 x;;
 let rec si64_trunc_f32 x = isabelle_i64_trunc_u_f32 x;;
 
 let rec wasm_extend_u
-  (Abs_i32 x) =
-    Abs_i64
-      (cast (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-        (len_bit0
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        x);;
+  (I32_impl x) =
+    I64_impl
+      (abs_uint64
+        (cast (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+          (len_bit0
+            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
+          (rep_uint32 x)));;
 
 let rec wasm_extend_s
-  (Abs_i32 x) =
-    Abs_i64
-      (signed_cast
-        (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-        (len_bit0
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        x);;
+  (I32_impl x) =
+    I64_impl
+      (abs_uint64
+        (signed_cast
+          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+          (len_bit0
+            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
+          (rep_uint32 x)));;
 
 let rec cvt_i64
   sx v =
@@ -3453,11 +3630,13 @@ let rec si32_trunc_f64 x = isabelle_i32_trunc_u_f64 x;;
 let rec si32_trunc_f32 x = isabelle_i32_trunc_u_f32 x;;
 
 let rec wasm_wrap
-  (Abs_i64 x) =
-    Abs_i32
-      (cast (len_bit0
-              (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x);;
+  (I64_impl x) =
+    I32_impl
+      (abs_uint32
+        (cast (len_bit0
+                (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
+          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+          (rep_uint64 x)));;
 
 let rec cvt_i32
   sx v =
@@ -3907,19 +4086,19 @@ let rec word_rsplit_rev _A _B
           (the_int _A w));;
 
 let rec serialise_i64
-  (Abs_i64 x) =
+  (I64_impl x) =
     map (fun a -> Abs_byte a)
       (word_rsplit_rev
         (len_bit0
           (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        (len_bit0 (len_bit0 (len_bit0 len_num1))) x);;
+        (len_bit0 (len_bit0 (len_bit0 len_num1))) (rep_uint64 x));;
 
 let rec serialise_i32
-  (Abs_i32 x) =
+  (I32_impl x) =
     map (fun a -> Abs_byte a)
       (word_rsplit_rev
         (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-        (len_bit0 (len_bit0 (len_bit0 len_num1))) x);;
+        (len_bit0 (len_bit0 (len_bit0 len_num1))) (rep_uint32 x));;
 
 let rec byte_of_nat
   x = Abs_byte (of_nat (len_bit0 (len_bit0 (len_bit0 len_num1))) x);;
@@ -4147,34 +4326,27 @@ let rec app_s_f_v_s_store_maybe_packed
     (match tp_opt with None -> app_s_f_v_s_store t off ms f v_s
       | Some tp -> app_s_f_v_s_store_packed t tp off ms f v_s);;
 
-let rec horner_sum _B
-  f a xs =
-    foldr (fun x b ->
-            plus _B.semiring_0_comm_semiring_0.comm_monoid_add_semiring_0.monoid_add_comm_monoid_add.semigroup_add_monoid_add.plus_semigroup_add
-              (f x)
-              (times
-                _B.semiring_0_comm_semiring_0.mult_zero_semiring_0.times_mult_zero
-                a b))
-      xs (zero _B.semiring_0_comm_semiring_0.mult_zero_semiring_0.zero_mult_zero);;
-
 let rec word_rcat_rev _A _B
   = comp (of_int _B)
       (horner_sum comm_semiring_0_int (the_int _A)
         (power power_int (Pos (Bit0 One)) (len_of _A.len0_len Type)));;
 
 let rec deserialise_i64_aux
-  x = Abs_i64
-        (word_rcat_rev (len_bit0 (len_bit0 (len_bit0 len_num1)))
-          (len_bit0
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-          x);;
+  bs = I64_impl
+         (abs_uint64
+           (word_rcat_rev (len_bit0 (len_bit0 (len_bit0 len_num1)))
+             (len_bit0
+               (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
+             bs));;
 
 let rec deserialise_i64 xa = deserialise_i64_aux (map rep_byte xa);;
 
 let rec deserialise_i32_aux
-  x = Abs_i32
-        (word_rcat_rev (len_bit0 (len_bit0 (len_bit0 len_num1)))
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))) x);;
+  bs = I32_impl
+         (abs_uint32
+           (word_rcat_rev (len_bit0 (len_bit0 (len_bit0 len_num1)))
+             (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+             bs));;
 
 let rec deserialise_i32 xa = deserialise_i32_aux (map rep_byte xa);;
 
@@ -4294,12 +4466,7 @@ let rec app_s_f_v_s_mem_size
           (ConstInt32 (int_of_nat_i32 (mem_size (nth ms j))) :: v_s,
             Step_normal)));;
 
-let int32_minus_one : i32
-  = Abs_i32
-      (uminus_word
-        (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-        (one_worda
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))));;
+let int32_minus_one : i32 = I32_impl (Int32.neg Int32.one);;
 
 let rec mem_grow
   m n = (let len = plus_nat (mem_size m) n in
@@ -4374,14 +4541,7 @@ let rec update_fc_step
 let rec app_testop_i _A
   testop c = (let Eqz = testop in int_eqz _A.wasm_int_ops_wasm_int c);;
 
-let rec wasm_bool
-  x = Abs_i32
-        (if x then one_worda
-                     (len_bit0
-                       (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-          else zero_worda
-                 (len_bit0
-                   (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))));;
+let rec wasm_bool b = I32_impl (if b then Int32.one else Int32.zero);;
 
 let rec app_testop
   op v =
@@ -5471,3 +5631,4 @@ let rec interp_instantiate
           else None));;
 
 end;; (*struct WasmRef_Isa*)
+

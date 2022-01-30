@@ -10,6 +10,18 @@ instance extern_t :: countable
 
 instance extern_t :: heap ..
 
+instance module_elem_ext :: (countable) countable
+proof(rule countable_classI[of "\<lambda>i. to_nat (e_tab i, e_off i, e_init i, module_elem.more i)"])
+qed auto
+
+instance module_elem_ext :: (heap) heap ..
+
+instance module_data_ext :: (countable) countable
+proof(rule countable_classI[of "\<lambda>i. to_nat (d_data i, d_off i, d_init i, module_data.more i)"])
+qed auto
+
+instance module_data_ext :: (heap) heap ..
+
 fun tab_typing_m :: "tabinst_m \<Rightarrow> tab_t \<Rightarrow> bool Heap" where
   "tab_typing_m t tt = do {
    t_min \<leftarrow> Array.len (fst t);
@@ -18,7 +30,7 @@ fun tab_typing_m :: "tabinst_m \<Rightarrow> tab_t \<Rightarrow> bool Heap" wher
 fun mem_typing_m :: "mem_m \<Rightarrow> mem_t \<Rightarrow> bool Heap" where
   "mem_typing_m m mt = do {
    m_min \<leftarrow> Array.len (fst m);
-   return (limits_compat \<lparr>l_min=m_min,l_max=(snd m)\<rparr> mt) }"
+   return (limits_compat \<lparr>l_min=(m_min div Ki64),l_max=(snd m)\<rparr> mt) }"
 
 fun external_typing_m :: "s_m \<Rightarrow> v_ext \<Rightarrow> extern_t \<Rightarrow> bool Heap" where
   "external_typing_m s_m (Ext_func i) (Te_func tf) = do {
@@ -122,7 +134,7 @@ definition interp_alloc_module_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext lis
     return (s_res, inst_m, exps)
     }"
 
-fun list_all2_m :: "('a \<Rightarrow> 'b \<Rightarrow> bool Heap) \<Rightarrow> 'a::heap list \<Rightarrow> 'b::heap list \<Rightarrow> bool Heap" where
+fun list_all2_m :: "('a \<Rightarrow> 'b \<Rightarrow> bool Heap) \<Rightarrow> 'a list \<Rightarrow> 'b list \<Rightarrow> bool Heap" where
   "list_all2_m R [] []  = return True"
 | "list_all2_m R (x#xs) [] = return False"
 | "list_all2_m R [] (y#ys) = return False"
@@ -185,13 +197,26 @@ fun interp_instantiate_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Righ
             (s_m', inst_m, v_exps) \<leftarrow> interp_alloc_module_m s_m m v_imps g_inits;
             e_offs \<leftarrow> Heap_Monad.fold_map (\<lambda>e. interp_get_i32_m s_m' inst_m (e_off e)) (m_elem m);
             d_offs \<leftarrow> Heap_Monad.fold_map (\<lambda>d. interp_get_i32_m s_m' inst_m (d_off d)) (m_data m);
-            start \<leftarrow> get_start_m inst_m (m_start m);
-            init_tabs_m s_m' inst_m (map nat_of_int e_offs) (m_elem m);
-            init_mems_m s_m' inst_m (map nat_of_int d_offs) (m_data m);
-            return (Some ((s_m', inst_m, v_exps), start)) }
+            e_in_bounds \<leftarrow>
+              list_all2_m (\<lambda>e_off e. do {
+                t_ind \<leftarrow> Array.nth (inst_m.tabs inst_m) (e_tab e);
+                (tab_e,max) \<leftarrow> Array.nth (s_m.tabs s_m') t_ind;
+                tab_e_len \<leftarrow> Array.len tab_e;
+                return (((nat_of_int e_off) + (length (e_init e))) \<le> tab_e_len) } ) e_offs (m_elem m);
+            d_in_bounds \<leftarrow>
+              list_all2_m (\<lambda>d_off d. do {
+                m_ind \<leftarrow> Array.nth (inst_m.mems inst_m) (d_data d);
+                (mem_e,max) \<leftarrow> Array.nth (s_m.mems s_m') m_ind;
+                mem_e_len \<leftarrow> Array.len mem_e;
+                return (((nat_of_int d_off) + (length (d_init d))) \<le> mem_e_len) } ) d_offs (m_data m);
+            (if (e_in_bounds \<and> d_in_bounds) then do {
+              start \<leftarrow> get_start_m inst_m (m_start m);
+              init_tabs_m s_m' inst_m (map nat_of_int e_offs) (m_elem m);
+              init_mems_m s_m' inst_m (map nat_of_int d_offs) (m_data m);
+              return (Some ((s_m', inst_m, v_exps), start))
+            } else return None) }
           else
             return None
         }
       | _ \<Rightarrow> return None)"
-
 end
