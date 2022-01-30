@@ -153,15 +153,38 @@ qed
   term app_s_f_v_s_mem_size_m
 term app_s_f_v_s_mem_size
 
-definition "mem_m_assn \<equiv> \<lambda>(mr,mm) (mri,mmi). mri \<mapsto>\<^sub>b\<^sub>a Rep_mem_rep mr * \<up>(mmi=mm)"
 
-definition "inst_m_assn' i ii \<equiv> 
-    inst_m.types ii \<mapsto>\<^sub>a inst.types i
-  * inst_m.funcs ii \<mapsto>\<^sub>a inst.funcs i  
-  * inst_m.tabs  ii \<mapsto>\<^sub>a inst.tabs  i 
-  * inst_m.mems  ii \<mapsto>\<^sub>a inst.mems  i 
-  * inst_m.globs ii \<mapsto>\<^sub>a inst.globs i"
-     
+definition "mem_m_assn \<equiv> \<lambda>(mr,mm) (mr_m,mm_m). mr_m \<mapsto>\<^sub>b\<^sub>aRep_mem_rep mr * \<up>(mm_m=mm)"
+
+definition mems_m_assn :: "mem list \<Rightarrow> mem_m array \<Rightarrow> assn" where
+  "mems_m_assn ms ms_m = (\<exists>\<^sub>A ms_i. ms_m \<mapsto>\<^sub>a ms_i  * list_assn mem_m_assn ms ms_i)"
+
+definition s_m_assn :: " s \<Rightarrow> s_m \<Rightarrow> assn" where 
+  "s_m_assn s s_m = mems_m_assn (s.mems s) (s_m.mems s_m)"
+
+definition "inst_m_assn i i_m \<equiv> 
+    inst_m.types i_m \<mapsto>\<^sub>a inst.types i
+  * inst_m.funcs i_m \<mapsto>\<^sub>a inst.funcs i  
+  * inst_m.tabs  i_m \<mapsto>\<^sub>a inst.tabs  i 
+  * inst_m.mems  i_m \<mapsto>\<^sub>a inst.mems  i 
+  * inst_m.globs i_m \<mapsto>\<^sub>a inst.globs i"
+
+definition fc_m_assn :: "frame_context \<Rightarrow> frame_context_m \<Rightarrow> assn" where 
+  "fc_m_assn fc fc_m = (
+  case fc of Frame_context redex lcs nf f \<Rightarrow> 
+  case fc_m of Frame_context_m redex_m lcs_m nf_m f_locs1 f_inst2 \<Rightarrow>
+  \<up>(redex = redex_m \<and> lcs = lcs_m \<and> nf = nf_m) * inst_m_assn (f_inst f) f_inst2
+)"
+
+definition "fcs_m_assn fcs fcs_m \<equiv> list_assn fc_m_assn fcs fcs_m"
+
+definition cfg_m_assn :: "config \<Rightarrow> config_m \<Rightarrow> assn" where
+  "cfg_m_assn cfg cfg_m = (
+  case cfg of Config d s fc fcs \<Rightarrow>
+  case cfg_m of Config_m d_m s_m fc_m fcs_m \<Rightarrow> 
+  \<up>(d=d_m) * s_m_assn s s_m * fc_m_assn fc fc_m * fcs_m_assn fcs fcs_m
+)"     
+
 lemma [sep_heap_rules]: "<mem_m_assn m mi> len_byte_array (fst mi) 
 <\<lambda>r. mem_m_assn m mi * \<up>(r=length (Rep_mem_rep (fst m)))>"
   unfolding mem_m_assn_def
@@ -176,33 +199,46 @@ method reinsert_list_idx for i :: nat =
   (simp;fail),
   (simp;fail)
   
-lemma mem_size_triple:"< mi \<mapsto>\<^sub>a mis * list_assn mem_m_assn ms mis * inst_m_assn' (f_inst i) ii > 
-    app_s_f_v_s_mem_size_m mi ii vs 
-  <\<lambda>r. \<up>(r = app_s_f_v_s_mem_size ms i vs) *
-   mi \<mapsto>\<^sub>a mis * (list_assn mem_m_assn) ms mis * inst_m_assn' (f_inst i) ii>"
-  unfolding app_s_f_v_s_mem_size_m_def inst_m_assn'_def list_assn_conv_idx
+lemma mem_size_triple:
+  "< ms_m \<mapsto>\<^sub>a ms_i * list_assn mem_m_assn ms ms_i * inst_m_assn (f_inst f) f_inst2 > 
+    app_s_f_v_s_mem_size_m ms_m f_inst2 v_s 
+  <\<lambda>r. \<up>(r = app_s_f_v_s_mem_size ms f v_s) *
+   ms_m \<mapsto>\<^sub>a ms_i * (list_assn mem_m_assn) ms ms_i * inst_m_assn (f_inst f) f_inst2>"
+  unfolding app_s_f_v_s_mem_size_m_def inst_m_assn_def list_assn_conv_idx
   apply extract_pre_pure
   apply sep_auto
-  apply (extract_list_idx "inst.mems (f_inst i) ! 0")
+  apply (extract_list_idx "inst.mems (f_inst f) ! 0")
   apply (sep_auto)
-  apply (reinsert_list_idx "inst.mems (f_inst i) ! 0")
+  apply (reinsert_list_idx "inst.mems (f_inst f) ! 0")
   apply (sep_auto)
   subgoal by (auto simp add: app_s_f_v_s_mem_size_def smem_ind_def mem_size_def 
         mem_length_def mem_rep_length_def split: option.split list.split)  
   apply (sep_auto)
   done
+
+lemma mem_size_triple':
+  "< mems_m_assn ms ms_m * inst_m_assn (f_inst f) f_inst2 > 
+    app_s_f_v_s_mem_size_m ms_m f_inst2 v_s 
+  <\<lambda>r. \<up>(r = app_s_f_v_s_mem_size ms f v_s) *
+   mems_m_assn ms ms_m * inst_m_assn (f_inst f) f_inst2>"
+  unfolding mems_m_assn_def 
+  using mem_size_triple[where ms=ms and ms_m = ms_m]
+  apply(sep_auto)
+  apply(rule post_exI_rule)
+  apply(sep_auto)
+  done
+
     
 find_theorems app_s_f_v_s_mem_size
 
 lemmas splits = 
-  frame_context_m.splits frame_context.splits config_m.splits redex.splits prod.splits
+  frame_context_m.splits frame_context.splits config.splits config_m.splits redex.splits prod.splits
 
 lemmas defs =  
   Heap_Monad.return_def Heap_Monad.heap_def 
   config_m_to_config_def frame_context_m_to_frame_context_def
 
-definition cfg_m_assn :: "config \<Rightarrow> config_m \<Rightarrow> assn" where
-  "cfg_m_assn cfg cfg_m = false"
+
 
 abbreviation cfg_m_pair_assn where 
   "cfg_m_pair_assn p p_m \<equiv> 
@@ -211,9 +247,161 @@ abbreviation cfg_m_pair_assn where
   cfg_m_assn cfg cfg_m * \<up>(res = res_m)"
 
 lemma run_step_b_e_m_triple:
-    "<cfg_m_assn cfg cfg_m> run_step_b_e_m b_e cfg_m 
+    "<cfg_m_assn cfg cfg_m> 
+    run_step_b_e_m b_e cfg_m 
     <\<lambda>r. cfg_m_pair_assn (run_step_b_e b_e cfg) r>"
-  sorry
+proof - 
+  obtain d s fc fcs where config:"cfg = Config d s fc fcs"
+    by(erule config.exhaust)
+  obtain redex lcs nf f where frame:"fc = Frame_context redex lcs nf f" 
+    by(erule frame_context.exhaust)
+  obtain v_s es b_es where redex:"redex = Redex v_s es b_es" 
+    by(erule redex.exhaust)
+
+  obtain d_m s_m fc_m fcs_m 
+    where config_m':"cfg_m = Config_m d_m s_m fc_m fcs_m" 
+    by(erule config_m.exhaust)  
+  
+  then have config_m:"cfg_m_assn cfg cfg_m \<Longrightarrow>\<^sub>A 
+    \<up>(cfg_m = Config_m d s_m fc_m fcs_m) * cfg_m_assn cfg cfg_m"
+    unfolding config cfg_m_assn_def by(auto)
+    
+  obtain redex_m lcs_m nf_m f_locs1 f_inst2 
+    where frame_m':"fc_m = Frame_context_m redex_m lcs_m nf_m f_locs1 f_inst2" 
+    using frame_context_m.exhaust by blast
+
+  have frame_m:"fc_m_assn fc fc_m \<Longrightarrow>\<^sub>A 
+    \<up>(fc_m = Frame_context_m redex lcs nf f_locs1 f_inst2) * fc_m_assn fc fc_m"
+    unfolding frame frame_m' fc_m_assn_def by auto
+
+  then have "cfg_m_assn cfg cfg_m \<Longrightarrow>\<^sub>A 
+    \<up>(fc_m = Frame_context_m redex lcs nf f_locs1 f_inst2) * cfg_m_assn cfg cfg_m"
+    using config_m unfolding config config_m' cfg_m_assn_def 
+    apply(simp del:ent_pure_post_iff)
+    by (metis ent_pure_post_iff entailsI mod_starE)
+    
+  obtain v_s_m es_m b_es_m where redex_m:"redex_m = Redex v_s_m es_m b_es_m" 
+    by(erule redex.exhaust)
+
+  show ?thesis
+  proof (cases b_e)
+    case Unreachable
+    have 1:"run_step_b_e Unreachable cfg = (cfg, Res_trap (STR ''unreachable''))"
+      using config by (auto simp add: defs split: splits)
+    have 2:"run_step_b_e_m Unreachable cfg_m = 
+      Heap_Monad.return (cfg_m, Res_trap (STR ''unreachable''))"
+      using config_m' by (auto simp add: defs split: splits)
+    have "<cfg_m_assn cfg cfg_m> 
+      run_step_b_e_m Unreachable cfg_m 
+      <\<lambda>r. cfg_m_pair_assn (run_step_b_e Unreachable cfg) r>" 
+      using 1 2 by(sep_auto)
+    then show ?thesis using Unreachable by auto
+  next
+    case Current_memory
+
+    have 2:"run_step_b_e_m Current_memory cfg_m = do {
+        (v_s', res) \<leftarrow> (app_s_f_v_s_mem_size_m (s_m.mems s_m) f_inst2 v_s_m);
+        Heap_Monad.return (Config_m d_m s_m (update_fc_step_m fc_m v_s' []) fcs_m, res) }" 
+      unfolding config_m' frame_m' redex_m by (auto simp add: defs split: splits)
+
+    obtain v_s' res where mem_size:"app_s_f_v_s_mem_size (s.mems s) f v_s = (v_s', res)"
+      by(erule prod.exhaust)
+
+    have 1:"run_step_b_e Current_memory cfg = (Config d s (update_fc_step fc v_s' []) fcs, res)"
+      using config frame redex mem_size by (auto simp add: defs split: splits)
+
+    have "<cfg_m_assn cfg cfg_m> app_s_f_v_s_mem_size_m (s_m.mems s_m) f_inst2 v_s_m 
+        <\<lambda>r.\<up>(r = (v_s', res)) * cfg_m_assn cfg cfg_m > "
+      using frame_rule[OF mem_size_triple'
+        [where ms="s.mems s" and ms_m="s_m.mems s_m" and f=f and v_s=v_s, of f_inst2]]
+      unfolding cfg_m_assn_def s_m_assn_def fc_m_assn_def 
+         config config_m' frame frame_m' redex redex_m mem_size
+      by(auto)
+
+    then show ?thesis 
+      unfolding Current_memory 1 2
+      unfolding cfg_m_assn_def fc_m_assn_def config config_m' frame frame_m'
+      by(simp, sep_auto)
+  next
+    case Nop
+    then show ?thesis sorry
+  next
+    case Drop
+    then show ?thesis sorry
+  next
+    case Select
+    then show ?thesis sorry
+  next
+    case (Block x51 x52)
+    then show ?thesis sorry
+  next
+    case (Loop x61 x62)
+  then show ?thesis sorry
+  next
+    case (If x71 x72 x73)
+    then show ?thesis sorry
+  next
+    case (Br x8)
+    then show ?thesis sorry
+  next
+  case (Br_if x9)
+    then show ?thesis sorry
+  next
+    case (Br_table x101 x102)
+    then show ?thesis sorry
+  next
+    case Return
+    then show ?thesis sorry
+  next
+  case (Call x12)
+    then show ?thesis sorry
+  next
+    case (Call_indirect x13)
+    then show ?thesis sorry
+  next
+    case (Get_local x14)
+    then show ?thesis sorry
+  next
+    case (Set_local x15)
+    then show ?thesis sorry
+  next
+    case (Tee_local x16)
+    then show ?thesis sorry
+  next
+    case (Get_global x17)
+    then show ?thesis sorry
+  next
+    case (Set_global x18)
+    then show ?thesis sorry
+  next
+    case (Load x191 x192 x193 x194)
+    then show ?thesis sorry
+  next
+    case (Store x201 x202 x203 x204)
+    then show ?thesis sorry
+  next
+    case Grow_memory
+    then show ?thesis sorry
+  next
+    case (EConst x23)
+    then show ?thesis sorry
+  next
+    case (Unop x241 x242)
+    then show ?thesis sorry
+  next
+    case (Binop x251 x252)
+    then show ?thesis sorry
+  next
+    case (Testop x261 x262)
+    then show ?thesis sorry
+  next
+    case (Relop x271 x272)
+    then show ?thesis sorry
+  next
+    case (Cvtop x281 x282 x283 x284)
+    then show ?thesis sorry
+  qed
+qed
 
 lemma run_step_b_e_m_run_step_b_e:
   assumes 
