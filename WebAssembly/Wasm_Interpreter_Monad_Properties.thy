@@ -331,6 +331,15 @@ lemma get_global_triple_s:
   apply(sep_auto)
   by (metis assn_times_comm star_aci(3)) 
 
+lemma set_local_triple: 
+  "<locs_m_assn (f_locs f) f_locs1 * inst_m_assn (f_inst f) f_inst2> 
+  app_f_v_s_set_local_m k f_locs1 v_s
+  <\<lambda>r. let (f', v_s', res) = (app_f_v_s_set_local k f v_s) in 
+  \<up>(r = (v_s', res)) 
+  * locs_m_assn (f_locs f') f_locs1 * inst_m_assn (f_inst f') f_inst2>"
+  unfolding locs_m_assn_def app_f_v_s_set_local_m_def app_f_v_s_set_local_def
+  by(sep_auto)
+
 lemma call_triple: 
  "<inst_m_assn (f_inst f) f_inst2> 
   app_f_call_m k f_inst2 
@@ -415,6 +424,46 @@ proof -
 
     then show ?thesis 
       unfolding Current_memory 1 2
+      unfolding cfg_m_assn_def fc_m_assn_def unfold_vars
+      by (simp, sep_auto)
+  next
+    case (Set_local k)
+    have 2:"run_step_b_e_m (Set_local k) cfg_m = do {
+        (v_s', res) \<leftarrow> (app_f_v_s_set_local_m k f_locs1 v_s_m);
+        let fc' = Frame_context_m (Redex v_s' es_m b_es_m) lcs_m nf_m f_locs1 f_inst2 in
+        Heap_Monad.return (Config_m d_m s_m fc' fcs_m, res) }" 
+      unfolding unfold_vars_m by (auto simp add: defs split: splits)
+
+    obtain f' v_s' res where set_local:"app_f_v_s_set_local k f v_s = (f', v_s', res)"
+      by(erule prod_cases3)
+
+    define cfg' where 
+      "cfg' = (let fc' = Frame_context (Redex v_s' es b_es) lcs nf f' in (Config d s fc' fcs))"
+
+    have 1:"run_step_b_e (Set_local k) cfg = (cfg', res)"
+      using config frame redex set_local cfg'_def by (auto simp add: defs split: splits)
+
+    define cfg_m' where 
+      "cfg_m' = (\<lambda>v_s_m'. 
+          let fc' = Frame_context_m (Redex v_s_m' es_m b_es_m) lcs_m nf_m f_locs1 f_inst2 in
+          Config_m d_m s_m fc' fcs_m)"
+
+    have 3:"run_step_b_e_m (Set_local k) cfg_m = do {
+        (v_s', res) \<leftarrow> (app_f_v_s_set_local_m k f_locs1 v_s_m);
+        Heap_Monad.return (cfg_m' v_s', res) }" 
+      using 2 cfg_m'_def by auto
+
+    have "<cfg_m_assn cfg cfg_m> 
+        app_f_v_s_set_local_m k f_locs1 v_s_m 
+        <\<lambda>r.\<up>(r = (v_s', res)) * cfg_m_assn cfg' (cfg_m' v_s') > "
+      using frame_rule[OF set_local_triple[of f f_locs1 f_inst2 k v_s],
+           of "s_m_assn s s_m * fcs_m_assn fcs fcs_m"]
+      unfolding cfg'_def cfg_m'_def unfold_vars_assns set_local
+      apply(auto) 
+      by (metis assn_times_comm star_aci(3))
+     
+    then show ?thesis 
+      unfolding Set_local 1 3
       unfolding cfg_m_assn_def fc_m_assn_def unfold_vars
       by (simp, sep_auto)
   next
@@ -522,9 +571,6 @@ proof -
       unfolding Call_indirect 1 2
       unfolding cfg_m_assn_def fc_m_assn_def unfold_vars
       by (simp, sep_auto)
-  next
-    case (Set_local k)
-    then show ?thesis sorry
   next
     case (Tee_local k)
     then show ?thesis sorry
