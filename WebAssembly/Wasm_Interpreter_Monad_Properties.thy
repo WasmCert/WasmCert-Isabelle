@@ -182,6 +182,7 @@ lemma [sep_heap_rules]: "<mem_m_assn m mi> len_byte_array (fst mi)
   unfolding mem_m_assn_def
   by (sep_auto split: prod.splits)
 
+
 definition mems_m_assn :: "mem list \<Rightarrow> mem_m array \<Rightarrow> assn" where
   "mems_m_assn ms ms_m = (\<exists>\<^sub>A ms_i. ms_m \<mapsto>\<^sub>a ms_i  * list_assn mem_m_assn ms ms_i)"
 
@@ -212,17 +213,7 @@ definition funcs_m_assn :: "cl list \<Rightarrow> cl_m array \<Rightarrow> assn"
 definition tabinst_m_assn :: "tabinst \<Rightarrow> tabinst_m \<Rightarrow> assn" where 
   "tabinst_m_assn = (\<lambda>(tr,tm) (tr_m,tm_m). tr_m \<mapsto>\<^sub>a tr * \<up>(tm = tm_m))"
 
-lemma [sep_heap_rules]: "<tabinst_m_assn t t_m> 
-    Array.len (fst t_m) 
-    <\<lambda>r. tabinst_m_assn t t_m * \<up>(r=length (fst t))>"
-  unfolding tabinst_m_assn_def
-  by (sep_auto split: prod.splits)
 
-lemma [sep_heap_rules]: "<tabinst_m_assn t t_m> 
-    Array.nth (fst t_m) x
-    <\<lambda>r. tabinst_m_assn t t_m * \<up>(r=(fst t)!x)>"
-  unfolding tabinst_m_assn_def
-  by (sep_auto split: prod.splits)
 
 definition tabs_m_assn :: "tabinst list \<Rightarrow> tabinst_m array \<Rightarrow> assn" where
  "tabs_m_assn ts ts_m = (\<exists>\<^sub>A ts_i. ts_m \<mapsto>\<^sub>a ts_i * list_assn tabinst_m_assn ts ts_i)"
@@ -257,7 +248,6 @@ definition cfg_m_assn :: "config \<Rightarrow> config_m \<Rightarrow> assn" wher
   \<up>(d=d_m) * s_m_assn s s_m * fc_m_assn fc fc_m * fcs_m_assn fcs fcs_m
 )"     
 
-  
 lemma mem_size_triple:
   "< ms_m \<mapsto>\<^sub>a ms_i * list_assn mem_m_assn ms ms_i * inst_m_assn (f_inst f) f_inst2 > 
     app_s_f_v_s_mem_size_m ms_m f_inst2 v_s 
@@ -277,13 +267,13 @@ lemma mem_size_triple:
 
 
 
-
 lemma get_local_triple: 
   "<locs_m_assn (f_locs f) f_locs1> 
   app_f_v_s_get_local_m k f_locs1 v_s 
   <\<lambda>r. \<up>(r = app_f_v_s_get_local k f v_s) * locs_m_assn (f_locs f) f_locs1>"
   unfolding locs_m_assn_def app_f_v_s_get_local_m_def app_f_v_s_get_local_def
   by sep_auto
+
 
 lemma get_global_triple:
   "<globs_m_assn gs gs_m * inst_m_assn (f_inst f) f_inst2> 
@@ -303,6 +293,15 @@ lemma set_local_triple:
   * locs_m_assn (f_locs f') f_locs1 * inst_m_assn (f_inst f') f_inst2>"
   unfolding locs_m_assn_def app_f_v_s_set_local_m_def app_f_v_s_set_local_def
   by(sep_auto)
+
+lemma set_global_triple: 
+  "<globs_m_assn gs gs_m * inst_m_assn (f_inst f) f_inst2> 
+  app_s_f_v_s_set_global_m k gs_m f_inst2 v_s
+  <\<lambda>r. let (gs', v_s', res) = (app_s_f_v_s_set_global k gs f v_s) in 
+  \<up>(r = (v_s', res)) 
+  * globs_m_assn gs' gs_m * inst_m_assn (f_inst f) f_inst2>"
+  unfolding app_s_f_v_s_set_global_m_def inst_m_assn_def globs_m_assn_def
+  by (sep_auto simp:app_s_f_v_s_set_global_def update_glob_def sglob_ind_def Let_def)
 
 lemma call_triple: 
  "<inst_m_assn (f_inst f) f_inst2> 
@@ -336,6 +335,17 @@ method defer_vcg = then_else \<open>rule is_complex_goal\<close> \<open>fail\<cl
 
 method sep_auto_all = (defer_vcg | (rule is_complex_goal, sep_auto))+
 
+lemma [sep_heap_rules]: "<tabinst_m_assn t t_m> 
+    Array.len (fst t_m) 
+    <\<lambda>r. tabinst_m_assn t t_m * \<up>(r=length (fst t))>"
+  unfolding tabinst_m_assn_def
+  by (sep_auto split: prod.splits)
+
+lemma [sep_heap_rules]: "<tabinst_m_assn t t_m> 
+    Array.nth (fst t_m) x
+    <\<lambda>r. tabinst_m_assn t t_m * \<up>(r=(fst t)!x)>"
+  unfolding tabinst_m_assn_def
+  by (sep_auto split: prod.splits)
 
 lemma [sep_heap_rules]:"<funcs_m_assn cls cls_m> 
     Array.nth cls_m i  
@@ -373,42 +383,6 @@ lemma call_indirect_triple:
      apply(auto simp add:stypes_def tab_cl_ind_def)
   done
 
-
-
-(*
-  apply(sep_auto)
-   defer 
-  unfolding inst_m_assn_def tabs_m_assn_def list_assn_conv_idx
-  
-   apply(sep_auto split:v.splits)
-    apply(extract_pre_pure)
-       apply(extract_list_idx "inst.tabs (f_inst f) ! 0")
-       apply(sep_auto)
-       apply(extract_pre_pure)
-       apply(reinsert_list_idx "inst.tabs (f_inst f) ! 0")
-  apply(sep_auto)
-       apply(extract_pre_pure)
-       apply(extract_list_idx "inst.tabs (f_inst f) ! 0")
-       apply(sep_auto)
-       apply(extract_pre_pure)
-       apply(reinsert_list_idx "inst.tabs (f_inst f) ! 0")
-     apply(defer_vcg | (rule is_complex_goal, sep_auto))+
-     apply(simp_all add:app_s_f_v_s_call_indirect_def Let_def split:list.splits option.splits)
-     apply(auto simp add:stypes_def tab_cl_ind_def)
-  subgoal sledgehammer
-    using tab_cl_ind_def by auto sorry
-  subgoal sledgehammer
-    using tab_cl_ind_def by force sorry
-  subgoal sledgehammer
-    using tab_cl_ind_def by force sorry
-  subgoal sledgehammer
-    by (simp add: stypes_def tab_cl_ind_def) sorry
-  subgoal sledgehammer
-    by (simp add: stypes_def tab_cl_ind_def) sorry
-  subgoal sledgehammer
-    by (simp add: tab_cl_ind_def) sorry
-  sorry
-*)
 
 find_theorems app_s_f_v_s_mem_size
 
@@ -456,10 +430,11 @@ proof -
   show ?thesis
   proof (cases b_e)
     case (Tee_local k)
-    then show ?thesis sorry
+    then show ?thesis unfolding unfold_vars_assns by sep_auto
   next
     case (Set_global k)
-    then show ?thesis sorry
+    then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
+      by (sep_auto heap:set_global_triple split:prod.splits)
   next
     case (Load t tp_sx a off)
     then show ?thesis sorry
@@ -471,242 +446,84 @@ proof -
     then show ?thesis sorry
   next
     case Current_memory
-
-    show ?thesis 
-      unfolding Current_memory unfold_vars_assns s_m_assn_def mems_m_assn_def 
+    then show ?thesis 
+      unfolding unfold_vars_assns s_m_assn_def mems_m_assn_def 
       by(sep_auto heap:mem_size_triple)
   next
     case (Set_local k)
-     
-    show ?thesis 
-      unfolding Set_local unfold_vars_assns
+    then show ?thesis 
+      unfolding unfold_vars_assns
       by (sep_auto heap:set_local_triple split:prod.splits)
   next
     case (Get_local k)
-
-    show ?thesis 
-      unfolding Get_local unfold_vars_assns 
-      by (sep_auto heap:get_local_triple)
+    then show ?thesis 
+      unfolding unfold_vars_assns by (sep_auto heap:get_local_triple)
   next
     case (Get_global k)
-    show ?thesis 
-      unfolding Get_global unfold_vars_assns s_m_assn_def
-      by (sep_auto heap:get_global_triple)
+    then show ?thesis 
+      unfolding unfold_vars_assns s_m_assn_def by (sep_auto heap:get_global_triple)
   next
     case (Call k)
-
-    show ?thesis 
-      unfolding Call unfold_vars_assns
-      by (sep_auto heap:call_triple)
+    then show ?thesis 
+      unfolding unfold_vars_assns by (sep_auto heap:call_triple)
   next
     case (Call_indirect k)
-
-    show ?thesis 
-      unfolding Call_indirect unfold_vars_assns s_m_assn_def
-      by (sep_auto heap:call_indirect_triple)
+    then show ?thesis 
+      unfolding unfold_vars_assns s_m_assn_def by (sep_auto heap:call_indirect_triple)
   next
     case Return (* this case relies on garbage collection *)
-
-    show ?thesis unfolding unfold_vars_assns fcs_m_assn_def Return
-      by(simp split:splits list.split, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns fcs_m_assn_def
+      by (sep_auto split:splits list.split)
   next
     case (Block tf b_ebs)
-    show ?thesis unfolding unfold_vars_assns Block
-      by(simp split:splits tf.splits, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns by(sep_auto split:tf.splits)
   next
     case (Loop tfs b_els)
-    show ?thesis unfolding unfold_vars_assns Loop
-      by(simp split:splits tf.splits, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns by(sep_auto split:tf.splits)
   next
     case (Br k)
-    show ?thesis unfolding unfold_vars_assns Br
-      by(simp split:splits label_context.splits, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns by(sep_auto split:label_context.splits)
   next
     case Unreachable
-    then show ?thesis unfolding unfold_vars_assns by(simp split:splits, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns by sep_auto
   next
     case Nop
-    then show ?thesis unfolding unfold_vars_assns by(simp split:splits, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns by sep_auto
   next
     case Drop 
-    then show ?thesis unfolding unfold_vars_assns by(simp split:splits, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns by sep_auto
   next
     case Select 
-    then show ?thesis unfolding unfold_vars_assns by(simp split:splits, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns by sep_auto
   next
     case (If tf es1 es2) 
-    then show ?thesis unfolding unfold_vars_assns by(simp split:splits, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns by sep_auto
   next
     case (Br_if k)
-    then show ?thesis unfolding unfold_vars_assns by(simp split:splits, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns by sep_auto
   next
     case (Br_table ks k)
-    then show ?thesis unfolding unfold_vars_assns by(simp split:splits, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns by sep_auto
   next
     case (EConst k)
-    then show ?thesis unfolding unfold_vars_assns by(simp split:splits, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns by sep_auto
   next
     case (Unop t op)
-    then show ?thesis unfolding unfold_vars_assns by(simp split:splits, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns by sep_auto
   next
     case (Binop t op)
-    then show ?thesis unfolding unfold_vars_assns by(simp split:splits, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns by sep_auto
   next
     case (Testop t op)
-    then show ?thesis unfolding unfold_vars_assns by(simp split:splits, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns by sep_auto
   next
     case (Relop t op)
-    then show ?thesis unfolding unfold_vars_assns by(simp split:splits, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns by sep_auto
   next
     case (Cvtop t2 op t1 sx)
-    then show ?thesis unfolding unfold_vars_assns by(simp split:splits, sep_auto)
+    then show ?thesis unfolding unfold_vars_assns by sep_auto
   qed
 qed
-
-lemma run_step_b_e_m_run_step_b_e:
-  assumes 
-    "execute (run_step_b_e_m b_e cfg_m) h = Some ((cfg_m', res), h')"
-  shows 
-    "run_step_b_e b_e (config_m_to_config h cfg_m) = ((config_m_to_config h' cfg_m'), res)"
-  using assms
-proof - 
-  define cfg where "cfg = config_m_to_config h cfg_m"
-  obtain d s fc fcs where config:"config_m_to_config h cfg_m = Config d s fc fcs"
-    using config.exhaust by blast
-  obtain redex lcs nf f where frame:"fc = Frame_context redex lcs nf f" 
-    using frame_context.exhaust by blast
-  obtain v_s es b_es where redex:"redex = Redex v_s es b_es" 
-    using redex.exhaust by blast
-
-  obtain s_m fc_m fcs_m where config_m:"cfg_m = Config_m d s_m fc_m fcs_m"
-    using config unfolding config_m_to_config_def 
-    by (simp split: config_m.splits)
-  obtain f_locs1 f_inst2 where frame_m:"fc_m = Frame_context_m redex lcs nf f_locs1 f_inst2" 
-    using config frame unfolding config_m config_m_to_config_def 
-       frame_context_m_to_frame_context_def
-    by (simp split: config_m.splits frame_context_m.splits)
-
-  show ?thesis
-  proof(cases b_e)
-    case Current_memory
-    obtain v_s' res' where mem_size:"(v_s', res') = app_s_f_v_s_mem_size (s.mems s) f v_s"
-      by (metis surjective_pairing) 
-    have step_b_e:"run_step_b_e Current_memory (config_m_to_config h cfg_m) =
-        (Config d s (update_fc_step fc v_s' []) fcs, res') "
-      using config frame redex mem_size by (auto simp add: defs split: splits) 
-
-    have 1:"run_step_b_e_m Current_memory cfg_m = (do {
-        (v_s', res) \<leftarrow> (app_s_f_v_s_mem_size_m (s_m.mems s_m) f_inst2 v_s);
-        Heap_Monad.return (Config_m d s_m (update_fc_step_m fc_m v_s' []) fcs_m, res) }) "
-      using config_m frame_m redex by (auto simp add: defs split: splits) 
-
-    obtain v_s'_m where
-      mem_size_m:"execute (app_s_f_v_s_mem_size_m (s_m.mems s_m) f_inst2 v_s) h = Some ((v_s'_m, res), h')"
-      and cfg_m':"cfg_m' = Config_m d s_m (update_fc_step_m fc_m v_s'_m []) fcs_m" 
-      using assms unfolding Current_memory 1 execute_bind_case 
-      by(simp add:execute_simps split: option.splits prod.splits)
-
-    have "h' = h" using mem_size_m 
-      sorry 
-      
-    then have "(v_s'_m, res) = app_s_f_v_s_mem_size (s.mems s) f v_s" sorry 
-    then have 2:"v_s' = v_s'_m \<and> res = res'" using mem_size prod.inject by metis
-
-    have "Config d s (update_fc_step fc v_s' []) fcs = config_m_to_config h' cfg_m'"
-    proof -
-      have "fc = frame_context_m_to_frame_context h' fc_m" 
-        using \<open>h' = h\<close> config config_m unfolding cfg_def config_m_to_config_def 
-        by (simp split: config_m.splits)
-      then have 
-        "update_fc_step fc v_s' [] = frame_context_m_to_frame_context h' (update_fc_step_m fc_m v_s'_m [])" 
-        using 2 unfolding frame_context_m_to_frame_context_def 
-        by(simp split: frame_context.splits frame_context_m.splits)
-      then show ?thesis using config unfolding \<open>h' = h\<close> config_m_to_config_def cfg_m'
-        by(simp add:config_m split: config_m.splits)
-    qed
-    then show ?thesis using 2 step_b_e Current_memory assms(1) 
-      unfolding \<open>h' = h\<close> config_m
-      sorry
-  next
-    case (Call k)
-    show ?thesis using assms unfolding Call 
-      apply (auto simp add: defs split: splits) sorry
-  next
-    case (Call_indirect k)
-    show ?thesis using assms unfolding Call_indirect 
-      apply (auto simp add: defs split: splits) sorry
-  next
-    case (Get_local k)
-    then show ?thesis sorry
-  next
-    case (Set_local k)
-    then show ?thesis sorry
-  next
-    case (Get_global k)
-    then show ?thesis sorry
-  next
-    case (Set_global k)
-    then show ?thesis sorry
-  next
-    case (Load x191 x192 x193 x194)
-    then show ?thesis sorry
-  next
-    case (Store x201 x202 x203 x204)
-    then show ?thesis sorry
-  next
-    case Grow_memory
-    then show ?thesis sorry
-  next
-    case (Block tf b_ebs)
-    show ?thesis using assms unfolding Block 
-      by (auto simp add: defs Let_def split: splits tf.split)
-  next
-    case (Loop tf b_els)
-    show ?thesis using assms unfolding Loop 
-      by (auto simp add: defs Let_def split: splits tf.split)
-  next
-    case Return
-    (* why are those defined twice? *)
-    have 1:"\<And>r v. Wasm_Interpreter.update_redex_return r v 
-      = Wasm_Interpreter_Monad.update_redex_return r v"
-      by (metis Wasm_Interpreter.update_redex_return.elims 
-          Wasm_Interpreter_Monad.update_redex_return.simps)
-    show ?thesis using assms unfolding Return 
-      by (auto simp add: defs 1 split: splits frame_context_m.split list.split)
-  next
-    case (Br k)
-    show ?thesis using assms unfolding Br
-      by (auto simp add: defs Let_def split: splits label_context.splits if_splits)
-  next
-    case Unreachable show ?thesis using assms by (auto simp add: defs Unreachable split: splits)
-  next
-    case Nop show ?thesis using assms by (auto simp add: defs Nop split: splits)
-  next
-    case Drop show ?thesis using assms by (auto simp add: defs Drop split: splits)
-  next
-    case Select show ?thesis using assms by (auto simp add: defs Select split: splits)
-  next
-    case (If tf es1 es2) show ?thesis using assms by (auto simp add: defs If split: splits)
-  next
-    case (Br_if k) show ?thesis using assms  by (auto simp add: defs Br_if split: splits)
-  next
-    case (Br_table ks k) show ?thesis using assms by (auto simp add: defs Br_table split: splits)
-  next
-    case (Tee_local k) show ?thesis using assms by (auto simp add: defs Tee_local split: splits)
-  next
-    case (EConst k) show ?thesis using assms by (auto simp add: defs EConst split: splits)
-  next
-    case (Unop t op) show ?thesis using assms by (auto simp add: defs Unop split: splits)
-  next
-    case (Binop t op) show ?thesis using assms by (auto simp add: defs Binop split: splits)  
-  next
-    case (Testop t op) show ?thesis using assms by (auto simp add: defs Testop split: splits)
-  next
-    case (Relop t op) show ?thesis using assms by (auto simp add: defs Relop split: splits)
-  next
-    case (Cvtop t2 op t1 sx) show ?thesis using assms by (auto simp add: defs Cvtop split: splits)
-  qed 
-qed 
 
 lemma run_step_e_m_run_step_e:
   assumes 
@@ -720,7 +537,7 @@ proof(cases e)
   have "run_step_e e (config_m_to_config h cfg_m) = run_step_b_e b_e (config_m_to_config h cfg_m)"
     unfolding Basic by(rule config.induct, auto simp add: defs split: splits) 
   also have "... = ((config_m_to_config h' cfg_m'), res)" 
-    using assms run_step_b_e_m_run_step_b_e unfolding 1 by simp
+    using assms sorry
   finally show ?thesis by -
 next
   case (Invoke i_cl)
