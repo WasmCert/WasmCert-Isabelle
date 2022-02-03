@@ -190,26 +190,24 @@ definition cl_m_assn :: "cl \<Rightarrow> cl_m \<Rightarrow> assn" where
   cl.Func_native i tf ts b_es \<Rightarrow> 
     (case cl_m of 
     cl_m.Func_native i_m tf_m ts_m b_es_m \<Rightarrow> 
-      inst_m_assn i i_m * \<up>(tf = tf_m \<and> ts = ts_m \<and> b_es = b_es_m) 
+      \<up>(tf = tf_m \<and> ts = ts_m \<and> b_es = b_es_m) 
   | cl_m.Func_host tf_m host_m \<Rightarrow> false)
 | cl.Func_host tf host \<Rightarrow> 
     (case cl_m of 
     cl_m.Func_native i_m tf_m ts_m b_es_m \<Rightarrow> false 
   | cl_m.Func_host tf_m host_m \<Rightarrow> \<up>(tf = tf_m \<and> host = host_m))
 )"
+ (*todo: express that inst are equal, somehow*)
 
-
+lemma cl_m_assn_type:
+  assumes "h \<Turnstile> cl_m_assn cl cl_m" 
+  shows "cl_type cl = cl_m_type cl_m"
+  using assms
+  unfolding cl_m_assn_def cl_type_def cl_m_type_def
+  by(simp split:cl.splits cl_m.splits)
 
 definition funcs_m_assn :: "cl list \<Rightarrow> cl_m array \<Rightarrow> assn" where
   "funcs_m_assn fs fs_m = (\<exists>\<^sub>A fs_i. fs_m \<mapsto>\<^sub>a fs_i * list_assn cl_m_assn fs fs_i)"
-
-lemma [sep_heap_rules]:"<funcs_m_assn cls cls_m> 
-    Array.nth cls_m i  
-    <\<lambda>r. \<up>(cl_m_type r = cl_type (cls!i)) * funcs_m_assn cls cls_m>" 
-  unfolding funcs_m_assn_def cl_m_assn_def
-  apply(extract_pre_pure)
-  apply(sep_auto)
-  sorry  
 
 definition tabinst_m_assn :: "tabinst \<Rightarrow> tabinst_m \<Rightarrow> assn" where 
   "tabinst_m_assn = (\<lambda>(tr,tm) (tr_m,tm_m). tr_m \<mapsto>\<^sub>a tr * \<up>(tm = tm_m))"
@@ -277,30 +275,7 @@ lemma mem_size_triple:
   apply (sep_auto)
   done
 
-lemma mem_size_triple':
-  "< mems_m_assn ms ms_m * inst_m_assn (f_inst f) f_inst2 > 
-    app_s_f_v_s_mem_size_m ms_m f_inst2 v_s 
-  <\<lambda>r. \<up>(r = app_s_f_v_s_mem_size ms f v_s) *
-   mems_m_assn ms ms_m * inst_m_assn (f_inst f) f_inst2>"
-  unfolding mems_m_assn_def 
-  using mem_size_triple[where ms=ms and ms_m = ms_m]
-  apply(sep_auto)
-  apply(rule post_exI_rule)
-  apply(sep_auto)
-  done
 
-lemma mem_size_triple_s: 
-  "< s_m_assn s s_m * inst_m_assn (f_inst f) f_inst2 > 
-    app_s_f_v_s_mem_size_m (s_m.mems s_m) f_inst2 v_s 
-  <\<lambda>r. \<up>(r = app_s_f_v_s_mem_size (s.mems s) f v_s) *
-   s_m_assn s s_m * inst_m_assn (f_inst f) f_inst2>"
-  unfolding s_m_assn_def
-  using frame_rule[OF mem_size_triple'[of "s.mems s" "s_m.mems s_m" f f_inst2 v_s],
-       of "funcs_m_assn (s.funcs s) (s_m.funcs s_m) 
-          * tabs_m_assn (s.tabs s) (s_m.tabs s_m)
-          * globs_m_assn (s.globs s) (s_m.globs s_m)"] 
-  apply(sep_auto)
-  by (metis assn_times_comm star_aci(3)) 
 
 
 lemma get_local_triple: 
@@ -319,17 +294,6 @@ lemma get_global_triple:
     sglob_ind_def
   by (sep_auto)
 
-lemma get_global_triple_s:
-  "< s_m_assn s s_m * inst_m_assn (f_inst f) f_inst2> 
-  app_s_f_v_s_get_global_m k (s_m.globs s_m) f_inst2 v_s
-  <\<lambda>r.\<up>(r = app_s_f_v_s_get_global k (s.globs s) f v_s)
-  * s_m_assn s s_m * inst_m_assn (f_inst f) f_inst2>"
-  unfolding s_m_assn_def 
-  using frame_rule[OF get_global_triple[of "s.globs s" "s_m.globs s_m" f f_inst2 k v_s], 
-       of "funcs_m_assn (s.funcs s) (s_m.funcs s_m) * tabs_m_assn (s.tabs s) (s_m.tabs s_m) 
-      * mems_m_assn (s.mems s) (s_m.mems s_m)"]
-  apply(sep_auto)
-  by (metis assn_times_comm star_aci(3)) 
 
 lemma set_local_triple: 
   "<locs_m_assn (f_locs f) f_locs1 * inst_m_assn (f_inst f) f_inst2> 
@@ -347,13 +311,104 @@ lemma call_triple:
   unfolding inst_m_assn_def app_f_call_m_def app_f_call_def sfunc_ind_def
   by(sep_auto)
 
+
+lemmas is_complex_goal = asm_rl[of "< _ > _ < _ >"] asm_rl[of "_ \<Longrightarrow>\<^sub>A _"]
+
+method_setup then_else = \<open>let
+in
+  Method.text_closure -- Method.text_closure -- Method.text_closure >>
+    (fn ((textb, textt), texte) => fn ctxt => fn using => fn st =>
+      let
+        val bmethod = Method.evaluate_runtime textb ctxt using;
+        val tmethod = Method.evaluate_runtime textt ctxt using;
+        val emethod = Method.evaluate_runtime texte ctxt using;
+      in
+        (case try (fn st => bmethod st |> Seq.pull) st of
+          SOME (SOME (Seq.Result st,_)) => tmethod st
+        | _ => emethod st)
+      end)
+end     
+\<close>
+
+method defer_vcg = then_else \<open>rule is_complex_goal\<close> \<open>fail\<close> 
+  \<open>find_goal \<open>rule is_complex_goal\<close>, 
+  (rule is_complex_goal | tactic \<open>defer_tac 1\<close>)\<close>
+
+method sep_auto_all = (defer_vcg | (rule is_complex_goal, sep_auto))+
+
+
+lemma [sep_heap_rules]:"<funcs_m_assn cls cls_m> 
+    Array.nth cls_m i  
+    <\<lambda>r. \<up>(cl_m_type r = cl_type (cls!i)) * funcs_m_assn cls cls_m>" 
+  unfolding funcs_m_assn_def list_assn_conv_idx
+  apply(sep_auto heap del:nth_rule)
+  apply(extract_pre_pure)
+  apply(sep_auto)
+  apply(simp add: listI_assn_extract[of i])
+  using cl_m_assn_type 
+  by (metis mod_starD)
+
 lemma call_indirect_triple:
   "<tabs_m_assn ts ts_m * funcs_m_assn fs fs_m * inst_m_assn (f_inst f) f_inst2> 
   app_s_f_v_s_call_indirect_m k ts_m fs_m f_inst2 v_s
   <\<lambda>r. \<up>(r = app_s_f_v_s_call_indirect k ts fs f v_s) 
 * tabs_m_assn ts ts_m * funcs_m_assn fs fs_m * inst_m_assn (f_inst f) f_inst2>"
-  sorry
+  unfolding app_s_f_v_s_call_indirect_m_def 
+  supply [split] = v.splits option.splits
+  unfolding inst_m_assn_def tabs_m_assn_def list_assn_conv_idx
+  apply(sep_auto_all)
+      apply(extract_pre_pure)
+       apply(extract_list_idx "inst.tabs (f_inst f) ! 0")
+       apply(sep_auto)
+       apply(extract_pre_pure)
+      apply(reinsert_list_idx "inst.tabs (f_inst f) ! 0")
+      apply(sep_auto_all)
+      apply(extract_pre_pure)
+       apply(extract_list_idx "inst.tabs (f_inst f) ! 0")
+       apply(sep_auto)
+       apply(extract_pre_pure)
+       apply(reinsert_list_idx "inst.tabs (f_inst f) ! 0")
+       apply(sep_auto_all)
+         apply(simp_all add:app_s_f_v_s_call_indirect_def Let_def split:list.splits option.splits)
+     apply(auto simp add:stypes_def tab_cl_ind_def)
+  done
 
+
+
+(*
+  apply(sep_auto)
+   defer 
+  unfolding inst_m_assn_def tabs_m_assn_def list_assn_conv_idx
+  
+   apply(sep_auto split:v.splits)
+    apply(extract_pre_pure)
+       apply(extract_list_idx "inst.tabs (f_inst f) ! 0")
+       apply(sep_auto)
+       apply(extract_pre_pure)
+       apply(reinsert_list_idx "inst.tabs (f_inst f) ! 0")
+  apply(sep_auto)
+       apply(extract_pre_pure)
+       apply(extract_list_idx "inst.tabs (f_inst f) ! 0")
+       apply(sep_auto)
+       apply(extract_pre_pure)
+       apply(reinsert_list_idx "inst.tabs (f_inst f) ! 0")
+     apply(defer_vcg | (rule is_complex_goal, sep_auto))+
+     apply(simp_all add:app_s_f_v_s_call_indirect_def Let_def split:list.splits option.splits)
+     apply(auto simp add:stypes_def tab_cl_ind_def)
+  subgoal sledgehammer
+    using tab_cl_ind_def by auto sorry
+  subgoal sledgehammer
+    using tab_cl_ind_def by force sorry
+  subgoal sledgehammer
+    using tab_cl_ind_def by force sorry
+  subgoal sledgehammer
+    by (simp add: stypes_def tab_cl_ind_def) sorry
+  subgoal sledgehammer
+    by (simp add: stypes_def tab_cl_ind_def) sorry
+  subgoal sledgehammer
+    by (simp add: tab_cl_ind_def) sorry
+  sorry
+*)
 
 find_theorems app_s_f_v_s_mem_size
 
@@ -400,178 +455,6 @@ proof -
 
   show ?thesis
   proof (cases b_e)
-    case Current_memory
-
-    have 2:"run_step_b_e_m Current_memory cfg_m = do {
-        (v_s', res) \<leftarrow> (app_s_f_v_s_mem_size_m (s_m.mems s_m) f_inst2 v_s_m);
-        Heap_Monad.return (Config_m d_m s_m (update_fc_step_m fc_m v_s' []) fcs_m, res) }" 
-      unfolding unfold_vars_m by (auto simp add: defs split: splits)
-
-    obtain v_s' res where mem_size:"app_s_f_v_s_mem_size (s.mems s) f v_s = (v_s', res)"
-      by(erule prod.exhaust)
-
-    have 1:"run_step_b_e Current_memory cfg = (Config d s (update_fc_step fc v_s' []) fcs, res)"
-      using config frame redex mem_size by (auto simp add: defs split: splits)
-
-    have "<cfg_m_assn cfg cfg_m> 
-        app_s_f_v_s_mem_size_m (s_m.mems s_m) f_inst2 v_s_m 
-        <\<lambda>r.\<up>(r = (v_s', res)) * cfg_m_assn cfg cfg_m > "
-      using frame_rule[OF mem_size_triple_s
-        [of s s_m f f_inst2 v_s], 
-        of "locs_m_assn (f_locs f) f_locs1 * fcs_m_assn fcs fcs_m"]
-      unfolding unfold_vars_assns s_m_assn_def  mem_size
-      by (sep_auto)
-
-    then show ?thesis 
-      unfolding Current_memory 1 2
-      unfolding cfg_m_assn_def fc_m_assn_def unfold_vars
-      by (simp, sep_auto)
-  next
-    case (Set_local k)
-    have 2:"run_step_b_e_m (Set_local k) cfg_m = do {
-        (v_s', res) \<leftarrow> (app_f_v_s_set_local_m k f_locs1 v_s_m);
-        let fc' = Frame_context_m (Redex v_s' es_m b_es_m) lcs_m nf_m f_locs1 f_inst2 in
-        Heap_Monad.return (Config_m d_m s_m fc' fcs_m, res) }" 
-      unfolding unfold_vars_m by (auto simp add: defs split: splits)
-
-    obtain f' v_s' res where set_local:"app_f_v_s_set_local k f v_s = (f', v_s', res)"
-      by(erule prod_cases3)
-
-    define cfg' where 
-      "cfg' = (let fc' = Frame_context (Redex v_s' es b_es) lcs nf f' in (Config d s fc' fcs))"
-
-    have 1:"run_step_b_e (Set_local k) cfg = (cfg', res)"
-      using config frame redex set_local cfg'_def by (auto simp add: defs split: splits)
-
-    define cfg_m' where 
-      "cfg_m' = (\<lambda>v_s_m'. 
-          let fc' = Frame_context_m (Redex v_s_m' es_m b_es_m) lcs_m nf_m f_locs1 f_inst2 in
-          Config_m d_m s_m fc' fcs_m)"
-
-    have 3:"run_step_b_e_m (Set_local k) cfg_m = do {
-        (v_s', res) \<leftarrow> (app_f_v_s_set_local_m k f_locs1 v_s_m);
-        Heap_Monad.return (cfg_m' v_s', res) }" 
-      using 2 cfg_m'_def by auto
-
-    have "<cfg_m_assn cfg cfg_m> 
-        app_f_v_s_set_local_m k f_locs1 v_s_m 
-        <\<lambda>r.\<up>(r = (v_s', res)) * cfg_m_assn cfg' (cfg_m' v_s') > "
-      using frame_rule[OF set_local_triple[of f f_locs1 f_inst2 k v_s],
-           of "s_m_assn s s_m * fcs_m_assn fcs fcs_m"]
-      unfolding cfg'_def cfg_m'_def unfold_vars_assns set_local
-      apply(auto) 
-      by (metis assn_times_comm star_aci(3))
-     
-    then show ?thesis 
-      unfolding Set_local 1 3
-      unfolding cfg_m_assn_def fc_m_assn_def unfold_vars
-      by (simp, sep_auto)
-  next
-    case (Get_local k)
-    have 2:"run_step_b_e_m (Get_local k) cfg_m = do {
-        (v_s', res) \<leftarrow> (app_f_v_s_get_local_m k f_locs1 v_s_m);
-        Heap_Monad.return (Config_m d_m s_m (update_fc_step_m fc_m v_s' []) fcs_m, res) }" 
-      unfolding unfold_vars_m by (auto simp add: defs split: splits)
-
-    obtain v_s' res where get_local:"app_f_v_s_get_local k f v_s = (v_s', res)"
-      by(erule prod.exhaust)
-
-    have 1:"run_step_b_e (Get_local k) cfg = (Config d s (update_fc_step fc v_s' []) fcs, res)"
-      using config frame redex get_local by (auto simp add: defs split: splits)
-
-    have "<cfg_m_assn cfg cfg_m> 
-        app_f_v_s_get_local_m k f_locs1 v_s_m 
-        <\<lambda>r.\<up>(r = (v_s', res)) * cfg_m_assn cfg cfg_m > "
-    using frame_rule[OF get_local_triple
-        [of f f_locs1 k v_s], 
-        of "s_m_assn s s_m * inst_m_assn (f_inst f) f_inst2 * fcs_m_assn fcs fcs_m"]
-    unfolding cfg_m_assn_def fc_m_assn_def unfold_vars get_local
-      apply(sep_auto)
-    by (metis assn_times_comm star_aci(3)) (*Why doesn't sep_auto see commutativity? *)
-
-    then show ?thesis 
-      unfolding Get_local 1 2
-      unfolding cfg_m_assn_def fc_m_assn_def unfold_vars
-      by (simp, sep_auto)
-  next
-    case (Get_global k)
-    have 2:"run_step_b_e_m (Get_global k) cfg_m = do {
-        (v_s', res) \<leftarrow> (app_s_f_v_s_get_global_m k (s_m.globs s_m) f_inst2 v_s_m);
-        Heap_Monad.return (Config_m d_m s_m (update_fc_step_m fc_m v_s' []) fcs_m, res) }" 
-      unfolding unfold_vars_m by (auto simp add: defs split: splits)
-    obtain v_s' res where get_global:"app_s_f_v_s_get_global k (s.globs s) f v_s = (v_s', res)"
-      by(erule prod.exhaust)
-
-    have 1:"run_step_b_e (Get_global k) cfg = (Config d s (update_fc_step fc v_s' []) fcs, res)"
-      using config frame redex get_global by (auto simp add: defs split: splits)
-
-    have "<cfg_m_assn cfg cfg_m> 
-        app_s_f_v_s_get_global_m k (s_m.globs s_m) f_inst2 v_s_m 
-        <\<lambda>r.\<up>(r = (v_s', res)) * cfg_m_assn cfg cfg_m > "
-      using frame_rule[OF get_global_triple_s[of s s_m f f_inst2 k v_s], 
-           of "locs_m_assn (f_locs f) f_locs1 * fcs_m_assn fcs fcs_m"]
-      unfolding cfg_m_assn_def fc_m_assn_def unfold_vars get_global
-      by(sep_auto)
-
-    then show ?thesis 
-      unfolding Get_global 1 2
-      unfolding cfg_m_assn_def fc_m_assn_def unfold_vars
-      by (simp, sep_auto)
-  next
-    case (Call k)
-
-    have 2:"run_step_b_e_m (Call k) cfg_m = do {
-        (es_cont, res) \<leftarrow> (app_f_call_m k f_inst2);
-        Heap_Monad.return (Config_m d_m s_m (update_fc_step_m fc_m v_s_m es_cont) fcs_m, res) }" 
-      unfolding unfold_vars_m by (auto simp add: defs split: splits)
-
-    obtain es_cont res where call:"app_f_call k f = (es_cont, res)"
-      by(erule prod.exhaust)
-
-    have 1:"run_step_b_e (Call k) cfg = (Config d s (update_fc_step fc v_s es_cont) fcs, res)"
-      using config frame redex call by (auto simp add: defs split: splits)
-
-    have "<cfg_m_assn cfg cfg_m> 
-        app_f_call_m k f_inst2
-        <\<lambda>r.\<up>(r = (es_cont, res)) * cfg_m_assn cfg cfg_m > "
-      using frame_rule[OF call_triple[of f f_inst2 k],
-          of "s_m_assn s s_m * locs_m_assn (f_locs f) f_locs1 * fcs_m_assn fcs fcs_m"]
-      unfolding unfold_vars_assns call
-      apply(sep_auto)
-      by (metis assn_times_comm)
-
-    then show ?thesis
-      unfolding Call 1 2
-      unfolding cfg_m_assn_def fc_m_assn_def unfold_vars
-      by (simp, sep_auto)
-  next
-    case (Call_indirect k)
-
-    have 2:"run_step_b_e_m (Call_indirect k) cfg_m = do {
-        (v_s', es_cont, res) 
-          \<leftarrow> (app_s_f_v_s_call_indirect_m k (s_m.tabs s_m) (s_m.funcs s_m) f_inst2 v_s_m);
-        Heap_Monad.return (Config_m d_m s_m (update_fc_step_m fc_m v_s' es_cont) fcs_m, res) }" 
-      unfolding unfold_vars_m by (auto simp add: defs split: splits)
-
-    obtain v_s' es_cont res 
-      where call_indirect:
-        "app_s_f_v_s_call_indirect k (s.tabs s) (s.funcs s) f v_s = (v_s', es_cont, res)"
-      by (erule prod_cases3)
-
-    have 1:"run_step_b_e (Call_indirect k) cfg = 
-        (Config d s (update_fc_step fc v_s' es_cont) fcs, res)"
-      using config frame redex call_indirect by (auto simp add: defs split: splits)
-
-    have "<cfg_m_assn cfg cfg_m> 
-        app_s_f_v_s_call_indirect_m k (s_m.tabs s_m) (s_m.funcs s_m) f_inst2 v_s_m
-        <\<lambda>r.\<up>(r = (v_s', es_cont, res)) * cfg_m_assn cfg cfg_m >"
-      sorry
-
-    then show ?thesis 
-      unfolding Call_indirect 1 2
-      unfolding cfg_m_assn_def fc_m_assn_def unfold_vars
-      by (simp, sep_auto)
-  next
     case (Tee_local k)
     then show ?thesis sorry
   next
@@ -587,18 +470,45 @@ proof -
     case Grow_memory
     then show ?thesis sorry
   next
+    case Current_memory
+
+    show ?thesis 
+      unfolding Current_memory unfold_vars_assns s_m_assn_def mems_m_assn_def 
+      by(sep_auto heap:mem_size_triple)
+  next
+    case (Set_local k)
+     
+    show ?thesis 
+      unfolding Set_local unfold_vars_assns
+      by (sep_auto heap:set_local_triple split:prod.splits)
+  next
+    case (Get_local k)
+
+    show ?thesis 
+      unfolding Get_local unfold_vars_assns 
+      by (sep_auto heap:get_local_triple)
+  next
+    case (Get_global k)
+    show ?thesis 
+      unfolding Get_global unfold_vars_assns s_m_assn_def
+      by (sep_auto heap:get_global_triple)
+  next
+    case (Call k)
+
+    show ?thesis 
+      unfolding Call unfold_vars_assns
+      by (sep_auto heap:call_triple)
+  next
+    case (Call_indirect k)
+
+    show ?thesis 
+      unfolding Call_indirect unfold_vars_assns s_m_assn_def
+      by (sep_auto heap:call_indirect_triple)
+  next
     case Return (* this case relies on garbage collection *)
-    have 1:"\<And>r v. Wasm_Interpreter.update_redex_return r v 
-      = Wasm_Interpreter_Monad.update_redex_return r v"
-      by (metis Wasm_Interpreter.update_redex_return.elims 
-          Wasm_Interpreter_Monad.update_redex_return.simps)
-    show ?thesis unfolding unfold_vars_assns fcs_m_assn_def Return 1
-      apply(simp split:splits list.split)
-      apply(sep_auto)
-        apply(simp add:1)
-       apply(sep_auto)
-      apply(sep_auto)
-      done
+
+    show ?thesis unfolding unfold_vars_assns fcs_m_assn_def Return
+      by(simp split:splits list.split, sep_auto)
   next
     case (Block tf b_ebs)
     show ?thesis unfolding unfold_vars_assns Block
