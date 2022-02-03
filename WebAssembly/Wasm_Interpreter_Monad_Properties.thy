@@ -191,7 +191,7 @@ definition cl_m_assn :: "cl \<Rightarrow> cl_m \<Rightarrow> assn" where
   cl.Func_native i tf ts b_es \<Rightarrow> 
     (case cl_m of 
     cl_m.Func_native i_m tf_m ts_m b_es_m \<Rightarrow> 
-      \<up>(tf = tf_m \<and> ts = ts_m \<and> b_es = b_es_m) 
+     inst_m_assn i i_m * \<up>(tf = tf_m \<and> ts = ts_m \<and> b_es = b_es_m) 
   | cl_m.Func_host tf_m host_m \<Rightarrow> false)
 | cl.Func_host tf host \<Rightarrow> 
     (case cl_m of 
@@ -347,7 +347,7 @@ lemma [sep_heap_rules]: "<tabinst_m_assn t t_m>
   unfolding tabinst_m_assn_def
   by (sep_auto split: prod.splits)
 
-lemma [sep_heap_rules]:"<funcs_m_assn cls cls_m> 
+lemma funcs_nth_type_triple:"<funcs_m_assn cls cls_m> 
     Array.nth cls_m i  
     <\<lambda>r. \<up>(cl_m_type r = cl_type (cls!i)) * funcs_m_assn cls cls_m>" 
   unfolding funcs_m_assn_def list_assn_conv_idx
@@ -379,6 +379,8 @@ lemma call_indirect_triple:
        apply(extract_pre_pure)
        apply(reinsert_list_idx "inst.tabs (f_inst f) ! 0")
        apply(sep_auto_all)
+         apply(sep_auto heap: funcs_nth_type_triple)
+  apply(sep_auto_all)
          apply(simp_all add:app_s_f_v_s_call_indirect_def Let_def split:list.splits option.splits)
      apply(auto simp add:stypes_def tab_cl_ind_def)
   done
@@ -524,6 +526,116 @@ proof -
     then show ?thesis unfolding unfold_vars_assns by sep_auto
   qed
 qed
+
+abbreviation "s_m_vs_pair_assn \<equiv> \<lambda>(s, vs) (s_m, vs_m). s_m_assn s s_m * \<up>(vs=vs_m)"
+
+abbreviation "s_m_vs_opt_assn a a_m \<equiv> (case a of 
+   Some s_vs \<Rightarrow> (case a_m of Some s_vs_m \<Rightarrow> s_m_vs_pair_assn s_vs s_vs_m | None \<Rightarrow> false) 
+ | None \<Rightarrow> (case a_m of Some s_vs_m \<Rightarrow> false | None \<Rightarrow> emp)) "
+
+lemma host_apply_impl_m_triple:
+ "< s_m_assn s s_m>
+ host_apply_impl_m s_m tf h vs
+ <\<lambda>r. s_m_vs_opt_assn (host_apply_impl s tf h vs) r * s_m_assn s s_m >"
+  sorry
+
+lemma host_apply_impl_m_triple':
+ "< s_m.funcs s_m \<mapsto>\<^sub>a fs_i * list_assn cl_m_assn (s.funcs s) fs_i 
+* tabs_m_assn (s.tabs s) (s_m.tabs s_m) * mems_m_assn (s.mems s) (s_m.mems s_m) 
+* globs_m_assn (s.globs s) (s_m.globs s_m)>
+ host_apply_impl_m s_m tf h vs
+ <\<lambda>r. s_m_vs_opt_assn (host_apply_impl s tf h vs) r 
+* s_m.funcs s_m \<mapsto>\<^sub>a fs_i * list_assn cl_m_assn (s.funcs s) fs_i 
+* tabs_m_assn (s.tabs s) (s_m.tabs s_m) * mems_m_assn (s.mems s) (s_m.mems s_m) 
+* globs_m_assn (s.globs s) (s_m.globs s_m)>"
+  sorry
+
+lemma test:
+  assumes "i < length xs" 
+  shows "list_assn P xs ys \<Longrightarrow>\<^sub>A (P (xs!i) (ys!i)) * ((P (xs!i) (ys!i))  -* list_assn P xs ys)"
+  unfolding list_assn_conv_idx 
+  using assms 
+  apply(extract_list_idx i)
+  apply(rule ent_star_mono)
+   apply(sep_auto)
+  apply(rule ent_wandI)
+  apply(reinsert_list_idx i)
+  apply(sep_auto)
+  done
+
+lemma ent_triple_preI:
+  assumes "\<And>h. h\<Turnstile>P \<Longrightarrow> P \<Longrightarrow>\<^sub>A Q"
+  shows "P \<Longrightarrow>\<^sub>A Q"
+  using assms unfolding entails_def by auto
+
+method extract_pre_pure' uses dest =
+  (rule hoare_triple_preI | rule ent_triple_preI | drule asm_rl[of "_\<Turnstile>_"]),
+  (determ \<open>elim mod_starE dest[elim_format] extract_pure_rules[elim_format]\<close>)?,
+  ((determ \<open>thin_tac "_ \<Turnstile> _"\<close>)+)?,
+  (simp (no_asm) only: triv_forall_equality)?
+
+lemma run_step_e_m_triple:
+    "<cfg_m_assn cfg cfg_m> 
+    run_step_e_m e cfg_m 
+    <\<lambda>r. cfg_m_pair_assn (run_step_e e cfg) r>\<^sub>t"
+proof -
+  obtain d s fc fcs where config:"cfg = Config d s fc fcs"
+    by(erule config.exhaust)
+  obtain redex lcs nf f where frame:"fc = Frame_context redex lcs nf f" 
+    by(erule frame_context.exhaust)
+  obtain v_s es b_es where redex:"redex = Redex v_s es b_es" 
+    by(erule redex.exhaust)
+  obtain d_m s_m fc_m fcs_m where config_m:"cfg_m = Config_m d_m s_m fc_m fcs_m" 
+    by(erule config_m.exhaust)  
+  obtain redex_m lcs_m nf_m f_locs1 f_inst2 
+    where frame_m:"fc_m = Frame_context_m redex_m lcs_m nf_m f_locs1 f_inst2" 
+    by(erule frame_context_m.exhaust)
+  obtain v_s_m es_m b_es_m where redex_m:"redex_m = Redex v_s_m es_m b_es_m" 
+    by(erule redex.exhaust)
+  note unfold_vars_m = config_m frame_m redex_m
+  note unfold_vars = config frame redex unfold_vars_m
+  note unfold_vars_assns = unfold_vars cfg_m_assn_def fc_m_assn_def
+
+  show ?thesis 
+  proof (cases e)
+    case (Basic b_e)
+    have 1:"run_step_e_m (Basic b_e) cfg_m = run_step_b_e_m b_e cfg_m"
+      unfolding unfold_vars_m by simp
+    have 2:"run_step_e (Basic b_e) cfg = run_step_b_e b_e cfg"
+      unfolding unfold_vars by simp 
+    show ?thesis unfolding Basic 1 2 by(sep_auto heap:run_step_b_e_m_triple)
+  next
+    case (Invoke i_cl)
+
+    
+
+    show ?thesis unfolding Invoke unfold_vars_assns 
+      supply [simp] = Let_def and 
+        [split] = splits v.splits option.splits cl.splits cl_m.splits tf.splits nat.splits
+      apply(sep_auto simp:s_m_assn_def funcs_m_assn_def)
+                apply(sep_auto heap:host_apply_impl_m_triple' ) 
+               apply(sep_auto_all)
+                       apply(sep_auto simp:locs_m_assn_def)
+      unfolding list_assn_conv_idx 
+      subgoal apply(extract_pre_pure')
+        apply(extract_list_idx i_cl)
+        apply(sep_auto simp: fcs_m_assn_def fc_m_assn_def locs_m_assn_def cl_m_assn_def 
+            s_m_assn_def funcs_m_assn_def)
+        sorry
+      
+          
+      sorry
+  next
+    case Trap
+    then show ?thesis unfolding unfold_vars by sep_auto
+  next
+    case (Label x41 x42 x43)
+    then show ?thesis unfolding unfold_vars by sep_auto
+  next
+    case (Frame x51 x52 x53)
+    then show ?thesis unfolding unfold_vars by sep_auto
+  qed
+qed 
 
 lemma run_step_e_m_run_step_e:
   assumes 
