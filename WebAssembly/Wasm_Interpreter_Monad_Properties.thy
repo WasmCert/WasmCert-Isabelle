@@ -620,32 +620,6 @@ lemma pure_dup:
   using assms unfolding is_pure_assn_def
   by auto
 
-(*
-lemma listI_assn_unextract:
-  assumes "i\<in>I" "i<length xs"  
-  shows "A (xs!i) (xsi!i) * listI_assn (I-{i}) A xs xsi = listI_assn I A xs xsi"
-  using listI_assn_extract[OF assms, of A xsi] by auto 
-
-lemma extract_cl_m_assn: 
-  assumes "i < length fs" 
-  shows "list_assn (cl_m_assn i_s) fs fsi =
-  cl_m_assn i_s (fs!i) (fsi!i) *  list_assn (cl_m_assn i_s) fs fsi"
-proof - 
-  have 1:"list_assn (cl_m_assn i_s) fs fsi = cl_m_assn i_s (fs ! i) (fsi ! i) 
-      * listI_assn ({0..<length fs} - {i}) (cl_m_assn i_s) fs fsi " 
-    using listI_assn_extract[of i _ fs "cl_m_assn i_s" fsi] assms unfolding list_assn_conv_idx
-    by (meson atLeastLessThan_iff zero_le)
-
-  also have "... = cl_m_assn i_s (fs ! i) (fsi ! i) *  cl_m_assn i_s (fs ! i) (fsi ! i)
-      * listI_assn ({0..<length fs} - {i}) (cl_m_assn i_s) fs fsi"
-    using pure_dup[OF cl_m_assn_pure] by auto
-
-  also have "... = cl_m_assn i_s (fs ! i) (fsi ! i) * list_assn (cl_m_assn i_s) fs fsi" 
-    using 1 by (simp add: mult.assoc) 
-    
-  finally show ?thesis by -
-qed
-*)
 
 lemma [sep_heap_rules]:
   "< fs_m\<mapsto>\<^sub>a fs_i * list_assn (cl_m_assn i_s) fs fs_i> 
