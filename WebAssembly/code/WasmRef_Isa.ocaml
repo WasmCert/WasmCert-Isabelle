@@ -960,7 +960,6 @@ module WasmRef_Isa : sig
   val is_none : 'a option -> bool
   val bind : 'a pred -> ('a -> 'b pred) -> 'b pred
   val apply : ('a -> 'b pred) -> 'a seq -> 'b seq
-  val blita : 'a array -> Z.t -> 'a array -> Z.t -> Z.t -> (unit -> unit)
   val blit :
     'a heap -> 'a array -> nat -> 'a array -> nat -> nat -> (unit -> unit)
   val map_filter : ('a -> 'b option) -> 'a list -> 'b list
@@ -3860,11 +3859,14 @@ and apply f x1 = match f, x1 with f, Empty -> Empty
             | f, Insert (x, p) -> Join (f x, Join (bind p f, Empty))
             | f, Join (p, xq) -> Join (bind p f, apply f xq);;
 
-let blita _ _ _ _ _ = failwith "Array_Blit.blit\039";;
-
 let rec blit _A
-  src si dst di len =
-    blita src (integer_of_nat si) dst (integer_of_nat di) (integer_of_nat len);;
+  uu uv uw ux l =
+    (if equal_nat l zero_nat then (fun () -> ())
+      else (fun () ->
+             (let x = array_nth _A uu uv () in
+              let _ = upd _A ux x uw () in
+               blit _A uu (plus_nat uv one_nata) uw (plus_nat ux one_nata)
+                 (minus_nat l one_nata) ())));;
 
 let rec map_filter
   f x1 = match f, x1 with f, [] -> []

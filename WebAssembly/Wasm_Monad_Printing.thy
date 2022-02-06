@@ -12,6 +12,10 @@ lemma[code]:
   apply (simp add: bind_def map_conv_bind_option fun_eq_iff execute_return split: option.splits)
   done
 
+(* restore naive blit implementation *)
+declare [[code drop: blit]]
+lemmas[code] = blit.simps
+
 export_code open nat_of_byte byte_of_nat
                  ocaml_int32_to_isabelle_int32
                  isabelle_int32_to_ocaml_int32
