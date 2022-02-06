@@ -17,6 +17,14 @@ lemma drop_bit_int_code_ [code]: fixes i :: int shows
   "drop_bit n (Int.Neg (num.Bit1 m)) = (case n of 0 \<Rightarrow> (Int.Neg (num.Bit1 m)) | Suc n \<Rightarrow> drop_bit n (Int.Neg (Num.inc m)))"
   by (simp_all add: shiftr_eq_drop_bit drop_bit_Suc add_One split: nat.splits)
 
+(* TODO: why is this not a thing already? *)
+declare [[code drop: map_Heap]]
+lemma[code]:
+  "map_Heap f M = do { a \<leftarrow> M; return (f a) }"
+  apply (cases M)
+  apply (simp add: bind_def map_conv_bind_option fun_eq_iff execute_return split: option.splits)
+  done
+
 export_code open nat_of_byte byte_of_nat
                  ocaml_int32_to_isabelle_int32
                  isabelle_int32_to_ocaml_int32

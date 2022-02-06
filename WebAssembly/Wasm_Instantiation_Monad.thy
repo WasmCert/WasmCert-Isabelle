@@ -29,7 +29,7 @@ fun tab_typing_m :: "tabinst_m \<Rightarrow> tab_t \<Rightarrow> bool Heap" wher
 
 fun mem_typing_m :: "mem_m \<Rightarrow> mem_t \<Rightarrow> bool Heap" where
   "mem_typing_m m mt = do {
-   m_min \<leftarrow> Array.len (fst m);
+   m_min \<leftarrow> len_byte_array (fst m);
    return (limits_compat \<lparr>l_min=(m_min div Ki64),l_max=(snd m)\<rparr> mt) }"
 
 fun external_typing_m :: "s_m \<Rightarrow> v_ext \<Rightarrow> extern_t \<Rightarrow> bool Heap" where
@@ -97,7 +97,7 @@ definition interp_alloc_module_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext lis
                   globs = inst_globs \<rparr>;
     empty_inst \<leftarrow> make_empty_inst_m;
     empty_tab \<leftarrow> Array.of_list [];
-    empty_mem \<leftarrow> Array.of_list [];
+    empty_mem \<leftarrow> new_zeroed_byte_array 0;
     let dummy_func = (Func_native empty_inst ([] _> []) [] []);
     let dummy_tab = (empty_tab, None);
     let dummy_mem = (empty_mem, None);
@@ -106,10 +106,10 @@ definition interp_alloc_module_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext lis
     s_tabs \<leftarrow> Array.new (length_tabs_s + length (m_tabs m)) dummy_tab;
     s_mems \<leftarrow> Array.new (length_mems_s + length (m_mems m)) dummy_mem;
     s_globs \<leftarrow> Array.new (length_globs_s + length (m_globs m)) dummy_glob;
-    array_blit (s_m.funcs s_m) 0 s_funcs 0 length_funcs_s;
-    array_blit (s_m.tabs s_m) 0 s_tabs 0 length_tabs_s;
-    array_blit (s_m.mems s_m) 0 s_mems 0 length_mems_s;
-    array_blit (s_m.globs s_m) 0 s_globs 0 length_globs_s;
+    blit (s_m.funcs s_m) 0 s_funcs 0 length_funcs_s;
+    blit (s_m.tabs s_m) 0 s_tabs 0 length_tabs_s;
+    blit (s_m.mems s_m) 0 s_mems 0 length_mems_s;
+    blit (s_m.globs s_m) 0 s_globs 0 length_globs_s;
     array_blit_map (m_funcs m)
       (\<lambda>(i, tlocs, b_es). do { ft \<leftarrow> Array.nth inst_types i; return (Func_native inst_m ft tlocs b_es) })
       s_funcs
@@ -119,7 +119,7 @@ definition interp_alloc_module_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext lis
       s_tabs
       length_tabs_s;
     array_blit_map (m_mems m)
-      (\<lambda>mt. do { m' \<leftarrow> Array.new (l_min mt * Ki64) zero_byte; return (m', (l_max mt)) })
+      (\<lambda>mt. do { m' \<leftarrow> new_zeroed_byte_array (l_min mt * Ki64); return (m', (l_max mt)) })
       s_mems
       length_mems_s;
     array_blit_map (zip (m_globs m) gvs)
@@ -163,7 +163,7 @@ definition init_mem_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> nat \<Rightarro
      do {
        m_ind \<leftarrow> Array.nth (inst_m.mems inst) (d_data d);
        mem \<leftarrow> Array.nth (s_m.mems s) m_ind;
-       write_bytes_m mem d_ind (d_init d) }"
+       store_uint8_list (fst mem) d_ind (d_init d) }"
 
 definition init_tabs_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> nat list \<Rightarrow> module_elem list \<Rightarrow> unit Heap" where
   "init_tabs_m s inst e_inds es = do {Heap_Monad.fold_map (\<lambda>(e_ind,e). init_tab_m s inst e_ind e) (zip e_inds es); return () }"
@@ -207,7 +207,7 @@ fun interp_instantiate_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Righ
               list_all2_m (\<lambda>d_off d. do {
                 m_ind \<leftarrow> Array.nth (inst_m.mems inst_m) (d_data d);
                 (mem_e,max) \<leftarrow> Array.nth (s_m.mems s_m') m_ind;
-                mem_e_len \<leftarrow> Array.len mem_e;
+                mem_e_len \<leftarrow> len_byte_array mem_e;
                 return (((nat_of_int d_off) + (length (d_init d))) \<le> mem_e_len) } ) d_offs (m_data m);
             (if (e_in_bounds \<and> d_in_bounds) then do {
               start \<leftarrow> get_start_m inst_m (m_start m);

@@ -1,11 +1,11 @@
-theory Wasm_Interpreter_Monad imports Main Wasm_Countable Wasm_Interpreter "HOL-Imperative_HOL.Array" begin
+theory Wasm_Interpreter_Monad imports Wasm_Native_Word_Entry Wasm_Countable Wasm_Interpreter "HOL-Imperative_HOL.Array" "../libs/Byte_Array" begin
 
-instance byte :: heap ..
+instance uint8 :: heap ..
 instance tf :: heap ..
 instance v :: heap ..
 instance global_ext :: (heap) heap ..
 
-type_synonym mem_m = "(byte array) \<times> nat option"
+type_synonym mem_m = "(byte_array) \<times> nat option"
 
 record inst_m = \<comment> \<open>instances\<close>
   types :: "tf array"
@@ -48,7 +48,7 @@ datatype config_m = Config_m depth s_m frame_context_m "frame_context_m list"
 
 definition mem_m_to_m :: "heap \<Rightarrow> mem_m \<Rightarrow> mem" where
 "mem_m_to_m h mem_m \<equiv>
-  (Abs_mem_rep (Array.get h (fst mem_m)), snd mem_m)"
+  (Abs_mem_rep (Array.get h (Rep_byte_array (fst mem_m))), snd mem_m)"
 
 definition inst_m_to_inst :: "heap \<Rightarrow> inst_m \<Rightarrow> inst" where
 "inst_m_to_inst h inst_m \<equiv>
@@ -154,155 +154,153 @@ definition app_s_f_v_s_set_global_m :: "nat \<Rightarrow> global array \<Rightar
             return (v_s', Step_normal) }
       | _ \<Rightarrow> return (v_s, crash_invalid))"
 
-fun read_bytes_m :: "mem_m \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes Heap" where
-  "read_bytes_m m off l =
-     (case l of
-        0 \<Rightarrow> return []
-      | Suc l' \<Rightarrow> do {
-        b \<leftarrow> Array.nth (fst m) off;
-        bs \<leftarrow> read_bytes_m m (off+1) l';
-        return (b#bs) })"
+definition load_uint32_packed :: "byte_array \<Rightarrow> nat \<Rightarrow> tp \<Rightarrow> sx \<Rightarrow> uint32 Heap" where
+  "load_uint32_packed a n tp sx \<equiv> do {
+     v \<leftarrow> (case (tp,sx) of
+            (Tp_i8,U) \<Rightarrow> load_uint32_of_uint8 a n
+          | (Tp_i8,S) \<Rightarrow> load_uint32_of_sint8 a n
+          | (Tp_i16,U) \<Rightarrow> load_uint32_of_uint16 a n
+          | (Tp_i16,S) \<Rightarrow> load_uint32_of_sint16 a n
+          | (Tp_i32,U) \<Rightarrow> load_uint32 a n
+          | (Tp_i32,S) \<Rightarrow> load_uint32 a n);
+     return v
+  }"
 
-definition load_m :: "mem_m \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> nat \<Rightarrow> (bytes option) Heap" where
-  "load_m m n off l =
+definition load_uint64_packed :: "byte_array \<Rightarrow> nat \<Rightarrow> tp \<Rightarrow> sx \<Rightarrow> uint64 Heap" where
+  "load_uint64_packed a n tp sx \<equiv> do {
+     v \<leftarrow> (case (tp,sx) of
+            (Tp_i8,U) \<Rightarrow> load_uint64_of_uint8 a n
+          | (Tp_i8,S) \<Rightarrow> load_uint64_of_sint8 a n
+          | (Tp_i16,U) \<Rightarrow> load_uint64_of_uint16 a n
+          | (Tp_i16,S) \<Rightarrow> load_uint64_of_sint16 a n
+          | (Tp_i32,U) \<Rightarrow> load_uint64_of_uint32 a n
+          | (Tp_i32,S) \<Rightarrow> load_uint64_of_sint32 a n);
+     return v
+  }"
+
+definition load_m_v :: "mem_m \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> t \<Rightarrow> (v option) Heap" where
+  "load_m_v m n off t =
      do {
-       m_len \<leftarrow> Array.len (fst m);
-       (if (m_len \<ge> (n+off+l)) then do {
-          bs \<leftarrow> (read_bytes_m m (n+off) l);
-          return (Some bs) }
+       m_len \<leftarrow> len_byte_array (fst m);
+       (if (m_len \<ge> (n+off+(t_length t))) then do {
+          (case t of
+            T_i32 \<Rightarrow> do { v \<leftarrow> load_uint32 (fst m) (n+off);
+                          return (Some (ConstInt32 (i32_impl_abs v))) }
+          | T_i64 \<Rightarrow> do { v \<leftarrow> load_uint64 (fst m) (n+off);
+                          return (Some (ConstInt64 (i64_impl_abs v))) }
+          | T_f32 \<Rightarrow> do { v \<leftarrow> load_uint32 (fst m) (n+off);
+                          return (Some (ConstFloat32 (deserialise_f32 (serialise_i32 (i32_impl_abs v))))) }
+          | T_f64 \<Rightarrow> do { v \<leftarrow> load_uint64 (fst m) (n+off);
+                          return (Some (ConstFloat64 (deserialise_f64 (serialise_i64 (i64_impl_abs v))))) }
+          )}
         else
           return None)
      }"
 
-definition load_packed_m :: "sx \<Rightarrow> mem_m \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes option Heap" where
-  "load_packed_m sx m n off lp l =
+definition load_packed_m_v :: "mem_m \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> t \<Rightarrow> tp \<Rightarrow> sx \<Rightarrow> (v option) Heap" where
+  "load_packed_m_v m n off t tp sx =
      do {
-       bs_maybe \<leftarrow> load_m m n off lp;
-       return (map_option (sign_extend sx l) bs_maybe)
+       m_len \<leftarrow> len_byte_array (fst m);
+       (if (m_len \<ge> (n+off+(tp_length tp))) then do {
+          (case t of
+            T_i32 \<Rightarrow> do { v \<leftarrow> load_uint32_packed (fst m) (n+off) tp sx;
+                          return (Some (ConstInt32 (i32_impl_abs v))) }
+          | T_i64 \<Rightarrow> do { v \<leftarrow> load_uint64_packed (fst m) (n+off) tp sx;
+                          return (Some (ConstInt64 (i64_impl_abs v))) }
+          | T_f32 \<Rightarrow> do { v \<leftarrow> load_uint32_packed (fst m) (n+off) tp sx;
+                          return (Some (ConstFloat32 (deserialise_f32 (serialise_i32 (i32_impl_abs v))))) }
+          | T_f64 \<Rightarrow> do { v \<leftarrow> load_uint64_packed (fst m) (n+off) tp sx;
+                          return (Some (ConstFloat64 (deserialise_f64 (serialise_i64 (i64_impl_abs v))))) }
+          )}
+        else
+          return None)
      }"
-
-definition app_s_f_v_s_load_m :: "t \<Rightarrow> nat \<Rightarrow> mem_m array \<Rightarrow> inst_m \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step) Heap" where
-  "app_s_f_v_s_load_m t off ms i_m v_s = 
-          (case v_s of
-             (ConstInt32 c)#v_s' \<Rightarrow> do {
-               j \<leftarrow> Array.nth (inst_m.mems i_m) 0;
-               m \<leftarrow> Array.nth ms j;
-               bs_maybe \<leftarrow> load_m m (nat_of_int c) off (t_length t);
-               (case bs_maybe of
-                  Some bs \<Rightarrow> return ((wasm_deserialise bs t)#v_s', Step_normal)
-                | None \<Rightarrow> return (v_s', (Res_trap (STR ''load'')))) }
-           | _ \<Rightarrow> return (v_s, crash_invalid))"
-
-definition app_s_f_v_s_load_packed_m :: "t \<Rightarrow> tp \<Rightarrow> sx \<Rightarrow> nat \<Rightarrow> mem_m array \<Rightarrow> inst_m \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step) Heap" where
-  "app_s_f_v_s_load_packed_m t tp sx off ms i_m v_s = 
-          (case v_s of
-             (ConstInt32 c)#v_s' \<Rightarrow> do {
-               j \<leftarrow> Array.nth (inst_m.mems i_m) 0;
-               m \<leftarrow> Array.nth ms j;
-               bs_maybe \<leftarrow> load_packed_m sx m (nat_of_int c) off (tp_length tp) (t_length t);
-               (case bs_maybe of
-                  Some bs \<Rightarrow> return ((wasm_deserialise bs t)#v_s', Step_normal)
-                | None \<Rightarrow> return (v_s', (Res_trap (STR ''load'')))) }
-           | _ \<Rightarrow> return (v_s, crash_invalid))"
 
 definition app_s_f_v_s_load_maybe_packed_m :: "t \<Rightarrow> (tp \<times> sx) option \<Rightarrow> nat \<Rightarrow> mem_m array \<Rightarrow> inst_m \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step) Heap" where
-  "app_s_f_v_s_load_maybe_packed_m t tp_sx off ms f v_s =
-     (case tp_sx of
-        Some (tp, sx) \<Rightarrow> app_s_f_v_s_load_packed_m t tp sx off ms f v_s
-      | None \<Rightarrow> app_s_f_v_s_load_m t off ms f v_s)"
+  "app_s_f_v_s_load_maybe_packed_m t tp_sx off ms i_m v_s =
+    (case v_s of
+        (ConstInt32 c)#v_s' \<Rightarrow> do {
+             j \<leftarrow> Array.nth (inst_m.mems i_m) 0;
+             m \<leftarrow> Array.nth ms j;
+             v_maybe \<leftarrow> (case tp_sx of
+                           None \<Rightarrow> load_m_v m (nat_of_int c) off t
+                         | Some (tp,sx) \<Rightarrow> load_packed_m_v m (nat_of_int c) off t tp sx);
+             (case v_maybe of
+                Some v \<Rightarrow> return (v#v_s', Step_normal)
+              | None \<Rightarrow> return (v_s', (Res_trap (STR ''load'')))) }
+         | _ \<Rightarrow> return (v_s, crash_invalid))"
 
-fun write_bytes_m :: "mem_m \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> unit Heap" where
-  "write_bytes_m m off bs =
-     (case bs of
-        [] \<Rightarrow> return ()
-      | b#bs' \<Rightarrow>
-          do {
-            Array.upd off b (fst m);
-            write_bytes_m m (off+1) bs';
-            return ()
-          })"
+definition store_uint32_packed :: "byte_array \<Rightarrow> nat \<Rightarrow> uint32 \<Rightarrow> tp \<Rightarrow> unit Heap" where
+  "store_uint32_packed a n v tp \<equiv> do {
+   (case tp of
+      Tp_i8 \<Rightarrow> store_uint8_of_uint32 a n v
+    | Tp_i16 \<Rightarrow> store_uint16_of_uint32 a n v
+    | Tp_i32 \<Rightarrow> store_uint32 a n v)
+  }"
 
-definition store_m :: "mem_m \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes \<Rightarrow> nat \<Rightarrow> (unit option) Heap" where
-  "store_m m n off bs l =
+definition store_uint64_packed :: "byte_array \<Rightarrow> nat \<Rightarrow> uint64 \<Rightarrow> tp \<Rightarrow> unit Heap" where
+  "store_uint64_packed a n v tp \<equiv> do {
+   (case tp of
+      Tp_i8 \<Rightarrow> store_uint8_of_uint64 a n v
+    | Tp_i16 \<Rightarrow> store_uint16_of_uint64 a n v
+    | Tp_i32 \<Rightarrow> store_uint32_of_uint64 a n v)
+  }"
+
+definition store_m_v :: "mem_m \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> v \<Rightarrow> (unit option) Heap" where
+  "store_m_v m n off v =
      do {
-       m_len \<leftarrow> Array.len (fst m);
-       if (m_len \<ge> (n+off+l)) then do {
-         write_bytes_m m (n+off) (bytes_takefill zero_byte l bs);
-         return (Some ())
-       }
-       else
-         return None
+       m_len \<leftarrow> len_byte_array (fst m);
+       (if (m_len \<ge> (n+off+(t_length (typeof v)))) then do {
+          (case v of
+            ConstInt32 c \<Rightarrow> do { store_uint32 (fst m) (n+off) (i32_impl_rep c); return (Some ()) }
+          | ConstInt64 c \<Rightarrow> do { store_uint64 (fst m) (n+off) (i64_impl_rep c); return (Some ()) }
+          | ConstFloat32 c \<Rightarrow> do { store_uint32 (fst m) (n+off) (i32_impl_rep (deserialise_i32 (serialise_f32 c))); return (Some ()) }
+          | ConstFloat64 c \<Rightarrow> do { store_uint64 (fst m) (n+off) (i64_impl_rep (deserialise_i64 (serialise_f64 c))); return (Some ()) }
+          )}
+        else
+          return None)
      }"
 
-definition store_packed_m :: "mem_m \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes \<Rightarrow> nat \<Rightarrow> (unit option) Heap" where
-  "store_packed_m = store_m"
-
-definition app_s_f_v_s_store_m :: "t \<Rightarrow> nat \<Rightarrow> mem_m array \<Rightarrow> inst_m \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step) Heap" where
-  "app_s_f_v_s_store_m t off ms i_m v_s = 
-          (case v_s of
-             v#(ConstInt32 c)#v_s' \<Rightarrow>
-               (if (types_agree t v) then
-                  do {
-                    j \<leftarrow> Array.nth (inst_m.mems i_m) 0;
-                    m \<leftarrow> Array.nth ms j;
-                    u_maybe \<leftarrow> store_m m (nat_of_int c) off (bits v) (t_length t);
-                    (case u_maybe of
-                       Some bs \<Rightarrow> return (v_s', Step_normal)
-                     | None \<Rightarrow> return (v_s', (Res_trap (STR ''store'')))) }
-                else return (v_s, crash_invalid))
-           | _ \<Rightarrow> return (v_s, crash_invalid))"
-
-definition app_s_f_v_s_store_packed_m :: "t \<Rightarrow> tp \<Rightarrow> nat \<Rightarrow> mem_m array \<Rightarrow> inst_m \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step) Heap" where
-  "app_s_f_v_s_store_packed_m t tp off ms i_m v_s = 
-          (case v_s of
-             v#(ConstInt32 c)#v_s' \<Rightarrow>
-               (if (types_agree t v) then
-                  do {
-                    j \<leftarrow> Array.nth (inst_m.mems i_m) 0;
-                    m \<leftarrow> Array.nth ms j;
-                    u_maybe \<leftarrow> store_m m (nat_of_int c) off (bits v) (tp_length tp);
-                    (case u_maybe of
-                       Some bs \<Rightarrow> return (v_s', Step_normal)
-                     | None \<Rightarrow> return (v_s', (Res_trap (STR ''store'')))) }
-                else return (v_s, crash_invalid))
-           | _ \<Rightarrow> return (v_s, crash_invalid))"
+definition store_packed_m_v :: "mem_m \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> v \<Rightarrow> tp \<Rightarrow> (unit option) Heap" where
+  "store_packed_m_v m n off v tp =
+     do {
+       m_len \<leftarrow> len_byte_array (fst m);
+       (if (m_len \<ge> (n+off+(t_length (typeof v)))) then do {
+          (case v of
+            ConstInt32 c \<Rightarrow> do { store_uint32_packed (fst m) (n+off) (i32_impl_rep c) tp; return (Some ()) }
+          | ConstInt64 c \<Rightarrow> do { store_uint64_packed (fst m) (n+off) (i64_impl_rep c) tp; return (Some ()) }
+          | ConstFloat32 c \<Rightarrow> do { store_uint32_packed (fst m) (n+off) (i32_impl_rep (deserialise_i32 (serialise_f32 c))) tp; return (Some ()) }
+          | ConstFloat64 c \<Rightarrow> do { store_uint64_packed (fst m) (n+off) (i64_impl_rep (deserialise_i64 (serialise_f64 c))) tp; return (Some ()) }
+          )}
+        else
+          return None)
+     }"
 
 definition app_s_f_v_s_store_maybe_packed_m :: "t \<Rightarrow> tp option \<Rightarrow> nat \<Rightarrow> mem_m array \<Rightarrow> inst_m \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step) Heap" where
   "app_s_f_v_s_store_maybe_packed_m t tp_opt off ms i_m v_s =
-     (case tp_opt of
-        Some tp \<Rightarrow> app_s_f_v_s_store_packed_m t tp off ms i_m v_s
-      | None \<Rightarrow> app_s_f_v_s_store_m t off ms i_m v_s)"
+   (case v_s of
+     v#(ConstInt32 c)#v_s' \<Rightarrow>
+       (if (types_agree t v) then
+          do {
+            j \<leftarrow> Array.nth (inst_m.mems i_m) 0;
+            m \<leftarrow> Array.nth ms j;
+            u_maybe \<leftarrow> (case tp_opt of
+                          None \<Rightarrow> store_m_v m (nat_of_int c) off v
+                        | Some tp \<Rightarrow> store_packed_m_v m (nat_of_int c) off v tp);
+            (case u_maybe of
+               Some _ \<Rightarrow> return (v_s', Step_normal)
+             | None \<Rightarrow> return (v_s', (Res_trap (STR ''store'')))) }
+        else return (v_s, crash_invalid))
+   | _ \<Rightarrow> return (v_s, crash_invalid))"
 
 definition app_s_f_v_s_mem_size_m :: "mem_m array \<Rightarrow> inst_m \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step) Heap" where
   "app_s_f_v_s_mem_size_m ms i_m v_s =
      do {
        j \<leftarrow> Array.nth (inst_m.mems i_m) 0;
        m \<leftarrow> Array.nth ms j;
-       m_len \<leftarrow> Array.len (fst m);
+       m_len \<leftarrow> len_byte_array (fst m);
        return (((ConstInt32 (int_of_nat (m_len div Ki64)))#v_s), Step_normal)
      }"
-
-fun array_blit_ge :: "('a::heap) array \<Rightarrow> nat \<Rightarrow> 'a array \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> unit Heap" where
-  "array_blit_ge src src_pos dst dst_pos len =
-   (case len of
-      0 \<Rightarrow> return ()
-    | Suc len' \<Rightarrow>
-        do {
-          x \<leftarrow> Array.nth src src_pos;
-          Array.upd dst_pos x dst;
-          array_blit_ge src (src_pos+1) dst (dst_pos+1) len'
-        })"
-
-fun array_blit_lt :: "('a::heap) array \<Rightarrow> nat \<Rightarrow> 'a array \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> unit Heap" where
-  "array_blit_lt src src_pos dst dst_pos len =
-   (case len of
-      0 \<Rightarrow> return ()
-    | Suc len' \<Rightarrow>
-        do {
-          x \<leftarrow> Array.nth src src_pos;
-          Array.upd dst_pos x dst;
-          array_blit_lt src (src_pos-1) dst (dst_pos-1) len'
-        })"
 
 fun array_blit_map :: "'b list \<Rightarrow> ('b \<Rightarrow> ('a::heap) Heap) \<Rightarrow> 'a array \<Rightarrow> nat \<Rightarrow> unit Heap" where
   "array_blit_map src_list src_f dst dst_pos =
@@ -315,13 +313,6 @@ fun array_blit_map :: "'b list \<Rightarrow> ('b \<Rightarrow> ('a::heap) Heap) 
           array_blit_map ys src_f dst (dst_pos+1)
         })"
 
-fun array_blit :: "('a::heap) array \<Rightarrow> nat \<Rightarrow> 'a array \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> unit Heap" where
-  "array_blit src src_pos dst dst_pos len =
-   (if (src_pos \<ge> dst_pos) then
-          array_blit_ge src src_pos dst dst_pos len
-        else
-          array_blit_lt src (src_pos+(len-1)) dst (dst_pos+(len-1)) len)"
-
 definition app_s_f_v_s_mem_grow_m :: "mem_m array \<Rightarrow> inst_m \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step) Heap" where
   "app_s_f_v_s_mem_grow_m ms i_m v_s =
      (case v_s of
@@ -329,11 +320,10 @@ definition app_s_f_v_s_mem_grow_m :: "mem_m array \<Rightarrow> inst_m \<Rightar
            do {
              j \<leftarrow> Array.nth (inst_m.mems i_m) 0;
              m \<leftarrow> Array.nth ms j;
-             m_len \<leftarrow> Array.len (fst m);
+             m_len \<leftarrow> len_byte_array (fst m);
              let new_m_len = (m_len div Ki64) + (nat_of_int c);
              if (new_m_len \<le> 2^16 \<and> pred_option (\<lambda>max. new_m_len \<le> max) (snd m)) then do {
-               m_new_fst \<leftarrow> Array.new (new_m_len * Ki64) (zero_byte);
-               array_blit (fst m) 0 m_new_fst 0 m_len;
+               m_new_fst \<leftarrow> grow_zeroed_byte_array (fst m) ((nat_of_int c) * Ki64);
                Array.upd j (m_new_fst, snd m) ms;
                return (((ConstInt32 (int_of_nat (m_len div Ki64)))#v_s'), Step_normal) }
              else

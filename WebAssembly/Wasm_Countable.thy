@@ -82,9 +82,9 @@ instance host :: countable
 instance cl :: countable
   by countable_datatype
 
-instance byte :: countable
+instance uint8 :: countable
 proof(rule countable_classI[of "\<lambda>n::byte. nat_of_byte n"])
-qed (simp add: Rep_byte_inject nat_of_byte.rep_eq)
+qed (simp add: Rep_uint8_inject nat_of_byte_def nat_of_uint8.rep_eq)
 
 instance mem_rep :: countable
 proof(rule countable_classI[of "\<lambda>m::mem_rep. to_nat (Rep_mem_rep m)"])

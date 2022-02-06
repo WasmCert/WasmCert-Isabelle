@@ -5,6 +5,7 @@ theory Wasm_Ast
     Main
     "HOL-Library.Word"
     "Word_Lib.Reversed_Bit_Lists"
+    "Native_Word.Uint8"
 begin
 
 type_synonym \<comment> \<open>immediate\<close>
@@ -26,20 +27,14 @@ setup_lifting type_definition_i64
 declare Quotient_i64[transfer_rule]
 
 \<comment> \<open>memory\<close>
-(* type_synonym byte = "8 word" *)
-typedef byte = "UNIV :: (8 word) set" ..
-setup_lifting type_definition_byte
-declare Quotient_byte[transfer_rule]
+type_synonym byte = uint8
 
-(* For some reason this lemma does get automatically generated *)
-lemmas[code] = Abs_byte_inverse[simplified]
+definition "msb_byte = (msb::byte \<Rightarrow> bool)"
+definition "zero_byte = (0::byte)"
+definition "negone_byte = (-1::byte)"
 
-lift_definition msb_byte :: "byte \<Rightarrow> bool" is msb .
-lift_definition zero_byte :: "byte" is 0 .
-lift_definition negone_byte :: "byte" is "max_word" .
-
-lift_definition nat_of_byte :: "byte \<Rightarrow> nat" is "unat" .
-lift_definition byte_of_nat :: "nat \<Rightarrow> byte" is "of_nat" .
+definition "nat_of_byte = nat_of_uint8"
+definition "byte_of_nat = uint8_of_nat"
 
 type_synonym bytes = "byte list"
 
