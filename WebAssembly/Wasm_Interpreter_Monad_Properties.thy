@@ -1,26 +1,35 @@
 theory Wasm_Interpreter_Monad_Properties imports "../libs/Misc_Generic_Lemmas" "../libs/List_Assn" Wasm_Interpreter_Monad begin
 
+lemma load_fX_from_uiX_bs_helper:
+  assumes "n*8 = LENGTH('a::len)"
+          "length bs \<le> n"
+  shows "((word_rsplit_rev::'a word \<Rightarrow> _) (word_rcat_rev (map Rep_uint8 bs))) = (map Rep_uint8 (takefill 0 n bs))"
+proof -
+  have 3:"(word_rcat_rev :: _ \<Rightarrow> 'a word) (map Rep_uint8 bs) = (word_rcat_rev :: _ \<Rightarrow> 'a word) (takefill 0 n (map Rep_uint8 bs))"
+    using word_rcat_rev_is_word_rcat_rev_takefill[of n "(map Rep_uint8 bs)"]
+    apply standard
+    apply (auto simp add: assms)
+    done
+  hence "((word_rsplit_rev::'a word \<Rightarrow> _) (word_rcat_rev (map Rep_uint8 bs))) = takefill 0 n (map Rep_uint8 bs)"
+    using assms word_split_rcat_rev_size
+    by (force simp add: word_size)
+  thus ?thesis
+    unfolding map_takefill
+    by (simp add: zero_uint8.rep_eq)
+qed
 
 lemma load_f32_from_ui32_bs:
   assumes "length bs \<le> 4"
   shows "(serialise_i32 (i32_impl_abs (Abs_uint32' (word_rcat_rev (map Rep_uint8' bs))))) = takefill 0 4 bs"
 proof -
-  have 1:"(word_rsplit_rev::32 word \<Rightarrow> _) (word_rcat_rev (takefill 0 4 (map Rep_uint8 bs))) = takefill 0 4 (map Rep_uint8 bs)"
-    using word_split_rcat_rev_size assms
-    by (force simp add: word_size)
+  have 1:"(word_rsplit_rev::32 word \<Rightarrow> _) (word_rcat_rev ((map Rep_uint8 bs))) = (map Rep_uint8 (takefill 0 4 bs))"
+    using load_fX_from_uiX_bs_helper[OF _ assms]
+    by force
   have 2:"Abs_uint8' \<circ> Rep_uint8 = id"
     unfolding Abs_uint8'_def map_fun_def
     by (simp add: Rep_uint8_inverse fun_comp_eq_conv)
-  have 3:"(word_rcat_rev :: _ \<Rightarrow> 32 word) (map Rep_uint8 bs) = (word_rcat_rev :: _ \<Rightarrow> 32 word) (takefill 0 4 (map Rep_uint8 bs))"
-    using word_rcat_rev_is_word_rcat_rev_takefill[of 4 "(map Rep_uint8 bs)"]
-    apply standard
-    apply (auto simp add: assms)
-    done
-  have 4: "(takefill 0 4 (map Rep_uint8 bs)) = (map Rep_uint8 (takefill 0 4 bs))"
-    unfolding map_takefill
-    by (simp add: zero_uint8.rep_eq)
   show ?thesis
-    using 1 2 3 4
+    using 1 2
     unfolding serialise_i32_def i32_impl_abs_def
     by (auto simp add: I32.rep_abs Abs_uint32'.abs_eq Abs_uint32_inverse)
 qed
@@ -29,29 +38,21 @@ lemma load_f64_from_ui64_bs:
   assumes "length bs \<le> 8"
   shows "(serialise_i64 (i64_impl_abs (Abs_uint64' (word_rcat_rev (map Rep_uint8' bs))))) = takefill 0 8 bs"
 proof -
-  have 1:"(word_rsplit_rev::64 word \<Rightarrow> _) (word_rcat_rev (takefill 0 8 (map Rep_uint8 bs))) = takefill 0 8 (map Rep_uint8 bs)"
-    using word_split_rcat_rev_size assms
-    by (force simp add: word_size)
+  have 1:"(word_rsplit_rev::64 word \<Rightarrow> _) (word_rcat_rev ((map Rep_uint8 bs))) = (map Rep_uint8 (takefill 0 8 bs))"
+    using load_fX_from_uiX_bs_helper[OF _ assms]
+    by force
   have 2:"Abs_uint8' \<circ> Rep_uint8 = id"
     unfolding Abs_uint8'_def map_fun_def
     by (simp add: Rep_uint8_inverse fun_comp_eq_conv)
-  have 3:"(word_rcat_rev :: _ \<Rightarrow> 64 word) (map Rep_uint8 bs) = (word_rcat_rev :: _ \<Rightarrow> 64 word) (takefill 0 8 (map Rep_uint8 bs))"
-    using word_rcat_rev_is_word_rcat_rev_takefill[of 8 "(map Rep_uint8 bs)"]
-    apply standard
-    apply (auto simp add: assms)
-    done
-  have 4: "(takefill 0 8 (map Rep_uint8 bs)) = (map Rep_uint8 (takefill 0 8 bs))"
-    unfolding map_takefill
-    by (simp add: zero_uint8.rep_eq)
   show ?thesis
-    using 1 2 3 4
+    using 1 2
     unfolding serialise_i64_def i64_impl_abs_def
     by (auto simp add: I64.rep_abs Abs_uint64'.abs_eq Abs_uint64_inverse)
 qed
 
 lemma word_list_sign_extend_Rep_uint8:
   assumes "length bs > 0"
-  shows "(word_list_sign_extend n (map Rep_uint8' bs)) = map Rep_uint8' (sign_extend S n bs)"
+  shows "(word_list_sign_extend n (map Rep_uint8 bs)) = map Rep_uint8 (Wasm_Base_Defs.sign_extend S n bs)"
 proof -
   have "msb (last bs) = (msb (last (map Rep_uint8 bs)))"
     using assms
@@ -59,64 +60,58 @@ proof -
     apply (simp_all add: msb_uint8.rep_eq)
     done
   thus ?thesis
-  unfolding msb_byte_def msbyte_def word_list_sign_extend_def sign_extend_def negone_byte_def zero_byte_def bytes_takefill_def
-  by (simp add: map_takefill one_uint8.rep_eq uminus_uint8.rep_eq zero_uint8.rep_eq)
+    unfolding msb_byte_def msbyte_def word_list_sign_extend_def sign_extend_def negone_byte_def zero_byte_def bytes_takefill_def
+    by (simp add: map_takefill one_uint8.rep_eq uminus_uint8.rep_eq zero_uint8.rep_eq)
+qed
+
+lemma load_fX_from_siX_bs_helper:
+  assumes "n*8 = LENGTH('a::len)"
+          "length bs \<le> n"
+          "length bs > 0"
+  shows "(word_rsplit_rev::'a word \<Rightarrow> _) (word_rcat_rev (word_list_sign_extend n (map Rep_uint8 bs))) = map Rep_uint8 (Wasm_Base_Defs.sign_extend S n bs)"
+proof -
+  have 1:"(word_rsplit_rev::'a word \<Rightarrow> _) ((word_rcat_rev :: _ \<Rightarrow> 'a word) (map Rep_uint8 (Wasm_Base_Defs.sign_extend S n bs))) = (map Rep_uint8 (Wasm_Base_Defs.sign_extend S n bs))"
+    using word_split_rcat_rev_size
+    apply standard
+    apply (auto simp add: assms word_size Wasm_Base_Defs.sign_extend_def bytes_takefill_def)
+    done
+  thus ?thesis
+    using word_list_sign_extend_Rep_uint8 assms(3)
+    by simp
 qed
 
 lemma load_f32_from_si32_bs:
   assumes "length bs > 0" "length bs \<le> 4"
   shows "(serialise_i32 (i32_impl_abs (Abs_uint32' (word_rcat_rev (word_list_sign_extend 4 (map Rep_uint8' bs)))))) = sign_extend S 4 bs"
 proof -
-  have 1:"
-     ((word_rsplit_rev :: 32 word \<Rightarrow> _)
-       ((word_rcat_rev)
-         (map Rep_uint8
-           (Wasm_Base_Defs.sign_extend S 4
-             bs)))) =
-    map Rep_uint8 (Wasm_Base_Defs.sign_extend S 4 bs)"
-    using word_split_rcat_rev_size[of "(map Rep_uint8 (Wasm_Base_Defs.sign_extend S 4 bs))"] assms
-    by (force simp add: word_size sign_extend_def bytes_takefill_def)
+  have 1:"(word_rsplit_rev::32 word \<Rightarrow> _) (word_rcat_rev (word_list_sign_extend 4 (map Rep_uint8 bs))) =
+            map Rep_uint8 (Wasm_Base_Defs.sign_extend S 4 bs)"
+    using load_fX_from_siX_bs_helper assms
+    by force
   have 2:"Abs_uint8' \<circ> Rep_uint8 = id"
     unfolding Abs_uint8'_def map_fun_def
     by (simp add: Rep_uint8_inverse fun_comp_eq_conv)
-  have 3: "(takefill 0 4 (map Rep_uint8 bs)) = (map Rep_uint8 (takefill 0 4 bs))"
-    unfolding map_takefill
-    by (simp add: zero_uint8.rep_eq)
-  have "(serialise_i32 (i32_impl_abs (Abs_uint32' (word_rcat_rev (map Rep_uint8' (sign_extend S 4 bs)))))) = sign_extend S 4 bs"
-    using 2 3
+  show ?thesis
+    using 1 2
     unfolding serialise_i32_def i32_impl_abs_def
-    by (auto simp add: 1 I32.rep_abs Abs_uint32'.abs_eq Abs_uint32_inverse)
-  thus ?thesis
-    using word_list_sign_extend_Rep_uint8 assms(1)
-    by auto
+    by (auto simp add: I32.rep_abs Abs_uint32'.abs_eq Abs_uint32_inverse)
 qed
 
 lemma load_f64_from_si64_bs:
   assumes "length bs > 0" "length bs \<le> 8"
   shows "(serialise_i64 (i64_impl_abs (Abs_uint64' (word_rcat_rev (word_list_sign_extend 8 (map Rep_uint8' bs)))))) = sign_extend S 8 bs"
 proof -
-  have 1:"
-     ((word_rsplit_rev :: 64 word \<Rightarrow> _)
-       ((word_rcat_rev)
-         (map Rep_uint8
-           (Wasm_Base_Defs.sign_extend S 8
-             bs)))) =
-    map Rep_uint8 (Wasm_Base_Defs.sign_extend S 8 bs)"
-    using word_split_rcat_rev_size[of "(map Rep_uint8 (Wasm_Base_Defs.sign_extend S 8 bs))"] assms
-    by (force simp add: word_size sign_extend_def bytes_takefill_def)
+  have 1:"(word_rsplit_rev::64 word \<Rightarrow> _) (word_rcat_rev (word_list_sign_extend 8 (map Rep_uint8 bs))) =
+            map Rep_uint8 (Wasm_Base_Defs.sign_extend S 8 bs)"
+    using load_fX_from_siX_bs_helper assms
+    by force
   have 2:"Abs_uint8' \<circ> Rep_uint8 = id"
     unfolding Abs_uint8'_def map_fun_def
     by (simp add: Rep_uint8_inverse fun_comp_eq_conv)
-  have 3: "(takefill 0 4 (map Rep_uint8 bs)) = (map Rep_uint8 (takefill 0 4 bs))"
-    unfolding map_takefill
-    by (simp add: zero_uint8.rep_eq)
-  have "(serialise_i64 (i64_impl_abs (Abs_uint64' (word_rcat_rev (map Rep_uint8' (sign_extend S 8 bs)))))) = sign_extend S 8 bs"
-    using 2 3
+  show ?thesis
+    using 1 2
     unfolding serialise_i64_def i64_impl_abs_def
-    by (auto simp add: 1 I64.rep_abs Abs_uint64'.abs_eq Abs_uint64_inverse)
-  thus ?thesis
-    using word_list_sign_extend_Rep_uint8 assms(1)
-    by auto
+    by (auto simp add: I64.rep_abs Abs_uint64'.abs_eq Abs_uint64_inverse)
 qed
 
 lemma store_f32_to_i32_bs:
