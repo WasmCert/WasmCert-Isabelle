@@ -155,113 +155,97 @@ fun store_uint8_list :: "byte_array \<Rightarrow> nat \<Rightarrow> uint8 list \
 
 (* loading and storing uint32 *)
 
-definition load_uint32_of_uint8 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint32 Heap" where
-  "load_uint32_of_uint8 a n \<equiv> do {
-     b\<leftarrow>load_uint8 a n;
-     return (Abs_uint32' (ucast (Rep_uint8' b)))
-  }"
-
-definition load_uint32_of_sint8 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint32 Heap" where
-  "load_uint32_of_sint8 a n \<equiv> do {
-     b\<leftarrow>load_uint8 a n;
-     return (Abs_uint32' (scast (Rep_uint8' b)))
-  }"
-
-definition load_uint32_of_uint16 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint32 Heap" where
-  "load_uint32_of_uint16 a n \<equiv> do {
-     bs\<leftarrow>load_uint8_list a n 2;
+definition load_uint32_of_uintX :: "byte_array \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> uint32 Heap" where
+  "load_uint32_of_uintX a n x \<equiv> do {
+     bs\<leftarrow>load_uint8_list a n x;
      return (Abs_uint32' (word_rcat_rev (map Rep_uint8' bs)))
   }"
 
-definition load_uint32_of_sint16 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint32 Heap" where
-  "load_uint32_of_sint16 a n \<equiv> do {
-     bs\<leftarrow>load_uint8_list a n 2;
+definition load_uint32_of_sintX :: "byte_array \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> uint32 Heap" where
+  "load_uint32_of_sintX a n x \<equiv> do {
+     bs\<leftarrow>load_uint8_list a n x;
      return (Abs_uint32' (word_rcat_rev (word_list_sign_extend 4 (map Rep_uint8' bs))))
   }"
 
-definition load_uint32 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint32 Heap" where
-  "load_uint32 a n \<equiv> do {
-     bs\<leftarrow>load_uint8_list a n 4;
-     return (Abs_uint32' (word_rcat_rev (map Rep_uint8' bs)))
+definition store_uintX_of_uint32 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint32 \<Rightarrow> nat \<Rightarrow> unit Heap" where
+  "store_uintX_of_uint32 a n v x \<equiv> do {
+     store_uint8_list a n (map Abs_uint8' (takefill (0::8 word) x (word_rsplit_rev (Rep_uint32' v))))
   }"
+
+definition load_uint32_of_uint8 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint32 Heap" where
+  "load_uint32_of_uint8 a n \<equiv> load_uint32_of_uintX a n 1"
+
+definition load_uint32_of_sint8 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint32 Heap" where
+  "load_uint32_of_sint8 a n \<equiv> load_uint32_of_sintX a n 1"
+
+definition load_uint32_of_uint16 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint32 Heap" where
+  "load_uint32_of_uint16 a n \<equiv>  load_uint32_of_uintX a n 2"
+
+definition load_uint32_of_sint16 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint32 Heap" where
+  "load_uint32_of_sint16 a n \<equiv> load_uint32_of_sintX a n 2"
+
+definition load_uint32 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint32 Heap" where
+  "load_uint32 a n \<equiv>  load_uint32_of_uintX a n 4"
 
 definition store_uint8_of_uint32 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint32 \<Rightarrow> unit Heap" where
-  "store_uint8_of_uint32 a n v \<equiv> do {
-     store_uint8_list a n (map Abs_uint8' (takefill (0::8 word) 1 (word_rsplit_rev (Rep_uint32' v))))
-  }"
+  "store_uint8_of_uint32 a n v \<equiv> store_uintX_of_uint32 a n v 1"
 
 definition store_uint16_of_uint32 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint32 \<Rightarrow> unit Heap" where
-  "store_uint16_of_uint32 a n v \<equiv> do {
-     store_uint8_list a n (map Abs_uint8' (takefill (0::8 word) 2 (word_rsplit_rev (Rep_uint32' v))))
-  }"
+  "store_uint16_of_uint32 a n v \<equiv> store_uintX_of_uint32 a n v 2"
 
 definition store_uint32 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint32 \<Rightarrow> unit Heap" where
-  "store_uint32 a n v \<equiv> do {
-     store_uint8_list a n (map Abs_uint8' (takefill (0::8 word) 4 (word_rsplit_rev (Rep_uint32' v))))
-  }"
+  "store_uint32 a n v \<equiv> store_uintX_of_uint32 a n v 4"
 
 (* loading and storing uint64 *)
 
-definition load_uint64_of_uint8 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint64 Heap" where
-  "load_uint64_of_uint8 a n \<equiv> do {
-     b\<leftarrow>load_uint8 a n;
-     return (Abs_uint64' (ucast (Rep_uint8' b)))
+definition load_uint64_of_uintX :: "byte_array \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> uint64 Heap" where
+  "load_uint64_of_uintX a n x \<equiv> do {
+     bs\<leftarrow>load_uint8_list a n x;
+     return (Abs_uint64' (word_rcat_rev (map Rep_uint8' bs)))
   }"
+
+definition load_uint64_of_sintX :: "byte_array \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> uint64 Heap" where
+  "load_uint64_of_sintX a n x \<equiv> do {
+     bs\<leftarrow>load_uint8_list a n x;
+     return (Abs_uint64' (word_rcat_rev (word_list_sign_extend 8 (map Rep_uint8' bs))))
+  }"
+
+definition store_uintX_of_uint64 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint64 \<Rightarrow> nat \<Rightarrow> unit Heap" where
+  "store_uintX_of_uint64 a n v x \<equiv> do {
+     store_uint8_list a n (map Abs_uint8' (takefill (0::8 word) x (word_rsplit_rev (Rep_uint64' v))))
+  }"
+
+definition load_uint64_of_uint8 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint64 Heap" where
+  "load_uint64_of_uint8 a n \<equiv> load_uint64_of_uintX a n 1"
 
 definition load_uint64_of_sint8 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint64 Heap" where
-  "load_uint64_of_sint8 a n \<equiv> do {
-     b\<leftarrow>load_uint8 a n;
-     return (Abs_uint64' (scast (Rep_uint8' b)))
-  }"
+  "load_uint64_of_sint8 a n \<equiv> load_uint64_of_sintX a n 1"
 
 definition load_uint64_of_uint16 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint64 Heap" where
-  "load_uint64_of_uint16 a n \<equiv> do {
-     bs\<leftarrow>load_uint8_list a n 2;
-     return (Abs_uint64' (word_rcat_rev (map Rep_uint8' bs)))
-  }"
+  "load_uint64_of_uint16 a n \<equiv> load_uint64_of_uintX a n 2"
 
 definition load_uint64_of_sint16 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint64 Heap" where
-  "load_uint64_of_sint16 a n \<equiv> do {
-     bs\<leftarrow>load_uint8_list a n 2;
-     return (Abs_uint64' (word_rcat_rev (word_list_sign_extend 8 (map Rep_uint8' bs))))
-  }"
+  "load_uint64_of_sint16 a n \<equiv> load_uint64_of_sintX a n 2"
 
 definition load_uint64_of_uint32 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint64 Heap" where
-  "load_uint64_of_uint32 a n \<equiv> do {
-     bs\<leftarrow>load_uint8_list a n 4;
-     return (Abs_uint64' (word_rcat_rev (map Rep_uint8' bs)))
-  }"
+  "load_uint64_of_uint32 a n \<equiv> load_uint64_of_uintX a n 4"
 
 definition load_uint64_of_sint32 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint64 Heap" where
-  "load_uint64_of_sint32 a n \<equiv> do {
-     bs\<leftarrow>load_uint8_list a n 4;
-     return (Abs_uint64' (word_rcat_rev (word_list_sign_extend 8 (map Rep_uint8' bs))))
-  }"
+  "load_uint64_of_sint32 a n \<equiv> load_uint64_of_sintX a n 4"
 
 definition load_uint64 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint64 Heap" where
-  "load_uint64 a n \<equiv> do {
-     bs\<leftarrow>load_uint8_list a n 8;
-     return (Abs_uint64' (word_rcat_rev (map Rep_uint8' bs)))
-  }"
+  "load_uint64 a n \<equiv> load_uint64_of_uintX a n 8"
 
 definition store_uint8_of_uint64 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint64 \<Rightarrow> unit Heap" where
-  "store_uint8_of_uint64 a n v \<equiv> do {
-     store_uint8_list a n (map Abs_uint8' (takefill (0::8 word) 1 (word_rsplit_rev (Rep_uint64' v))))
-  }"
+  "store_uint8_of_uint64 a n v \<equiv> store_uintX_of_uint64 a n v 1"
 
 definition store_uint16_of_uint64 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint64 \<Rightarrow> unit Heap" where
-  "store_uint16_of_uint64 a n v \<equiv> do {
-     store_uint8_list a n (map Abs_uint8' (takefill (0::8 word) 2 (word_rsplit_rev (Rep_uint64' v))))
-  }"
+  "store_uint16_of_uint64 a n v \<equiv> store_uintX_of_uint64 a n v 2"
 
 definition store_uint32_of_uint64 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint64 \<Rightarrow> unit Heap" where
-  "store_uint32_of_uint64 a n v \<equiv> do {
-     store_uint8_list a n (map Abs_uint8' (takefill (0::8 word) 4 (word_rsplit_rev (Rep_uint64' v))))
-  }"
+  "store_uint32_of_uint64 a n v \<equiv> store_uintX_of_uint64 a n v 4"
 
 definition store_uint64 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint64 \<Rightarrow> unit Heap" where
-  "store_uint64 a n v \<equiv> do {
-     store_uint8_list a n (map Abs_uint8' (takefill (0::8 word) 8 (word_rsplit_rev (Rep_uint64' v))))
-  }"
+  "store_uint64 a n v \<equiv> store_uintX_of_uint64 a n v 8"
 
 end
