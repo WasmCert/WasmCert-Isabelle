@@ -119,8 +119,9 @@ lemma store_packed_max:
   unfolding store_packed_def
   by simp
 
-axiomatization where
-  wasm_deserialise_type:"typeof (wasm_deserialise bs t) = t"
+lemma wasm_deserialise_type:"typeof (wasm_deserialise bs t) = t"
+  unfolding wasm_deserialise_def typeof_def
+  by (simp split: t.splits)
 
 axiomatization where
     host_apply_preserve_store1:"host_apply s (t1s _> t2s) f vs hs (Some (s', vs')) \<Longrightarrow> store_extension s s'"

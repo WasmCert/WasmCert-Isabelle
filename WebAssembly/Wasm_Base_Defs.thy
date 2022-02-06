@@ -157,6 +157,11 @@ consts
   serialise_f64 :: "f64 \<Rightarrow> bytes"
   deserialise_f32 :: "bytes \<Rightarrow> f32"
   deserialise_f64 :: "bytes \<Rightarrow> f64"
+
+axiomatization where
+  serialise_f32_len: "serialise_f32 x = bs \<Longrightarrow> length bs = 4" and
+  serialise_f64_len: "serialise_f64 y = bs \<Longrightarrow> length bs = 8"
+
 (* TODO: check correctness of the below *)
 (* intra-int conversions *)
 lift_definition wasm_wrap :: "i64 \<Rightarrow> i32" is "Word.ucast" .
