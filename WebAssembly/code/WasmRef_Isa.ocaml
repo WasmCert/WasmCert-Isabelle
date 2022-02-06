@@ -1006,6 +1006,7 @@ module WasmRef_Isa : sig
   val l_min : 'a limit_t_ext -> nat
   val l_max : 'a limit_t_ext -> nat option
   val limits_compat : 'a limit_t_ext -> 'b limit_t_ext -> bool
+  val zero_byte : uint8
   val ocaml_int64_to_isabelle_int64 : Int64.t -> i64
   val isabelle_i64_trunc_u_f64 : F64Wrapper.t -> i64 option
   val ui64_trunc_f64 : F64Wrapper.t -> i64 option
@@ -1101,6 +1102,9 @@ module WasmRef_Isa : sig
   val bits : v -> uint8 list
   val byte_of_nat : nat -> uint8
   val nat_of_byte : uint8 -> nat
+  val uminus_word : 'a len -> 'a word -> 'a word
+  val uminus_uint8 : uint8 -> uint8
+  val negone_byte : uint8
   val m_data : 'a m_ext -> unit module_data_ext list
   val m_elem : 'a m_ext -> unit module_elem_ext list
   val m_mems : 'a m_ext -> unit limit_t_ext list
@@ -1210,7 +1214,6 @@ module WasmRef_Isa : sig
   val load_uint64_of_uint32 : byte_array -> nat -> (unit -> int64)
   val load_uint64_of_uint16 : byte_array -> nat -> (unit -> int64)
   val msb_word : 'a len -> 'a word -> bool
-  val uminus_word : 'a len -> 'a word -> 'a word
   val word_list_sign_extend : 'a len -> nat -> 'a word list -> 'a word list
   val load_uint64_of_sintX : byte_array -> nat -> nat -> (unit -> int64)
   val load_uint64_of_sint32 : byte_array -> nat -> (unit -> int64)
@@ -4286,6 +4289,8 @@ let rec limits_compat
             | Some lt1_the -> less_eq_nat lt1_the lt2_the))
         (l_max lt2);;
 
+let zero_byte : uint8 = zero_uint8a;;
+
 let rec ocaml_int64_to_isabelle_int64
   n = I64_impl_abs (uint64 (LibAux.z_of_uint64 n));;
 
@@ -4847,6 +4852,15 @@ let rec bits
 let rec byte_of_nat x = uint8_of_nat x;;
 
 let rec nat_of_byte x = nat_of_uint8 x;;
+
+let rec uminus_word _A a = of_int _A (uminus_inta (the_int _A a));;
+
+let rec uminus_uint8
+  xa = Abs_uint8
+         (uminus_word (len_bit0 (len_bit0 (len_bit0 len_num1)))
+           (rep_uint8a xa));;
+
+let negone_byte : uint8 = uminus_uint8 one_uint8a;;
 
 let rec m_data
   (M_ext
@@ -5526,8 +5540,6 @@ let rec msb_word _A
           (signed_take_bit ring_bit_operations_int
             (minus_nat (len_of _A.len0_len Type) one_nata) (the_int _A a)))
         (uminus_inta one_inta);;
-
-let rec uminus_word _A a = of_int _A (uminus_inta (the_int _A a));;
 
 let rec word_list_sign_extend _A
   l ws =
