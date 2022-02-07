@@ -52,10 +52,10 @@ code_printing
   type_constructor byte_array \<rightharpoonup> (OCaml) "Bytes.t"
 
 code_printing
-  constant new_zeroed_byte_array' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.make _ 0)"
+  constant new_zeroed_byte_array' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.make (Z.to'_int _) 0)"
 | constant len_byte_array' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.length _)"
-| constant blit_byte_array' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.blit _ _ _ _ _)"
-| constant load_uint8' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.get'_uint8 _ _)"
-| constant store_uint8' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.set'_uint8 _ _ _)"
+| constant blit_byte_array' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.blit _ (Z.to'_int _) _ (Z.to'_int _) (Z.to'_int _))"
+| constant load_uint8' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.get'_uint8 _ (Z.to'_int _))"
+| constant store_uint8' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.set'_uint8 _ (Z.to'_int _) (Z.to'_int _))"
 
 end
