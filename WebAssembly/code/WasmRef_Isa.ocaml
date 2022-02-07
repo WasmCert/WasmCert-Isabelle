@@ -4558,7 +4558,7 @@ let rec m_tabs
 let rec map_Heap f m = (fun () -> (let a = m () in f a));;
 
 let rec load_uint8
-  ba n = map_Heap uint8 ((fn () =>  Bytes.get_uint8 ba (integer_of_nat n)));;
+  ba n = map_Heap uint8 ((fun () ->  Bytes.get_uint8 ba (integer_of_nat n)));;
 
 let rec typerep_of _A x = typerep _A Type;;
 
@@ -4629,7 +4629,7 @@ let rec load_uint64
 
 let rec store_uint8
   ba n b =
-    (fn () =>  Bytes.set_uint8 ba (integer_of_nat n) (integer_of_uint8 b));;
+    (fun () ->  Bytes.set_uint8 ba (integer_of_nat n) (integer_of_uint8 b));;
 
 let rec bitzero
   t = (match t with T_i32 -> ConstInt32 zero_i32a
@@ -4911,7 +4911,7 @@ let rec limit_type_checker_p
 let rec limit_typing x1 x2 = holds (limit_type_checker_p x1 x2);;
 
 let rec len_byte_array
-  ba = map_Heap nat_of_integer ((fn () =>  Bytes.length ba));;
+  ba = map_Heap nat_of_integer ((fun () ->  Bytes.length ba));;
 
 let rec app_testop_i _A
   testop c = (let Eqz = testop in int_eqz _A.wasm_int_ops_wasm_int c);;
@@ -4927,7 +4927,7 @@ let rec app_testop
 
 let rec blit_byte_array
   baa sn ba dn ln =
-    (fn () => 
+    (fun () -> 
       Bytes.blit baa (integer_of_nat
                        sn) ba (integer_of_nat dn) (integer_of_nat ln));;
 
@@ -5468,7 +5468,7 @@ let rec app_s_f_v_s_mem_size_m
         (ConstInt32 (int_of_nat_i32 (divide_nat m_len ki64)) :: v_s,
           Step_normal)));;
 
-let rec new_zeroed_byte_array n = (fn () =>  Bytes.make (integer_of_nat n) 0);;
+let rec new_zeroed_byte_array n = (fun () ->  Bytes.make (integer_of_nat n) 0);;
 
 let rec grow_zeroed_byte_array
   a n = (if equal_nat n zero_nat then (fun () -> a)
