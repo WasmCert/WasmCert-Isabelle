@@ -4560,7 +4560,8 @@ let rec map_Heap f m = (fun () -> (let a = m () in f a));;
 let rec load_uint8
   ba n =
     map_Heap uint8
-      ((fun () ->  Bytes.get_uint8 ba (Z.to_int (integer_of_nat n))));;
+      ((fun () -> 
+        Z.of_int (Bytes.get_uint8 ba (Z.to_int (integer_of_nat n)))));;
 
 let rec typerep_of _A x = typerep _A Type;;
 
@@ -4915,7 +4916,7 @@ let rec limit_type_checker_p
 let rec limit_typing x1 x2 = holds (limit_type_checker_p x1 x2);;
 
 let rec len_byte_array
-  ba = map_Heap nat_of_integer ((fun () ->  Bytes.length ba));;
+  ba = map_Heap nat_of_integer ((fun () ->  Z.of_int (Bytes.length ba)));;
 
 let rec app_testop_i _A
   testop c = (let Eqz = testop in int_eqz _A.wasm_int_ops_wasm_int c);;
