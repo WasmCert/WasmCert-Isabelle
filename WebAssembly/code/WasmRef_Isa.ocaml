@@ -463,10 +463,6 @@ module WasmRef_Isa : sig
   type 'a finite = {countable_finite : 'a countable}
   type 'a bit0 = Abs_bit0 of int
   type uint8 = Abs_uint8 of num1 bit0 bit0 bit0 word
-  val typerep_uint8a : uint8 itself -> typerepa
-  val countable_uint8 : uint8 countable
-  val typerep_uint8 : uint8 typerep
-  val heap_uint8 : uint8 heap
   val rep_uint8a : uint8 -> num1 bit0 bit0 bit0 word
   val len_of_num1 : num1 itself -> nat
   val len0_num1 : num1 len0
@@ -854,11 +850,10 @@ module WasmRef_Isa : sig
   val countable_unit : unit countable
   val typerep_unit : unit typerep
   val heap_unit : unit heap
-  type byte_array = Abs_byte_array of uint8 array
-  val typerep_byte_arraya : byte_array itself -> typerepa
-  val countable_byte_array : byte_array countable
-  val typerep_byte_array : byte_array typerep
-  val heap_byte_array : byte_array heap
+  val typerep_byte_arraya : Bytes.t itself -> typerepa
+  val countable_byte_array : Bytes.t countable
+  val typerep_byte_array : Bytes.t typerep
+  val heap_byte_array : Bytes.t heap
   type 'a global_ext = Global_ext of mut * v * 'a
   val typerep_global_exta : 'a typerep -> 'a global_ext itself -> typerepa
   val countable_global_ext : 'a countable -> 'a global_ext countable
@@ -888,7 +883,7 @@ module WasmRef_Isa : sig
   and 'a s_m_ext =
     S_m_ext of
       cl_m array * ((nat option) array * nat option) array *
-        (byte_array * nat option) array * unit global_ext array * 'a
+        (Bytes.t * nat option) array * unit global_ext array * 'a
   and host =
     Abs_host_m of
       (unit s_m_ext * v list -> (unit -> ((unit s_m_ext * v list) option)))
@@ -1096,7 +1091,8 @@ module WasmRef_Isa : sig
   val m_elem : 'a m_ext -> unit module_elem_ext list
   val m_mems : 'a m_ext -> unit limit_t_ext list
   val m_tabs : 'a m_ext -> unit limit_t_ext list
-  val load_uint8 : byte_array -> nat -> (unit -> uint8)
+  val map_Heap : ('a -> 'b) -> (unit -> 'a) -> (unit -> 'b)
+  val load_uint8 : Bytes.t -> nat -> (unit -> uint8)
   val typerep_of : 'a typerep -> 'a -> typerepa
   val name : 'a typerep -> 'a -> string
   val m_funcs : 'a m_ext -> (nat * (t list * b_e list)) list
@@ -1104,24 +1100,22 @@ module WasmRef_Isa : sig
   val m_start : 'a m_ext -> nat option
   val m_types : 'a m_ext -> tf list
   val word_rcat_rev : 'a len -> 'b len -> 'a word list -> 'b word
-  val load_uint8_list : byte_array -> nat -> nat -> (unit -> (uint8 list))
-  val load_uint32_of_uintX : byte_array -> nat -> nat -> (unit -> int32)
-  val load_uint32 : byte_array -> nat -> (unit -> int32)
-  val load_uint64_of_uintX : byte_array -> nat -> nat -> (unit -> int64)
-  val load_uint64 : byte_array -> nat -> (unit -> int64)
-  val store_uint8 : byte_array -> nat -> uint8 -> (unit -> unit)
+  val load_uint8_list : Bytes.t -> nat -> nat -> (unit -> (uint8 list))
+  val load_uint32_of_uintX : Bytes.t -> nat -> nat -> (unit -> int32)
+  val load_uint32 : Bytes.t -> nat -> (unit -> int32)
+  val load_uint64_of_uintX : Bytes.t -> nat -> nat -> (unit -> int64)
+  val load_uint64 : Bytes.t -> nat -> (unit -> int64)
+  val store_uint8 : Bytes.t -> nat -> uint8 -> (unit -> unit)
   val bitzero : t -> v
   val n_zeros : t list -> v list
   val const_expr_p : unit t_context_ext -> b_e -> unit pred
   val const_expr : unit t_context_ext -> b_e -> bool
   val takefill : 'a -> nat -> 'a list -> 'a list
-  val store_uint8_list : byte_array -> nat -> uint8 list -> (unit -> unit)
-  val store_uintX_of_uint32 :
-    byte_array -> nat -> int32 -> nat -> (unit -> unit)
-  val store_uint32 : byte_array -> nat -> int32 -> (unit -> unit)
-  val store_uintX_of_uint64 :
-    byte_array -> nat -> int64 -> nat -> (unit -> unit)
-  val store_uint64 : byte_array -> nat -> int64 -> (unit -> unit)
+  val store_uint8_list : Bytes.t -> nat -> uint8 list -> (unit -> unit)
+  val store_uintX_of_uint32 : Bytes.t -> nat -> int32 -> nat -> (unit -> unit)
+  val store_uint32 : Bytes.t -> nat -> int32 -> (unit -> unit)
+  val store_uintX_of_uint64 : Bytes.t -> nat -> int64 -> nat -> (unit -> unit)
+  val store_uint64 : Bytes.t -> nat -> int64 -> (unit -> unit)
   val min : 'a ord -> 'a -> 'a -> 'a
   val app_unop_i : 'a wasm_int -> unop_i -> 'a -> 'a
   val app_unop_i_v : unop_i -> v -> v
@@ -1130,7 +1124,6 @@ module WasmRef_Isa : sig
   val app_unop : unop -> v -> v
   val m_exports : 'a m_ext -> unit module_export_ext list
   val m_imports : 'a m_ext -> unit module_import_ext list
-  val map_Heap : ('a -> 'b) -> (unit -> 'a) -> (unit -> 'b)
   val app_binop_i : 'a wasm_int -> binop_i -> 'a -> 'a -> 'a option
   val app_binop_i_v : binop_i -> v -> v -> v option
   val app_binop_f : 'a wasm_float -> binop_f -> 'a -> 'a -> 'a option
@@ -1145,11 +1138,11 @@ module WasmRef_Isa : sig
   val split_n : v list -> nat -> v list * v list
   val limit_type_checker_p : unit limit_t_ext -> nat -> unit pred
   val limit_typing : unit limit_t_ext -> nat -> bool
-  val len_byte_array : byte_array -> (unit -> nat)
+  val len_byte_array : Bytes.t -> (unit -> nat)
   val app_testop_i : 'a wasm_int -> testop -> 'a -> bool
   val app_testop : testop -> v -> v
   val blit_byte_array :
-    byte_array -> nat -> byte_array -> nat -> nat -> (unit -> unit)
+    Bytes.t -> nat -> Bytes.t -> nat -> nat -> (unit -> unit)
   val types_agree : t -> v -> bool
   val crash_invalid : res_step
   val app_v_s_if :
@@ -1179,50 +1172,48 @@ module WasmRef_Isa : sig
   val split_v_s_b_s : b_e list -> v list * b_e list
   val update_redex_return : redex -> v list -> redex
   val update_fc_return_m : frame_context_m -> v list -> frame_context_m
-  val store_uint32_of_uint64 : byte_array -> nat -> int64 -> (unit -> unit)
-  val store_uint16_of_uint64 : byte_array -> nat -> int64 -> (unit -> unit)
-  val store_uint8_of_uint64 : byte_array -> nat -> int64 -> (unit -> unit)
-  val store_uint64_packed : byte_array -> nat -> int64 -> tp -> (unit -> unit)
-  val store_uint16_of_uint32 : byte_array -> nat -> int32 -> (unit -> unit)
-  val store_uint8_of_uint32 : byte_array -> nat -> int32 -> (unit -> unit)
-  val store_uint32_packed : byte_array -> nat -> int32 -> tp -> (unit -> unit)
+  val store_uint32_of_uint64 : Bytes.t -> nat -> int64 -> (unit -> unit)
+  val store_uint16_of_uint64 : Bytes.t -> nat -> int64 -> (unit -> unit)
+  val store_uint8_of_uint64 : Bytes.t -> nat -> int64 -> (unit -> unit)
+  val store_uint64_packed : Bytes.t -> nat -> int64 -> tp -> (unit -> unit)
+  val store_uint16_of_uint32 : Bytes.t -> nat -> int32 -> (unit -> unit)
+  val store_uint8_of_uint32 : Bytes.t -> nat -> int32 -> (unit -> unit)
+  val store_uint32_packed : Bytes.t -> nat -> int32 -> tp -> (unit -> unit)
   val i64_impl_rep : i64 -> int64
   val i32_impl_rep : i32 -> int32
   val store_packed_m_v :
-    byte_array * nat option -> nat -> nat -> v -> tp -> (unit -> (unit option))
+    Bytes.t * nat option -> nat -> nat -> v -> tp -> (unit -> (unit option))
   val memsa : 'a inst_m_ext -> nat array
   val store_m_v :
-    byte_array * nat option -> nat -> nat -> v -> (unit -> (unit option))
+    Bytes.t * nat option -> nat -> nat -> v -> (unit -> (unit option))
   val app_s_f_v_s_store_maybe_packed_m :
     t -> tp option ->
            nat ->
-             (byte_array * nat option) array ->
+             (Bytes.t * nat option) array ->
                unit inst_m_ext -> v list -> (unit -> (v list * res_step))
-  val load_uint64_of_uint32 : byte_array -> nat -> (unit -> int64)
-  val load_uint64_of_uint16 : byte_array -> nat -> (unit -> int64)
+  val load_uint64_of_uint32 : Bytes.t -> nat -> (unit -> int64)
+  val load_uint64_of_uint16 : Bytes.t -> nat -> (unit -> int64)
   val msb_word : 'a len -> 'a word -> bool
   val word_list_sign_extend : 'a len -> nat -> 'a word list -> 'a word list
-  val load_uint64_of_sintX : byte_array -> nat -> nat -> (unit -> int64)
-  val load_uint64_of_sint32 : byte_array -> nat -> (unit -> int64)
-  val load_uint64_of_sint16 : byte_array -> nat -> (unit -> int64)
-  val load_uint64_of_uint8 : byte_array -> nat -> (unit -> int64)
-  val load_uint64_of_sint8 : byte_array -> nat -> (unit -> int64)
-  val load_uint64_packed : byte_array -> nat -> tp -> sx -> (unit -> int64)
-  val load_uint32_of_uint16 : byte_array -> nat -> (unit -> int32)
-  val load_uint32_of_sintX : byte_array -> nat -> nat -> (unit -> int32)
-  val load_uint32_of_sint16 : byte_array -> nat -> (unit -> int32)
-  val load_uint32_of_uint8 : byte_array -> nat -> (unit -> int32)
-  val load_uint32_of_sint8 : byte_array -> nat -> (unit -> int32)
-  val load_uint32_packed : byte_array -> nat -> tp -> sx -> (unit -> int32)
+  val load_uint64_of_sintX : Bytes.t -> nat -> nat -> (unit -> int64)
+  val load_uint64_of_sint32 : Bytes.t -> nat -> (unit -> int64)
+  val load_uint64_of_sint16 : Bytes.t -> nat -> (unit -> int64)
+  val load_uint64_of_uint8 : Bytes.t -> nat -> (unit -> int64)
+  val load_uint64_of_sint8 : Bytes.t -> nat -> (unit -> int64)
+  val load_uint64_packed : Bytes.t -> nat -> tp -> sx -> (unit -> int64)
+  val load_uint32_of_uint16 : Bytes.t -> nat -> (unit -> int32)
+  val load_uint32_of_sintX : Bytes.t -> nat -> nat -> (unit -> int32)
+  val load_uint32_of_sint16 : Bytes.t -> nat -> (unit -> int32)
+  val load_uint32_of_uint8 : Bytes.t -> nat -> (unit -> int32)
+  val load_uint32_of_sint8 : Bytes.t -> nat -> (unit -> int32)
+  val load_uint32_packed : Bytes.t -> nat -> tp -> sx -> (unit -> int32)
   val load_packed_m_v :
-    byte_array * nat option ->
-      nat -> nat -> t -> tp -> sx -> (unit -> (v option))
-  val load_m_v :
-    byte_array * nat option -> nat -> nat -> t -> (unit -> (v option))
+    Bytes.t * nat option -> nat -> nat -> t -> tp -> sx -> (unit -> (v option))
+  val load_m_v : Bytes.t * nat option -> nat -> nat -> t -> (unit -> (v option))
   val app_s_f_v_s_load_maybe_packed_m :
     t -> (tp * sx) option ->
            nat ->
-             (byte_array * nat option) array ->
+             (Bytes.t * nat option) array ->
                unit inst_m_ext -> v list -> (unit -> (v list * res_step))
   val cl_m_type : cl_m -> tf
   val types : 'a inst_m_ext -> tf array
@@ -1243,12 +1234,12 @@ module WasmRef_Isa : sig
         unit inst_m_ext -> v list -> (unit -> (v list * res_step))
   val divide_nat : nat -> nat -> nat
   val app_s_f_v_s_mem_size_m :
-    (byte_array * nat option) array ->
+    (Bytes.t * nat option) array ->
       unit inst_m_ext -> v list -> (unit -> (v list * res_step))
-  val new_zeroed_byte_array : nat -> (unit -> byte_array)
-  val grow_zeroed_byte_array : byte_array -> nat -> (unit -> byte_array)
+  val new_zeroed_byte_array : nat -> (unit -> Bytes.t)
+  val grow_zeroed_byte_array : Bytes.t -> nat -> (unit -> Bytes.t)
   val app_s_f_v_s_mem_grow_m :
-    (byte_array * nat option) array ->
+    (Bytes.t * nat option) array ->
       unit inst_m_ext -> v list -> (unit -> (v list * res_step))
   val app_f_v_s_set_local_m :
     nat -> v array -> v list -> (unit -> (v list * res_step))
@@ -1265,7 +1256,7 @@ module WasmRef_Isa : sig
   val funcs : 'a s_m_ext -> cl_m array
   val crash_invariant : res_step
   val tabs : 'a s_m_ext -> ((nat option) array * nat option) array
-  val mems : 'a s_m_ext -> (byte_array * nat option) array
+  val mems : 'a s_m_ext -> (Bytes.t * nat option) array
   val app_v_s_testop : testop -> v list -> v list * res_step
   val app_v_s_select : v list -> v list * res_step
   val run_step_b_e_m : b_e -> config_m -> (unit -> (config_m * res_step))
@@ -1315,8 +1306,7 @@ module WasmRef_Isa : sig
       unit inst_m_ext -> nat list -> unit module_elem_ext list -> (unit -> unit)
   val list_all2_m :
     ('a -> 'b -> (unit -> bool)) -> 'a list -> 'b list -> (unit -> bool)
-  val mem_typing_m :
-    byte_array * nat option -> unit limit_t_ext -> (unit -> bool)
+  val mem_typing_m : Bytes.t * nat option -> unit limit_t_ext -> (unit -> bool)
   val tab_typing_m :
     (nat option) array * nat option -> unit limit_t_ext -> (unit -> bool)
   val make_empty_inst_m : (unit -> unit inst_m_ext)
@@ -2280,16 +2270,6 @@ type 'a finite = {countable_finite : 'a countable};;
 type 'a bit0 = Abs_bit0 of int;;
 
 type uint8 = Abs_uint8 of num1 bit0 bit0 bit0 word;;
-
-let rec typerep_uint8a t = Typerep ("Uint8.uint8", []);;
-
-let countable_uint8 = (() : uint8 countable);;
-
-let typerep_uint8 = ({typerep = typerep_uint8a} : uint8 typerep);;
-
-let heap_uint8 =
-  ({countable_heap = countable_uint8; typerep_heap = typerep_uint8} :
-    uint8 heap);;
 
 let rec rep_uint8a (Abs_uint8 x) = x;;
 
@@ -3641,18 +3621,15 @@ let typerep_unit = ({typerep = typerep_unita} : unit typerep);;
 let heap_unit =
   ({countable_heap = countable_unit; typerep_heap = typerep_unit} : unit heap);;
 
-type byte_array = Abs_byte_array of uint8 array;;
-
 let rec typerep_byte_arraya t = Typerep ("Byte_Array.byte_array", []);;
 
-let countable_byte_array = (() : byte_array countable);;
+let countable_byte_array = (() : Bytes.t countable);;
 
-let typerep_byte_array =
-  ({typerep = typerep_byte_arraya} : byte_array typerep);;
+let typerep_byte_array = ({typerep = typerep_byte_arraya} : Bytes.t typerep);;
 
 let heap_byte_array =
   ({countable_heap = countable_byte_array; typerep_heap = typerep_byte_array} :
-    byte_array heap);;
+    Bytes.t heap);;
 
 type 'a global_ext = Global_ext of mut * v * 'a;;
 
@@ -3703,7 +3680,7 @@ type cl_m = Func_native of unit inst_m_ext * tf * t list * b_e list |
 and 'a s_m_ext =
   S_m_ext of
     cl_m array * ((nat option) array * nat option) array *
-      (byte_array * nat option) array * unit global_ext array * 'a
+      (Bytes.t * nat option) array * unit global_ext array * 'a
 and host =
   Abs_host_m of
     (unit s_m_ext * v list -> (unit -> ((unit s_m_ext * v list) option)));;
@@ -4578,7 +4555,10 @@ let rec m_tabs
       m_imports, m_exports, more))
     = m_tabs;;
 
-let rec load_uint8 (Abs_byte_array x) = array_nth heap_uint8 x;;
+let rec map_Heap f m = (fun () -> (let a = m () in f a));;
+
+let rec load_uint8
+  ba n = map_Heap uint8 ((fn () =>  Bytes.get_uint8 ba (integer_of_nat n)));;
 
 let rec typerep_of _A x = typerep _A Type;;
 
@@ -4648,7 +4628,8 @@ let rec load_uint64
   a n = load_uint64_of_uintX a n (nat_of_integer (Z.of_int 8));;
 
 let rec store_uint8
-  (Abs_byte_array x) = (fun n b () -> (let _ = upd heap_uint8 n b x () in ()));;
+  ba n b =
+    (fn () =>  Bytes.set_uint8 ba (integer_of_nat n) (integer_of_uint8 b));;
 
 let rec bitzero
   t = (match t with T_i32 -> ConstInt32 zero_i32a
@@ -4783,8 +4764,6 @@ let rec m_imports
     (m_types, m_funcs, m_tabs, m_mems, m_globs, m_elem, m_data, m_start,
       m_imports, m_exports, more))
     = m_imports;;
-
-let rec map_Heap f m = (fun () -> (let a = m () in f a));;
 
 let rec app_binop_i _A
   iop c1 c2 =
@@ -4931,7 +4910,8 @@ let rec limit_type_checker_p
 
 let rec limit_typing x1 x2 = holds (limit_type_checker_p x1 x2);;
 
-let rec len_byte_array (Abs_byte_array x) = len heap_uint8 x;;
+let rec len_byte_array
+  ba = map_Heap nat_of_integer ((fn () =>  Bytes.length ba));;
 
 let rec app_testop_i _A
   testop c = (let Eqz = testop in int_eqz _A.wasm_int_ops_wasm_int c);;
@@ -4946,7 +4926,10 @@ let rec app_testop
       | ConstFloat64 _ -> ConstInt32 zero_i32a);;
 
 let rec blit_byte_array
-  (Abs_byte_array xc) xb (Abs_byte_array x) = blit heap_uint8 xc xb x;;
+  baa sn ba dn ln =
+    (fn () => 
+      Bytes.blit baa (integer_of_nat
+                       sn) ba (integer_of_nat dn) (integer_of_nat ln));;
 
 let rec types_agree t v = equal_ta (typeof v) t;;
 
@@ -5485,8 +5468,7 @@ let rec app_s_f_v_s_mem_size_m
         (ConstInt32 (int_of_nat_i32 (divide_nat m_len ki64)) :: v_s,
           Step_normal)));;
 
-let rec new_zeroed_byte_array
-  x = map_Heap (fun a -> Abs_byte_array a) (newa heap_uint8 x zero_uint8a);;
+let rec new_zeroed_byte_array n = (fn () =>  Bytes.make (integer_of_nat n) 0);;
 
 let rec grow_zeroed_byte_array
   a n = (if equal_nat n zero_nat then (fun () -> a)
