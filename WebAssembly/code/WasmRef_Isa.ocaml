@@ -5475,7 +5475,7 @@ let rec app_s_f_v_s_mem_size_m
           Step_normal)));;
 
 let rec new_zeroed_byte_array
-  n = (fun () ->  Bytes.make (Z.to_int (integer_of_nat n)) 0);;
+  n = (fun () ->  Bytes.make (Z.to_int (integer_of_nat n)) (Char.chr 0));;
 
 let rec grow_zeroed_byte_array
   a n = (if equal_nat n zero_nat then (fun () -> a)
