@@ -5281,7 +5281,10 @@ let rec load_uint32_of_sintX
 let rec load_uint32_of_sint16
   a n = load_uint32_of_sintX a n (nat_of_integer (Z.of_int 2));;
 
-let rec load_uint32_of_uint8 a n = load_uint32_of_uintX a n one_nata;;
+let rec load_uint32_of_uint8
+  ba n =
+    (fun () -> 
+      Int32.of_int (Bytes.get_uint8 ba (Z.to_int (integer_of_nat n))));;
 
 let rec load_uint32_of_sint8 a n = load_uint32_of_sintX a n one_nata;;
 

@@ -48,6 +48,12 @@ definition "store_uint8' ba i bi = store_uint8 ba (nat_of_integer i) (Uint8 bi)"
 lemma[code]: "store_uint8 ba n b = store_uint8' ba (integer_of_nat n) (integer_of_uint8 b)"
   by (simp add: Uint8_integer_of_uint8 pointfree_idE store_uint8'_def)
 
+definition "load_uint32_of_uint8' ba i = load_uint32_of_uint8 ba (nat_of_integer i)"
+
+lemma[code]: "load_uint32_of_uint8 ba n = load_uint32_of_uint8' ba (integer_of_nat n)"
+  unfolding load_uint32_of_uint8'_def
+  by simp
+
 (* requires OCaml 4.08 or above *)
 code_printing
   type_constructor byte_array \<rightharpoonup> (OCaml) "Bytes.t"
@@ -58,5 +64,6 @@ code_printing
 | constant blit_byte_array' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.blit _ (Z.to'_int _) _ (Z.to'_int _) (Z.to'_int _))"
 | constant load_uint8' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Z.of'_int (Bytes.get'_uint8 _ (Z.to'_int _)))"
 | constant store_uint8' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.set'_uint8 _ (Z.to'_int _) (Z.to'_int _))"
+| constant load_uint32_of_uint8' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Int32.of'_int (Bytes.get'_uint8 _ (Z.to'_int _)))"
 
 end
