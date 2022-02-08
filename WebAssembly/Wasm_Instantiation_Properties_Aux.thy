@@ -65,8 +65,7 @@ proof -
     then have same_length:"length tab'_e = length tab_e" using init_tab_is by auto
 
     have set_inclusion:"set tab'_e \<subseteq> set tab_e \<union> set e_pay " using init_tab_is
-      (* ugly sledgehammer *)
-      by (smt (z3) set_append set_drop_subset set_take_subset subset_trans sup.boundedI sup_ge1 sup_ge2)
+      by (simp add: le_supI1 set_drop_subset set_take_subset)
 
     {
       assume "tab_agree s (tab_e,max)"  

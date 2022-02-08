@@ -15,8 +15,8 @@ qed
 lemma list_all2_in_set:
   assumes "x\<in>set xs" "list_all2 f xs ys" 
   shows "\<exists>y. f x y \<and> y\<in>set ys" 
-  using assms 
-  by (smt (verit, best) list_all2_conv_all_nth mem_Collect_eq set_conv_nth)
+  using list_all2_iff[of f xs ys] assms
+  by simp (metis case_prodD in_set_impl_in_set_zip1 set_zip_rightD)
 
 lemma list_all2_forget:
   assumes "list_all2 P xs ys"
@@ -143,6 +143,7 @@ theorem instantiation_sound:
         "\<exists>\<C>. inst_typing s' inst \<C>"
         "\<exists>tes. list_all2 (\<lambda>v_exp te. external_typing s' (E_desc v_exp) te) v_exps tes"
         "pred_option (\<lambda>i. i < length (s.funcs s')) start"
+        "store_extension s s'"
 proof -
   obtain s1 s2 t_imps t_exps g_inits f e_offs d_offs where 
     "module_typing m t_imps t_exps"  
@@ -163,9 +164,11 @@ proof -
     using assms(2) instantiate.simps by auto
 
   have "store_extension s s1" using alloc_module_preserve_store_extension s_alloc_module by auto
-  have "store_extension s1 s2" using init_tabs_preserve_store_extension s_init_tabs by auto 
-  have "store_extension s2 s'" using init_mems_preserve_store_extension s_init_mems by auto 
-
+  moreover have "store_extension s1 s2" using init_tabs_preserve_store_extension s_init_tabs by auto 
+  moreover have "store_extension s2 s'" using init_mems_preserve_store_extension s_init_mems by auto 
+  ultimately show s_ext_is:"store_extension s s'"
+    using store_extension_trans
+    by blast
   obtain \<C> \<C>' fts gts 
     where c_is:"list_all2 (module_func_typing \<C>) (m_funcs m) fts"
     "list_all (module_tab_typing) (m_tabs m)"
@@ -189,7 +192,7 @@ proof -
   have "funcs s1 = funcs s2" using init_tabs_only_modify_tabs[OF s_init_tabs] by auto
   also have "... = funcs s'" using init_mems_only_modify_mems[OF s_init_mems] by auto
   finally have "funcs s1 = funcs s'" by -
-  obtain fs ts ms gs where 
+  obtain fs ts ms gs where s1_is:
     "funcs s1 = funcs s @ fs" 
     "tabs s1 = tabs s @ ts"
     "mems s1 = mems s @ ms"
@@ -308,10 +311,16 @@ proof -
         unfolding cl_type_def alloc_func_simple_def fs_alloc list.rel_map(1) 
         by(simp add: list_all2_refl split:prod.splits)
 
-      moreover have "list_all2 (\<lambda>f ft. (fst f) < length (types_t \<C>)\<and> (types_t \<C>)!(fst f) = ft) 
+      moreover 
+     have "(\<And>x y.
+              module_func_typing \<C> x y \<Longrightarrow>
+                fst x < length (types_t \<C>) \<and> types_t \<C> ! fst x = y)"
+       unfolding module_func_typing.simps
+       by fastforce
+     hence "list_all2 (\<lambda>f ft. (fst f) < length (types_t \<C>)\<and> (types_t \<C>)!(fst f) = ft) 
           (m_funcs m) fts"
-        using list_all2_mono[OF c_is(1)] unfolding module_func_typing.simps 
-        by (smt (z3) fst_conv) 
+        using list_all2_mono[OF c_is(1)]
+        by simp
 
       ultimately have "list_all2 (\<lambda>f ft. cl_type f = ft) fs fts" using \<open>types inst = types_t \<C>\<close> 
         list_all2_trans[where as=fs and bs="(m_funcs m)" and cs=fts]
@@ -361,8 +370,8 @@ proof -
         by (metis min.idem)   
 
       have "list_all2 (\<lambda>g gt. gt = g_type g) (m_globs m) gts" 
-        using c_is(8)  unfolding module_glob_typing.simps 
-        by (smt (verit, best) list_all2_mono module_glob.select_convs(1))
+        unfolding module_glob_typing.simps 
+        by (metis (mono_tags, lifting) c_is(8) list_all2_mono module_glob_typing_equiv_module_glob_type_checker)
       then have "gts = map g_type (m_globs m)"
         unfolding list_all2_conv_all_nth 
         by (metis map_intro_length) 
@@ -502,16 +511,17 @@ proof -
           using tabi_agree_s1 unfolding tabi_agree_def
           by (simp add: less_imp_le_nat list_all2_conv_all_nth list_all_length) 
         moreover have "list_all (\<lambda>e. e_tab e < length (inst.tabs inst)) (m_elem m)"
-          using tabi_agree_s1 c_is(3) unfolding list_all2_conv_all_nth module_elem_typing.simps
-          by (smt (verit, best) list_all_iff module_elem.select_convs(1)) 
-        ultimately show ?thesis using s_element_in_bounds unfolding element_in_bounds_def
-          by (smt (verit, best) list.rel_map(1) list_all2_conv_all_nth list_all_length)
-      qed 
-
+          using tabi_agree_s1 c_is(3)
+          unfolding list_all2_conv_all_nth module_elem_typing.simps list_all_length
+          by auto
+        ultimately show ?thesis using s_element_in_bounds
+          unfolding element_in_bounds_def list_all2_conv_all_nth list_all_length
+          by auto
+      qed
       have "list_all (tab_agree s) (tabs s)" using assms(1) unfolding store_typing.simps by auto
       then have "list_all (tab_agree s1) (tabs s)" 
         using tab_agree_store_extension_inv[OF \<open>store_extension s s1\<close>] 
-        by (simp add: list_all_length) 
+        by (simp add: list_all_length)
       moreover have "list_all (tab_agree s1) ts" 
         using \<open>list_all (module_tab_typing) (m_tabs m)\<close> 
         unfolding ts_alloc alloc_tab_simple_def tab_agree_def list.pred_map(1) comp_def 

@@ -1416,6 +1416,77 @@ lemma store_extension_refl:
   unfolding store_extension.simps
   by (metis (mono_tags) append_Nil2 list_all2_conv_all_nth s.cases)
 
+lemma global_extension_trans:
+  assumes "global_extension g g''"
+          "global_extension g'' g'"
+  shows "global_extension g g'"
+  using assms
+  unfolding global_extension_def
+  by auto
+
+lemma mem_extension_trans:
+  assumes "mem_extension m m''"
+          "mem_extension m'' m'"
+  shows "mem_extension m m'"
+  using assms
+  unfolding mem_extension_def
+  by auto
+
+lemma tab_extension_trans:
+  assumes "tab_extension t t''"
+          "tab_extension t'' t'"
+  shows "tab_extension t t'"
+  using assms
+  unfolding tab_extension_def
+  by auto
+
+lemma store_extension_trans:
+  assumes "store_extension s s''"
+          "store_extension s'' s'"
+        shows "store_extension s s'"
+proof -
+  obtain cls ts ms gs ts'' ms'' gs'' cls''_rest ts''_rest ms''_rest gs''_rest where s_is:
+    "s = \<lparr>s.funcs = cls, s.tabs = ts, s.mems = ms, s.globs = gs\<rparr>"
+    "s'' = \<lparr>s.funcs = cls@cls''_rest, s.tabs = ts''@ts''_rest, s.mems = ms''@ms''_rest, s.globs = gs''@gs''_rest\<rparr>"
+    "list_all2 tab_extension ts ts''"
+    "list_all2 mem_extension ms ms''"
+    "list_all2 global_extension gs gs''"
+    using assms(1)
+    by (cases rule: store_extension.cases) blast
+  obtain cls'_rest ts' ts'_rest ms' ms'_rest gs' gs'_rest where s'_is:
+    "s' = \<lparr>s.funcs = cls@cls''_rest@cls'_rest, s.tabs = ts'@ts'_rest, s.mems = ms'@ms'_rest, s.globs = gs'@gs'_rest\<rparr>"
+    "list_all2 tab_extension (ts''@ts''_rest) ts'"
+    "list_all2 mem_extension (ms''@ms''_rest) ms'"
+    "list_all2 global_extension (gs''@gs''_rest) gs'"
+    using assms(2) s_is(2)
+    apply (cases rule: store_extension.cases)
+    apply (metis (no_types, lifting) append.assoc s.ext_inject)
+    done
+  obtain ts'_' ts'_rest_' ms'_' ms'_rest_' gs'_' gs'_rest'_' where s'_is_alt:
+    "ts' = ts'_'@ts'_rest_'"
+    "ms' = ms'_'@ms'_rest_'"
+    "gs' = gs'_'@gs'_rest'_'"
+    "list_all2 tab_extension ts'' ts'_'"
+    "list_all2 mem_extension ms'' ms'_'"
+    "list_all2 global_extension gs'' gs'_'"
+    using s'_is
+          list_all2_append1[of tab_extension "ts''" "ts''_rest" ts']
+          list_all2_append1[of mem_extension "ms''" "ms''_rest" ms']
+          list_all2_append1[of global_extension "gs''" "gs''_rest" gs']
+    apply simp
+    apply (metis (no_types, lifting))
+    done
+  have
+    "list_all2 tab_extension ts ts'_'"
+    "list_all2 mem_extension ms ms'_'"
+    "list_all2 global_extension gs gs'_'"
+    using s_is(3,4,5) s'_is_alt list_all2_trans tab_extension_trans mem_extension_trans global_extension_trans
+    by blast+
+  thus ?thesis
+    using s'_is s'_is_alt
+    by (simp add: s_is store_extension.simps) blast
+qed
+
 lemma global_extension_update:
   assumes "g_mut g = T_mut"
           "typeof (g_val g) = typeof v"
