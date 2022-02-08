@@ -334,9 +334,6 @@ definition app_s_f_v_s_mem_grow_m :: "mem_m array \<Rightarrow> inst_m \<Rightar
 fun update_fc_step_m :: "frame_context_m \<Rightarrow> v_stack \<Rightarrow> e list \<Rightarrow> frame_context_m" where
   "update_fc_step_m (Frame_context_m rdx lcs nf f1 f2) v_s' es_cont = (Frame_context_m (update_redex_step rdx v_s' es_cont) lcs nf f1 f2)"
 
-fun update_redex_return :: "redex \<Rightarrow> v_stack \<Rightarrow> redex" where
-  "update_redex_return (Redex v_s es b_es) v_s' = (Redex (v_s'@v_s) es b_es)"
-
 fun update_fc_return_m :: "frame_context_m \<Rightarrow> v_stack \<Rightarrow> frame_context_m" where
   "update_fc_return_m (Frame_context_m rdx lcs nf f1 f2) v_s' = (Frame_context_m (update_redex_return rdx v_s') lcs nf f1 f2)"
 
