@@ -4,14 +4,6 @@ theory Wasm_Monad_Printing imports OCaml_Printing Wasm_Instantiation_Monad Wasm_
 code_identifier constant Neg \<rightharpoonup> (OCaml) "WasmRef_Isa.Neg"
 code_identifier constant  Array.nth \<rightharpoonup> (OCaml) "WasmRef_Isa.array_nth"
 
-(* TODO: why is this not a thing already? *)
-declare [[code drop: map_Heap]]
-lemma[code]:
-  "map_Heap f M = do { a \<leftarrow> M; return (f a) }"
-  apply (cases M)
-  apply (simp add: bind_def map_conv_bind_option fun_eq_iff execute_return split: option.splits)
-  done
-
 (* restore naive blit implementation *)
 declare [[code drop: blit]]
 lemmas[code] = blit.simps

@@ -5017,7 +5017,7 @@ let rec update_fc_return_m
 let rec store_uint32_of_uint64
   ba n v =
     (fun () -> 
-      Bytes.set_uint32_le ba (Z.to_int (integer_of_nat n)) (Int64.to_int32 v));;
+      Bytes.set_int32_le ba (Z.to_int (integer_of_nat n)) (Int64.to_int32 v));;
 
 let rec store_uint16_of_uint64
   ba n v =

@@ -120,6 +120,14 @@ lemma[code]: "store_uint8_of_uint64 ba n v = store_uint8_of_uint64' ba (integer_
             store_uint64'_def
   by simp_all
 
+(* TODO: why is this not a thing already? *)
+declare [[code drop: map_Heap]]
+lemma[code]:
+  "map_Heap f M = do { a \<leftarrow> M; return (f a) }"
+  apply (cases M)
+  apply (simp add: bind_def map_conv_bind_option fun_eq_iff execute_return split: option.splits)
+  done
+
 (* requires OCaml 4.08 or above *)
 (* assumes sizeof(int) \<ge> 8 *)
 code_printing
@@ -155,7 +163,7 @@ code_printing
 (* i64 stores *)
 | constant store_uint8_of_uint64' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.set'_uint8 _ (Z.to'_int _) (Int64.to'_int _))"
 | constant store_uint16_of_uint64' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.set'_uint16'_le _ (Z.to'_int _) (Int64.to'_int _))"
-| constant store_uint32_of_uint64' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.set'_uint32'_le _ (Z.to'_int _) (Int64.to'_int32 _))"
+| constant store_uint32_of_uint64' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.set'_int32'_le _ (Z.to'_int _) (Int64.to'_int32 _))"
 | constant store_uint64' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.set'_int64'_le _ (Z.to'_int _) _)"
 
 end
