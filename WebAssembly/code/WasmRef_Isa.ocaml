@@ -943,7 +943,6 @@ module WasmRef_Isa : sig
   val upd : 'a heap -> nat -> 'a -> 'a array -> (unit -> ('a array))
   val drop : nat -> 'a list -> 'a list
   val null : 'a list -> bool
-  val last : 'a list -> 'a
   val take_tr : nat -> 'a list -> 'a list -> 'a list
   val take : nat -> 'a list -> 'a list
   val cast : 'b len -> 'a len -> 'b word -> 'a word
@@ -972,7 +971,6 @@ module WasmRef_Isa : sig
   val tg_t : 'a tg_ext -> t
   val glob_typing : 'a global_ext -> 'b tg_ext -> bool
   val signed_cast : 'b len -> 'a len -> 'b word -> 'a word
-  val bin_sign : int -> int
   val adjunct : 'a pred -> 'a seq -> 'a seq
   val sup_pred : 'a pred -> 'a pred -> 'a pred
   val if_pred : bool -> unit pred
@@ -1091,30 +1089,20 @@ module WasmRef_Isa : sig
   val m_elem : 'a m_ext -> unit module_elem_ext list
   val m_mems : 'a m_ext -> unit limit_t_ext list
   val m_tabs : 'a m_ext -> unit limit_t_ext list
-  val map_Heap : ('a -> 'b) -> (unit -> 'a) -> (unit -> 'b)
-  val load_uint8 : Bytes.t -> nat -> (unit -> uint8)
   val typerep_of : 'a typerep -> 'a -> typerepa
   val name : 'a typerep -> 'a -> string
   val m_funcs : 'a m_ext -> (nat * (t list * b_e list)) list
   val m_globs : 'a m_ext -> unit module_glob_ext list
   val m_start : 'a m_ext -> nat option
   val m_types : 'a m_ext -> tf list
-  val word_rcat_rev : 'a len -> 'b len -> 'a word list -> 'b word
-  val load_uint8_list : Bytes.t -> nat -> nat -> (unit -> (uint8 list))
-  val load_uint32_of_uintX : Bytes.t -> nat -> nat -> (unit -> int32)
   val load_uint32 : Bytes.t -> nat -> (unit -> int32)
-  val load_uint64_of_uintX : Bytes.t -> nat -> nat -> (unit -> int64)
   val load_uint64 : Bytes.t -> nat -> (unit -> int64)
   val store_uint8 : Bytes.t -> nat -> uint8 -> (unit -> unit)
   val bitzero : t -> v
   val n_zeros : t list -> v list
   val const_expr_p : unit t_context_ext -> b_e -> unit pred
   val const_expr : unit t_context_ext -> b_e -> bool
-  val takefill : 'a -> nat -> 'a list -> 'a list
-  val store_uint8_list : Bytes.t -> nat -> uint8 list -> (unit -> unit)
-  val store_uintX_of_uint32 : Bytes.t -> nat -> int32 -> nat -> (unit -> unit)
   val store_uint32 : Bytes.t -> nat -> int32 -> (unit -> unit)
-  val store_uintX_of_uint64 : Bytes.t -> nat -> int64 -> nat -> (unit -> unit)
   val store_uint64 : Bytes.t -> nat -> int64 -> (unit -> unit)
   val min : 'a ord -> 'a -> 'a -> 'a
   val app_unop_i : 'a wasm_int -> unop_i -> 'a -> 'a
@@ -1124,6 +1112,7 @@ module WasmRef_Isa : sig
   val app_unop : unop -> v -> v
   val m_exports : 'a m_ext -> unit module_export_ext list
   val m_imports : 'a m_ext -> unit module_import_ext list
+  val map_Heap : ('a -> 'b) -> (unit -> 'a) -> (unit -> 'b)
   val app_binop_i : 'a wasm_int -> binop_i -> 'a -> 'a -> 'a option
   val app_binop_i_v : binop_i -> v -> v -> v option
   val app_binop_f : 'a wasm_float -> binop_f -> 'a -> 'a -> 'a option
@@ -1144,9 +1133,11 @@ module WasmRef_Isa : sig
   val blit_byte_array :
     Bytes.t -> nat -> Bytes.t -> nat -> nat -> (unit -> unit)
   val types_agree : t -> v -> bool
+  val store_uint8_list : Bytes.t -> nat -> uint8 list -> (unit -> unit)
   val crash_invalid : res_step
   val app_v_s_if :
     tf -> b_e list -> b_e list -> v list -> v list * (e list * res_step)
+  val word_rcat_rev : 'a len -> 'b len -> 'a word list -> 'b word
   val g_val_update : (v -> v) -> 'a global_ext -> 'a global_ext
   val typing : unit t_context_ext -> b_e list -> tf -> bool
   val app_v_s_drop : v list -> v list * res_step
@@ -1193,16 +1184,12 @@ module WasmRef_Isa : sig
                unit inst_m_ext -> v list -> (unit -> (v list * res_step))
   val load_uint64_of_uint32 : Bytes.t -> nat -> (unit -> int64)
   val load_uint64_of_uint16 : Bytes.t -> nat -> (unit -> int64)
-  val msb_word : 'a len -> 'a word -> bool
-  val word_list_sign_extend : 'a len -> nat -> 'a word list -> 'a word list
-  val load_uint64_of_sintX : Bytes.t -> nat -> nat -> (unit -> int64)
   val load_uint64_of_sint32 : Bytes.t -> nat -> (unit -> int64)
   val load_uint64_of_sint16 : Bytes.t -> nat -> (unit -> int64)
   val load_uint64_of_uint8 : Bytes.t -> nat -> (unit -> int64)
   val load_uint64_of_sint8 : Bytes.t -> nat -> (unit -> int64)
   val load_uint64_packed : Bytes.t -> nat -> tp -> sx -> (unit -> int64)
   val load_uint32_of_uint16 : Bytes.t -> nat -> (unit -> int32)
-  val load_uint32_of_sintX : Bytes.t -> nat -> nat -> (unit -> int32)
   val load_uint32_of_sint16 : Bytes.t -> nat -> (unit -> int32)
   val load_uint32_of_uint8 : Bytes.t -> nat -> (unit -> int32)
   val load_uint32_of_sint8 : Bytes.t -> nat -> (unit -> int32)
@@ -3798,8 +3785,6 @@ let rec drop
 let rec null = function [] -> true
                | x :: xs -> false;;
 
-let rec last (x :: xs) = (if null xs then x else last xs);;
-
 let rec take_tr
   n x1 acc_r = match n, x1, acc_r with n, [], acc_r -> rev acc_r
     | n, x :: xs, acc_r ->
@@ -3887,9 +3872,6 @@ let rec glob_typing
 
 let rec signed_cast _B _A
   w = Word (take_bit_int (len_of _A.len0_len Type) (the_signed_int _B w));;
-
-let rec bin_sign
-  k = (if less_eq_int zero_inta k then zero_inta else uminus_inta one_inta);;
 
 let rec adjunct p x1 = match p, x1 with p, Empty -> Join (p, Empty)
                   | p, Insert (x, q) -> Insert (x, sup_pred q p)
@@ -4555,14 +4537,6 @@ let rec m_tabs
       m_imports, m_exports, more))
     = m_tabs;;
 
-let rec map_Heap f m = (fun () -> (let a = m () in f a));;
-
-let rec load_uint8
-  ba n =
-    map_Heap uint8
-      ((fun () -> 
-        Z.of_int (Bytes.get_uint8 ba (Z.to_int (integer_of_nat n)))));;
-
 let rec typerep_of _A x = typerep _A Type;;
 
 let rec name _A a = (let Typerep (s, _) = typerep_of _A a in s);;
@@ -4591,44 +4565,11 @@ let rec m_types
       m_imports, m_exports, more))
     = m_types;;
 
-let rec word_rcat_rev _A _B
-  = comp (of_int _B)
-      (horner_sum comm_semiring_0_int (the_int _A)
-        (power power_int (Int_of_integer (Z.of_int 2))
-          (len_of _A.len0_len Type)));;
-
-let rec load_uint8_list
-  a n l =
-    (if equal_nat l zero_nat then (fun () -> [])
-      else (fun () ->
-             (let b = load_uint8 a n () in
-              let bs = load_uint8_list a (suc n) (minus_nat l one_nata) () in
-               b :: bs)));;
-
-let rec load_uint32_of_uintX
-  a n x =
-    (fun () ->
-      (let bs = load_uint8_list a n x () in
-        abs_uint32
-          (word_rcat_rev (len_bit0 (len_bit0 (len_bit0 len_num1)))
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-            (map rep_uint8 bs))));;
-
 let rec load_uint32
-  a n = load_uint32_of_uintX a n (nat_of_integer (Z.of_int 4));;
-
-let rec load_uint64_of_uintX
-  a n x =
-    (fun () ->
-      (let bs = load_uint8_list a n x () in
-        abs_uint64
-          (word_rcat_rev (len_bit0 (len_bit0 (len_bit0 len_num1)))
-            (len_bit0
-              (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-            (map rep_uint8 bs))));;
+  ba n = (fun () ->  Bytes.get_int32_le ba (Z.to_int (integer_of_nat n)));;
 
 let rec load_uint64
-  a n = load_uint64_of_uintX a n (nat_of_integer (Z.of_int 8));;
+  ba n = (fun () ->  Bytes.get_int64_le ba (Z.to_int (integer_of_nat n)));;
 
 let rec store_uint8
   ba n b =
@@ -4689,42 +4630,11 @@ let rec const_expr_p
 
 let rec const_expr x1 x2 = holds (const_expr_p x1 x2);;
 
-let rec takefill
-  fill n xs =
-    (if equal_nat n zero_nat then []
-      else (match xs with [] -> fill :: takefill fill (minus_nat n one_nata) xs
-             | y :: ys -> y :: takefill fill (minus_nat n one_nata) ys));;
-
-let rec store_uint8_list
-  a n x2 = match a, n, x2 with a, n, [] -> (fun () -> ())
-    | a, n, b :: bs ->
-        (fun () ->
-          (let _ = store_uint8 a n b () in store_uint8_list a (suc n) bs ()));;
-
-let rec store_uintX_of_uint32
-  a n v x =
-    store_uint8_list a n
-      (map abs_uint8
-        (takefill (zero_worda (len_bit0 (len_bit0 (len_bit0 len_num1)))) x
-          (word_rsplit_rev
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-            (len_bit0 (len_bit0 (len_bit0 len_num1))) (rep_uint32 v))));;
-
 let rec store_uint32
-  a n v = store_uintX_of_uint32 a n v (nat_of_integer (Z.of_int 4));;
-
-let rec store_uintX_of_uint64
-  a n v x =
-    store_uint8_list a n
-      (map abs_uint8
-        (takefill (zero_worda (len_bit0 (len_bit0 (len_bit0 len_num1)))) x
-          (word_rsplit_rev
-            (len_bit0
-              (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-            (len_bit0 (len_bit0 (len_bit0 len_num1))) (rep_uint64 v))));;
+  ba n v = (fun () ->  Bytes.set_int32_le ba (Z.to_int (integer_of_nat n)) v);;
 
 let rec store_uint64
-  a n v = store_uintX_of_uint64 a n v (nat_of_integer (Z.of_int 8));;
+  ba n v = (fun () ->  Bytes.set_int64_le ba (Z.to_int (integer_of_nat n)) v);;
 
 let rec min _A a b = (if less_eq _A a b then a else b);;
 
@@ -4769,6 +4679,8 @@ let rec m_imports
     (m_types, m_funcs, m_tabs, m_mems, m_globs, m_elem, m_data, m_start,
       m_imports, m_exports, more))
     = m_imports;;
+
+let rec map_Heap f m = (fun () -> (let a = m () in f a));;
 
 let rec app_binop_i _A
   iop c1 c2 =
@@ -4939,6 +4851,12 @@ let rec blit_byte_array
 
 let rec types_agree t v = equal_ta (typeof v) t;;
 
+let rec store_uint8_list
+  a n x2 = match a, n, x2 with a, n, [] -> (fun () -> ())
+    | a, n, b :: bs ->
+        (fun () ->
+          (let _ = store_uint8 a n b () in store_uint8_list a (suc n) bs ()));;
+
 let crash_invalid : res_step
   = Res_crash (Error_invalid "type system violation");;
 
@@ -4952,6 +4870,12 @@ let rec app_v_s_if
       | ConstInt64 _ :: _ -> (v_s, ([], crash_invalid))
       | ConstFloat32 _ :: _ -> (v_s, ([], crash_invalid))
       | ConstFloat64 _ :: _ -> (v_s, ([], crash_invalid)));;
+
+let rec word_rcat_rev _A _B
+  = comp (of_int _B)
+      (horner_sum comm_semiring_0_int (the_int _A)
+        (power power_int (Int_of_integer (Z.of_int 2))
+          (len_of _A.len0_len Type)));;
 
 let rec g_val_update
   g_vala (Global_ext (g_mut, g_val, more)) =
@@ -5091,12 +5015,19 @@ let rec update_fc_return_m
     Frame_context_m (update_redex_return rdx v_s, lcs, nf, f1, f2);;
 
 let rec store_uint32_of_uint64
-  a n v = store_uintX_of_uint64 a n v (nat_of_integer (Z.of_int 4));;
+  ba n v =
+    (fun () -> 
+      Bytes.set_uint32_le ba (Z.to_int (integer_of_nat n)) (Int64.to_int32 v));;
 
 let rec store_uint16_of_uint64
-  a n v = store_uintX_of_uint64 a n v (nat_of_integer (Z.of_int 2));;
+  ba n v =
+    (fun () -> 
+      Bytes.set_uint16_le ba (Z.to_int (integer_of_nat n)) (Int64.to_int v));;
 
-let rec store_uint8_of_uint64 a n v = store_uintX_of_uint64 a n v one_nata;;
+let rec store_uint8_of_uint64
+  ba n v =
+    (fun () -> 
+      Bytes.set_uint8 ba (Z.to_int (integer_of_nat n)) (Int64.to_int v));;
 
 let rec store_uint64_packed
   a n v tp =
@@ -5105,9 +5036,14 @@ let rec store_uint64_packed
       | Tp_i32 -> store_uint32_of_uint64 a n v);;
 
 let rec store_uint16_of_uint32
-  a n v = store_uintX_of_uint32 a n v (nat_of_integer (Z.of_int 2));;
+  ba n v =
+    (fun () -> 
+      Bytes.set_uint16_le ba (Z.to_int (integer_of_nat n)) (Int32.to_int v));;
 
-let rec store_uint8_of_uint32 a n v = store_uintX_of_uint32 a n v one_nata;;
+let rec store_uint8_of_uint32
+  ba n v =
+    (fun () -> 
+      Bytes.set_uint8 ba (Z.to_int (integer_of_nat n)) (Int32.to_int v));;
 
 let rec store_uint32_packed
   a n v tp =
@@ -5211,45 +5147,35 @@ let rec app_s_f_v_s_store_maybe_packed_m
       | _ :: ConstFloat64 _ :: _ -> (fun () -> (v_s, crash_invalid)));;
 
 let rec load_uint64_of_uint32
-  a n = load_uint64_of_uintX a n (nat_of_integer (Z.of_int 4));;
+  ba n =
+    (fun () -> 
+      Int64.of_int (Int32.unsigned_to_int (Bytes.get_int32_le ba (Z.to_int (integer_of_nat
+                                     n)))));;
 
 let rec load_uint64_of_uint16
-  a n = load_uint64_of_uintX a n (nat_of_integer (Z.of_int 2));;
-
-let rec msb_word _A
-  a = equal_inta
-        (bin_sign
-          (signed_take_bit ring_bit_operations_int
-            (minus_nat (len_of _A.len0_len Type) one_nata) (the_int _A a)))
-        (uminus_inta one_inta);;
-
-let rec word_list_sign_extend _A
-  l ws =
-    takefill
-      (if msb_word _A (last ws) then uminus_word _A (one_worda _A)
-        else zero_worda _A)
-      l ws;;
-
-let rec load_uint64_of_sintX
-  a n x =
-    (fun () ->
-      (let bs = load_uint8_list a n x () in
-        abs_uint64
-          (word_rcat_rev (len_bit0 (len_bit0 (len_bit0 len_num1)))
-            (len_bit0
-              (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-            (word_list_sign_extend (len_bit0 (len_bit0 (len_bit0 len_num1)))
-              (nat_of_integer (Z.of_int 8)) (map rep_uint8 bs)))));;
+  ba n =
+    (fun () -> 
+      Int64.of_int (Bytes.get_uint16_le ba (Z.to_int (integer_of_nat n))));;
 
 let rec load_uint64_of_sint32
-  a n = load_uint64_of_sintX a n (nat_of_integer (Z.of_int 4));;
+  ba n =
+    (fun () -> 
+      Int64.of_int32 (Bytes.get_int32_le ba (Z.to_int (integer_of_nat n))));;
 
 let rec load_uint64_of_sint16
-  a n = load_uint64_of_sintX a n (nat_of_integer (Z.of_int 2));;
+  ba n =
+    (fun () -> 
+      Int64.of_int (Bytes.get_int16_le ba (Z.to_int (integer_of_nat n))));;
 
-let rec load_uint64_of_uint8 a n = load_uint64_of_uintX a n one_nata;;
+let rec load_uint64_of_uint8
+  ba n =
+    (fun () -> 
+      Int64.of_int (Bytes.get_uint8 ba (Z.to_int (integer_of_nat n))));;
 
-let rec load_uint64_of_sint8 a n = load_uint64_of_sintX a n one_nata;;
+let rec load_uint64_of_sint8
+  ba n =
+    (fun () -> 
+      Int64.of_int (Bytes.get_int8 ba (Z.to_int (integer_of_nat n))));;
 
 let rec load_uint64_packed
   a n tp sx =
@@ -5266,27 +5192,24 @@ let rec load_uint64_packed
         x));;
 
 let rec load_uint32_of_uint16
-  a n = load_uint32_of_uintX a n (nat_of_integer (Z.of_int 2));;
-
-let rec load_uint32_of_sintX
-  a n x =
-    (fun () ->
-      (let bs = load_uint8_list a n x () in
-        abs_uint32
-          (word_rcat_rev (len_bit0 (len_bit0 (len_bit0 len_num1)))
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-            (word_list_sign_extend (len_bit0 (len_bit0 (len_bit0 len_num1)))
-              (nat_of_integer (Z.of_int 4)) (map rep_uint8 bs)))));;
+  ba n =
+    (fun () -> 
+      Int32.of_int (Bytes.get_uint16_le ba (Z.to_int (integer_of_nat n))));;
 
 let rec load_uint32_of_sint16
-  a n = load_uint32_of_sintX a n (nat_of_integer (Z.of_int 2));;
+  ba n =
+    (fun () -> 
+      Int32.of_int (Bytes.get_int16_le ba (Z.to_int (integer_of_nat n))));;
 
 let rec load_uint32_of_uint8
   ba n =
     (fun () -> 
       Int32.of_int (Bytes.get_uint8 ba (Z.to_int (integer_of_nat n))));;
 
-let rec load_uint32_of_sint8 a n = load_uint32_of_sintX a n one_nata;;
+let rec load_uint32_of_sint8
+  ba n =
+    (fun () -> 
+      Int32.of_int (Bytes.get_int8 ba (Z.to_int (integer_of_nat n))));;
 
 let rec load_uint32_packed
   a n tp sx =
