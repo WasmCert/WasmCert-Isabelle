@@ -5149,8 +5149,8 @@ let rec app_s_f_v_s_store_maybe_packed_m
 let rec load_uint64_of_uint32
   ba n =
     (fun () -> 
-      Int64.of_int (Int32.unsigned_to_int (Bytes.get_int32_le ba (Z.to_int (integer_of_nat
-                                     n)))));;
+      Int64.of_int (Option.get (Int32.unsigned_to_int (Bytes.get_int32_le ba (Z.to_int (integer_of_nat
+         n))))));;
 
 let rec load_uint64_of_uint16
   ba n =

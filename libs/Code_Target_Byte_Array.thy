@@ -157,7 +157,7 @@ code_printing
 | constant load_uint64_of_sint8' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Int64.of'_int (Bytes.get'_int8 _ (Z.to'_int _)))"
 | constant load_uint64_of_uint16' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Int64.of'_int (Bytes.get'_uint16'_le _ (Z.to'_int _)))"
 | constant load_uint64_of_sint16' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Int64.of'_int (Bytes.get'_int16'_le _ (Z.to'_int _)))"
-| constant load_uint64_of_uint32' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Int64.of'_int (Int32.unsigned'_to'_int (Bytes.get'_int32'_le _ (Z.to'_int _))))"
+| constant load_uint64_of_uint32' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Int64.of'_int (Option.get (Int32.unsigned'_to'_int (Bytes.get'_int32'_le _ (Z.to'_int _)))))"
 | constant load_uint64_of_sint32' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Int64.of'_int32 (Bytes.get'_int32'_le _ (Z.to'_int _)))"
 | constant load_uint64' \<rightharpoonup> (OCaml) "(fun/ ()/ -> /Bytes.get'_int64'_le _ (Z.to'_int _))"
 (* i64 stores *)
