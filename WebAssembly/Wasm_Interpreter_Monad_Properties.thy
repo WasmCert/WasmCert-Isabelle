@@ -253,6 +253,16 @@ definition fc_m_assn :: "inst_store \<Rightarrow> frame_context \<Rightarrow> fr
   * locs_m_assn (f_locs f) f_locs1
 )"
 
+definition "fc_m_assn_pure fc fc_m \<equiv> (
+  case fc of Frame_context redex lcs nf f \<Rightarrow> 
+  case fc_m of Frame_context_m redex_m lcs_m nf_m f_locs1 f_inst2 \<Rightarrow>
+  redex = redex_m \<and> lcs = lcs_m \<and> nf = nf_m)"
+
+lemma extract_pre_fc_m_assn[extract_pure_rules]: 
+  "h \<Turnstile> fc_m_assn i_s fc fc_m \<Longrightarrow> fc_m_assn_pure fc fc_m"
+  unfolding fc_m_assn_def fc_m_assn_pure_def 
+  by (sep_auto split:frame_context.splits frame_context_m.splits)
+
 definition "fcs_m_assn i_s fcs fcs_m \<equiv> list_assn (fc_m_assn i_s) fcs fcs_m"
 
 lemma [simp]:"fcs_m_assn i_s (fc#fcs) (fc_m#fcs_m) = 
@@ -266,6 +276,20 @@ definition cfg_m_assn :: "inst_store \<Rightarrow> config \<Rightarrow> config_m
   \<up>(d=d_m) * s_m_assn i_s s s_m * fc_m_assn i_s fc fc_m * fcs_m_assn i_s fcs fcs_m
    * inst_store_assn i_s
 )"     
+
+definition "cfg_m_assn_pure cfg cfg_m = (
+  case cfg of Config d s fc fcs \<Rightarrow>
+  case cfg_m of Config_m d_m s_m fc_m fcs_m \<Rightarrow> 
+  d=d_m \<and> fc_m_assn_pure fc fc_m \<and> length fcs = length fcs_m
+)"     
+
+lemma extract_pre_cfg_m_assn[extract_pure_rules]: 
+  "h \<Turnstile> cfg_m_assn i_s cfg cfg_m \<Longrightarrow> cfg_m_assn_pure cfg cfg_m"
+  unfolding cfg_m_assn_def cfg_m_assn_pure_def fcs_m_assn_def
+  apply (sep_auto split:config.splits config_m.splits)
+  subgoal by (metis mod_starE extract_pre_fc_m_assn)
+  by (metis mod_starE extract_pre_list_assn_lengthD) 
+   
 
 lemma mem_size_triple:
   assumes "inst_at (is, i_ms) (f_inst f, f_inst2) j" 
@@ -690,32 +714,88 @@ proof -
   qed
 qed 
 
-lemma run_step_e_m_run_step_e:
-  assumes 
-    "execute (run_step_e_m e cfg_m) h = Some ((cfg_m', res), h')"
-  shows 
-    "run_step_e e (config_m_to_config h cfg_m) = ((config_m_to_config h' cfg_m'), res)"
-proof(cases e)
-  case (Basic b_e)
-  have 1:"run_step_e_m e cfg_m = run_step_b_e_m b_e cfg_m" unfolding Basic
-    by(rule config_m.induct, auto simp add: defs split: splits)
-  have "run_step_e e (config_m_to_config h cfg_m) = run_step_b_e b_e (config_m_to_config h cfg_m)"
-    unfolding Basic by(rule config.induct, auto simp add: defs split: splits) 
-  also have "... = ((config_m_to_config h' cfg_m'), res)" 
-    using assms sorry
-  finally show ?thesis by -
+lemma update_fc_return_preserve_assn:
+  "cfg_m_assn i_s (Config d s fc (fc'#fcs)) (Config_m d_m s_m fc_m (fc'_m#fcs_m)) 
+  \<Longrightarrow>\<^sub>A cfg_m_assn i_s (Config (Suc d) s (update_fc_return fc' v_s) fcs)
+    (Config_m (Suc d_m) s_m (update_fc_return_m fc'_m v_s) fcs_m) * true"
+  unfolding cfg_m_assn_def 
+  apply(sep_auto split:splits)
+  unfolding fc_m_assn_def
+  by(sep_auto split:frame_context.splits frame_context_m.splits)
+
+lemma update_label_context_preserve_assn:"cfg_m_assn i_s 
+      (Config d s (Frame_context (Redex v_s [] []) 
+        (Label_context v_ls b_els nl b_elcs # lcs) nf_m f) fcs)
+      (Config_m d_m s_m (Frame_context_m (Redex v_s_m [] []) 
+        (Label_context v_ls_m b_els_m nl_m b_elcs_m # lcs_m) nf_m f_locs1 f_inst2) fcs_m)
+  \<Longrightarrow>\<^sub>A cfg_m_assn i_s 
+      (Config d s (Frame_context (Redex (v_s@v_ls) [] b_els) 
+        lcs nf_m f) fcs)
+      (Config_m d_m s_m (Frame_context_m (Redex (v_s_m@v_ls_m) [] b_els_m) 
+        lcs_m nf_m f_locs1 f_inst2) fcs_m)"
+  unfolding cfg_m_assn_def fc_m_assn_def
+  by (sep_auto split:splits)
+
+lemma update_redex_preserve_assn:"cfg_m_assn i_s 
+       (Config d_m s (Frame_context redex lcs_m nf_m f) fcs)
+       (Config_m d_m s_m (Frame_context_m redex_m 
+        lcs_m nf_m f_locs1 f_inst2) fcs_m)
+  \<Longrightarrow>\<^sub>A cfg_m_assn i_s 
+       (Config d_m s (Frame_context (g redex) lcs_m nf_m f) fcs)
+       (Config_m d_m s_m (Frame_context_m (g redex_m) 
+        lcs_m nf_m f_locs1 f_inst2) fcs_m) "
+  unfolding cfg_m_assn_def fc_m_assn_def
+  by (sep_auto split:splits)
+
+lemma run_iter_m_triple:
+    "<cfg_m_assn i_s cfg cfg_m> 
+    run_iter_m n cfg_m 
+    <\<lambda>r. cfg_m_pair_assn i_s (run_iter n cfg) r>\<^sub>t"
+proof(induct n arbitrary: i_s cfg cfg_m)
+  case 0
+  show ?case unfolding 0 by sep_auto
 next
-  case (Invoke i_cl)
-  then show ?thesis sorry
-next
-  case Trap
-  show ?thesis using assms by (auto simp add: defs Trap split: splits)
-next
-  case (Label x41 x42 x43)
-  show ?thesis using assms by (auto simp add: defs Label split: splits)
-next
-  case (Frame x51 x52 x53)
-  show ?thesis using assms by (auto simp add: defs Frame split: splits)
+  case (Suc n)
+
+  obtain d s fc fcs where config:"cfg = Config d s fc fcs"
+    by(erule config.exhaust)
+  obtain redex lcs nf f where frame:"fc = Frame_context redex lcs nf f" 
+    by(erule frame_context.exhaust)
+  obtain v_s es b_es where redex:"redex = Redex v_s es b_es" 
+    by(erule redex.exhaust)
+  obtain d_m s_m fc_m fcs_m where config_m:"cfg_m = Config_m d_m s_m fc_m fcs_m" 
+    by(erule config_m.exhaust)  
+  obtain redex_m lcs_m nf_m f_locs1 f_inst2 
+    where frame_m:"fc_m = Frame_context_m redex_m lcs_m nf_m f_locs1 f_inst2" 
+    by(erule frame_context_m.exhaust)
+  obtain v_s_m es_m b_es_m where redex_m:"redex_m = Redex v_s_m es_m b_es_m" 
+    by(erule redex.exhaust)
+  note unfold_vars_m = config_m frame_m redex_m
+  note unfold_vars = config frame redex unfold_vars_m
+
+  show ?case unfolding unfold_vars
+    supply [simp del] = run_step_b_e_m.simps run_step_b_e.simps 
+      run_step_e_m.simps run_step_e.simps
+    apply(extract_pre_pure', simp add:cfg_m_assn_pure_def fc_m_assn_pure_def)
+    apply(sep_auto split:splits)
+       apply(cases fcs, auto)
+       apply(rule cons_pre_rule[OF update_fc_return_preserve_assn])
+       apply(sep_auto heap:Suc)
+      apply(sep_auto split:label_context.splits)
+      apply(rule cons_pre_rule[OF update_label_context_preserve_assn])
+      apply(sep_auto heap:Suc)
+     apply(sep_auto split:prod.splits)
+      apply(rule cons_pre_rule[OF update_redex_preserve_assn])
+      apply(sep_auto heap:Suc)
+     apply(sep_auto)
+      apply(rule cons_pre_rule[OF update_redex_preserve_assn])
+      apply(sep_auto heap:run_step_b_e_m_triple)
+     apply(sep_auto split:prod.splits res_step.splits heap:Suc)
+    apply(sep_auto)
+     apply(rule cons_pre_rule[OF update_redex_preserve_assn])
+     apply(sep_auto heap:run_step_e_m_triple)
+    apply(sep_auto split:res_step.splits prod.splits heap:Suc)
+    done
 qed
 
 lemma run_iter_m_run_iter:
