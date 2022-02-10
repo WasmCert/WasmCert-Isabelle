@@ -168,6 +168,31 @@ method reinsert_list_idx for i :: nat =
 method knock_down for i :: nat = 
  extract_pre_pure?, extract_list_idx i, sep_auto, extract_pre_pure?, reinsert_list_idx i
 
+lemmas is_complex_goal = asm_rl[of "< _ > _ < _ >"] asm_rl[of "_ \<Longrightarrow>\<^sub>A _"]
+
+method_setup then_else = \<open>let
+in
+  Method.text_closure -- Method.text_closure -- Method.text_closure >>
+    (fn ((textb, textt), texte) => fn ctxt => fn using => fn st =>
+      let
+        val bmethod = Method.evaluate_runtime textb ctxt using;
+        val tmethod = Method.evaluate_runtime textt ctxt using;
+        val emethod = Method.evaluate_runtime texte ctxt using;
+      in
+        (case try (fn st => bmethod st |> Seq.pull) st of
+          SOME (SOME (Seq.Result st,_)) => tmethod st
+        | _ => emethod st)
+      end)
+end     
+\<close>
+
+method defer_vcg = then_else \<open>rule is_complex_goal\<close> \<open>fail\<close> 
+  \<open>find_goal \<open>rule is_complex_goal\<close>, 
+  (rule is_complex_goal | tactic \<open>defer_tac 1\<close>)\<close>
+
+method sep_auto_all = (defer_vcg | (rule is_complex_goal, sep_auto))+
+
+
 term app_s_f_v_s_mem_size_m
 term app_s_f_v_s_mem_size
 
@@ -311,6 +336,56 @@ lemma mem_size_triple:
   done
 
 
+lemma [sep_heap_rules]: 
+    "< mem_m_assn m m_m > 
+      grow_zeroed_byte_array (fst m_m) n 
+    <\<lambda>r. mem_m_assn (mem_append m n 0) (r,snd m_m)>\<^sub>t"
+  unfolding mem_m_assn_def mem_append_def mem_rep_append_def
+  by(sep_auto split:prod.splits simp:Abs_mem_rep_inverse)
+
+
+
+lemma mem_grow_triple:
+  assumes "inst_at (is, i_ms) (f_inst f, f_inst2) j" 
+  shows 
+  "< ms_m \<mapsto>\<^sub>a ms_i * list_assn mem_m_assn ms ms_i * inst_store_assn (is, i_ms) > 
+    app_s_f_v_s_mem_grow_m ms_m f_inst2 v_s 
+  <\<lambda>r. let (ms', v_s', res) = app_s_f_v_s_mem_grow ms f v_s in
+   \<exists>\<^sub>A ms_i. \<up>(r = (v_s', res)) * 
+    ms_m \<mapsto>\<^sub>a ms_i * (list_assn mem_m_assn) ms' ms_i * inst_store_assn (is, i_ms)>\<^sub>t"
+proof - 
+  note expand = smem_ind_def mem_grow_def Let_def mem_size_def mem_length_def
+        mem_rep_length_def mem_max_def
+  note expand_with_assn = expand mem_m_assn_def mem_append_def
+  note splits = option.splits list.splits if_splits prod.splits
+
+  (* the "sep_auto simp:expand split:splits" list eliminate subgoals 
+    by finding contradictions in their assumptions *)
+  show ?thesis
+    using assms 
+    unfolding app_s_f_v_s_mem_grow_m_def inst_m_assn_def app_s_f_v_s_mem_grow_def list_assn_conv_idx
+    apply(sep_auto split: v.splits)
+        apply(knock_down "j")
+       apply(sep_auto)
+        apply(extract_list_idx "inst.mems (f_inst f) ! 0") 
+        (* not reinserting immediately -- the extracted mem_m_assn keeps being necessary *)
+        apply(sep_auto) 
+       apply(sep_auto simp:expand split:splits) 
+          apply(rule listI_assn_reinsert_upd, frame_inference, simp, simp)
+          apply(sep_auto simp:mem_append_def zero_byte_def)
+         apply(sep_auto simp:expand_with_assn split:splits)
+        apply(sep_auto)
+         apply(sep_auto simp:expand_with_assn split:splits) 
+        apply(sep_auto simp:expand_with_assn split:splits) 
+       apply(rule listI_assn_reinsert', frame_inference, simp, simp)
+       apply(sep_auto)
+      apply(sep_auto_all)
+    done
+qed
+
+
+  
+
 
 lemma get_local_triple: 
   "<locs_m_assn (f_locs f) f_locs1> 
@@ -379,29 +454,7 @@ lemma call_triple:
   done
 
 
-lemmas is_complex_goal = asm_rl[of "< _ > _ < _ >"] asm_rl[of "_ \<Longrightarrow>\<^sub>A _"]
 
-method_setup then_else = \<open>let
-in
-  Method.text_closure -- Method.text_closure -- Method.text_closure >>
-    (fn ((textb, textt), texte) => fn ctxt => fn using => fn st =>
-      let
-        val bmethod = Method.evaluate_runtime textb ctxt using;
-        val tmethod = Method.evaluate_runtime textt ctxt using;
-        val emethod = Method.evaluate_runtime texte ctxt using;
-      in
-        (case try (fn st => bmethod st |> Seq.pull) st of
-          SOME (SOME (Seq.Result st,_)) => tmethod st
-        | _ => emethod st)
-      end)
-end     
-\<close>
-
-method defer_vcg = then_else \<open>rule is_complex_goal\<close> \<open>fail\<close> 
-  \<open>find_goal \<open>rule is_complex_goal\<close>, 
-  (rule is_complex_goal | tactic \<open>defer_tac 1\<close>)\<close>
-
-method sep_auto_all = (defer_vcg | (rule is_complex_goal, sep_auto))+
 
 lemma [sep_heap_rules]: "<tabinst_m_assn t t_m> 
     Array.len (fst t_m) 
@@ -514,7 +567,8 @@ proof -
     then show ?thesis sorry
   next
     case Grow_memory
-    then show ?thesis sorry
+    show ?thesis unfolding Grow_memory unfold_vars_assns s_m_assn_def mems_m_assn_def
+      by(sep_auto heap:mem_grow_triple split:prod.splits)
   next
     case Current_memory
     then show ?thesis 
@@ -524,7 +578,7 @@ proof -
     case (Set_local k)
     then show ?thesis 
       unfolding unfold_vars_assns
-      by (sep_auto heap: set_local_triple[of _ _ f f_inst2] split:prod.splits)
+      by (sep_auto heap: set_local_triple split:prod.splits)
   next
     case (Get_local k)
     then show ?thesis 
