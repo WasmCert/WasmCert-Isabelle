@@ -330,20 +330,6 @@ lemma pure_dup:
   using assms unfolding is_pure_assn_def
   by auto
 
-lemma [sep_heap_rules]:
-  "< fs_m\<mapsto>\<^sub>a fs_i * list_assn (cl_m_assn i_s) fs fs_i> 
-  Array.nth fs_m i 
-  <\<lambda>r. \<up>(i < length fs_i \<and> r = fs_i!i) 
-  * cl_m_assn i_s (fs!i) r * fs_m \<mapsto>\<^sub>a fs_i * list_assn (cl_m_assn i_s) fs fs_i>"
-  unfolding funcs_m_assn_def list_assn_conv_idx 
-  apply(sep_auto)
-  apply(extract_pre_pure)
-  apply(extract_list_idx i)
-  apply(subst pure_dup[OF cl_m_assn_pure])
-  apply(reinsert_list_idx i)
-  apply(sep_auto)
-  done
-
 lemma [sep_heap_rules]: "<tabinst_m_assn t t_m> 
     Array.len (fst t_m) 
     <\<lambda>r. tabinst_m_assn t t_m * \<up>(r=length (fst t))>"
@@ -986,14 +972,27 @@ lemma host_apply_impl_m_triple:
   (host_apply_impl s tf h vs) r_opt >"
   sorry
 
-lemma host_apply_impl_m_triple'':
- "< s_m.funcs s_m \<mapsto>\<^sub>a fs_i * list_assn (cl_m_assn i_s) (s.funcs s) fs_i
-* tabs_m_assn (s.tabs s) (s_m.tabs s_m) * mems_m_assn (s.mems s) (s_m.mems s_m) 
-* globs_m_assn (s.globs s) (s_m.globs s_m)>
- host_apply_impl_m s_m tf h vs
- <\<lambda>r_opt. expect_assn (\<lambda>r r_m. s_m_vs_pair_assn i_s r r_m) (s_m_assn i_s s s_m)
-  (host_apply_impl s tf h vs) r_opt>"
-  sorry
+lemma funcs_nth_triple:
+  "< fs_m\<mapsto>\<^sub>a fs_i * list_assn (cl_m_assn i_s) fs fs_i> 
+  Array.nth fs_m i 
+  <\<lambda>r. \<up>(i < length fs_i \<and> r = fs_i!i) 
+  * cl_m_assn i_s (fs!i) r * fs_m \<mapsto>\<^sub>a fs_i * list_assn (cl_m_assn i_s) fs fs_i>"
+  unfolding funcs_m_assn_def list_assn_conv_idx 
+  apply(sep_auto)
+  apply(extract_pre_pure)
+  apply(extract_list_idx i)
+  apply(subst pure_dup[OF cl_m_assn_pure])
+  apply(reinsert_list_idx i)
+  apply(sep_auto)
+  done
+
+lemma funcs_nth_triple_s:
+  "< s_m_assn i_s s s_m> 
+  Array.nth (s_m.funcs s_m) i 
+  <\<lambda>r. \<up>(i < length (s.funcs s)) 
+  * cl_m_assn i_s (s.funcs s!i) r * s_m_assn i_s s s_m>"
+  unfolding s_m_assn_def funcs_m_assn_def
+  by (sep_auto heap:funcs_nth_triple heap del:nth_rule, extract_pre_pure)
 
 lemma run_step_e_m_triple:
     "<cfg_m_assn i_s cfg cfg_m> 
@@ -1029,14 +1028,12 @@ proof -
     case (Invoke i_cl)
 
     show ?thesis unfolding Invoke unfold_vars_assns 
+      apply(sep_auto heap: funcs_nth_triple_s split:cl_m.splits) 
       supply [simp] = Let_def and 
         [split] = v.splits option.splits 
         cl.splits cl_m.splits tf.splits nat.splits
-      and [sep_heap_rules] = host_apply_impl_m_triple''
-      apply(sep_auto simp:s_m_assn_def funcs_m_assn_def heap del: nth_rule)
-      supply [simp] = cl_m_assn_def locs_m_assn_def s_m_assn_def funcs_m_assn_def fc_m_assn_def 
-                apply(sep_auto_all)
-      apply (sep_auto)
+       apply(sep_auto simp:cl_m_assn_def locs_m_assn_def s_m_assn_def funcs_m_assn_def fc_m_assn_def)
+      apply(sep_auto heap:host_apply_impl_m_triple simp:cl_m_assn_def)
       done
   next
     case Trap
