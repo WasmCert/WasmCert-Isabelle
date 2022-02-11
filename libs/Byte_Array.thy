@@ -248,4 +248,133 @@ definition store_uint32_of_uint64 :: "byte_array \<Rightarrow> nat \<Rightarrow>
 definition store_uint64 :: "byte_array \<Rightarrow> nat \<Rightarrow> uint64 \<Rightarrow> unit Heap" where
   "store_uint64 a n v \<equiv> store_uintX_of_uint64 a n v 8"
 
+(* load/store heap rules *) 
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint8 a n
+   <\<lambda>r. \<up>(n < length la \<and> r = la!n) * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint8_def bl_assn_def 
+  by sep_auto
+
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint8_list a n x
+   <\<lambda>r. \<up>((if x > 0 then n+x \<le> length la else True) \<and> r = take x (drop n la) ) * a \<mapsto>\<^sub>b\<^sub>a la >"
+proof(induct x arbitrary:la a n)
+case 0
+  then show ?case by(sep_auto)
+next
+  case (Suc x)
+  show ?case 
+    apply(sep_auto heap:Suc)
+    using less_imp_Suc_add apply force
+    by (metis Cons_nth_drop_Suc take_Suc_Cons)
+qed
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint32_of_uintX a n x
+   <\<lambda>r. \<up>(r = (Abs_uint32' \<circ> word_rcat_rev \<circ> map Rep_uint8') (take x (drop n la)) 
+ \<and> (if x > 0 then n+x \<le> length la else True)) * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint32_of_uintX_def by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint32_of_sintX a n x
+   <\<lambda>r. \<up>(r = (Abs_uint32' \<circ> word_rcat_rev \<circ> word_list_sign_extend 4 \<circ> map Rep_uint8') 
+  (take x (drop n la)) 
+  \<and> (if x > 0 then n+x \<le> length la else True)) * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint32_of_sintX_def by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint32_of_uint8 a n
+   <\<lambda>r. \<up>(r = (Abs_uint32' \<circ> word_rcat_rev \<circ> map Rep_uint8') (take 1 (drop n la))
+  \<and> n+1 \<le> length la) * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint32_of_uint8_def by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint32_of_sint8 a n
+   <\<lambda>r. \<up>(r = (Abs_uint32' \<circ> word_rcat_rev \<circ> word_list_sign_extend 4 \<circ> map Rep_uint8') 
+  (take 1 (drop n la))
+  \<and> n+1 \<le> length la ) * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint32_of_sint8_def by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint32_of_uint16 a n
+   <\<lambda>r. \<up>(r = (Abs_uint32' \<circ> word_rcat_rev \<circ> map Rep_uint8') (take 2 (drop n la))
+  \<and> n+2 \<le> length la )  * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint32_of_uint16_def by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint32_of_sint16 a n
+   <\<lambda>r. \<up>(r = (Abs_uint32' \<circ> word_rcat_rev \<circ> word_list_sign_extend 4 \<circ> map Rep_uint8') 
+  (take 2 (drop n la))
+   \<and> n+2 \<le> length la ) * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint32_of_sint16_def by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint32 a n
+   <\<lambda>r. \<up>(r = (Abs_uint32' \<circ> word_rcat_rev \<circ> (map Rep_uint8')) (take 4 (drop n la)) 
+  \<and> n+4 \<le> length la) * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint32_def by sep_auto
+
+
+
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint64_of_uintX a n x
+   <\<lambda>r. \<up>(r = (Abs_uint64' \<circ> word_rcat_rev \<circ> (map Rep_uint8')) (take x (drop n la)) 
+  \<and> (if x > 0 then n+x \<le> length la else True)) * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint64_of_uintX_def by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint64_of_sintX a n x
+   <\<lambda>r. \<up>(r = (Abs_uint64' \<circ> word_rcat_rev \<circ> word_list_sign_extend 8 \<circ> map Rep_uint8') 
+  (take x (drop n la)) 
+  \<and> (if x > 0 then n+x \<le> length la else True)) * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint64_of_sintX_def by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint64_of_uint8 a n
+   <\<lambda>r. \<up>(r = (Abs_uint64' \<circ> word_rcat_rev \<circ> map Rep_uint8') (take 1 (drop n la)) 
+  \<and> n+1 \<le> length la) * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint64_of_uint8_def by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint64_of_sint8 a n
+   <\<lambda>r. \<up>(r = (Abs_uint64' \<circ> word_rcat_rev \<circ> word_list_sign_extend 8 \<circ> map Rep_uint8') 
+  (take 1 (drop n la))
+  \<and> n+1 \<le> length la) * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint64_of_sint8_def by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint64_of_uint16 a n
+   <\<lambda>r. \<up>(r = (Abs_uint64' \<circ> word_rcat_rev \<circ> map Rep_uint8') (take 2 (drop n la)) 
+  \<and> n+2 \<le> length la ) * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint64_of_uint16_def by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint64_of_sint16 a n
+   <\<lambda>r. \<up>(r = (Abs_uint64' \<circ> word_rcat_rev \<circ> word_list_sign_extend 8 \<circ> map Rep_uint8') 
+  (take 2 (drop n la)) 
+  \<and> n+2 \<le> length la) * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint64_of_sint16_def by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint64_of_uint32 a n
+   <\<lambda>r. \<up>(r = (Abs_uint64' \<circ> word_rcat_rev \<circ> map Rep_uint8') (take 4 (drop n la)) 
+  \<and> n+4 \<le> length la ) * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint64_of_uint32_def by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint64_of_sint32 a n
+   <\<lambda>r. \<up>(r = (Abs_uint64' \<circ> word_rcat_rev \<circ> word_list_sign_extend 8 \<circ> map Rep_uint8') 
+  (take 4 (drop n la)) 
+  \<and> n+4 \<le> length la) * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint64_of_sint32_def by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  load_uint64 a n
+   <\<lambda>r. \<up>(r = (Abs_uint64' \<circ> word_rcat_rev \<circ> (map Rep_uint8')) (take 8 (drop n la)) 
+  \<and> n+8 \<le> length la) 
+  * a \<mapsto>\<^sub>b\<^sub>a la >"
+  unfolding load_uint64_def by sep_auto
 end

@@ -319,72 +319,20 @@ lemma extract_pre_cfg_m_assn[extract_pure_rules]:
 lemma mem_size_triple:
   assumes "inst_at (is, i_ms) (f_inst f, f_inst2) j" 
   shows 
-  "< ms_m \<mapsto>\<^sub>a ms_i * list_assn mem_m_assn ms ms_i * inst_store_assn (is, i_ms) > 
+  "< mems_m_assn ms ms_m * inst_store_assn (is, i_ms) > 
     app_s_f_v_s_mem_size_m ms_m f_inst2 v_s 
   <\<lambda>r. \<up>(r = app_s_f_v_s_mem_size ms f v_s) *
-   ms_m \<mapsto>\<^sub>a ms_i * (list_assn mem_m_assn) ms ms_i * inst_store_assn (is, i_ms)>"
+   mems_m_assn ms ms_m * inst_store_assn (is, i_ms)>"
   using assms
-  unfolding app_s_f_v_s_mem_size_m_def inst_m_assn_def list_assn_conv_idx
+  unfolding app_s_f_v_s_mem_size_m_def inst_m_assn_def mems_m_assn_def list_assn_conv_idx
   apply sep_auto
    apply (knock_down j)
   apply(sep_auto)
   apply(knock_down "inst.mems (f_inst f) ! 0")
    apply (sep_auto)
-  subgoal by (auto simp add: app_s_f_v_s_mem_size_def smem_ind_def mem_size_def 
+  apply (auto simp add: app_s_f_v_s_mem_size_def smem_ind_def mem_size_def 
         mem_length_def mem_rep_length_def split: option.split list.split)  
-  apply (sep_auto)
   done
-
-
-lemma [sep_heap_rules]: 
-    "< mem_m_assn m m_m > 
-      grow_zeroed_byte_array (fst m_m) n 
-    <\<lambda>r. mem_m_assn (mem_append m n 0) (r,snd m_m)>\<^sub>t"
-  unfolding mem_m_assn_def mem_append_def mem_rep_append_def
-  by(sep_auto split:prod.splits simp:Abs_mem_rep_inverse)
-
-
-
-lemma mem_grow_triple:
-  assumes "inst_at (is, i_ms) (f_inst f, f_inst2) j" 
-  shows 
-  "< ms_m \<mapsto>\<^sub>a ms_i * list_assn mem_m_assn ms ms_i * inst_store_assn (is, i_ms) > 
-    app_s_f_v_s_mem_grow_m ms_m f_inst2 v_s 
-  <\<lambda>r. let (ms', v_s', res) = app_s_f_v_s_mem_grow ms f v_s in
-   \<exists>\<^sub>A ms_i. \<up>(r = (v_s', res)) * 
-    ms_m \<mapsto>\<^sub>a ms_i * (list_assn mem_m_assn) ms' ms_i * inst_store_assn (is, i_ms)>\<^sub>t"
-proof - 
-  note expand = smem_ind_def mem_grow_def Let_def mem_size_def mem_length_def
-        mem_rep_length_def mem_max_def
-  note expand_with_assn = expand mem_m_assn_def mem_append_def
-  note splits = option.splits list.splits if_splits prod.splits
-
-  (* the "sep_auto simp:expand split:splits" list eliminate subgoals 
-    by finding contradictions in their assumptions *)
-  show ?thesis
-    using assms 
-    unfolding app_s_f_v_s_mem_grow_m_def inst_m_assn_def app_s_f_v_s_mem_grow_def list_assn_conv_idx
-    apply(sep_auto split: v.splits)
-        apply(knock_down "j")
-       apply(sep_auto)
-        apply(extract_list_idx "inst.mems (f_inst f) ! 0") 
-        (* not reinserting immediately -- the extracted mem_m_assn keeps being necessary *)
-        apply(sep_auto) 
-       apply(sep_auto simp:expand split:splits) 
-          apply(rule listI_assn_reinsert_upd, frame_inference, simp, simp)
-          apply(sep_auto simp:mem_append_def zero_byte_def)
-         apply(sep_auto simp:expand_with_assn split:splits)
-        apply(sep_auto)
-         apply(sep_auto simp:expand_with_assn split:splits) 
-        apply(sep_auto simp:expand_with_assn split:splits) 
-       apply(rule listI_assn_reinsert', frame_inference, simp, simp)
-       apply(sep_auto)
-      apply(sep_auto_all)
-    done
-qed
-
-
-  
 
 
 lemma get_local_triple: 
@@ -507,6 +455,310 @@ lemma call_indirect_triple:
   done
 
 
+lemma [sep_heap_rules]: 
+    "< mem_m_assn m m_m > 
+      grow_zeroed_byte_array (fst m_m) n 
+    <\<lambda>r. mem_m_assn (mem_append m n 0) (r,snd m_m)>\<^sub>t"
+  unfolding mem_m_assn_def mem_append_def mem_rep_append_def
+  by(sep_auto split:prod.splits simp:Abs_mem_rep_inverse)
+
+
+
+lemma mem_grow_triple:
+  assumes "inst_at (is, i_ms) (f_inst f, f_inst2) j" 
+  shows 
+  "< mems_m_assn ms ms_m * inst_store_assn (is, i_ms) > 
+    app_s_f_v_s_mem_grow_m ms_m f_inst2 v_s 
+  <\<lambda>r. let (ms', v_s', res) = app_s_f_v_s_mem_grow ms f v_s in
+   \<up>(r = (v_s', res)) * mems_m_assn ms' ms_m * inst_store_assn (is, i_ms)>\<^sub>t"
+proof - 
+  note expand = smem_ind_def mem_grow_def Let_def mem_size_def mem_length_def
+        mem_rep_length_def mem_max_def
+  note expand_with_assn = expand mem_m_assn_def mem_append_def
+  note splits = option.splits list.splits if_splits prod.splits
+
+  (* the "sep_auto simp:expand split:splits" list eliminate subgoals 
+    by finding contradictions in their assumptions *)
+  show ?thesis
+    using assms 
+    unfolding app_s_f_v_s_mem_grow_m_def app_s_f_v_s_mem_grow_def 
+      inst_m_assn_def mems_m_assn_def
+      list_assn_conv_idx
+    apply(sep_auto split: v.splits)
+        apply(knock_down "j")
+       apply(sep_auto)
+        apply(extract_list_idx "inst.mems (f_inst f) ! 0") 
+        (* not reinserting immediately -- the extracted mem_m_assn keeps being necessary *)
+        apply(sep_auto) 
+       apply(sep_auto simp:expand split:splits) 
+          apply(rule listI_assn_reinsert_upd, frame_inference, simp, simp)
+          apply(sep_auto simp:mem_append_def zero_byte_def)
+         apply(sep_auto simp:expand_with_assn split:splits)
+        apply(sep_auto)
+         apply(sep_auto simp:expand_with_assn split:splits) 
+        apply(sep_auto simp:expand_with_assn split:splits) 
+       apply(rule listI_assn_reinsert', frame_inference, simp, simp)
+       apply(sep_auto)
+      apply(sep_auto_all)
+    done
+qed
+
+
+abbreviation "option_assn A x_opt y_opt \<equiv> (case x_opt of 
+  Some x \<Rightarrow> (case y_opt of Some y \<Rightarrow> A x y | None \<Rightarrow> false)
+  | None \<Rightarrow> (case y_opt of Some y \<Rightarrow> false | None \<Rightarrow> true)
+  )"
+
+named_theorems load_rules
+
+lemma [load_rules]: "<mem_m_assn m m_m> 
+  load_uint32 (fst m_m) n         
+   <\<lambda>r. \<up>(i32_impl_abs r = deserialise_i32 (read_bytes m n (t_length T_i32)) 
+  \<and> n + 4 \<le> mem_length m) 
+  * mem_m_assn m m_m>"
+  unfolding mem_m_assn_def i32_impl_abs_def deserialise_i32_def
+    read_bytes_def mem_rep_read_bytes_def t_length_def mem_length_def mem_rep_length_def
+  by (sep_auto simp:Abs_uint32'.rep_eq split:prod.splits)
+
+lemma [load_rules]: "<mem_m_assn m m_m> 
+  load_uint64 (fst m_m) n         
+   <\<lambda>r. \<up>(i64_impl_abs r = deserialise_i64 (read_bytes m n (t_length T_i64))
+  \<and> n+8 \<le> mem_length m) 
+  * mem_m_assn m m_m>"
+  unfolding mem_m_assn_def i64_impl_abs_def deserialise_i64_def
+    read_bytes_def mem_rep_read_bytes_def t_length_def mem_length_def mem_rep_length_def
+  by (sep_auto simp:Abs_uint64'.rep_eq split:prod.splits)
+
+lemma serialise_deserialise_i32:
+  assumes "length x = 4" 
+  shows "serialise_i32 (deserialise_i32 x) = x"
+  sorry
+
+lemma serialise_deserialise_i64:
+  assumes "length x = 8" 
+  shows "serialise_i64 (deserialise_i64 x) = x"
+  sorry
+
+lemma load_triple: 
+  "<mem_m_assn m m_m>
+  load_m_v m_m n off t
+  <\<lambda>r_opt. option_assn (\<lambda>r r_m. \<up>(r_m = wasm_deserialise r t)) (load m n off (t_length t)) r_opt
+  * mem_m_assn m m_m>"
+  unfolding load_m_v_def load_def wasm_deserialise_def 
+  by(sep_auto heap:load_rules split:t.splits simp:mem_length_def mem_rep_length_def
+      read_bytes_def mem_rep_read_bytes_def t_length_def 
+serialise_deserialise_i32 serialise_deserialise_i64)
+
+lemma [load_rules]:
+ "<mem_m_assn m m_m> 
+  load_uint32_of_sint8 (fst m_m) n         
+   <\<lambda>r. \<up>(i32_impl_abs r = (deserialise_i32 \<circ> sign_extend S 4) (read_bytes m n 1) 
+  \<and> n + 1 \<le> mem_length m) 
+  * mem_m_assn m m_m>"
+  unfolding mem_m_assn_def i32_impl_abs_def deserialise_i32_def
+    read_bytes_def mem_rep_read_bytes_def tp_length_def mem_length_def mem_rep_length_def
+  by (sep_auto simp:Abs_uint32'.rep_eq  word_list_sign_extend_Rep_uint8  split:prod.splits)
+
+lemma [load_rules]:
+ "<mem_m_assn m m_m> 
+  load_uint32_of_uint8 (fst m_m) n         
+   <\<lambda>r. \<up>(i32_impl_abs r = deserialise_i32 (read_bytes m n 1) 
+  \<and> n + 1 \<le> mem_length m) 
+  * mem_m_assn m m_m>"
+  unfolding mem_m_assn_def i32_impl_abs_def deserialise_i32_def
+    read_bytes_def mem_rep_read_bytes_def tp_length_def mem_length_def mem_rep_length_def
+  by(sep_auto simp:Abs_uint32'.rep_eq  split:prod.splits)
+
+lemma [load_rules]:
+ "<mem_m_assn m m_m> 
+  load_uint32_of_sint16 (fst m_m) n         
+   <\<lambda>r. \<up>(i32_impl_abs r = (deserialise_i32 \<circ> sign_extend S 4) (read_bytes m n 2) 
+  \<and> n + 2 \<le> mem_length m) 
+  * mem_m_assn m m_m>"
+  unfolding mem_m_assn_def i32_impl_abs_def deserialise_i32_def
+    read_bytes_def mem_rep_read_bytes_def tp_length_def mem_length_def mem_rep_length_def
+  by (sep_auto simp:Abs_uint32'.rep_eq  word_list_sign_extend_Rep_uint8  split:prod.splits)
+
+lemma [load_rules]:
+ "<mem_m_assn m m_m> 
+  load_uint32_of_uint16 (fst m_m) n         
+   <\<lambda>r. \<up>(i32_impl_abs r = deserialise_i32 (read_bytes m n 2) 
+  \<and> n + 2 \<le> mem_length m) 
+  * mem_m_assn m m_m>"
+  unfolding mem_m_assn_def i32_impl_abs_def deserialise_i32_def
+    read_bytes_def mem_rep_read_bytes_def tp_length_def mem_length_def mem_rep_length_def
+  by(sep_auto simp:Abs_uint32'.rep_eq  split:prod.splits)
+
+lemma [load_rules]:
+ "<mem_m_assn m m_m> 
+  load_uint64_of_sint8 (fst m_m) n         
+   <\<lambda>r. \<up>(i64_impl_abs r = (deserialise_i64 \<circ> sign_extend S 8) (read_bytes m n 1) 
+  \<and> n + 1 \<le> mem_length m) 
+  * mem_m_assn m m_m>"
+  unfolding mem_m_assn_def i64_impl_abs_def deserialise_i64_def
+    read_bytes_def mem_rep_read_bytes_def tp_length_def mem_length_def mem_rep_length_def
+  by (sep_auto simp:Abs_uint64'.rep_eq  word_list_sign_extend_Rep_uint8  split:prod.splits)
+
+lemma [load_rules]:
+ "<mem_m_assn m m_m> 
+  load_uint64_of_uint8 (fst m_m) n         
+   <\<lambda>r. \<up>(i64_impl_abs r = deserialise_i64 (read_bytes m n 1) 
+  \<and> n + 1 \<le> mem_length m) 
+  * mem_m_assn m m_m>"
+  unfolding mem_m_assn_def i64_impl_abs_def deserialise_i64_def
+    read_bytes_def mem_rep_read_bytes_def tp_length_def mem_length_def mem_rep_length_def
+  by(sep_auto simp:Abs_uint64'.rep_eq  split:prod.splits)
+
+lemma [load_rules]:
+ "<mem_m_assn m m_m> 
+  load_uint64_of_sint16 (fst m_m) n         
+   <\<lambda>r. \<up>(i64_impl_abs r = (deserialise_i64 \<circ> sign_extend S 8) (read_bytes m n 2) 
+  \<and> n + 2 \<le> mem_length m) 
+  * mem_m_assn m m_m>"
+  unfolding mem_m_assn_def i64_impl_abs_def deserialise_i64_def
+    read_bytes_def mem_rep_read_bytes_def tp_length_def mem_length_def mem_rep_length_def
+  by (sep_auto simp:Abs_uint64'.rep_eq  word_list_sign_extend_Rep_uint8 split:prod.splits)
+
+lemma [load_rules]:
+ "<mem_m_assn m m_m> 
+  load_uint64_of_uint16 (fst m_m) n         
+   <\<lambda>r. \<up>(i64_impl_abs r = deserialise_i64 (read_bytes m n 2) 
+  \<and> n + 2 \<le> mem_length m) 
+  * mem_m_assn m m_m>"
+  unfolding mem_m_assn_def i64_impl_abs_def deserialise_i64_def
+    read_bytes_def mem_rep_read_bytes_def tp_length_def mem_length_def mem_rep_length_def
+  by(sep_auto simp:Abs_uint64'.rep_eq  split:prod.splits)
+
+lemma [load_rules]:
+ "<mem_m_assn m m_m> 
+  load_uint64_of_sint32 (fst m_m) n         
+   <\<lambda>r. \<up>(i64_impl_abs r = (deserialise_i64 \<circ> sign_extend S 8) (read_bytes m n 4) 
+  \<and> n + 4 \<le> mem_length m) 
+  * mem_m_assn m m_m>"
+  unfolding mem_m_assn_def i64_impl_abs_def deserialise_i64_def
+    read_bytes_def mem_rep_read_bytes_def tp_length_def mem_length_def mem_rep_length_def
+  by (sep_auto simp:Abs_uint64'.rep_eq  word_list_sign_extend_Rep_uint8 split:prod.splits)
+
+lemma [load_rules]:
+ "<mem_m_assn m m_m> 
+  load_uint64_of_uint32 (fst m_m) n         
+   <\<lambda>r. \<up>(i64_impl_abs r = deserialise_i64 (read_bytes m n 4) 
+  \<and> n + 4 \<le> mem_length m) 
+  * mem_m_assn m m_m>"
+  unfolding mem_m_assn_def i64_impl_abs_def deserialise_i64_def
+    read_bytes_def mem_rep_read_bytes_def tp_length_def mem_length_def mem_rep_length_def
+  by(sep_auto simp:Abs_uint64'.rep_eq split:prod.splits)
+
+
+lemma sign_extend_id: 
+  "sign_extend sx (length bs) bs = bs"
+  unfolding sign_extend_def
+  by(simp add:msb_byte_def msbyte_def bytes_takefill_def)
+
+lemma read_bytes_length:"n+l \<le> mem_length m \<Longrightarrow> length (read_bytes m n l) = l" 
+  unfolding mem_length_def mem_rep_length_def read_bytes_def mem_rep_read_bytes_def
+  by simp
+
+lemma sign_extend_length:"length bs \<le> l \<Longrightarrow> length (sign_extend sx l bs) = l" 
+  unfolding sign_extend_def
+  by(simp add:msb_byte_def msbyte_def bytes_takefill_def)
+
+lemma deserialise_i32_absorb_sign_extend: 
+  "length bs \<le> 4 \<Longrightarrow> deserialise_i32 (sign_extend U 4 bs) = deserialise_i32 bs"
+  unfolding deserialise_i32_def word_rcat_rev_def sign_extend_def bytes_takefill_def
+    takefill_def zero_byte_def
+  apply(simp split:list.splits)
+  apply(auto)
+     apply (simp add: zero_uint8.rep_eq)+
+  done
+
+lemma deserialise_i64_absorb_sign_extend: 
+  "length bs \<le> 8 \<Longrightarrow> deserialise_i64 (sign_extend U 8 bs) = deserialise_i64 bs"
+  unfolding deserialise_i64_def word_rcat_rev_def sign_extend_def bytes_takefill_def
+    takefill_def zero_byte_def
+  apply(simp split:list.splits)
+  apply(auto)
+     apply (simp add: zero_uint8.rep_eq)+
+  done
+
+lemma [load_rules]:
+ "<mem_m_assn m m_m> 
+  load_uint32_packed (fst m_m) n tp sx        
+   <\<lambda>r. \<up>(i32_impl_abs r = (deserialise_i32 \<circ> sign_extend sx 4) (read_bytes m n (tp_length tp)) 
+  \<and> n + 1 \<le> mem_length m) 
+  * mem_m_assn m m_m>"
+  unfolding load_uint32_packed_def 
+  supply [simp] = tp_length_def t_length_def
+  apply(sep_auto split:tp.splits sx.splits)
+       apply(sep_auto heap:load_rules)+
+  subgoal  using read_bytes_length sign_extend_id
+    by metis
+    apply(sep_auto heap:load_rules, 
+      simp add:read_bytes_length deserialise_i32_absorb_sign_extend )+
+  done 
+
+lemma [load_rules]:
+ "<mem_m_assn m m_m> 
+  load_uint64_packed (fst m_m) n tp sx        
+   <\<lambda>r. \<up>(i64_impl_abs r = (deserialise_i64 \<circ> sign_extend sx 8) (read_bytes m n (tp_length tp)) 
+  \<and> n + 1 \<le> mem_length m) 
+  * mem_m_assn m m_m>"
+  unfolding load_uint64_packed_def 
+  supply [simp] = tp_length_def t_length_def
+  apply(sep_auto split:tp.splits sx.splits)
+       apply(sep_auto heap:load_rules, 
+        (simp add:read_bytes_length deserialise_i64_absorb_sign_extend)?)+
+  done 
+
+(* Note to self: had issues with sep_auto instantiating the postcondition by dropping the pure precondition *)
+
+lemma load_packed_triple: 
+  "<mem_m_assn m m_m>
+  load_packed_m_v m_m n off t tp sx
+  <\<lambda>r_opt. option_assn (\<lambda>r r_m. \<up>(r_m = wasm_deserialise r t)) 
+      (load_packed sx m n off (tp_length tp) (t_length t)) r_opt
+  * mem_m_assn m m_m>"
+  unfolding load_packed_m_v_def load_packed_def 
+  supply [simp] = t_length_def load_def wasm_deserialise_def mem_length_def mem_rep_length_def
+    and [sep_heap_rules] = load_rules
+    and [split] = option.splits t.splits
+  apply(sep_auto)
+     apply(sep_auto simp: sign_extend_def bytes_takefill_def serialise_deserialise_i32) 
+    apply(sep_auto)
+   apply(sep_auto simp: sign_extend_def bytes_takefill_def serialise_deserialise_i64) 
+   apply(sep_auto)
+  done
+
+lemma load_maybe_packed_triple:
+  assumes "inst_at (is, i_ms) (f_inst f, f_inst2) j"
+  shows "<mems_m_assn ms ms_m * inst_store_assn (is, i_ms)>
+  app_s_f_v_s_load_maybe_packed_m t tp_sx off ms_m f_inst2 v_s
+  <\<lambda>r.\<up>(r = app_s_f_v_s_load_maybe_packed t tp_sx off ms f v_s)
+  * mems_m_assn ms ms_m * inst_store_assn (is, i_ms)>\<^sub>t"
+proof -
+  note expand = smem_ind_def mem_grow_def Let_def mem_size_def mem_length_def
+        mem_rep_length_def mem_max_def
+  note splits = option.splits list.splits if_splits prod.splits
+
+  show ?thesis
+    using assms 
+    unfolding app_s_f_v_s_load_maybe_packed_m_def app_s_f_v_s_load_maybe_packed_def 
+      app_s_f_v_s_load_packed_def app_s_f_v_s_load_def
+      inst_m_assn_def mems_m_assn_def
+      list_assn_conv_idx
+    supply [sep_heap_rules] = load_triple load_packed_triple
+    apply(sep_auto split:v.splits)
+     apply(sep_auto split:option.splits)
+    apply(sep_auto split:v.splits)
+        apply(knock_down j)
+       apply(sep_auto split:option.splits)    
+               apply(sep_auto?, knock_down "inst.mems (f_inst f) ! 0",
+        sep_auto simp:expand split:splits)+ (*takes a moment*)   
+      apply(sep_auto split:splits)+
+    done
+qed
+
+
 find_theorems app_s_f_v_s_mem_size
 
 lemmas splits = 
@@ -561,18 +813,19 @@ proof -
       by (sep_auto heap:set_global_triple split:prod.splits)
   next
     case (Load t tp_sx a off)
-    then show ?thesis sorry
+    then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
+      by(sep_auto heap:load_maybe_packed_triple split:prod.splits)
   next
     case (Store t tp a off)
     then show ?thesis sorry
   next
     case Grow_memory
-    show ?thesis unfolding Grow_memory unfold_vars_assns s_m_assn_def mems_m_assn_def
+    then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
       by(sep_auto heap:mem_grow_triple split:prod.splits)
   next
     case Current_memory
     then show ?thesis 
-      unfolding unfold_vars_assns s_m_assn_def mems_m_assn_def 
+      unfolding unfold_vars_assns s_m_assn_def 
       by(sep_auto heap:mem_size_triple split:prod.splits)
   next
     case (Set_local k)
