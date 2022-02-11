@@ -542,7 +542,7 @@ qed
 
 named_theorems load_rules
 
-abbreviation "load32_triple m m_m fl n sx t_len \<equiv> 
+abbreviation "load32_mem_triple fl sx t_len m m_m n \<equiv> 
    <mem_m_assn m m_m> 
   fl (fst m_m) n         
    <\<lambda>r. \<up>(i32_impl_abs r = (deserialise_i32 \<circ> (case sx of S \<Rightarrow> sign_extend S 4 | U \<Rightarrow> id)) 
@@ -551,16 +551,16 @@ abbreviation "load32_triple m m_m fl n sx t_len \<equiv>
   * mem_m_assn m m_m>" 
 
 lemma [load_rules]: 
-  "load32_triple m m_m load_uint32 n U 4"
-  "load32_triple m m_m load_uint32_of_uint8 n U 1"
-  "load32_triple m m_m load_uint32_of_sint8 n S 1"
-  "load32_triple m m_m load_uint32_of_uint16 n U 2"
-  "load32_triple m m_m load_uint32_of_sint16 n S 2"
+  "load32_mem_triple load_uint32           U 4 m m_m n"
+  "load32_mem_triple load_uint32_of_uint8  U 1 m m_m n"
+  "load32_mem_triple load_uint32_of_sint8  S 1 m m_m n"
+  "load32_mem_triple load_uint32_of_uint16 U 2 m m_m n"
+  "load32_mem_triple load_uint32_of_sint16 S 2 m m_m n"
   unfolding mem_m_assn_def i32_impl_abs_def deserialise_i32_def
     read_bytes_def mem_rep_read_bytes_def t_length_def mem_length_def mem_rep_length_def
   by (sep_auto simp:Abs_uint32'.rep_eq word_list_sign_extend_Rep_uint8 split:prod.splits)+
 
-abbreviation "load64_triple m m_m fl n sx t_len \<equiv> 
+abbreviation "load64_mem_triple fl sx t_len m m_m n \<equiv> 
    <mem_m_assn m m_m> 
   fl (fst m_m) n         
    <\<lambda>r. \<up>(i64_impl_abs r = (deserialise_i64 \<circ> (case sx of S \<Rightarrow> sign_extend S 8 | U \<Rightarrow> id)) 
@@ -569,13 +569,13 @@ abbreviation "load64_triple m m_m fl n sx t_len \<equiv>
   * mem_m_assn m m_m>" 
 
 lemma [load_rules]: 
-  "load64_triple m m_m load_uint64 n U 8"
-  "load64_triple m m_m load_uint64_of_uint8 n U 1"
-  "load64_triple m m_m load_uint64_of_sint8 n S 1"
-  "load64_triple m m_m load_uint64_of_uint16 n U 2"
-  "load64_triple m m_m load_uint64_of_sint16 n S 2"
-  "load64_triple m m_m load_uint64_of_uint32 n U 4"
-  "load64_triple m m_m load_uint64_of_sint32 n S 4"
+  "load64_mem_triple load_uint64           U 8 m m_m n"
+  "load64_mem_triple load_uint64_of_uint8  U 1 m m_m n"
+  "load64_mem_triple load_uint64_of_sint8  S 1 m m_m n"
+  "load64_mem_triple load_uint64_of_uint16 U 2 m m_m n"
+  "load64_mem_triple load_uint64_of_sint16 S 2 m m_m n"
+  "load64_mem_triple load_uint64_of_uint32 U 4 m m_m n"
+  "load64_mem_triple load_uint64_of_sint32 S 4 m m_m n"
   unfolding mem_m_assn_def i64_impl_abs_def deserialise_i64_def
     read_bytes_def mem_rep_read_bytes_def t_length_def mem_length_def mem_rep_length_def
   by (sep_auto simp:Abs_uint64'.rep_eq word_list_sign_extend_Rep_uint8 split:prod.splits)+
