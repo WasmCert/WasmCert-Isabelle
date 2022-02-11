@@ -257,8 +257,15 @@ lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la>
   by sep_auto
 
 lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  store_uint8 a n b
+   <\<lambda>r. \<up>(n < length la) * a \<mapsto>\<^sub>b\<^sub>a la[n := b]>"
+  unfolding store_uint8_def bl_assn_def 
+  by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
   load_uint8_list a n x
-   <\<lambda>r. \<up>((if x > 0 then n+x \<le> length la else True) \<and> r = take x (drop n la) ) * a \<mapsto>\<^sub>b\<^sub>a la >"
+   <\<lambda>r. \<up>((if x > 0 then n+x \<le> length la else True) \<and> r = take x (drop n la) )
+   * a \<mapsto>\<^sub>b\<^sub>a la >"
 proof(induct x arbitrary:la a n)
 case 0
   then show ?case by(sep_auto)
@@ -268,6 +275,18 @@ next
     apply(sep_auto heap:Suc)
     using less_imp_Suc_add apply force
     by (metis Cons_nth_drop_Suc take_Suc_Cons)
+qed
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  store_uint8_list a n bs
+   <\<lambda>r. \<up>(case bs of [] \<Rightarrow> True | x#xs \<Rightarrow> n+length bs \<le> length la )
+   * a \<mapsto>\<^sub>b\<^sub>a (take n la @ bs @ drop (n+length bs) la) >"
+proof(induct bs arbitrary:a la n)
+case Nil
+  then show ?case by sep_auto
+next
+  case (Cons a bs)
+  show ?case by (sep_auto heap:Cons split:list.splits simp: take_update_last)
 qed
 
 lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
@@ -282,6 +301,18 @@ lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la>
   (take x (drop n la)) 
   \<and> (if x > 0 then n+x \<le> length la else True)) * a \<mapsto>\<^sub>b\<^sub>a la >"
   unfolding load_uint32_of_sintX_def by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  store_uintX_of_uint32 a n v x
+   <\<lambda>r. \<up>(if x > 0 then n+x \<le> length la else True)
+   * a \<mapsto>\<^sub>b\<^sub>a (take n la @ 
+    (map Abs_uint8' \<circ> takefill (0::8 word) x \<circ> word_rsplit_rev \<circ> Rep_uint32') v
+  @ drop (n+x) la) >"
+  unfolding store_uintX_of_uint32_def 
+  apply(sep_auto split:list.splits)
+   apply (metis length_takefill add.right_neutral add_Suc_right list.size(4)) 
+  apply(sep_auto)
+  done
 
 abbreviation "load32_triple fl sign t_len a la n \<equiv> 
   <a \<mapsto>\<^sub>b\<^sub>a la> 
@@ -302,6 +333,21 @@ lemma [sep_heap_rules]:
     load_uint32_def
   by sep_auto+
 
+abbreviation "store32_triple fs t_len a la n v \<equiv> 
+  <a \<mapsto>\<^sub>b\<^sub>a la> 
+  fs a n v 
+  <\<lambda>r. \<up>(n+t_len \<le> length la)
+   * a \<mapsto>\<^sub>b\<^sub>a (take n la @ 
+    (map Abs_uint8' \<circ> takefill (0::8 word) t_len \<circ> word_rsplit_rev \<circ> Rep_uint32') v
+  @ drop (n+t_len) la) >"
+
+lemma [sep_heap_rules]: 
+  "store32_triple store_uint8_of_uint32  1 a la n v"
+  "store32_triple store_uint16_of_uint32 2 a la n v"
+  "store32_triple store_uint32           4 a la n v"
+  unfolding store_uint8_of_uint32_def store_uint16_of_uint32_def store_uint32_def
+  by sep_auto+
+
 
 lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
   load_uint64_of_uintX a n x
@@ -315,6 +361,18 @@ lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la>
   (take x (drop n la)) 
   \<and> (if x > 0 then n+x \<le> length la else True)) * a \<mapsto>\<^sub>b\<^sub>a la >"
   unfolding load_uint64_of_sintX_def by sep_auto
+
+lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+  store_uintX_of_uint64 a n v x
+   <\<lambda>r. \<up>(if x > 0 then n+x \<le> length la else True)
+   * a \<mapsto>\<^sub>b\<^sub>a (take n la @ 
+    (map Abs_uint8' \<circ> takefill (0::8 word) x \<circ> word_rsplit_rev \<circ> Rep_uint64') v
+  @ drop (n+x) la) >"
+  unfolding store_uintX_of_uint64_def 
+  apply(sep_auto split:list.splits)
+   apply (metis length_takefill add.right_neutral add_Suc_right list.size(4)) 
+  apply(sep_auto)
+  done
 
 abbreviation "load64_triple fl sign t_len a la n \<equiv> 
   <a \<mapsto>\<^sub>b\<^sub>a la> 
@@ -337,4 +395,22 @@ lemma [sep_heap_rules]:
     load_uint64_of_uint32_def load_uint64_of_sint32_def
     load_uint64_def
   by sep_auto+
+
+abbreviation "store64_triple fs t_len a la n v \<equiv> 
+  <a \<mapsto>\<^sub>b\<^sub>a la> 
+  fs a n v 
+  <\<lambda>r. \<up>(n+t_len \<le> length la)
+   * a \<mapsto>\<^sub>b\<^sub>a (take n la @ 
+    (map Abs_uint8' \<circ> takefill (0::8 word) t_len \<circ> word_rsplit_rev \<circ> Rep_uint64') v
+  @ drop (n+t_len) la) >"
+
+lemma [sep_heap_rules]: 
+  "store64_triple store_uint8_of_uint64  1 a la n v"
+  "store64_triple store_uint16_of_uint64 2 a la n v"
+  "store64_triple store_uint32_of_uint64 4 a la n v"
+  "store64_triple store_uint64           8 a la n v"
+  unfolding store_uint8_of_uint64_def store_uint16_of_uint64_def 
+            store_uint32_of_uint64_def store_uint64_def
+  by sep_auto+
+
 end
