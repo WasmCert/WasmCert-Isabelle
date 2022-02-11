@@ -18,6 +18,38 @@ proof -
     by (simp add: zero_uint8.rep_eq)
 qed
 
+lemma serialise_deserialise_i32:
+  assumes "length x = 4"
+  shows "serialise_i32 (deserialise_i32 x) = x"
+proof -
+  have "(word_rsplit_rev :: (32 word \<Rightarrow> _))
+       (word_rcat_rev (map Rep_uint8 x)) = (map Rep_uint8 x)"
+  using assms takefill_same[of 0 x]
+  by (simp add: Abs_i32_inverse load_fX_from_uiX_bs_helper)
+  moreover have "Abs_uint8' \<circ> Rep_uint8 = id"
+    unfolding Abs_uint8'_def map_fun_def
+    by (simp add: Rep_uint8_inverse fun_comp_eq_conv)
+  ultimately show ?thesis
+    unfolding serialise_i32_def deserialise_i32_def
+    by (simp add: I32.rep_abs)
+qed
+
+lemma serialise_deserialise_i64:
+  assumes "length x = 8"
+  shows "serialise_i64 (deserialise_i64 x) = x"
+proof -
+  have "(word_rsplit_rev :: (64 word \<Rightarrow> _))
+       (word_rcat_rev (map Rep_uint8 x)) = (map Rep_uint8 x)"
+  using assms takefill_same[of 0 x]
+  by (simp add: Abs_i64_inverse load_fX_from_uiX_bs_helper)
+  moreover have "Abs_uint8' \<circ> Rep_uint8 = id"
+    unfolding Abs_uint8'_def map_fun_def
+    by (simp add: Rep_uint8_inverse fun_comp_eq_conv)
+  ultimately show ?thesis
+    unfolding serialise_i64_def deserialise_i64_def
+    by (simp add: I64.rep_abs)
+qed
+
 lemma load_f32_from_ui32_bs:
   assumes "length bs \<le> 4"
   shows "(serialise_i32 (i32_impl_abs (Abs_uint32' (word_rcat_rev (map Rep_uint8' bs))))) = takefill 0 4 bs"
