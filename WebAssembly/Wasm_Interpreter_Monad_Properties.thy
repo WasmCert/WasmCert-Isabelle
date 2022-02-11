@@ -18,6 +18,8 @@ proof -
     by (simp add: zero_uint8.rep_eq)
 qed
 
+(* TODO: the lemmas below should probably appear earlier in the development *)
+(* however they depend on more_more_word *)
 lemma serialise_deserialise_i32:
   assumes "length x = 4"
   shows "serialise_i32 (deserialise_i32 x) = x"
