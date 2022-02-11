@@ -1005,17 +1005,6 @@ lemma host_apply_impl_m_triple'':
   sorry
 
 
-lemma ent_triple_preI:
-  assumes "\<And>h. h\<Turnstile>P \<Longrightarrow> P \<Longrightarrow>\<^sub>A Q"
-  shows "P \<Longrightarrow>\<^sub>A Q"
-  using assms unfolding entails_def by auto
-
-method extract_pre_pure' uses dest =
-  (rule hoare_triple_preI | rule ent_triple_preI | drule asm_rl[of "_\<Turnstile>_"]),
-  (determ \<open>elim mod_starE dest[elim_format] extract_pure_rules[elim_format]\<close>)?,
-  ((determ \<open>thin_tac "_ \<Turnstile> _"\<close>)+)?,
-  (simp (no_asm) only: triv_forall_equality)?
-
 lemma pure_dup:
   assumes "is_pure_assn P" 
   shows "P = P*P" 
@@ -1030,7 +1019,7 @@ lemma [sep_heap_rules]:
   * cl_m_assn i_s (fs!i) r * fs_m \<mapsto>\<^sub>a fs_i * list_assn (cl_m_assn i_s) fs fs_i>"
   unfolding funcs_m_assn_def list_assn_conv_idx 
   apply(sep_auto)
-  apply(extract_pre_pure')
+  apply(extract_pre_pure)
   apply(extract_list_idx i)
   apply(subst pure_dup[OF cl_m_assn_pure])
   apply(reinsert_list_idx i)
