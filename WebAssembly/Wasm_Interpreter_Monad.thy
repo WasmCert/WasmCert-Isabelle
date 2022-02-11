@@ -265,7 +265,7 @@ definition store_packed_m_v :: "mem_m \<Rightarrow> nat \<Rightarrow> off \<Righ
   "store_packed_m_v m n off v tp =
      do {
        m_len \<leftarrow> len_byte_array (fst m);
-       (if (m_len \<ge> (n+off+(t_length (typeof v)))) then do {
+       (if (m_len \<ge> (n+off+(tp_length tp))) then do {
           (case v of
             ConstInt32 c \<Rightarrow> do { store_uint32_packed (fst m) (n+off) (i32_impl_rep c) tp; return (Some ()) }
           | ConstInt64 c \<Rightarrow> do { store_uint64_packed (fst m) (n+off) (i64_impl_rep c) tp; return (Some ()) }
