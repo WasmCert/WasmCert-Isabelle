@@ -155,6 +155,9 @@ datatype
   sx = S | U
 
 datatype
+  sat = Sat | Nonsat
+
+datatype
   unop_i = Clz | Ctz | Popcnt
 
 datatype
@@ -162,6 +165,8 @@ datatype
 
 datatype
   unop = Unop_i unop_i | Unop_f unop_f
+           (* 1.1: sign-extension operators *)
+         | Extend_s tp
 
 datatype
   binop_i = Add | Sub | Mul | Div sx | Rem sx | And | Or | Xor | Shl | Shr sx | Rotl | Rotr
@@ -224,7 +229,7 @@ datatype \<comment> \<open>basic instructions\<close>
     | Binop t binop
     | Testop t testop
     | Relop t relop
-    | Cvtop t cvtop t "sx option"
+    | Cvtop t cvtop t "(sat \<times> sx) option"
 
 record inst = \<comment> \<open>instances\<close>
   types :: "tf list"

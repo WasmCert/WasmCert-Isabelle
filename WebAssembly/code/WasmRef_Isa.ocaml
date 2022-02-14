@@ -867,8 +867,9 @@ module WasmRef_Isa : sig
   type relop = Relop_i of relop_i | Relop_f of relop_f
   type unop_i = Clz | Ctz | Popcnt
   type unop_f = Neg | Abs | Ceil | Floor | Trunc | Nearest | Sqrt
-  type unop = Unop_i of unop_i | Unop_f of unop_f
   type tp = Tp_i8 | Tp_i16 | Tp_i32
+  type unop = Unop_i of unop_i | Unop_f of unop_f | Extend_s of tp
+  type sat = Sat | Nonsat
   type b_e = Unreachable | Nop | Drop | Select | Block of tf * b_e list |
     Loop of tf * b_e list | If of tf * b_e list * b_e list | Br of nat |
     Br_if of nat | Br_table of nat list * nat | Return | Call of nat |
@@ -877,7 +878,7 @@ module WasmRef_Isa : sig
     Load of t * (tp * sx) option * nat * nat |
     Store of t * tp option * nat * nat | Current_memory | Grow_memory |
     EConst of v | Unop of t * unop | Binop of t * binop | Testop of t * testop |
-    Relop of t * relop | Cvtop of t * cvtop * t * sx option
+    Relop of t * relop | Cvtop of t * cvtop * t * (sat * sx) option
   type cl_m = Func_native of unit inst_m_ext * tf * t list * b_e list |
     Func_host of tf * host
   and 'a s_m_ext =
@@ -943,6 +944,7 @@ module WasmRef_Isa : sig
   val upd : 'a heap -> nat -> 'a -> 'a array -> (unit -> ('a array))
   val drop : nat -> 'a list -> 'a list
   val null : 'a list -> bool
+  val last : 'a list -> 'a
   val take_tr : nat -> 'a list -> 'a list -> 'a list
   val take : nat -> 'a list -> 'a list
   val cast : 'b len -> 'a len -> 'b word -> 'a word
@@ -960,6 +962,7 @@ module WasmRef_Isa : sig
   val eval : 'a equal -> 'a pred -> 'a -> bool
   val membera : 'a equal -> 'a seq -> 'a -> bool
   val holds : unit pred -> bool
+  val msbyte : uint8 list -> uint8
   val bot_pred : 'a pred
   val single : 'a -> 'a pred
   val abs_uint8 : num1 bit0 bit0 bit0 word -> uint8
@@ -974,6 +977,9 @@ module WasmRef_Isa : sig
   val adjunct : 'a pred -> 'a seq -> 'a seq
   val sup_pred : 'a pred -> 'a pred -> 'a pred
   val if_pred : bool -> unit pred
+  val msb_uint8 : uint8 -> bool
+  val msb_byte : uint8 -> bool
+  val size_t : t -> nat
   val dvd : 'a equal * 'a semidom_modulo -> 'a -> 'a -> bool
   val bin_split : nat -> int -> int * int
   val list_all : ('a -> bool) -> 'a list -> bool
@@ -988,6 +994,14 @@ module WasmRef_Isa : sig
   val limits_compat : 'a limit_t_ext -> 'b limit_t_ext -> bool
   val zero_byte : uint8
   val ocaml_int64_to_isabelle_int64 : Int64.t -> i64
+  val isabelle_i64_trunc_sat_u_f64 : F64Wrapper.t -> i64
+  val ui64_trunc_sat_f64 : F64Wrapper.t -> i64
+  val isabelle_i64_trunc_sat_u_f32 : F32Wrapper.t -> i64
+  val ui64_trunc_sat_f32 : F32Wrapper.t -> i64
+  val isabelle_i64_trunc_sat_s_f64 : F64Wrapper.t -> i64
+  val si64_trunc_sat_f64 : F64Wrapper.t -> i64
+  val isabelle_i64_trunc_sat_s_f32 : F32Wrapper.t -> i64
+  val si64_trunc_sat_f32 : F32Wrapper.t -> i64
   val isabelle_i64_trunc_u_f64 : F64Wrapper.t -> i64 option
   val ui64_trunc_f64 : F64Wrapper.t -> i64 option
   val isabelle_i64_trunc_u_f32 : F32Wrapper.t -> i64 option
@@ -998,8 +1012,16 @@ module WasmRef_Isa : sig
   val si64_trunc_f32 : F32Wrapper.t -> i64 option
   val wasm_extend_u : i32 -> i64
   val wasm_extend_s : i32 -> i64
-  val cvt_i64 : sx option -> v -> i64 option
+  val cvt_i64 : (sat * sx) option -> v -> i64 option
   val ocaml_int32_to_isabelle_int32 : Int32.t -> i32
+  val isabelle_i32_trunc_sat_u_f64 : F64Wrapper.t -> i32
+  val ui32_trunc_sat_f64 : F64Wrapper.t -> i32
+  val isabelle_i32_trunc_sat_u_f32 : F32Wrapper.t -> i32
+  val ui32_trunc_sat_f32 : F32Wrapper.t -> i32
+  val isabelle_i32_trunc_sat_s_f64 : F64Wrapper.t -> i32
+  val si32_trunc_sat_f64 : F64Wrapper.t -> i32
+  val isabelle_i32_trunc_sat_s_f32 : F32Wrapper.t -> i32
+  val si32_trunc_sat_f32 : F32Wrapper.t -> i32
   val isabelle_i32_trunc_u_f64 : F64Wrapper.t -> i32 option
   val ui32_trunc_f64 : F64Wrapper.t -> i32 option
   val isabelle_i32_trunc_u_f32 : F32Wrapper.t -> i32 option
@@ -1009,7 +1031,7 @@ module WasmRef_Isa : sig
   val isabelle_i32_trunc_s_f32 : F32Wrapper.t -> i32 option
   val si32_trunc_f32 : F32Wrapper.t -> i32 option
   val wasm_wrap : i64 -> i32
-  val cvt_i32 : sx option -> v -> i32 option
+  val cvt_i32 : (sat * sx) option -> v -> i32 option
   val isabelle_int64_to_ocaml_int64 : i64 -> Int64.t
   val f64_convert_u_isabelle_i64 : i64 -> F64Wrapper.t
   val f64_convert_ui64 : i64 -> F64Wrapper.t
@@ -1020,7 +1042,7 @@ module WasmRef_Isa : sig
   val f64_convert_si64 : i64 -> F64Wrapper.t
   val f64_convert_s_isabelle_i32 : i32 -> F64Wrapper.t
   val f64_convert_si32 : i32 -> F64Wrapper.t
-  val cvt_f64 : sx option -> v -> F64Wrapper.t option
+  val cvt_f64 : (sat * sx) option -> v -> F64Wrapper.t option
   val f32_convert_u_isabelle_i64 : i64 -> F32Wrapper.t
   val f32_convert_ui64 : i64 -> F32Wrapper.t
   val f32_convert_u_isabelle_i32 : i32 -> F32Wrapper.t
@@ -1029,8 +1051,8 @@ module WasmRef_Isa : sig
   val f32_convert_si64 : i64 -> F32Wrapper.t
   val f32_convert_s_isabelle_i32 : i32 -> F32Wrapper.t
   val f32_convert_si32 : i32 -> F32Wrapper.t
-  val cvt_f32 : sx option -> v -> F32Wrapper.t option
-  val cvt : t -> sx option -> v -> v option
+  val cvt_f32 : (sat * sx) option -> v -> F32Wrapper.t option
+  val cvt : t -> (sat * sx) option -> v -> v option
   val select_return_top : ct list -> ct -> ct -> checker_type
   val to_ct_list : t list -> ct list
   val produce : checker_type -> checker_type -> checker_type
@@ -1053,7 +1075,7 @@ module WasmRef_Isa : sig
   val unop_t_agree : unop -> t -> bool
   val option_projl : ('a * 'b) option -> 'a option
   val types_t : 'a t_context_ext -> tf list
-  val convert_cond : t -> t -> sx option -> bool
+  val convert_cond : t -> t -> (sat * sx) option -> bool
   val return : 'a t_context_ext -> (t list) option
   val memory : 'a t_context_ext -> unit limit_t_ext list
   val global : 'a t_context_ext -> unit tg_ext list
@@ -1070,6 +1092,7 @@ module WasmRef_Isa : sig
   val eq_i_i : 'a equal -> 'a -> 'a -> unit pred
   val fold_map : ('a -> (unit -> 'b)) -> 'a list -> (unit -> ('b list))
   val list_all2 : ('a -> 'b -> bool) -> 'a list -> 'b list -> bool
+  val size_tp : tp -> nat
   val bin_rsplit_rev : nat -> nat -> int -> int list
   val word_rsplit_rev : 'a len -> 'b len -> 'a word -> 'b word list
   val serialise_i64 : i64 -> uint8 list
@@ -1105,10 +1128,23 @@ module WasmRef_Isa : sig
   val store_uint32 : Bytes.t -> nat -> int32 -> (unit -> unit)
   val store_uint64 : Bytes.t -> nat -> int64 -> (unit -> unit)
   val min : 'a ord -> 'a -> 'a -> 'a
+  val takefill : 'a -> nat -> 'a list -> 'a list
+  val bytes_takefill : uint8 -> nat -> uint8 list -> uint8 list
   val app_unop_i : 'a wasm_int -> unop_i -> 'a -> 'a
   val app_unop_i_v : unop_i -> v -> v
   val app_unop_f : 'a wasm_float -> unop_f -> 'a -> 'a
   val app_unop_f_v : unop_f -> v -> v
+  val word_rcat_rev : 'a len -> 'b len -> 'a word list -> 'b word
+  val deserialise_i64 : uint8 list -> i64
+  val deserialise_i32 : uint8 list -> i32
+  val isabelle_byte_to_ocaml_char : uint8 -> Char.t
+  val f64_deserialise_isabelle_bytes : uint8 list -> F64Wrapper.t
+  val deserialise_f64 : uint8 list -> F64Wrapper.t
+  val f32_deserialise_isabelle_bytes : uint8 list -> F32Wrapper.t
+  val deserialise_f32 : uint8 list -> F32Wrapper.t
+  val wasm_deserialise : uint8 list -> t -> v
+  val sign_extend : sx -> nat -> uint8 list -> uint8 list
+  val app_extend_s : tp -> v -> v
   val app_unop : unop -> v -> v
   val m_exports : 'a m_ext -> unit module_export_ext list
   val m_imports : 'a m_ext -> unit module_import_ext list
@@ -1137,7 +1173,6 @@ module WasmRef_Isa : sig
   val crash_invalid : res_step
   val app_v_s_if :
     tf -> b_e list -> b_e list -> v list -> v list * (e list * res_step)
-  val word_rcat_rev : 'a len -> 'b len -> 'a word list -> 'b word
   val g_val_update : (v -> v) -> 'a global_ext -> 'a global_ext
   val typing : unit t_context_ext -> b_e list -> tf -> bool
   val app_v_s_drop : v list -> v list * res_step
@@ -1145,19 +1180,11 @@ module WasmRef_Isa : sig
   val d_off : 'a module_data_ext -> b_e list
   val e_off : 'a module_elem_ext -> b_e list
   val e_tab : 'a module_elem_ext -> nat
-  val isabelle_byte_to_ocaml_char : uint8 -> Char.t
-  val f32_deserialise_isabelle_bytes : uint8 list -> F32Wrapper.t
-  val deserialise_f32 : uint8 list -> F32Wrapper.t
-  val f64_deserialise_isabelle_bytes : uint8 list -> F64Wrapper.t
-  val deserialise_f64 : uint8 list -> F64Wrapper.t
-  val deserialise_i32 : uint8 list -> i32
-  val deserialise_i64 : uint8 list -> i64
   val int32_minus_one : i32
   val app_v_s_binop : binop -> v list -> v list * res_step
   val app_v_s_br_if : nat -> v list -> v list * (e list * res_step)
-  val wasm_deserialise : uint8 list -> t -> v
   val app_v_s_cvtop :
-    cvtop -> t -> t -> sx option -> v list -> v list * res_step
+    cvtop -> t -> t -> (sat * sx) option -> v list -> v list * res_step
   val app_v_s_relop : relop -> v list -> v list * res_step
   val split_v_s_b_s_aux : v list -> b_e list -> v list * b_e list
   val split_v_s_b_s : b_e list -> v list * b_e list
@@ -3648,9 +3675,11 @@ type unop_i = Clz | Ctz | Popcnt;;
 
 type unop_f = Neg | Abs | Ceil | Floor | Trunc | Nearest | Sqrt;;
 
-type unop = Unop_i of unop_i | Unop_f of unop_f;;
-
 type tp = Tp_i8 | Tp_i16 | Tp_i32;;
+
+type unop = Unop_i of unop_i | Unop_f of unop_f | Extend_s of tp;;
+
+type sat = Sat | Nonsat;;
 
 type b_e = Unreachable | Nop | Drop | Select | Block of tf * b_e list |
   Loop of tf * b_e list | If of tf * b_e list * b_e list | Br of nat |
@@ -3660,7 +3689,7 @@ type b_e = Unreachable | Nop | Drop | Select | Block of tf * b_e list |
   Load of t * (tp * sx) option * nat * nat | Store of t * tp option * nat * nat
   | Current_memory | Grow_memory | EConst of v | Unop of t * unop |
   Binop of t * binop | Testop of t * testop | Relop of t * relop |
-  Cvtop of t * cvtop * t * sx option;;
+  Cvtop of t * cvtop * t * (sat * sx) option;;
 
 type cl_m = Func_native of unit inst_m_ext * tf * t list * b_e list |
   Func_host of tf * host
@@ -3785,6 +3814,8 @@ let rec drop
 let rec null = function [] -> true
                | x :: xs -> false;;
 
+let rec last (x :: xs) = (if null xs then x else last xs);;
+
 let rec take_tr
   n x1 acc_r = match n, x1, acc_r with n, [], acc_r -> rev acc_r
     | n, x :: xs, acc_r ->
@@ -3843,6 +3874,8 @@ and membera _A xa0 x = match xa0, x with Empty, x -> false
 
 let rec holds p = eval equal_unit p ();;
 
+let rec msbyte bs = last bs;;
+
 let bot_pred : 'a pred = Seq (fun _ -> Empty);;
 
 let rec single x = Seq (fun _ -> Insert (x, bot_pred));;
@@ -3884,6 +3917,15 @@ and sup_pred
             | Join (p, xq) -> adjunct (Seq g) (Join (p, xq))));;
 
 let rec if_pred b = (if b then single () else bot_pred);;
+
+let rec msb_uint8 x = uint8_test_bit x (Z.of_int 7);;
+
+let rec msb_byte x = msb_uint8 x;;
+
+let rec size_t = function T_i32 -> zero_nat
+                 | T_i64 -> zero_nat
+                 | T_f32 -> zero_nat
+                 | T_f64 -> zero_nat;;
 
 let rec dvd (_A1, _A2)
   a b = eq _A1
@@ -3945,6 +3987,26 @@ let zero_byte : uint8 = zero_uint8a;;
 let rec ocaml_int64_to_isabelle_int64
   n = I64_impl_abs (uint64 (LibAux.z_of_uint64 n));;
 
+let rec isabelle_i64_trunc_sat_u_f64
+  f = ocaml_int64_to_isabelle_int64 (I64Wrapper_convert.trunc_sat_u_f64 f);;
+
+let rec ui64_trunc_sat_f64 x = isabelle_i64_trunc_sat_u_f64 x;;
+
+let rec isabelle_i64_trunc_sat_u_f32
+  f = ocaml_int64_to_isabelle_int64 (I64Wrapper_convert.trunc_sat_u_f32 f);;
+
+let rec ui64_trunc_sat_f32 x = isabelle_i64_trunc_sat_u_f32 x;;
+
+let rec isabelle_i64_trunc_sat_s_f64
+  f = ocaml_int64_to_isabelle_int64 (I64Wrapper_convert.trunc_sat_s_f64 f);;
+
+let rec si64_trunc_sat_f64 x = isabelle_i64_trunc_sat_s_f64 x;;
+
+let rec isabelle_i64_trunc_sat_s_f32
+  f = ocaml_int64_to_isabelle_int64 (I64Wrapper_convert.trunc_sat_s_f32 f);;
+
+let rec si64_trunc_sat_f32 x = isabelle_i64_trunc_sat_s_f32 x;;
+
 let rec isabelle_i64_trunc_u_f64
   f = map_option ocaml_int64_to_isabelle_int64
         (I64Wrapper_convert.trunc_u_f64 f);;
@@ -3989,21 +4051,47 @@ let rec wasm_extend_s
           (rep_uint32 x)));;
 
 let rec cvt_i64
-  sx v =
+  sat_sx v =
     (match v
       with ConstInt32 c ->
-        (match sx with None -> None | Some S -> Some (wasm_extend_s c)
-          | Some U -> Some (wasm_extend_u c))
+        (match sat_sx with None -> None | Some (_, S) -> Some (wasm_extend_s c)
+          | Some (_, U) -> Some (wasm_extend_u c))
       | ConstInt64 _ -> None
       | ConstFloat32 c ->
-        (match sx with None -> None | Some S -> si64_trunc_f32 c
-          | Some U -> ui64_trunc_f32 c)
+        (match sat_sx with None -> None
+          | Some (Sat, S) -> Some (si64_trunc_sat_f32 c)
+          | Some (Sat, U) -> Some (ui64_trunc_sat_f32 c)
+          | Some (Nonsat, S) -> si64_trunc_f32 c
+          | Some (Nonsat, U) -> ui64_trunc_f32 c)
       | ConstFloat64 c ->
-        (match sx with None -> None | Some S -> si64_trunc_f64 c
-          | Some U -> ui64_trunc_f64 c));;
+        (match sat_sx with None -> None
+          | Some (Sat, S) -> Some (si64_trunc_sat_f64 c)
+          | Some (Sat, U) -> Some (ui64_trunc_sat_f64 c)
+          | Some (Nonsat, S) -> si64_trunc_f64 c
+          | Some (Nonsat, U) -> ui64_trunc_f64 c));;
 
 let rec ocaml_int32_to_isabelle_int32
   n = I32_impl_abs (uint32 (LibAux.z_of_uint32 n));;
+
+let rec isabelle_i32_trunc_sat_u_f64
+  f = ocaml_int32_to_isabelle_int32 (I32Wrapper_convert.trunc_sat_u_f64 f);;
+
+let rec ui32_trunc_sat_f64 x = isabelle_i32_trunc_sat_u_f64 x;;
+
+let rec isabelle_i32_trunc_sat_u_f32
+  f = ocaml_int32_to_isabelle_int32 (I32Wrapper_convert.trunc_sat_u_f32 f);;
+
+let rec ui32_trunc_sat_f32 x = isabelle_i32_trunc_sat_u_f32 x;;
+
+let rec isabelle_i32_trunc_sat_s_f64
+  f = ocaml_int32_to_isabelle_int32 (I32Wrapper_convert.trunc_sat_s_f64 f);;
+
+let rec si32_trunc_sat_f64 x = isabelle_i32_trunc_sat_s_f64 x;;
+
+let rec isabelle_i32_trunc_sat_s_f32
+  f = ocaml_int32_to_isabelle_int32 (I32Wrapper_convert.trunc_sat_s_f32 f);;
+
+let rec si32_trunc_sat_f32 x = isabelle_i32_trunc_sat_s_f32 x;;
 
 let rec isabelle_i32_trunc_u_f64
   f = map_option ocaml_int32_to_isabelle_int32
@@ -4039,14 +4127,20 @@ let rec wasm_wrap
           (rep_uint64 x)));;
 
 let rec cvt_i32
-  sx v =
+  sat_sx v =
     (match v with ConstInt32 _ -> None | ConstInt64 c -> Some (wasm_wrap c)
       | ConstFloat32 c ->
-        (match sx with None -> None | Some S -> si32_trunc_f32 c
-          | Some U -> ui32_trunc_f32 c)
+        (match sat_sx with None -> None
+          | Some (Sat, S) -> Some (si32_trunc_sat_f32 c)
+          | Some (Sat, U) -> Some (ui32_trunc_sat_f32 c)
+          | Some (Nonsat, S) -> si32_trunc_f32 c
+          | Some (Nonsat, U) -> ui32_trunc_f32 c)
       | ConstFloat64 c ->
-        (match sx with None -> None | Some S -> si32_trunc_f64 c
-          | Some U -> ui32_trunc_f64 c));;
+        (match sat_sx with None -> None
+          | Some (Sat, S) -> Some (si32_trunc_sat_f64 c)
+          | Some (Sat, U) -> Some (ui32_trunc_sat_f64 c)
+          | Some (Nonsat, S) -> si32_trunc_f64 c
+          | Some (Nonsat, U) -> ui32_trunc_f64 c));;
 
 let rec isabelle_int64_to_ocaml_int64
   n = LibAux.uint64_of_z (integer_of_nat (nat_of_int_i64 n));;
@@ -4075,14 +4169,16 @@ let rec f64_convert_s_isabelle_i32
 let rec f64_convert_si32 x = f64_convert_s_isabelle_i32 x;;
 
 let rec cvt_f64
-  sx v =
+  sat_sx v =
     (match v
       with ConstInt32 c ->
-        (match sx with None -> None | Some S -> Some (f64_convert_si32 c)
-          | Some U -> Some (f64_convert_ui32 c))
+        (match sat_sx with None -> None
+          | Some (_, S) -> Some (f64_convert_si32 c)
+          | Some (_, U) -> Some (f64_convert_ui32 c))
       | ConstInt64 c ->
-        (match sx with None -> None | Some S -> Some (f64_convert_si64 c)
-          | Some U -> Some (f64_convert_ui64 c))
+        (match sat_sx with None -> None
+          | Some (_, S) -> Some (f64_convert_si64 c)
+          | Some (_, U) -> Some (f64_convert_ui64 c))
       | ConstFloat32 c -> Some ((F64Wrapper_convert.promote_f32) c)
       | ConstFloat64 _ -> None);;
 
@@ -4107,28 +4203,33 @@ let rec f32_convert_s_isabelle_i32
 let rec f32_convert_si32 x = f32_convert_s_isabelle_i32 x;;
 
 let rec cvt_f32
-  sx v =
+  sat_sx v =
     (match v
       with ConstInt32 c ->
-        (match sx with None -> None | Some S -> Some (f32_convert_si32 c)
-          | Some U -> Some (f32_convert_ui32 c))
+        (match sat_sx with None -> None
+          | Some (_, S) -> Some (f32_convert_si32 c)
+          | Some (_, U) -> Some (f32_convert_ui32 c))
       | ConstInt64 c ->
-        (match sx with None -> None | Some S -> Some (f32_convert_si64 c)
-          | Some U -> Some (f32_convert_ui64 c))
+        (match sat_sx with None -> None
+          | Some (_, S) -> Some (f32_convert_si64 c)
+          | Some (_, U) -> Some (f32_convert_ui64 c))
       | ConstFloat32 _ -> None
       | ConstFloat64 c -> Some ((F32Wrapper_convert.demote_f64) c));;
 
 let rec cvt
-  t sx v =
+  t sat_sx v =
     (match t
       with T_i32 ->
-        (match cvt_i32 sx v with None -> None | Some c -> Some (ConstInt32 c))
+        (match cvt_i32 sat_sx v with None -> None
+          | Some c -> Some (ConstInt32 c))
       | T_i64 ->
-        (match cvt_i64 sx v with None -> None | Some c -> Some (ConstInt64 c))
+        (match cvt_i64 sat_sx v with None -> None
+          | Some c -> Some (ConstInt64 c))
       | T_f32 ->
-        (match cvt_f32 sx v with None -> None | Some c -> Some (ConstFloat32 c))
+        (match cvt_f32 sat_sx v with None -> None
+          | Some c -> Some (ConstFloat32 c))
       | T_f64 ->
-        (match cvt_f64 sx v with None -> None
+        (match cvt_f64 sat_sx v with None -> None
           | Some c -> Some (ConstFloat64 c)));;
 
 let rec select_return_top
@@ -4265,7 +4366,9 @@ let rec binop_t_agree
     (match binop with Binop_i _ -> is_int_t t | Binop_f _ -> is_float_t t);;
 
 let rec unop_t_agree
-  unop t = (match unop with Unop_i _ -> is_int_t t | Unop_f _ -> is_float_t t);;
+  unop t =
+    (match unop with Unop_i _ -> is_int_t t | Unop_f _ -> is_float_t t
+      | Extend_s tp -> is_int_t t && less_nat (tp_length tp) (t_length t));;
 
 let rec option_projl x = map_option fst x;;
 
@@ -4275,9 +4378,9 @@ let rec types_t
     = types_t;;
 
 let rec convert_cond
-  t1 t2 sx =
+  t1 t2 sat_sx =
     not (equal_ta t1 t2) &&
-      equal_bool (is_none sx)
+      equal_bool (is_none sat_sx)
         (is_float_t t1 && is_float_t t2 ||
           is_int_t t1 &&
             (is_int_t t2 && less_nat (t_length t1) (t_length t2)));;
@@ -4354,9 +4457,9 @@ and check_single
     | c, Relop (t, op), ts ->
         (if relop_t_agree op t
           then type_update ts [TSome t; TSome t] (Typea [T_i32]) else Bot)
-    | c, Cvtop (t1, Convert, t2, sx), ts ->
-        (if convert_cond t1 t2 sx then type_update ts [TSome t2] (Typea [t1])
-          else Bot)
+    | c, Cvtop (t1, Convert, t2, sat_sx), ts ->
+        (if convert_cond t1 t2 sat_sx
+          then type_update ts [TSome t2] (Typea [t1]) else Bot)
     | c, Cvtop (t1, Reinterpret, t2, sx), ts ->
         (if not (equal_ta t1 t2) &&
               (equal_nat (t_length t1) (t_length t2) && is_none sx)
@@ -4455,6 +4558,10 @@ let rec list_all2
     p, x :: xs, y :: ys -> p x y && list_all2 p xs ys
     | p, xs, [] -> null xs
     | p, [], ys -> null ys;;
+
+let rec size_tp = function Tp_i8 -> zero_nat
+                  | Tp_i16 -> zero_nat
+                  | Tp_i32 -> zero_nat;;
 
 let rec bin_rsplit_rev
   n m c =
@@ -4638,6 +4745,14 @@ let rec store_uint64
 
 let rec min _A a b = (if less_eq _A a b then a else b);;
 
+let rec takefill
+  fill n xs =
+    (if equal_nat n zero_nat then []
+      else (match xs with [] -> fill :: takefill fill (minus_nat n one_nata) xs
+             | y :: ys -> y :: takefill fill (minus_nat n one_nata) ys));;
+
+let rec bytes_takefill x = takefill x;;
+
 let rec app_unop_i _A
   iop c =
     (match iop with Clz -> int_clz _A.wasm_int_ops_wasm_int c
@@ -4663,10 +4778,65 @@ let rec app_unop_f_v
       | ConstFloat32 c -> ConstFloat32 (app_unop_f wasm_float_f32 fop c)
       | ConstFloat64 c -> ConstFloat64 (app_unop_f wasm_float_f64 fop c));;
 
+let rec word_rcat_rev _A _B
+  = comp (of_int _B)
+      (horner_sum comm_semiring_0_int (the_int _A)
+        (power power_int (Int_of_integer (Z.of_int 2))
+          (len_of _A.len0_len Type)));;
+
+let rec deserialise_i64
+  bs = I64_impl_abs
+         (abs_uint64
+           (word_rcat_rev (len_bit0 (len_bit0 (len_bit0 len_num1)))
+             (len_bit0
+               (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
+             (map rep_uint8 bs)));;
+
+let rec deserialise_i32
+  bs = I32_impl_abs
+         (abs_uint32
+           (word_rcat_rev (len_bit0 (len_bit0 (len_bit0 len_num1)))
+             (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+             (map rep_uint8 bs)));;
+
+let rec isabelle_byte_to_ocaml_char n = LibAux.char_of_z (integer_of_uint8 n);;
+
+let rec f64_deserialise_isabelle_bytes
+  bs = ImplWrapper.deserialise_f64 (map isabelle_byte_to_ocaml_char bs);;
+
+let rec deserialise_f64 x = f64_deserialise_isabelle_bytes x;;
+
+let rec f32_deserialise_isabelle_bytes
+  bs = ImplWrapper.deserialise_f32 (map isabelle_byte_to_ocaml_char bs);;
+
+let rec deserialise_f32 x = f32_deserialise_isabelle_bytes x;;
+
+let rec wasm_deserialise
+  bs t =
+    (match t with T_i32 -> ConstInt32 (deserialise_i32 bs)
+      | T_i64 -> ConstInt64 (deserialise_i64 bs)
+      | T_f32 -> ConstFloat32 (deserialise_f32 bs)
+      | T_f64 -> ConstFloat64 (deserialise_f64 bs));;
+
+let rec sign_extend
+  sx l bytes =
+    (let msb = msb_byte (msbyte bytes) in
+     let byte =
+       (match sx with S -> (if msb then negone_byte else zero_byte)
+         | U -> zero_byte)
+       in
+      bytes_takefill byte l bytes);;
+
+let rec app_extend_s
+  tp v =
+    wasm_deserialise
+      (sign_extend S (size_t (typeof v)) (take (size_tp tp) (bits v)))
+      (typeof v);;
+
 let rec app_unop
   uop v =
     (match uop with Unop_i iop -> app_unop_i_v iop v
-      | Unop_f fop -> app_unop_f_v fop v);;
+      | Unop_f fop -> app_unop_f_v fop v | Extend_s tp -> app_extend_s tp v);;
 
 let rec m_exports
   (M_ext
@@ -4871,12 +5041,6 @@ let rec app_v_s_if
       | ConstFloat32 _ :: _ -> (v_s, ([], crash_invalid))
       | ConstFloat64 _ :: _ -> (v_s, ([], crash_invalid)));;
 
-let rec word_rcat_rev _A _B
-  = comp (of_int _B)
-      (horner_sum comm_semiring_0_int (the_int _A)
-        (power power_int (Int_of_integer (Z.of_int 2))
-          (len_of _A.len0_len Type)));;
-
 let rec g_val_update
   g_vala (Global_ext (g_mut, g_val, more)) =
     Global_ext (g_mut, g_vala g_val, more);;
@@ -4898,33 +5062,6 @@ let rec e_off (Module_elem_ext (e_tab, e_off, e_init, more)) = e_off;;
 
 let rec e_tab (Module_elem_ext (e_tab, e_off, e_init, more)) = e_tab;;
 
-let rec isabelle_byte_to_ocaml_char n = LibAux.char_of_z (integer_of_uint8 n);;
-
-let rec f32_deserialise_isabelle_bytes
-  bs = ImplWrapper.deserialise_f32 (map isabelle_byte_to_ocaml_char bs);;
-
-let rec deserialise_f32 x = f32_deserialise_isabelle_bytes x;;
-
-let rec f64_deserialise_isabelle_bytes
-  bs = ImplWrapper.deserialise_f64 (map isabelle_byte_to_ocaml_char bs);;
-
-let rec deserialise_f64 x = f64_deserialise_isabelle_bytes x;;
-
-let rec deserialise_i32
-  bs = I32_impl_abs
-         (abs_uint32
-           (word_rcat_rev (len_bit0 (len_bit0 (len_bit0 len_num1)))
-             (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-             (map rep_uint8 bs)));;
-
-let rec deserialise_i64
-  bs = I64_impl_abs
-         (abs_uint64
-           (word_rcat_rev (len_bit0 (len_bit0 (len_bit0 len_num1)))
-             (len_bit0
-               (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-             (map rep_uint8 bs)));;
-
 let int32_minus_one : i32 = I32_impl_abs (Int32.neg Int32.one);;
 
 let rec app_v_s_binop
@@ -4945,25 +5082,18 @@ let rec app_v_s_br_if
       | ConstFloat32 _ :: _ -> (v_s, ([], crash_invalid))
       | ConstFloat64 _ :: _ -> (v_s, ([], crash_invalid)));;
 
-let rec wasm_deserialise
-  bs t =
-    (match t with T_i32 -> ConstInt32 (deserialise_i32 bs)
-      | T_i64 -> ConstInt64 (deserialise_i64 bs)
-      | T_f32 -> ConstFloat32 (deserialise_f32 bs)
-      | T_f64 -> ConstFloat64 (deserialise_f64 bs));;
-
 let rec app_v_s_cvtop
-  cvtop t1 t2 sx v_s =
+  cvtop t1 t2 tp_sx v_s =
     (match v_s with [] -> (v_s, crash_invalid)
       | v1 :: v_sa ->
         (if types_agree t1 v1
           then (match cvtop
                  with Convert ->
-                   (match cvt t2 sx v1
+                   (match cvt t2 tp_sx v1
                      with None -> (v_sa, Res_trap (name typerep_cvtop cvtop))
                      | Some a -> (a :: v_sa, Step_normal))
                  | Reinterpret ->
-                   (if is_none sx
+                   (if is_none tp_sx
                      then (wasm_deserialise (bits v1) t2 :: v_sa, Step_normal)
                      else (v_s, crash_invalid)))
           else (v_s, crash_invalid)));;
@@ -5716,8 +5846,8 @@ let rec run_step_b_e_m
           (let (v_sa, res) = app_v_s_relop op v_s in
             (fun () ->
               (Config_m (d, s, update_fc_step_m fc v_sa [], fcs), res)))
-        | Cvtop (t2, op, t1, sx) ->
-          (let (v_sa, res) = app_v_s_cvtop op t1 t2 sx v_s in
+        | Cvtop (t2, op, t1, tp_sx) ->
+          (let (v_sa, res) = app_v_s_cvtop op t1 t2 tp_sx v_s in
             (fun () ->
               (Config_m (d, s, update_fc_step_m fc v_sa [], fcs), res)))));;
 

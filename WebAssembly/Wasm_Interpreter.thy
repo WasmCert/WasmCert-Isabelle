@@ -68,17 +68,17 @@ definition app_v_s_relop :: "relop \<Rightarrow> v_stack \<Rightarrow> (v_stack 
        v2#v1#v_s' \<Rightarrow> ((app_relop relop v1 v2)#v_s', Step_normal)
      | _ \<Rightarrow> (v_s, crash_invalid))"
 
-definition app_v_s_cvtop :: "cvtop \<Rightarrow> t \<Rightarrow> t \<Rightarrow> sx option \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
-  "app_v_s_cvtop cvtop t1 t2 sx v_s =
+definition app_v_s_cvtop :: "cvtop \<Rightarrow> t \<Rightarrow> t \<Rightarrow> (sat \<times> sx) option \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_cvtop cvtop t1 t2 tp_sx v_s =
      (case v_s of
        v1#v_s' \<Rightarrow>
        (if types_agree t1 v1 then
          (case cvtop of
             Convert \<Rightarrow>
-              expect (cvt t2 sx v1)
+              expect (cvt t2 tp_sx v1)
                      (\<lambda>v. (v#v_s', Step_normal))
                      (v_s', Res_trap (name cvtop))
-          | Reinterpret \<Rightarrow> if sx = None then
+          | Reinterpret \<Rightarrow> if tp_sx = None then
                              ((wasm_deserialise (bits v1) t2)#v_s', Step_normal)
                            else (v_s, crash_invalid))
         else (v_s, crash_invalid))
@@ -440,8 +440,8 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
         let (v_s', res) = (app_v_s_relop op v_s) in
         ((Config d s (update_fc_step fc v_s' []) fcs), res)
 
-    | (Cvtop t2 op t1 sx) \<Rightarrow>
-        let (v_s', res) = (app_v_s_cvtop op t1 t2 sx v_s) in
+    | (Cvtop t2 op t1 tp_sx) \<Rightarrow>
+        let (v_s', res) = (app_v_s_cvtop op t1 t2 tp_sx v_s) in
         ((Config d s (update_fc_step fc v_s' []) fcs), res)
 
     | (Unreachable) \<Rightarrow>

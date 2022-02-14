@@ -2,9 +2,9 @@ section {* Executable Type Checker *}
 
 theory Wasm_Checker imports Wasm_Checker_Types begin
 
-fun convert_cond :: "t \<Rightarrow> t \<Rightarrow> sx option \<Rightarrow> bool" where
-  "convert_cond t1 t2 sx = ((t1 \<noteq> t2) \<and> (sx = None) = ((is_float_t t1 \<and> is_float_t t2)
-                                                        \<or> (is_int_t t1 \<and> is_int_t t2 \<and> (t_length t1 < t_length t2))))"
+fun convert_cond :: "t \<Rightarrow> t \<Rightarrow> (sat \<times> sx) option \<Rightarrow> bool" where
+  "convert_cond t1 t2 sat_sx = ((t1 \<noteq> t2) \<and> (sat_sx = None) = ((is_float_t t1 \<and> is_float_t t2)
+                                                                 \<or> (is_int_t t1 \<and> is_int_t t2 \<and> (t_length t1 < t_length t2))))"
 
 fun same_lab_h :: "nat list \<Rightarrow> (t list) list \<Rightarrow> t list \<Rightarrow> (t list) option" where
   "same_lab_h [] _ ts = Some ts"
@@ -93,7 +93,7 @@ foldl_Cons: "foldl f a (x # xs) = foldl f (f a x) xs"
                                        then type_update ts [TSome t, TSome t] (Type [T_i32])
                                        else Bot)"
   (* convert *)
-| "check_single \<C> (Cvtop t1 Convert t2 sx) ts = (if (convert_cond t1 t2 sx)
+| "check_single \<C> (Cvtop t1 Convert t2 sat_sx) ts = (if (convert_cond t1 t2 sat_sx)
                                                    then type_update ts [TSome t2] (Type [t1])
                                                    else Bot)"
   (* reinterpret *)
