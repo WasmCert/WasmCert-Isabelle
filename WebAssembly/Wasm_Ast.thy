@@ -1,4 +1,4 @@
-section {* WebAssembly Core AST *}
+section \<open>WebAssembly Core AST\<close>
 
 theory Wasm_Ast
   imports

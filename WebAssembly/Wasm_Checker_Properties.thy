@@ -1,8 +1,8 @@
-section {* Correctness of Type Checker *}
+section \<open>Correctness of Type Checker\<close>
 
 theory Wasm_Checker_Properties imports Wasm_Checker Wasm_Properties begin
 
-subsection {* Soundness *}
+subsection \<open>Soundness\<close>
 
 lemma b_e_check_single_type_sound:
   assumes "type_update (Type x1) (to_ct_list t_in) (Type t_out) = Type x2"
@@ -818,7 +818,7 @@ proof -
     by simp
 qed
 
-subsection {* Completeness *}
+subsection \<open>Completeness\<close>
 
 lemma check_single_imp:
   assumes "check_single \<C> e ctn = ctm"

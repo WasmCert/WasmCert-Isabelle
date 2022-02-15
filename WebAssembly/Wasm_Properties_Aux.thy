@@ -1,4 +1,4 @@
-section {* Auxiliary Type System Properties *}
+section \<open>Auxiliary Type System Properties\<close>
 
 theory Wasm_Properties_Aux imports Wasm_Axioms begin
 

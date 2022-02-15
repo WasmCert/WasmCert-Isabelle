@@ -1,8 +1,8 @@
-section {* Lemmas for Soundness Proof *}
+section \<open>Lemmas for Soundness Proof\<close>
 
 theory Wasm_Properties imports Wasm_Properties_Aux begin
 
-subsection {* Preservation *}
+subsection \<open>Preservation\<close>
 
 lemma t_cvt: assumes "cvt t sx v = Some v'" shows "t = typeof v'"
   using assms
@@ -1217,7 +1217,8 @@ lemma types_preserved_get_local:
 proof -
   have "(local \<C>)!i = typeof v"
     using assms(2,3)
-    by (metis (no_types, hide_lams) append_Cons length_map list.simps(9) map_append nth_append_length)
+    by (metis (no_types, opaque_lifting) append_Cons length_map list.simps(9) map_append
+        nth_append_length)
   hence "ts' = ts@[typeof v]"
     using assms(1) unlift_b_e[of s \<C> "[Get_local i]"] b_e_type_get_local
     by fastforce
@@ -1234,7 +1235,8 @@ lemma types_preserved_set_local:
 proof -
   have v_type:"(local \<C>)!i = typeof v"
     using assms(2,3)
-    by (metis (no_types, hide_lams) append_Cons length_map list.simps(9) map_append nth_append_length)
+    by (metis (no_types, opaque_lifting) append_Cons length_map list.simps(9) map_append
+        nth_append_length)
   obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> [$C v'] : (ts _> ts'')" 
                              "s\<bullet>\<C> \<turnstile> [$Set_local i] : (ts'' _> ts')"
     using e_type_comp assms
@@ -1590,7 +1592,7 @@ proof -
     done
 qed
 
-subsection {* Progress *}
+subsection \<open>Progress\<close>
 
 lemma const_list_no_progress:
   assumes "const_list es"
@@ -1673,34 +1675,30 @@ qed
 lemma trap_no_progress:
   assumes "es = [Trap]"
   shows "\<not>\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
-proof -
-  {
-    assume "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
-    hence False
-      using assms
-    proof (induction rule: reduce.induct)
-      case (basic e e' s vs)
-      thus ?case
-      by (induction rule: reduce_simple.induct) auto
+proof (rule notI)
+  assume "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
+  thus False
+    unfolding assms
+  proof (induction s f "[Trap]" s' f' es' rule: reduce.induct)
+    case (basic e' s vs)
+    thus ?case
+      by (cases rule: reduce_simple.cases) simp_all
+  next
+    case (label s f es s' f' es' k lholed les')
+    show ?case
+      using label.hyps(3)
+    proof (cases rule: Lfilled.cases)
+      case (L0 vs es')
+      show ?thesis
+        using L0(2) label.hyps(1,2) empty_no_progress
+        by (auto simp add: Cons_eq_append_conv)
     next
-      case (label s f es s' f' es' k lholed les les')
-      show ?case
-        using label(2)
-        proof (cases rule: Lfilled.cases)
-          case (L0 vs es')
-          show ?thesis
-            using L0(2) label(1,4,5) empty_no_progress
-            by (auto simp add: Cons_eq_append_conv)
-        next
-          case (LN vs n es' l es'' k' lfilledk)
-          show ?thesis
-            using LN(2) label(5)
-            by (simp add: Cons_eq_append_conv)
-        qed
-    qed auto
-  }
-  thus ?thesis
-    by blast
+      case (LN vs n es' l es'' k' lfilledk)
+      show ?thesis
+        using LN(2) label.hyps(4)
+        by (simp add: Cons_eq_append_conv)
+    qed
+  qed auto
 qed
 
 lemma terminal_no_progress:
