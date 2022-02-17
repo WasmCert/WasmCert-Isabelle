@@ -34,7 +34,7 @@ lemma typeof_app_unop:
   assumes "typeof v = t"
   shows "typeof (app_unop op v) = t"
   using assms
-  unfolding typeof_def app_unop_def app_unop_i_v_def app_unop_f_v_def
+  unfolding typeof_def app_unop_def app_unop_i_v_def app_unop_f_v_def app_extend_s_def wasm_deserialise_def
   by (simp split: unop.splits unop_i.splits unop_f.splits v.splits)
 
 lemma typeof_app_testop:

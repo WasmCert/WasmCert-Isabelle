@@ -381,8 +381,8 @@ fun run_step_b_e_m :: "b_e \<Rightarrow> config_m \<Rightarrow> res_step_tuple_m
         let (v_s', res) = (app_v_s_relop op v_s) in
         return ((Config_m d s (update_fc_step_m fc v_s' []) fcs), res)
 
-    | (Cvtop t2 op t1 sx) \<Rightarrow>
-        let (v_s', res) = (app_v_s_cvtop op t1 t2 sx v_s) in
+    | (Cvtop t2 op t1 tp_sx) \<Rightarrow>
+        let (v_s', res) = (app_v_s_cvtop op t1 t2 tp_sx v_s) in
         return ((Config_m d s (update_fc_step_m fc v_s' []) fcs), res)
 
     | (Unreachable) \<Rightarrow>

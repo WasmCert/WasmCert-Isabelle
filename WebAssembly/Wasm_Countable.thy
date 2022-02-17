@@ -16,6 +16,9 @@ instance tp :: countable
 instance sx :: countable
   by countable_datatype
 
+instance sat :: countable
+  by countable_datatype
+
 instance i32 :: countable
 proof(rule countable_classI[of "\<lambda>n::i32. nat_of_int n"])
 qed (simp add: Rep_i32_inject nat_of_int_i32.rep_eq)

@@ -139,6 +139,16 @@ consts
   si64_trunc_f32 :: "f32 \<Rightarrow> i64 option"
   ui64_trunc_f64 :: "f64 \<Rightarrow> i64 option"
   si64_trunc_f64 :: "f64 \<Rightarrow> i64 option"
+  (* 1.1: saturating float to i32 *)
+  ui32_trunc_sat_f32 :: "f32 \<Rightarrow> i32"
+  si32_trunc_sat_f32 :: "f32 \<Rightarrow> i32"
+  ui32_trunc_sat_f64 :: "f64 \<Rightarrow> i32"
+  si32_trunc_sat_f64 :: "f64 \<Rightarrow> i32"
+  (* 1.1: saturating float to i64 *)
+  ui64_trunc_sat_f32 :: "f32 \<Rightarrow> i64"
+  si64_trunc_sat_f32 :: "f32 \<Rightarrow> i64"
+  ui64_trunc_sat_f64 :: "f64 \<Rightarrow> i64"
+  si64_trunc_sat_f64 :: "f64 \<Rightarrow> i64"
   (* int to f32 *)
   f32_convert_ui32 :: "i32 \<Rightarrow> f32"
   f32_convert_si32 :: "i32 \<Rightarrow> f32"
@@ -226,6 +236,23 @@ definition wasm_deserialise :: "bytes \<Rightarrow> t \<Rightarrow> v" where
                             | T_f32 \<Rightarrow> ConstFloat32 (deserialise_f32 bs)
                             | T_f64 \<Rightarrow> ConstFloat64 (deserialise_f64 bs))"
 
+definition bits :: "v \<Rightarrow> bytes" where
+  "bits v = (case v of
+               ConstInt32 c \<Rightarrow> (serialise_i32 c)
+             | ConstInt64 c \<Rightarrow> (serialise_i64 c)
+             | ConstFloat32 c \<Rightarrow> (serialise_f32 c)
+             | ConstFloat64 c \<Rightarrow> (serialise_f64 c))"
+
+definition bitzero :: "t \<Rightarrow> v" where
+  "bitzero t = (case t of
+                T_i32 \<Rightarrow> ConstInt32 0
+              | T_i64 \<Rightarrow> ConstInt64 0
+              | T_f32 \<Rightarrow> ConstFloat32 0
+              | T_f64 \<Rightarrow> ConstFloat64 0)"
+
+definition n_zeros :: "t list \<Rightarrow> v list" where
+  "n_zeros ts = (map (\<lambda>t. bitzero t) ts)"
+
 definition typeof :: " v \<Rightarrow> t" where
   "typeof v = (case v of
                  ConstInt32 _ \<Rightarrow> T_i32
@@ -273,7 +300,8 @@ definition unop_t_agree :: "unop \<Rightarrow> t \<Rightarrow> bool" where
   "unop_t_agree unop t =
      (case unop of
         Unop_i _ \<Rightarrow> is_int_t t
-      | Unop_f _ \<Rightarrow> is_float_t t)"
+      | Unop_f _ \<Rightarrow> is_float_t t
+      | Extend_s tp \<Rightarrow> is_int_t t \<and> t_length t > tp_length tp)"
 
 definition binop_t_agree :: "binop \<Rightarrow> t \<Rightarrow> bool" where
   "binop_t_agree binop t =
@@ -319,11 +347,16 @@ definition app_unop_f_v :: "unop_f \<Rightarrow> v \<Rightarrow> v" where
      | (ConstFloat64 c) \<Rightarrow> ConstFloat64 (app_unop_f fop c)
      | v' \<Rightarrow> v')"
 
+definition app_extend_s :: "tp \<Rightarrow> v \<Rightarrow> v" where
+  "app_extend_s tp v =
+     wasm_deserialise (sign_extend S (size_t (typeof v)) (take (size_tp tp) (bits v))) (typeof v)"
+
 definition app_unop :: "unop \<Rightarrow> v \<Rightarrow> v" where
   "app_unop uop v =
     (case uop of
        Unop_i iop \<Rightarrow> app_unop_i_v iop v
-     | Unop_f fop \<Rightarrow> app_unop_f_v fop v)"
+     | Unop_f fop \<Rightarrow> app_unop_f_v fop v
+     | Extend_s tp \<Rightarrow> app_extend_s tp v)"
 
 definition app_binop_i :: "binop_i \<Rightarrow> 'i::wasm_int \<Rightarrow> 'i::wasm_int \<Rightarrow> ('i::wasm_int) option" where
   "app_binop_i iop c1 c2 = (case iop of
@@ -520,84 +553,75 @@ definition load_store_t_bounds :: "a \<Rightarrow> tp option \<Rightarrow> t \<R
                                    None \<Rightarrow> 2^a \<le> t_length t
                                  | Some tp \<Rightarrow> 2^a \<le> tp_length tp \<and> tp_length tp < t_length t \<and>  is_int_t t)"
 
-definition cvt_i32 :: "sx option \<Rightarrow> v \<Rightarrow> i32 option" where
-  "cvt_i32 sx v = (case v of
-                   ConstInt32 c \<Rightarrow> None
-                 | ConstInt64 c \<Rightarrow> Some (wasm_wrap c)
-                 | ConstFloat32 c \<Rightarrow> (case sx of
-                                        Some U \<Rightarrow> ui32_trunc_f32 c
-                                      | Some S \<Rightarrow> si32_trunc_f32 c
-                                      | None \<Rightarrow> None)
-                 | ConstFloat64 c \<Rightarrow> (case sx of
-                                        Some U \<Rightarrow> ui32_trunc_f64 c
-                                      | Some S \<Rightarrow> si32_trunc_f64 c
-                                      | None \<Rightarrow> None))"
+definition cvt_i32 :: "(sat \<times> sx) option \<Rightarrow> v \<Rightarrow> i32 option" where
+  "cvt_i32 sat_sx v = (case v of
+                         ConstInt32 c \<Rightarrow> None
+                       | ConstInt64 c \<Rightarrow> Some (wasm_wrap c)
+                       | ConstFloat32 c \<Rightarrow> (case sat_sx of
+                                              Some (Nonsat, U) \<Rightarrow> ui32_trunc_f32 c
+                                            | Some (Nonsat, S) \<Rightarrow> si32_trunc_f32 c
+                                            | Some (Sat, U) \<Rightarrow> Some (ui32_trunc_sat_f32 c)
+                                            | Some (Sat, S) \<Rightarrow> Some (si32_trunc_sat_f32 c)
+                                            | None \<Rightarrow> None)
+                       | ConstFloat64 c \<Rightarrow> (case sat_sx of
+                                              Some (Nonsat, U) \<Rightarrow> ui32_trunc_f64 c
+                                            | Some (Nonsat, S) \<Rightarrow> si32_trunc_f64 c
+                                            | Some (Sat, U) \<Rightarrow> Some (ui32_trunc_sat_f64 c)
+                                            | Some (Sat, S) \<Rightarrow> Some (si32_trunc_sat_f64 c)
+                                        | None \<Rightarrow> None))"
 
-definition cvt_i64 :: "sx option \<Rightarrow> v \<Rightarrow> i64 option" where
-  "cvt_i64 sx v = (case v of
-                   ConstInt32 c \<Rightarrow> (case sx of
-                                        Some U \<Rightarrow> Some (wasm_extend_u c)
-                                      | Some S \<Rightarrow> Some (wasm_extend_s c)
-                                      | None \<Rightarrow> None)
-                 | ConstInt64 c \<Rightarrow> None
-                 | ConstFloat32 c \<Rightarrow> (case sx of
-                                        Some U \<Rightarrow> ui64_trunc_f32 c
-                                      | Some S \<Rightarrow> si64_trunc_f32 c
-                                      | None \<Rightarrow> None)
-                 | ConstFloat64 c \<Rightarrow> (case sx of
-                                        Some U \<Rightarrow> ui64_trunc_f64 c
-                                      | Some S \<Rightarrow> si64_trunc_f64 c
-                                      | None \<Rightarrow> None))"
+definition cvt_i64 :: "(sat \<times> sx) option \<Rightarrow> v \<Rightarrow> i64 option" where
+  "cvt_i64 sat_sx v = (case v of
+                         ConstInt32 c \<Rightarrow> (case sat_sx of
+                                              Some (_, U) \<Rightarrow> Some (wasm_extend_u c)
+                                            | Some (_, S) \<Rightarrow> Some (wasm_extend_s c)
+                                            | None \<Rightarrow> None)
+                       | ConstInt64 c \<Rightarrow> None
+                       | ConstFloat32 c \<Rightarrow> (case sat_sx of
+                                              Some (Nonsat, U) \<Rightarrow> ui64_trunc_f32 c
+                                            | Some (Nonsat, S) \<Rightarrow> si64_trunc_f32 c
+                                            | Some (Sat, U) \<Rightarrow> Some (ui64_trunc_sat_f32 c)
+                                            | Some (Sat, S) \<Rightarrow> Some (si64_trunc_sat_f32 c)
+                                            | None \<Rightarrow> None)
+                       | ConstFloat64 c \<Rightarrow> (case sat_sx of
+                                              Some (Nonsat, U) \<Rightarrow> ui64_trunc_f64 c
+                                            | Some (Nonsat, S) \<Rightarrow> si64_trunc_f64 c
+                                            | Some (Sat, U) \<Rightarrow> Some (ui64_trunc_sat_f64 c)
+                                            | Some (Sat, S) \<Rightarrow> Some (si64_trunc_sat_f64 c)
+                                            | None \<Rightarrow> None))"
 
-definition cvt_f32 :: "sx option \<Rightarrow> v \<Rightarrow> f32 option" where
-  "cvt_f32 sx v = (case v of
-                   ConstInt32 c \<Rightarrow> (case sx of
-                                      Some U \<Rightarrow> Some (f32_convert_ui32 c)
-                                    | Some S \<Rightarrow> Some (f32_convert_si32 c)
-                                    | _ \<Rightarrow> None)
-                 | ConstInt64 c \<Rightarrow> (case sx of
-                                      Some U \<Rightarrow> Some (f32_convert_ui64 c)
-                                    | Some S \<Rightarrow> Some (f32_convert_si64 c)
-                                    | _ \<Rightarrow> None)
-                 | ConstFloat32 c \<Rightarrow> None
-                 | ConstFloat64 c \<Rightarrow> Some (wasm_demote c))"
+definition cvt_f32 :: "(sat \<times> sx) option \<Rightarrow> v \<Rightarrow> f32 option" where
+  "cvt_f32 sat_sx v = (case v of
+                         ConstInt32 c \<Rightarrow> (case sat_sx of
+                                            Some (_, U) \<Rightarrow> Some (f32_convert_ui32 c)
+                                          | Some (_, S) \<Rightarrow> Some (f32_convert_si32 c)
+                                          | _ \<Rightarrow> None)
+                       | ConstInt64 c \<Rightarrow> (case sat_sx of
+                                            Some (_, U) \<Rightarrow> Some (f32_convert_ui64 c)
+                                          | Some (_, S) \<Rightarrow> Some (f32_convert_si64 c)
+                                          | _ \<Rightarrow> None)
+                       | ConstFloat32 c \<Rightarrow> None
+                       | ConstFloat64 c \<Rightarrow> Some (wasm_demote c))"
 
-definition cvt_f64 :: "sx option \<Rightarrow> v \<Rightarrow> f64 option" where
-  "cvt_f64 sx v = (case v of
-                   ConstInt32 c \<Rightarrow> (case sx of
-                                      Some U \<Rightarrow> Some (f64_convert_ui32 c)
-                                    | Some S \<Rightarrow> Some (f64_convert_si32 c)
-                                    | _ \<Rightarrow> None)
-                 | ConstInt64 c \<Rightarrow> (case sx of
-                                      Some U \<Rightarrow> Some (f64_convert_ui64 c)
-                                    | Some S \<Rightarrow> Some (f64_convert_si64 c)
-                                    | _ \<Rightarrow> None)
-                 | ConstFloat32 c \<Rightarrow> Some (wasm_promote c)
-                 | ConstFloat64 c \<Rightarrow> None)"
+definition cvt_f64 :: "(sat \<times> sx) option \<Rightarrow> v \<Rightarrow> f64 option" where
+  "cvt_f64 sat_sx v = (case v of
+                         ConstInt32 c \<Rightarrow> (case sat_sx of
+                                            Some (_, U) \<Rightarrow> Some (f64_convert_ui32 c)
+                                          | Some (_, S) \<Rightarrow> Some (f64_convert_si32 c)
+                                          | _ \<Rightarrow> None)
+                       | ConstInt64 c \<Rightarrow> (case sat_sx of
+                                            Some (_, U) \<Rightarrow> Some (f64_convert_ui64 c)
+                                          | Some (_, S) \<Rightarrow> Some (f64_convert_si64 c)
+                                          | _ \<Rightarrow> None)
+                       | ConstFloat32 c \<Rightarrow> Some (wasm_promote c)
+                       | ConstFloat64 c \<Rightarrow> None)"
 
-definition cvt :: "t \<Rightarrow> sx option \<Rightarrow> v \<Rightarrow> v option" where
-  "cvt t sx v = (case t of
-                 T_i32 \<Rightarrow> (case (cvt_i32 sx v) of Some c \<Rightarrow> Some (ConstInt32 c) | None \<Rightarrow> None)
-               | T_i64 \<Rightarrow> (case (cvt_i64 sx v) of Some c \<Rightarrow> Some (ConstInt64 c) | None \<Rightarrow> None)
-               | T_f32 \<Rightarrow> (case (cvt_f32 sx v) of Some c \<Rightarrow> Some (ConstFloat32 c) | None \<Rightarrow> None)
-               | T_f64 \<Rightarrow> (case (cvt_f64 sx v) of Some c \<Rightarrow> Some (ConstFloat64 c) | None \<Rightarrow> None))"
-
-definition bits :: "v \<Rightarrow> bytes" where
-  "bits v = (case v of
-               ConstInt32 c \<Rightarrow> (serialise_i32 c)
-             | ConstInt64 c \<Rightarrow> (serialise_i64 c)
-             | ConstFloat32 c \<Rightarrow> (serialise_f32 c)
-             | ConstFloat64 c \<Rightarrow> (serialise_f64 c))"
-
-definition bitzero :: "t \<Rightarrow> v" where
-  "bitzero t = (case t of
-                T_i32 \<Rightarrow> ConstInt32 0
-              | T_i64 \<Rightarrow> ConstInt64 0
-              | T_f32 \<Rightarrow> ConstFloat32 0
-              | T_f64 \<Rightarrow> ConstFloat64 0)"
-
-definition n_zeros :: "t list \<Rightarrow> v list" where
-  "n_zeros ts = (map (\<lambda>t. bitzero t) ts)"
+definition cvt :: "t \<Rightarrow> (sat \<times> sx) option \<Rightarrow> v \<Rightarrow> v option" where
+  "cvt t sat_sx v = (case t of
+                       T_i32 \<Rightarrow> (case (cvt_i32 sat_sx v) of Some c \<Rightarrow> Some (ConstInt32 c) | None \<Rightarrow> None)
+                     | T_i64 \<Rightarrow> (case (cvt_i64 sat_sx v) of Some c \<Rightarrow> Some (ConstInt64 c) | None \<Rightarrow> None)
+                     | T_f32 \<Rightarrow> (case (cvt_f32 sat_sx v) of Some c \<Rightarrow> Some (ConstFloat32 c) | None \<Rightarrow> None)
+                     | T_f64 \<Rightarrow> (case (cvt_f64 sat_sx v) of Some c \<Rightarrow> Some (ConstFloat64 c) | None \<Rightarrow> None))"
 
 lemma is_int_t_exists:
   assumes "is_int_t t"
