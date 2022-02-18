@@ -426,7 +426,7 @@ next
 qed
 
 lemma list_blit_array_triple:
-  assumes "length l + n < length la"
+  assumes "length l + n \<le> length la"
   shows "<a \<mapsto>\<^sub>a la> 
            list_blit_array l a n
          <\<lambda>r. a \<mapsto>\<^sub>a (take n la @ l @ drop (n+length l) la)>"
@@ -437,7 +437,7 @@ proof (induct l arbitrary: la n)
     by sep_auto
 next
   case (Cons x xl)
-  have 1:"length xl + (Suc n) < length (list_update la n x)"
+  have 1:"length xl + (Suc n) \<le> length (list_update la n x)"
     using Cons(2)
     by auto
   have 2:"<a \<mapsto>\<^sub>a (list_update la n x)>
@@ -452,7 +452,7 @@ next
              xl @
              drop (Suc (n + length xl)) la = (take (Suc n) (list_update la n x) @
              xl @ drop ((Suc n) + length xl) (list_update la n x))"
-    by simp (metis 1 ab_semigroup_add_class.add.commute add_Suc add_lessD1 length_list_update take_update_last)
+    by simp (metis 1 Suc_le_eq add_leD2 length_list_update take_update_last)
   show ?case
     apply sep_auto
     using upd_conv_take_nth_drop[of n la x] Cons(2) apply simp
@@ -462,13 +462,13 @@ qed
 
 lemma array_blit_map_triple:
   assumes  "length l = length l'"
-           "length l + n < length la"
+           "length l + n \<le> length la"
            "<P> Heap_Monad.fold_map f l <\<lambda>res. \<up>(res = l') * Q >"
   shows " <a \<mapsto>\<^sub>a la * P> 
             array_blit_map l f a n
           <\<lambda>r. a \<mapsto>\<^sub>a (take n la @ l' @ drop (n+length l') la) * Q >"
 proof -
-  have 1:"length l' + n < length la"
+  have 1:"length l' + n \<le> length la"
     using assms
     by auto
   show ?thesis
