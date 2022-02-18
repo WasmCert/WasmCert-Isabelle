@@ -225,6 +225,11 @@ definition store :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes
 definition store_packed :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes \<Rightarrow> nat \<Rightarrow> mem option" where
   "store_packed = store"
 
+definition store_tab :: "tabinst \<Rightarrow> nat \<Rightarrow> i list \<Rightarrow> tabinst option" where
+  "store_tab tab n icls = (if (tab_size tab \<ge> (n+(length icls)))
+                          then Some (((take n (fst tab)) @ (map Some icls) @ (drop (n + length icls) (fst tab))), snd tab)
+                          else None)"
+
 consts
   (* host *)
   host_apply :: "s \<Rightarrow> tf \<Rightarrow> host \<Rightarrow> v list \<Rightarrow> host_state \<Rightarrow> (s \<times> v list) option \<Rightarrow> bool"
@@ -499,6 +504,9 @@ definition stab_cl_ind :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> i
 
 definition stab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> i option" where
   "stab s i j = (case (inst.tabs i) of (k#_) => stab_cl_ind s k j | [] => None)"
+
+definition stab_ind :: "inst \<Rightarrow> nat option" where
+  "stab_ind i = (case (inst.tabs i) of (n#_) \<Rightarrow> Some n | [] \<Rightarrow> None)"
 
 definition update_glob :: "global list \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v \<Rightarrow> global list" where
   "update_glob gs i j v =  (let k = sglob_ind i j in gs[k:=(gs!k)\<lparr>g_val := v\<rparr>])"

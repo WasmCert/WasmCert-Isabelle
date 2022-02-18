@@ -93,6 +93,22 @@ definition config_m_to_config :: "heap \<Rightarrow> config_m \<Rightarrow> conf
      (Config_m d s_m fc_m fcs_m) \<Rightarrow>
         Config d (s_m_to_s h s_m) (frame_context_m_to_frame_context h fc_m) (map (frame_context_m_to_frame_context h) fcs_m)"
 
+fun list_blit_array :: "'a::heap list \<Rightarrow> 'a array \<Rightarrow> nat \<Rightarrow> unit Heap" where
+  "list_blit_array src_list dst dst_pos =
+   (case src_list of
+      [] \<Rightarrow> return ()
+    | y#ys \<Rightarrow>
+        do {
+          Array.upd dst_pos y dst;
+          list_blit_array ys dst (dst_pos+1)
+        })"
+
+fun array_blit_map :: "'b list \<Rightarrow> ('b \<Rightarrow> ('a::heap) Heap) \<Rightarrow> 'a array \<Rightarrow> nat \<Rightarrow> unit Heap" where
+  "array_blit_map src_list src_f dst dst_pos = do {
+     ys \<leftarrow> Heap_Monad.fold_map src_f src_list;
+     list_blit_array ys dst dst_pos
+  }"
+
 definition app_f_v_s_get_local_m :: "nat \<Rightarrow> v array \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step) Heap" where
   "app_f_v_s_get_local_m k loc_arr v_s =
      do {
@@ -302,17 +318,6 @@ definition app_s_f_v_s_mem_size_m :: "mem_m array \<Rightarrow> inst_m \<Rightar
        return (((ConstInt32 (int_of_nat (m_len div Ki64)))#v_s), Step_normal)
      }"
 
-fun array_blit_map :: "'b list \<Rightarrow> ('b \<Rightarrow> ('a::heap) Heap) \<Rightarrow> 'a array \<Rightarrow> nat \<Rightarrow> unit Heap" where
-  "array_blit_map src_list src_f dst dst_pos =
-   (case src_list of
-      [] \<Rightarrow> return ()
-    | y#ys \<Rightarrow>
-        do {
-          x \<leftarrow> src_f y;
-          Array.upd dst_pos x dst;
-          array_blit_map ys src_f dst (dst_pos+1)
-        })"
-
 definition app_s_f_v_s_mem_grow_m :: "mem_m array \<Rightarrow> inst_m \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step) Heap" where
   "app_s_f_v_s_mem_grow_m ms i_m v_s =
      (case v_s of
@@ -330,6 +335,46 @@ definition app_s_f_v_s_mem_grow_m :: "mem_m array \<Rightarrow> inst_m \<Rightar
                return (((ConstInt32 (int32_minus_one))#v_s'), Step_normal)
            }
      | _ \<Rightarrow> return (v_s, crash_invalid))"
+
+definition init_mem_m_v :: "mem_m \<Rightarrow> nat \<Rightarrow> byte list \<Rightarrow> (unit option) Heap" where
+  "init_mem_m_v m n bs =
+     do {
+       m_len \<leftarrow> len_byte_array (fst m);
+       (if (m_len \<ge> (n+(length bs))) then do {
+          store_uint8_list (fst m) n bs; return (Some ()) }
+        else
+          return None)
+     }"
+
+definition init_tab_m_v :: "tabinst_m \<Rightarrow> nat \<Rightarrow> i list \<Rightarrow> (unit option) Heap" where
+  "init_tab_m_v t n icls =
+     do {
+       t_len \<leftarrow> Array.len (fst t);
+       (if (t_len \<ge> (n+(length icls))) then do {
+          list_blit_array (map Some icls) (fst t) n; return (Some ()) }
+        else
+          return None)
+     }"
+
+definition app_s_f_init_mem_m :: "nat \<Rightarrow> byte list \<Rightarrow> mem_m array \<Rightarrow> inst_m \<Rightarrow> res_step Heap" where
+  "app_s_f_init_mem_m off bs ms i_m =
+   (do {
+      j \<leftarrow> Array.nth (inst_m.mems i_m) 0;
+      m \<leftarrow> Array.nth ms j;
+      u_maybe \<leftarrow> init_mem_m_v m off bs;
+      (case u_maybe of
+         Some _ \<Rightarrow> return Step_normal
+       | None \<Rightarrow> return (Res_trap (STR ''init_mem''))) })"
+
+definition app_s_f_init_tab_m :: "nat \<Rightarrow> i list \<Rightarrow> tabinst_m array \<Rightarrow> inst_m \<Rightarrow> res_step Heap" where
+  "app_s_f_init_tab_m off icls ts i_m =
+   (do {
+      j \<leftarrow> Array.nth (inst_m.tabs i_m) 0;
+      t \<leftarrow> Array.nth ts j;
+      u_maybe \<leftarrow> init_tab_m_v t off icls;
+      (case u_maybe of
+         Some _ \<Rightarrow> return Step_normal
+       | None \<Rightarrow> return (Res_trap (STR ''init_tab''))) })"
 
 fun update_fc_step_m :: "frame_context_m \<Rightarrow> v_stack \<Rightarrow> e list \<Rightarrow> frame_context_m" where
   "update_fc_step_m (Frame_context_m rdx lcs nf f1 f2) v_s' es_cont = (Frame_context_m (update_redex_step rdx v_s' es_cont) lcs nf f1 f2)"
@@ -544,6 +589,14 @@ fun run_step_e_m :: "e \<Rightarrow> config_m \<Rightarrow> res_step_tuple_m Hea
                    | None \<Rightarrow> return (Config_m d s (Frame_context_m (Redex v_s' es b_es) lcs nf f_locs1 f_inst2) fcs, Res_trap (STR ''host_apply'')) }
                  else
                     return (Config_m d s fc fcs, crash_invalid))}
+
+    | (Init_mem n bs) \<Rightarrow> do {
+        res \<leftarrow> (app_s_f_init_mem_m n bs (s_m.mems s) f_inst2);
+        return (Config_m d s fc fcs, res) }
+
+    | (Init_tab n icls) \<Rightarrow> do {
+        res \<leftarrow> (app_s_f_init_tab_m n icls (s_m.tabs s) f_inst2);
+        return (Config_m d s fc fcs, res) }
 
      | _ \<Rightarrow> return (Config_m d s fc fcs, crash_invariant)))"
 (* should never produce Label, Frame, or Trap *)

@@ -115,6 +115,10 @@ and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> boo
 | "\<lbrakk>i < length (funcs \<S>); cl_type ((funcs \<S>)!i) = tf\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Invoke i] : tf"
   (* label *)
 | "\<lbrakk>\<S>\<bullet>\<C> \<turnstile> e0s : (ts _> t2s); \<S>\<bullet>\<C>\<lparr>label := ([ts] @ (label \<C>))\<rparr> \<turnstile> es : ([] _> t2s); length ts = n\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Label n e0s es] : ([] _> t2s)"
+  (* Init_mem (instantiation) *)
+| "\<lbrakk>length (memory \<C>) \<ge> 1\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Init_mem n bs] : ([] _> [])"
+  (* Init_tab (instantiation) *)
+| "\<lbrakk>length (table \<C>) \<ge> 1; list_all (\<lambda>ti. ti < length (funcs \<S>)) tis\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Init_tab n tis] : ([] _> [])"
 (* section: l_typing *)
 | "\<lbrakk>frame_typing \<S> f \<C>; \<S>\<bullet>\<C>\<lparr>return := rs\<rparr> \<turnstile> es : ([] _> ts)\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile> f;es : ts"
 
@@ -223,11 +227,16 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
 | grow_memory:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C (ConstInt32 c), $(Grow_memory)]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[$C (ConstInt32 (int_of_nat n))]\<rparr>"
   \<comment> \<open>\<open>grow_memory fail\<close>\<close>
 | grow_memory_fail:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C (ConstInt32 c),$(Grow_memory)]\<rparr> \<leadsto> \<lparr>s;f;[$C (ConstInt32 int32_minus_one)]\<rparr>"
-  (* The bad ones. *)
+  (* The bad ones *)
   \<comment> \<open>\<open>inductive label reduction\<close>\<close>
 | label:"\<lbrakk>\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>; Lfilled k lholed es les; Lfilled k lholed es' les'\<rbrakk> \<Longrightarrow> \<lparr>s;f;les\<rparr> \<leadsto> \<lparr>s';f';les'\<rparr>"
   \<comment> \<open>\<open>inductive local reduction\<close>\<close>
 | local:"\<lbrakk>\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>\<rbrakk> \<Longrightarrow> \<lparr>s;f0;[Frame n f es]\<rparr> \<leadsto> \<lparr>s';f0;[Frame n f' es']\<rparr>"
+  (* instantiation helpers *)
+| init_mem_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; store m n 0 bs (length bs) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_mem n bs]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[]\<rparr>"
+| init_mem_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; store m n 0 bs (length bs) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_mem n bs]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| init_tab_Some:"\<lbrakk>stab_ind (f_inst f) = Some j; ((tabs s)!j) = t; store_tab t n icls = Some tab'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_tab n icls]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:= ((tabs s)[j := tab'])\<rparr>;f;[]\<rparr>"
+| init_tab_None:"\<lbrakk>stab_ind (f_inst f) = Some j; ((tabs s)!j) = t; store_tab t n icls = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_tab n icls]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
 
 definition reduce_trans where
   "reduce_trans \<equiv> (\<lambda>(s,f,es) (s',f',es'). \<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>)^**"
