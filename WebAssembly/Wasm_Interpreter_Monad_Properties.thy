@@ -268,7 +268,95 @@ lemma extract_pre_cfg_m_assn[extract_pure_rules]:
   apply (sep_auto split:config.splits config_m.splits)
   subgoal by (metis mod_starE extract_pre_fc_m_assn)
   by (metis mod_starE extract_pre_list_assn_lengthD) 
-   
+
+lemma array_fold_map_triple:
+  assumes "length l = length l'"
+          "((length l)+1) = length Ps"
+          "\<And>i. \<lbrakk>i < length l\<rbrakk> \<Longrightarrow> <Ps!i> f (l!i) <\<lambda>x. \<up>(x = l'!i) * Ps!(i+1)>"
+  shows "<Ps!0> Heap_Monad.fold_map f l <\<lambda>res. \<up>(res = l') * Ps!(length l) >"
+  using assms
+proof(induct l arbitrary: l' Ps)
+case Nil
+  thus ?case
+    by sep_auto
+next
+  case (Cons x xl)
+  obtain y yl where l'_is:"l' = y#yl" "length xl = length yl"
+    using Cons(2)
+    by (metis length_Suc_conv)
+  have 1:"length xl + 1 = length (tl Ps)"
+         "Ps \<noteq> []"
+    using Cons(3)
+    by auto
+  have "(\<And>i. i < length xl \<Longrightarrow>
+          <tl Ps ! i> f (xl ! i)
+          <\<lambda>x. \<up> (x = yl ! i) *
+               tl Ps ! (i + 1)>)"
+    using Cons(4) Misc.nth_tl[OF 1(2)] l'_is(1)
+    by simp (metis Suc_mono nth_Cons_Suc)
+  hence "<Ps ! 1> Heap_Monad.fold_map f xl
+  <\<lambda>res. \<up> (res = yl) * Ps ! (length xl + 1)>"
+    using Cons(1)[OF l'_is(2) 1(1)] Misc.nth_tl[OF 1(2)]
+    by simp
+  moreover
+  have " <Ps ! 0> f x <\<lambda>x. \<up>(x = l'!0) * Ps!1>"
+    using Cons(4)[of 0]
+    by simp
+  ultimately
+  show ?case
+    using l'_is(1)
+    by sep_auto
+qed
+
+lemma list_blit_array_triple:
+  assumes "length l + n < length la"
+  shows "<a \<mapsto>\<^sub>a la> 
+           list_blit_array l a n
+         <\<lambda>r. a \<mapsto>\<^sub>a (take n la @ l @ drop (n+length l) la)>"
+  using assms
+proof (induct l arbitrary: la n)
+  case Nil
+  thus ?case
+    by sep_auto
+next
+  case (Cons x xl)
+  have 1:"length xl + (Suc n) < length (list_update la n x)"
+    using Cons(2)
+    by auto
+  have 2:"<a \<mapsto>\<^sub>a (list_update la n x)>
+            list_blit_array xl a (Suc n)
+          <\<lambda>r. a \<mapsto>\<^sub>a
+            (take (Suc n) (list_update la n x) @
+             xl @ drop ((Suc n) + length xl) (list_update la n x))>"
+    using Cons(1)[OF 1]
+    by blast
+  have 3:"take n la @
+             x #
+             xl @
+             drop (Suc (n + length xl)) la = (take (Suc n) (list_update la n x) @
+             xl @ drop ((Suc n) + length xl) (list_update la n x))"
+    by simp (metis 1 ab_semigroup_add_class.add.commute add_Suc add_lessD1 length_list_update take_update_last)
+  show ?case
+    apply sep_auto
+    using upd_conv_take_nth_drop[of n la x] Cons(2) apply simp
+    using 2 3 apply simp apply (metis append_Cons append_assoc empty_append_eq_id)
+    done
+qed
+
+lemma array_blit_map_triple:
+  assumes  "length l = length l'"
+           "length l + n < length la"
+           "<P> Heap_Monad.fold_map f l <\<lambda>res. \<up>(res = l') * Q >"
+  shows " <a \<mapsto>\<^sub>a la * P> 
+            array_blit_map l f a n
+          <\<lambda>r. a \<mapsto>\<^sub>a (take n la @ l' @ drop (n+length l') la) * Q >"
+proof -
+  have 1:"length l' + n < length la"
+    using assms
+    by auto
+  show ?thesis
+    by (sep_auto simp del: list_blit_array.simps heap: list_blit_array_triple[OF 1] assms(3))
+qed
 
 (* hoare triples for run_step_b_e_m *)
 
@@ -378,9 +466,6 @@ lemma call_indirect_triple:
      apply(auto simp add:stypes_def tab_cl_ind_def)
   done
 
-
-
-
 (* memory stuff *)
 
 lemma [sep_heap_rules]: 
@@ -469,7 +554,6 @@ lemma [load_rules]:
     read_bytes_def mem_rep_read_bytes_def t_length_def mem_length_def mem_rep_length_def
   by (sep_auto simp:Abs_uint64'.rep_eq word_list_sign_extend_Rep_uint8 split:prod.splits)+
 
-
 lemma load_triple: 
   "<mem_m_assn m m_m>
   load_m_v m_m n off t
@@ -480,8 +564,6 @@ lemma load_triple:
   by(sep_auto heap:load_rules split:t.splits simp:mem_length_def mem_rep_length_def
       read_bytes_def mem_rep_read_bytes_def t_length_def 
 serialise_deserialise_i32 serialise_deserialise_i64)
-
-
 
 lemma sign_extend_id: 
   "sign_extend sx (length bs) bs = bs"
@@ -587,7 +669,6 @@ proof -
     done
 qed
 
-
 named_theorems store_rules
 
 abbreviation "store32_mem_triple fs t_len m m_m n v \<equiv> 
@@ -662,7 +743,6 @@ lemma store_packed_triple:
       mem_length_def mem_rep_length_def 
       serialise_deserialise_i32 serialise_f32_len
       serialise_deserialise_i64 serialise_f64_len)
-  
 
 lemma store_maybe_packed_triple:
   assumes "inst_at (is, i_ms) (f_inst f, f_inst2) j"
@@ -710,7 +790,22 @@ proof -
     done
 qed
 
+lemma init_mem_triple: 
+  "<mem_m_assn m m_m>
+  init_mem_m_v m_m n bs
+  <\<lambda>r_opt. expect_assn (\<lambda>m' r_m. mem_m_assn m' m_m) (mem_m_assn m m_m)
+    (store m n 0 bs (length bs)) r_opt>"
+  by(sep_auto split:v.splits prod.splits list.splits heap:store_rules 
+      simp: Rep_mem_rep_inverse Abs_mem_rep_inverse bytes_takefill_def
+            write_bytes_def mem_rep_write_bytes_def mem_m_assn_def
+            init_mem_m_v_def store_def mem_length_def mem_rep_length.rep_eq)
 
+lemma init_tab_triple: 
+  "<a \<mapsto>\<^sub>a tabrep * \<up>(tab_m=(a,t_max))>
+  init_tab_m_v tab_m n icls
+  <\<lambda>r_opt. expect_assn (\<lambda>t' r_m. a \<mapsto>\<^sub>a (fst t') * \<up>(tab_m=(a,(snd t')))) (a \<mapsto>\<^sub>a t * \<up>(tab_m=(a,t_max)))
+    (store_tab (tabrep, t_max) n icls) r_opt>"
+  sorry
 
 (* run_step_b_e *)
 
@@ -927,6 +1022,12 @@ proof -
   next
     case (Frame x51 x52 x53)
     then show ?thesis unfolding unfold_vars by sep_auto
+  next
+    case (Init_mem x61 x62)
+    then show ?thesis sorry
+  next
+    case (Init_tab x71 x72)
+    then show ?thesis sorry
   qed
 qed 
 

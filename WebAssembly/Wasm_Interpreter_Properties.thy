@@ -512,6 +512,30 @@ next
   qed
 qed
 
+lemma app_s_f_init_mem_is:
+  assumes "app_s_f_init_mem off bs ms f = (ms', res)"
+  shows "(res = Step_normal \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[Init_mem off bs]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:=ms'\<rparr>;f;(v_stack_to_es v_s)\<rparr>)) \<or>
+         (\<exists>str. res = Res_trap str \<and> ms = ms' \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[Init_mem off bs]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s)@[Trap]\<rparr>)) \<or>
+         (res = crash_invalid)"
+  using progress_L0_left[OF reduce.init_mem_Some] progress_L0_left[OF reduce.init_mem_None] assms
+  unfolding app_s_f_init_mem_def
+  apply (simp split: list.splits cvtop.splits if_splits option.splits v.splits)
+  apply metis
+  apply fastforce
+  done
+
+lemma app_s_f_init_tab_is:
+  assumes "app_s_f_init_tab off icls ts f = (ts', res)"
+  shows "(res = Step_normal \<and> ((tabs s = ts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[Init_tab off icls]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:=ts'\<rparr>;f;(v_stack_to_es v_s)\<rparr>)) \<or>
+         (\<exists>str. res = Res_trap str \<and> ts = ts' \<and> ((tabs s = ts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[Init_tab off icls]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s)@[Trap]\<rparr>)) \<or>
+         (res = crash_invalid)"
+  using progress_L0_left[OF reduce.init_tab_Some] progress_L0_left[OF reduce.init_tab_None] assms
+  unfolding app_s_f_init_tab_def
+  apply (simp split: list.splits cvtop.splits if_splits option.splits v.splits)
+  apply metis
+  apply fastforce
+  done
+
 fun es_redex_to_es :: "e list \<Rightarrow> redex \<Rightarrow> e list" where
   "es_redex_to_es es (Redex v_sr esr b_esr) = v_stack_to_es v_sr @ es @ esr @ ($*b_esr)"
 
@@ -1838,6 +1862,74 @@ proof -
         qed
       qed
     qed
+  next
+    case (Init_mem n bs)
+    obtain ms' where ms'_is:
+      "fcs' = fcs"
+      "fc' = fc"
+      "app_s_f_init_mem n bs (s.mems s) f = (ms', res)"
+      "s' = s\<lparr>mems:=ms'\<rparr>"
+      using Init_mem Cons assms fc_is
+      by (fastforce split: prod.splits)
+    consider
+        (a)   "res = Step_normal"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[Init_mem n bs]\<rparr> \<leadsto> \<lparr>s';f;(v_stack_to_es v_s)\<rparr>)"
+      | (b) str where
+              "mems s = ms'"
+              "res = Res_trap str"
+              "\<lparr>s;f;v_stack_to_es v_s @ [Init_mem n bs]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s) @ [Trap]\<rparr>"
+      | (c) "(res = crash_invalid)"
+      using app_s_f_init_mem_is[OF ms'_is(3), of s] Init_mem ms'_is(4)
+      by fastforce
+    thus ?thesis
+    proof (cases)
+      case a
+      thus ?thesis
+        using es_frame_contexts_to_config_ctx2[OF a(2)] Init_mem fc_is ms'_is(1,2) 0
+        by simp blast
+    next
+      case b
+      have "s = s'"
+        using b(1) ms'_is(4)
+        by simp
+      thus ?thesis
+        using es_frame_contexts_to_config_trap_ctx[OF b(3)] Init_mem fc_is Cons ms'_is(1,2) b 0
+        by simp blast
+    qed auto
+  next
+    case (Init_tab n icls)
+    obtain ts' where ts'_is:
+      "fcs' = fcs"
+      "fc' = fc"
+      "app_s_f_init_tab n icls (s.tabs s) f = (ts', res)"
+      "s' = s\<lparr>tabs:=ts'\<rparr>"
+      using Init_tab Cons assms fc_is
+      by (fastforce split: prod.splits)
+    consider
+        (a)   "res = Step_normal"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[Init_tab n icls]\<rparr> \<leadsto> \<lparr>s';f;(v_stack_to_es v_s)\<rparr>)"
+      | (b) str where
+              "tabs s = ts'"
+              "res = Res_trap str"
+              "\<lparr>s;f;v_stack_to_es v_s @ [Init_tab n icls]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s) @ [Trap]\<rparr>"
+      | (c) "(res = crash_invalid)"
+      using app_s_f_init_tab_is[OF ts'_is(3), of s] Init_tab ts'_is(4)
+      by fastforce
+    thus ?thesis
+    proof (cases)
+      case a
+      thus ?thesis
+        using es_frame_contexts_to_config_ctx2[OF a(2)] Init_tab fc_is ts'_is(1,2) 0
+        by simp blast
+    next
+      case b
+      have "s = s'"
+        using b(1) ts'_is(4)
+        by simp
+      thus ?thesis
+        using es_frame_contexts_to_config_trap_ctx[OF b(3)] Init_tab fc_is Cons ts'_is(1,2) b 0
+        by simp blast
+    qed auto
   qed fastforce+
 qed
 

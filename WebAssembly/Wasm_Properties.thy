@@ -92,6 +92,51 @@ next
   thus ?case
     using local(2)[OF local(3) tls_def(1,3), of _  "(label \<C>i')"]
     by force
+next
+  case (init_mem_Some f j s m n bs mem')
+  show ?case
+    using store_size[OF init_mem_Some(3)] store_max[OF init_mem_Some(3)]
+          store_typing_in_mem_agree init_mem_Some
+          store_extension_mem_leq[OF init_mem_Some(4,2), of mem']
+    by (metis inst_typing_imp_memi_agree memi_agree_def order_refl)
+next
+  case (init_tab_Some f j s t n icls tab')
+  have "tab_size t \<le> tab_size tab'"
+    using store_tab_size[OF init_tab_Some(3)]
+    by simp
+  moreover
+  have "tab_agree s tab'"
+  proof -
+    have a:"tab_agree s t"
+      using inst_typing_imp_tabi_agree store_typing_in_tab_agree
+      by (metis init_tab_Some(1,2,4,5) tabi_agree_def)
+    hence b:"pred_option ((\<le>) (tab_size tab')) (tab_max tab')"
+      using init_tab_Some(3)
+      unfolding store_tab_def tab_agree_def
+      apply (simp split: if_splits)
+      apply (metis init_tab_Some(3) sndI store_tab_size)
+      done
+    have "list_all (\<lambda>icl. icl < length (s.funcs s)) icls"
+      using e_type_init_tab[OF init_tab_Some(6)]
+      by simp
+    hence "list_all (\<lambda>i_opt. (case i_opt of None \<Rightarrow> True | Some i \<Rightarrow> i < length (funcs s))) (map Some icls)"
+      by (induction icls) auto
+    hence "list_all (\<lambda>i_opt. (case i_opt of None \<Rightarrow> True | Some i \<Rightarrow> i < length (funcs s)))
+             (fst ((take n (fst t) @ map Some icls @ drop (n + length icls) (fst t), tab_max t)))"
+      by (metis a append_take_drop_id fst_conv list_all_append tab_agree_def)
+    thus ?thesis
+      using b
+      unfolding tab_agree_def
+      by (metis init_tab_Some(3) option.distinct(1) option.inject store_tab_def)
+  qed
+  moreover
+  have "tab_max t = tab_max tab'"
+    using store_tab_max[OF init_tab_Some(3)]
+    by simp
+  ultimately
+  show ?case
+    using store_extension_tab_leq[OF init_tab_Some(4,2), of tab']
+    by blast
 qed (auto simp add: store_extension_refl store_extension.intros)
 
 lemma store_preserved:
@@ -712,7 +757,7 @@ proof -
     by (simp add: frame_typing.intros ts_c_def(3))
   ultimately
   have "s\<bullet>Some t2s \<tturnstile> \<lparr> f_locs=(vs @ zs), f_inst=i \<rparr>;([$Block ([] _> t2s) es]) : t2s"
-    using e_typing_l_typing.intros(8) c''_def
+    using e_typing_l_typing.intros(10) c''_def
     by fastforce
   thus ?thesis
     using e_typing_l_typing.intros(3,5) ts_c_def t_eqs(1) assms(2,7)
@@ -1527,11 +1572,29 @@ next
     using 0(2) frame_typing.intros local.hyps reduce_inst_is
     by auto
   hence 1:"s'\<bullet>(Some tls) \<tturnstile> f';es' : tls"
-    using 0 e_typing_l_typing.intros(8) es_def(1,3) reduce_inst_is[OF local(1)]
+    using 0 e_typing_l_typing.intros(10) es_def(1,3) reduce_inst_is[OF local(1)]
     by fastforce
   show ?case
     using e_typing_l_typing.intros(3) e_typing_l_typing.intros(5)[OF 1 es_def(2)] es_def(5) local(5)
     by (metis (full_types) append_Nil2)
+next
+case (init_mem_Some f j s m n bs mem')
+  thus ?case
+    using e_type_empty e_type_init_mem
+    by presburger
+next
+  case (init_mem_None f j s m n bs)
+  thus ?case
+    by (simp add: e_typing_l_typing.intros(4))
+next
+  case (init_tab_Some f j s t n icls tab')
+  thus ?case
+    using e_type_empty e_type_init_tab
+    by presburger
+next
+  case (init_tab_None f j s t n icls)
+  thus ?case
+    by (simp add: e_typing_l_typing.intros(4))
 qed
 
 lemma types_preserved_e2:
@@ -1582,7 +1645,7 @@ proof -
     using defs(2) store_preserved(1)[OF assms] inst_typing_store_extension_inv
     by blast
   show ?thesis
-    using defs e_typing_l_typing.intros(8)
+    using defs e_typing_l_typing.intros(10)
           assms(1) reduce_inst_is 1 2
     unfolding frame_typing.simps
     apply simp
@@ -2629,6 +2692,7 @@ proof -
        store_typing s \<Longrightarrow>
        length (local \<C>) = length (f_locs f) \<Longrightarrow>
        length (memory \<C>) = length (inst.mems (f_inst f))  \<Longrightarrow>
+       length (table \<C>) = length (inst.tabs (f_inst f))  \<Longrightarrow>
          \<exists>a s' f' cs_es'. \<lparr>s;f;cs_es\<rparr> \<leadsto> \<lparr>s';f';cs_es'\<rparr>"
    and prems2:
       "s\<bullet>rs \<tturnstile> f;cs_es : ts' \<Longrightarrow>
@@ -2659,7 +2723,7 @@ proof -
         using 2(5,6) True
         by (metis append_assoc e_type_comp_conc1 map_append)
       show ?thesis
-        using 2(4)[OF 2(5) _ t_ts''_is] 2(5-14) t_vcs_is
+        using 2(4)[OF 2(5) _ t_ts''_is] 2(5-15) t_vcs_is
         by auto
     next
       case False
@@ -2741,7 +2805,7 @@ proof -
       next
         case False
         show ?thesis
-          using 2(3)[OF _ _ _ _ _ False _ 2(12, 13, 14)] preds 2(5)
+          using 2(3)[OF _ _ _ _ _ False _ 2(12, 13, 14, 15)] preds 2(5)
                 progress_L0[of s f "(($C*cs) @ es)" _ _ _ "[]" "[e]"]
           apply simp
           apply (metis "2.prems"(2) "2.prems"(3) consts_app_ex(2) consts_const_list e_type_const_conv_vs outer_False)
@@ -2987,14 +3051,43 @@ proof -
         by simp
     qed
   next
-    case (8 \<S> f \<C> rs es ts)
+    case (8 \<C> \<S> n bs)
+    obtain j m where j_is:"smem_ind (f_inst f) = Some j"
+                          "s.mems \<S> ! j = m"
+      using 8(1,11)
+      unfolding smem_ind_def
+      by (fastforce split: list.splits)
+    thus ?case
+      using progress_L0_left[OF reduce.init_mem_None[OF j_is, of n bs]]
+            progress_L0_left[OF reduce.init_mem_Some[OF j_is, of n bs]]
+            8(3)
+      apply (cases "store m n 0 bs (length bs)")
+      apply blast+
+      done
+  next
+    case (9 \<C> \<S> tis n)
+    obtain j t where j_is:"stab_ind (f_inst f) = Some j"
+                          "s.tabs \<S> ! j = t"
+      using 9(1,13)
+      unfolding stab_ind_def
+      by (fastforce split: list.splits)
+    thus ?case
+      using progress_L0_left[OF reduce.init_tab_None[OF j_is, of n tis]]
+            progress_L0_left[OF reduce.init_tab_Some[OF j_is, of n tis]]
+            9(4)
+      apply (cases "store_tab t n tis")
+      apply blast+
+      done
+  next
+    case (10 \<S> f \<C> rs es ts)
     have "length (local \<C>) = length (f_locs f)"
          "length (memory \<C>) = length (inst.mems (f_inst f))"
-      using store_local_label_empty 8(1) store_mem_exists
+         "length (table \<C>) = length (inst.tabs (f_inst f))"
+      using store_local_label_empty 10(1) store_mem_exists store_tab_exists
       unfolding frame_typing.simps
       by fastforce+
     thus ?case
-      using 8(3)[OF 8(2) _ _ 8(4) _ 8(6,7,8), of "[]" "[]" f] 8(5)
+      using 10(3)[OF 10(2) _ _ 10(4) _ 10(6,7,8), of "[]" "[]" f] 10(5)
             e_typing_l_typing.intros(1)[OF b_e_typing.empty[of "\<C>\<lparr>return := rs\<rparr>"]]
       unfolding const_list_def
       by simp
@@ -3441,7 +3534,7 @@ next
     using reduce_trans_L0[OF assms]
     by blast
   have 2:"($C*ves)@[Trap]@esc \<noteq> [Trap]"
-    by (metis False Lfilled.L0 Lholed.inject(1) e.distinct(11) lfilled_single not_Cons_self2)
+    by (metis False Lfilled.L0 Lholed.inject(1) e.distinct(15) lfilled_single not_Cons_self2)
   show ?thesis
     using reduce.basic[OF reduce_simple.trap[OF 2, of "LBase ves esc"], of s' f'] Lfilled.simps[of 0]
           reduce_trans_app_end[OF _ 1]

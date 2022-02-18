@@ -119,6 +119,20 @@ lemma store_packed_max:
   unfolding store_packed_def
   by simp
 
+lemma store_tab_size:
+  assumes "(store_tab t n icls = Some t')"
+  shows "tab_size t = tab_size t'"
+  using assms
+  unfolding store_tab_def
+  by (fastforce split: if_splits)
+
+lemma store_tab_max:
+  assumes "(store_tab t n icls = Some t')"
+  shows "tab_max t = tab_max t'"
+  using assms
+  unfolding store_tab_def
+  by (fastforce split: if_splits)
+
 lemma wasm_deserialise_type:"typeof (wasm_deserialise bs t) = t"
   unfolding wasm_deserialise_def typeof_def
   by (simp split: t.splits)

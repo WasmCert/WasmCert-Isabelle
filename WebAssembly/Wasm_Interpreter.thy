@@ -248,6 +248,24 @@ definition app_s_f_v_s_mem_grow :: "mem list \<Rightarrow> f \<Rightarrow> v_sta
                 | None => (ms, v_s, crash_invalid))
            | _ \<Rightarrow> (ms, v_s, crash_invalid))"
 
+definition app_s_f_init_mem :: "nat \<Rightarrow> byte list \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow> (mem list \<times> res_step)" where
+  "app_s_f_init_mem off bs ms f = 
+     (let i = (f_inst f) in
+     (case smem_ind i of
+        Some j => expect (store (ms!j) off 0 bs (length bs))
+                        (\<lambda>mem'. ((ms[j := mem']), Step_normal))
+                        (ms, Res_trap (STR ''init_mem''))
+      | None => (ms, crash_invalid)))"
+
+definition app_s_f_init_tab :: "nat \<Rightarrow> i list \<Rightarrow> tabinst list \<Rightarrow> f \<Rightarrow> (tabinst list \<times> res_step)" where
+  "app_s_f_init_tab off icls ts f = 
+     (let i = (f_inst f) in
+     (case stab_ind i of
+        Some j => expect (store_tab (ts!j) off icls)
+                        (\<lambda>t'. ((ts[j := t']), Step_normal))
+                        (ts, Res_trap (STR ''init_tab''))
+      | None => (ts, crash_invalid)))"
+
 (* 0: local value stack, 1: current redex, 2: tail of redex *)
 datatype redex = Redex v_stack "e list" "b_e list"
 
@@ -599,6 +617,12 @@ fun run_step_e :: "e \<Rightarrow> config \<Rightarrow> res_step_tuple" where
                    | None \<Rightarrow> (Config d s (Frame_context (Redex v_s' es b_es) lcs nf f) fcs, Res_trap (STR ''host_apply''))
                  else
                     (Config d s fc fcs, crash_invalid))
+     | Init_mem n bs \<Rightarrow>
+        let (ms', res) = (app_s_f_init_mem n bs (mems s) f) in
+        (Config d (s\<lparr>mems:=ms'\<rparr>) fc fcs, res)
+     | Init_tab n icls \<Rightarrow>
+        let (ts', res) = (app_s_f_init_tab n icls (tabs s) f) in
+        (Config d (s\<lparr>tabs:=ts'\<rparr>) fc fcs, res)
      | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))"
 (* should never produce Label, Frame, or Trap *)
 

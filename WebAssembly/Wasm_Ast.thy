@@ -267,6 +267,9 @@ datatype e = \<comment> \<open>administrative instruction\<close>
   | Invoke i
   | Label nat "e list" "e list"
   | Frame nat f "e list"
+  (* only used by instantiation *)
+  | Init_mem nat "byte list"
+  | Init_tab nat "i list"
 
 datatype Lholed =
     \<comment> \<open>L0 = v* [<hole>] e*\<close>
