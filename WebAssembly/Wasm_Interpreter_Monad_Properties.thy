@@ -1139,6 +1139,12 @@ proof -
   next
     case (Frame x51 x52 x53)
     then show ?thesis unfolding unfold_vars by sep_auto
+  next
+    case (Init_mem x61 x62)
+    then show ?thesis sorry
+  next
+    case (Init_tab x71 x72)
+    then show ?thesis sorry
   qed
 qed 
 
