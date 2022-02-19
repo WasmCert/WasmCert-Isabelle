@@ -32,7 +32,7 @@ lemma module_glob_typing_equiv_module_glob_type_checker:
 
 fun module_elem_type_checker :: "t_context \<Rightarrow> module_elem \<Rightarrow> bool" where
   "module_elem_type_checker \<C> \<lparr>e_tab=t, e_off=es, e_init=is\<rparr> =
-     (const_exprs \<C> es \<and> b_e_type_checker \<C> es ([] _> [T_i32]) \<and> t < length (table \<C>) \<and> list_all (\<lambda>i. i < length (func_t \<C>)) is)"
+     (t = 0 \<and> const_exprs \<C> es \<and> b_e_type_checker \<C> es ([] _> [T_i32]) \<and> t < length (table \<C>) \<and> list_all (\<lambda>i. i < length (func_t \<C>)) is)"
 
 lemma module_elem_typing_equiv_module_elem_type_checker:
   "module_elem_typing \<C> m_e = module_elem_type_checker \<C> m_e"
@@ -42,7 +42,7 @@ lemma module_elem_typing_equiv_module_elem_type_checker:
 
 fun module_data_type_checker :: "t_context \<Rightarrow> module_data \<Rightarrow> bool" where
   "module_data_type_checker \<C> \<lparr>d_data=d, d_off=es, d_init=bs\<rparr> =
-     (const_exprs \<C> es \<and> b_e_type_checker \<C> es ([] _> [T_i32]) \<and> d < length (memory \<C>))"
+     (d = 0 \<and> const_exprs \<C> es \<and> b_e_type_checker \<C> es ([] _> [T_i32]) \<and> d < length (memory \<C>))"
 
 lemma module_data_typing_equiv_module_data_type_checker:
   "module_data_typing \<C> m_e = module_data_type_checker \<C> m_e"

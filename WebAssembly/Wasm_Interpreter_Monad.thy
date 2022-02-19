@@ -649,6 +649,12 @@ definition "make_empty_inst_m \<equiv> do {
   let f_inst2 = \<lparr> types = f_inst2_types, funcs = f_inst2_funcs, tabs = f_inst2_tabs, mems = f_inst2_mems, globs = f_inst2_globs\<rparr> in
   return f_inst2 }"
 
+fun run_instantiate_m :: "fuel \<Rightarrow> depth \<Rightarrow> (s_m \<times> inst_m \<times> e list) \<Rightarrow> (s_m \<times> res) Heap" where
+  "run_instantiate_m n d (s, f_inst2, es) = do {
+     f_locs1 \<leftarrow> Array.of_list [];
+     (cfg',res) \<leftarrow> run_iter_m n (Config_m d s (Frame_context_m (Redex [] es []) [] 0 f_locs1 f_inst2) []);
+     case cfg' of (Config_m d' s' fc' fcs') \<Rightarrow> return (s',res) }"
+
 fun run_v_m :: "fuel \<Rightarrow> depth \<Rightarrow> (s_m \<times> v array \<times> inst_m \<times> b_e list) \<Rightarrow> (s_m \<times> res) Heap" where
   "run_v_m n d (s, f_locs1, f_inst2, b_es) = do {
      (cfg',res) \<leftarrow> run_iter_m n (Config_m d s (Frame_context_m (Redex [] [] b_es) [] 0 f_locs1 f_inst2) []);

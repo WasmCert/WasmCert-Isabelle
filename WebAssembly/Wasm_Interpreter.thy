@@ -663,6 +663,11 @@ function(sequential) run_iter :: "fuel \<Rightarrow> config \<Rightarrow> res_tu
 termination
   by (relation "measure (\<lambda>p. fst p)") auto
 
+fun run_instantiate :: "fuel \<Rightarrow> depth \<Rightarrow> (s \<times> inst \<times> e list) \<Rightarrow> (s \<times> res)" where
+  "run_instantiate n d (s, inst, es) =
+     (let (cfg',res) = run_iter n (Config d s (Frame_context (Redex [] es []) [] 0 \<lparr>f_locs=[],f_inst=inst\<rparr>) []) in
+      case cfg' of (Config d s fc fcs) \<Rightarrow> (s,res))"
+
 fun run_v :: "fuel \<Rightarrow> depth \<Rightarrow> (s \<times> f \<times> b_e list) \<Rightarrow> (s \<times> res)" where
   "run_v n d (s, f, b_es) =
      (let (cfg',res) = run_iter n (Config d s (Frame_context (Redex [] [] b_es) [] 0 f) []) in

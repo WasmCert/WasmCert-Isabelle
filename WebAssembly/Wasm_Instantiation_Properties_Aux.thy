@@ -14,402 +14,10 @@ definition data_in_bounds where
 abbreviation "element_funcs_in_bounds s inst e 
 \<equiv>list_all (\<lambda>i. (inst.funcs inst)!i < length (s.funcs s)) (e_init e)" 
 
-lemma init_tab_form:
-  assumes "s' = init_tab s inst e_ind e" 
-  shows "list_all2 tab_extension (tabs s) (tabs s')" 
-        "\<exists>tabs'. s' = s\<lparr>tabs := tabs'\<rparr>"
-        "element_funcs_in_bounds s inst e
-        \<Longrightarrow> element_in_bounds s inst e_ind e
-        \<Longrightarrow> list_all (tab_agree s) (tabs s) 
-        \<Longrightarrow> list_all (tab_agree s') (tabs s')"
-proof -
-  obtain t_ind tab_e max e_pay tab'_e where init_tab_is:
-    "t_ind = ((inst.tabs inst)!(e_tab e))" 
-    "(tab_e,max) = (tabs s)!t_ind" 
-    "e_pay = map (\<lambda>i. Some ((inst.funcs inst)!i)) (e_init e)"
-    "tab'_e = ((take e_ind tab_e) @ e_pay @ (drop (e_ind + length e_pay) tab_e))" 
-    by (metis prod.exhaust)
-
-  then have "init_tab s inst e_ind e = s\<lparr>tabs := (tabs s)[t_ind := (tab'_e,max)]\<rparr>" 
-    unfolding init_tab_def by(fastforce simp add: Let_def split: prod.splits)
-  then have 1:"s' = s\<lparr>tabs := (tabs s)[t_ind := (tab'_e,max)]\<rparr>" using assms by auto 
-
-  have 2: "tabs s' = (tabs s)[t_ind := (tab'_e,max)]" using 1 by auto
-
-  have 3: "\<And>P. P (tab_e,max) (tab'_e, max) \<Longrightarrow> (\<And>a. P a a) \<Longrightarrow> list_all2 P (tabs s) (tabs s')"
-    using init_tab_is(2) unfolding 1 list_all2_conv_all_nth  
-    by (simp, metis nth_list_update_eq nth_list_update_neq)
-
-  have "length tab_e \<le> length tab'_e" using init_tab_is
-    by simp 
-  then have "tab_extension (tab_e,max) (tab'_e, max)" 
-    unfolding tab_extension_def using init_tab_is
-    by (metis fst_conv snd_conv) 
-  then show "list_all2 tab_extension (tabs s) (tabs s')"  
-    using 3 tab_extension_refl by auto
-
-  show "\<exists>tabs'. s' = s\<lparr>tabs := tabs'\<rparr>" unfolding assms init_tab_def
-    by(simp add: Let_def exI split:prod.splits)
-
-  have "funcs s = funcs s'" unfolding 1 by auto
-
-  {
-    assume "list_all (case_option True (\<lambda>i. i < length (s.funcs s))) e_pay" 
-    then have within_funcs_bounds:"list_all (case_option True (\<lambda>i. i < length (s.funcs s'))) e_pay" 
-      using \<open>funcs s = funcs s'\<close> by auto
-
-    assume "element_in_bounds s inst e_ind e"
-    then have "e_ind + (length e_pay) \<le> length tab_e" 
-      using init_tab_is unfolding element_in_bounds_def
-      by (metis fst_conv length_map) 
-    then have same_length:"length tab'_e = length tab_e" using init_tab_is by auto
-
-    have set_inclusion:"set tab'_e \<subseteq> set tab_e \<union> set e_pay " using init_tab_is
-      by (simp add: le_supI1 set_drop_subset set_take_subset)
-
-    {
-      assume "tab_agree s (tab_e,max)"  
-      then have "tab_agree s' (tab_e,max)" 
-        unfolding tab_agree_def using \<open>funcs s = funcs s'\<close> by auto
-    
-      then have "tab_agree s' (tab'_e, max)" unfolding tab_agree_def 
-        using same_length within_funcs_bounds set_inclusion
-        by (metis append_take_drop_id fst_conv init_tab_is(4) list_all_append snd_conv) 
-    } 
-    then have "list_all (tab_agree s) (tabs s) 
-        \<Longrightarrow> list_all (tab_agree s') (tabs s')"
-      using init_tab_is(2) length_list_update nth_list_update_eq nth_list_update_neq
-      unfolding list_all_length by (metis "2" \<open>s.funcs s = s.funcs s'\<close> tab_agree_def) 
-      
-  }
-  then show "element_funcs_in_bounds s inst e
-        \<Longrightarrow> element_in_bounds s inst e_ind e
-        \<Longrightarrow> list_all (tab_agree s) (tabs s) 
-        \<Longrightarrow> list_all (tab_agree s') (tabs s')"
-    using init_tab_is by (simp add: list_all_length)
-qed
-
-lemma init_mem_form:
-  assumes "s' = init_mem s inst d_ind d" 
-  shows "list_all2 mem_extension (mems s) (mems s')" 
-        "\<exists>mems'. s' = s\<lparr>mems := mems'\<rparr>"
-        "data_in_bounds s inst d_ind d 
-        \<Longrightarrow> list_all mem_agree (mems s) 
-        \<Longrightarrow> list_all mem_agree (mems s')"
-        "data_in_bounds s inst d_ind d 
-        \<Longrightarrow> list_all2 (\<lambda>m1 m2. mem_length m1 = mem_length m2) (mems s) (mems s')"
-proof -
-  obtain m_ind mem mem' where init_mem_is: "m_ind = ((inst.mems inst)!(d_data d))"
-                               "mem = (mems s)!m_ind"
-                               "mem' = write_bytes mem d_ind (d_init d)"
-                               "s' =s\<lparr>mems := (mems s)[m_ind := mem']\<rparr>" 
-    using assms unfolding init_mem_def Let_def by auto 
-
-  have "mem_size mem \<le> mem_size mem'" using init_mem_is
-    by (simp add: div_le_mono mem_length_def mem_rep_length.rep_eq 
-       mem_rep_write_bytes.rep_eq mem_size_def write_bytes_def)
-     (* sledgehammer :P *) 
-
-  moreover have "mem_max mem = mem_max mem'" using init_mem_is
-    by (simp add: mem_max_def write_bytes_def) 
-
-  ultimately have "mem_extension mem mem'" 
-    unfolding mem_extension_def by auto
-
-  then show "list_all2 mem_extension (mems s) (mems s')"  
-    using init_mem_is mem_extension_refl unfolding init_mem_is(4) list_all2_conv_all_nth  
-    by (simp, metis nth_list_update_eq nth_list_update_neq)
-
-  show "\<exists>mems'. s' = s\<lparr>mems := mems'\<rparr>" unfolding assms init_mem_def
-    by(simp add: Let_def exI split:prod.splits)
-
-  {
-    assume "data_in_bounds s inst d_ind d" 
-    then have "d_ind + length (d_init d) \<le> mem_length mem" 
-      unfolding init_mem_is(2,1) data_in_bounds_def Let_def 
-      by simp
-    then have "mem_length mem = mem_length mem'" 
-      unfolding init_mem_is(3) 
-      by(simp add:write_bytes_def mem_length_def mem_rep_length_def 
-          mem_rep_write_bytes.rep_eq)
-  }
-  note same_length = this
-
-  {
-    assume "data_in_bounds s inst d_ind d" 
-
-    then have "mem_size mem = mem_size mem'" 
-      using same_length unfolding init_mem_is(3) 
-      by(simp add:mem_size_def)
-  
-    assume "mem_agree mem"
-
-    then have "mem_agree mem'" 
-      using \<open>mem_size mem = mem_size mem'\<close> \<open>mem_max mem = mem_max mem'\<close>
-      by auto
-  }
-  then show "data_in_bounds s inst d_ind d 
-        \<Longrightarrow> list_all mem_agree (mems s) 
-        \<Longrightarrow> list_all mem_agree (mems s')"
-    unfolding init_mem_is(4) list_all_length using nth_list_update_eq nth_list_update_neq
-    (*todo: ugly sledgehammer*)
-    by (metis (no_types, lifting) init_mem_is(2) length_list_update s.select_convs(3) 
-        s.surjective s.update_convs(3))
-  
-  show "data_in_bounds s inst d_ind d 
-        \<Longrightarrow> list_all2 (\<lambda>m1 m2. mem_length m1 = mem_length m2) (mems s) (mems s')" 
-    using init_mem_is same_length unfolding init_mem_is(4) list_all2_conv_all_nth  
-    by (simp, metis nth_list_update_eq nth_list_update_neq)
-qed
-
-
-lemma init_tabs_trans_pred: 
-  assumes "s' = init_tabs s inst e_inds es" 
-          "\<And>a b c. P a b \<Longrightarrow> P b c \<Longrightarrow> P a c"
-          "\<And>a. P a a"
-          "\<And>s1 s2 e_inds es. s2 = init_tab s1 inst e_inds es \<Longrightarrow> P s1 s2"
-  shows "P s s'" 
-proof -
-  {
-    fix a
-    have "s' = foldl (\<lambda>s' (e_ind,e). init_tab s' inst e_ind e) s a \<Longrightarrow> P s s'"
-    proof (induction a arbitrary:s)
-      case Nil
-      show ?case using Nil assms(3) unfolding foldl_Nil 
-        by(simp)  
-    next
-      case (Cons a1 a2)
-      define s_mid where "s_mid = init_tab s inst (fst a1) (snd a1)" 
-      then have 1:"s' = foldl (\<lambda>s' (e_ind,e). init_tab s' inst e_ind e) s_mid a2" 
-        using Cons foldl_Cons
-        by(simp add: case_prod_beta')
-      show ?case using assms(2)[OF assms(4)[OF s_mid_def] Cons(1)[OF 1]] by auto
-      qed 
-  }
-  then show "P s s'" using assms(1) unfolding init_tabs_def
-    by blast
-qed
-
-lemma init_mems_trans_pred: 
-  assumes "s' = init_mems s inst d_inds ds" 
-          "\<And>a b c. P a b \<Longrightarrow> P b c \<Longrightarrow> P a c"
-          "\<And>a. P a a"
-          "\<And>s1 s2 d_ind d. s2 = init_mem s1 inst d_ind d \<Longrightarrow> P s1 s2"
-  shows "P s s'" 
-proof -
-  {
-    fix a
-    have "s' = foldl (\<lambda>s' (d_ind,d). init_mem s' inst d_ind d) s a \<Longrightarrow> P s s'"
-    proof (induction a arbitrary:s)
-      case Nil
-      show ?case using Nil assms(3) unfolding foldl_Nil 
-        by(simp)  
-    next
-      case (Cons a1 a2)
-      define s_mid where "s_mid = init_mem s inst (fst a1) (snd a1)" 
-      then have 1:"s' = foldl (\<lambda>s' (d_ind,d). init_mem s' inst d_ind d) s_mid a2" 
-        using Cons foldl_Cons
-        by(simp add: case_prod_beta')
-      show ?case using assms(2)[OF assms(4)[OF s_mid_def] Cons(1)[OF 1]] by auto
-      qed 
-  }
-  then show "P s s'" using assms(1) unfolding init_mems_def
-    by blast
-qed
-
-lemma init_tabs_trans_list_pred: 
-  assumes "s' = init_tabs s inst e_inds es" 
-          "\<And>a b c. P a b \<Longrightarrow> P b c \<Longrightarrow> P a c"
-          "\<And>a. P a a" 
-          "\<And>s1 s2 inst e_ind e. s2 = init_tab s1 inst e_ind e \<Longrightarrow> list_all2 P (tabs s1) (tabs s2)"
-  shows "list_all2 P (tabs s) (tabs s')" 
-  apply(rule init_tabs_trans_pred[OF assms(1)])
-  using assms(2) list_all2_trans apply blast 
-  using assms(3) list_all2_refl apply blast
-  using assms(4) apply simp
-  done
-
-
-lemma init_mems_trans_list_pred: 
-  assumes "s' = init_mems s inst e_inds es" 
-          "\<And>a b c. P a b \<Longrightarrow> P b c \<Longrightarrow> P a c"
-          "\<And>a. P a a" 
-          "\<And>s1 s2 inst d_ind d. s2 = init_mem s1 inst d_ind d \<Longrightarrow> list_all2 P (mems s1) (mems s2)"
-  shows "list_all2 P (mems s) (mems s')" 
-  apply(rule init_mems_trans_pred[OF assms(1)])
-  using assms(2) list_all2_trans apply blast 
-  using assms(3) list_all2_refl apply blast
-  using assms(4) apply simp
-  done
-
 lemma tab_extension_trans:"tab_extension a b \<Longrightarrow> tab_extension b c \<Longrightarrow> tab_extension a c" 
   unfolding tab_extension_def by auto
 lemma mem_extension_trans:"mem_extension a b \<Longrightarrow> mem_extension b c \<Longrightarrow> mem_extension a c" 
   unfolding mem_extension_def by auto
-
-lemma init_tabs_tab_extension:
-  assumes "s' = init_tabs s inst e_inds es" 
-  shows "list_all2 tab_extension (tabs s) (tabs s')" 
-  using init_tabs_trans_list_pred[OF assms, where P=tab_extension] tab_extension_trans
-      tab_extension_refl init_tab_form(1) by blast
-lemma init_mems_mem_extension:
-  assumes "s' = init_mems s inst d_inds ds" 
-  shows "list_all2 mem_extension (mems s) (mems s')" 
-  using init_mems_trans_list_pred[OF assms, where P=mem_extension] mem_extension_trans
-      mem_extension_refl init_mem_form(1) by blast
-
-lemma init_tabs_only_modify_tabs: 
-  assumes "s' = init_tabs s inst e_inds es" 
-  shows "\<exists>tabs'. s' = s\<lparr>tabs := tabs'\<rparr>" 
-  apply(rule init_tabs_trans_pred[OF assms], auto)
-   apply(metis s.cases s.update_convs(2))
-  apply(simp add: init_tab_form(2))
-  done
-
-lemma init_mems_only_modify_mems: 
-  assumes "s' = init_mems s inst d_inds ds" 
-  shows "\<exists>mems'. s' = s\<lparr>mems := mems'\<rparr>" 
-  apply(rule init_mems_trans_pred[OF assms], auto)
-   apply(metis s.cases s.update_convs(3))
-  apply(simp add: init_mem_form(2))
-  done
-
-lemma init_tabs_tab_typing:
-  assumes "s' = init_tabs s inst e_inds es" 
-  shows "list_all2 (\<lambda>t t'. tab_typing t tt \<longrightarrow> tab_typing t' tt) (tabs s) (tabs s')"
-  apply(rule list_all2_mono[of tab_extension, OF init_tabs_tab_extension[OF assms]])
-  unfolding tab_extension_def tab_typing_def limits_compat_def
-  by(simp add:pred_option_def)
-
-lemma init_tabs_tabi_agree:
-  assumes "s' = init_tabs s inst e_inds es" 
-        "tabi_agree (tabs s) n tt"
-  shows "tabi_agree (tabs s') n tt"
-  using init_tabs_tab_typing[OF assms(1)] assms(2) unfolding tabi_agree_def list_all2_conv_all_nth
-  by auto
-
-
-lemma init_mems_mem_typing:
-  assumes "s' = init_mems s inst e_inds es" 
-  shows "list_all2 (\<lambda>m m'. mem_typing m mt \<longrightarrow> mem_typing m' mt) (mems s) (mems s')"
-  apply(rule list_all2_mono[of mem_extension, OF init_mems_mem_extension[OF assms]])
-  unfolding mem_extension_def mem_typing_def limits_compat_def
-  by(simp add:pred_option_def)
-
-lemma init_mems_memi_agree:
-  assumes "s' = init_mems s inst e_inds es" 
-        "memi_agree (mems s) n tt"
-  shows "memi_agree (mems s') n tt"
-  using init_mems_mem_typing[OF assms(1)] assms(2) unfolding memi_agree_def list_all2_conv_all_nth
-  by auto
-
-lemma init_tabs_tab_agree:
-  assumes "s' = init_tabs s inst e_inds es" 
-"list_all (element_funcs_in_bounds s inst) es"
-"list_all2 (element_in_bounds s inst) e_inds es"
-"list_all (tab_agree s) (tabs s)"
-  shows "list_all (tab_agree s') (tabs s')"
-proof - 
-
-  {
-    fix a 
-    have "list_all (element_funcs_in_bounds s inst) (map snd a)
-      \<Longrightarrow> list_all2 (element_in_bounds s inst) (map fst a) (map snd a)
-      \<Longrightarrow> list_all (tab_agree s) (tabs s)
-      \<Longrightarrow> s' = foldl (\<lambda>s' (e_ind,e). init_tab s' inst e_ind e) s a
-      \<Longrightarrow> list_all (tab_agree s') (tabs s')"
-    proof(induct a arbitrary: s)
-      case Nil
-      then show ?case by simp 
-    next
-      case (Cons a1 a2)
-      define s_mid where "s_mid = init_tab s inst (fst a1) (snd a1)" 
-      then have 1:"s' = foldl (\<lambda>s' (e_ind,e). init_tab s' inst e_ind e) s_mid a2" 
-        using Cons foldl_Cons
-        by(simp add: case_prod_beta')
-
-      have "funcs s_mid = funcs s" using init_tab_form(2)[OF s_mid_def] by auto 
-      then have 2:"list_all (element_funcs_in_bounds s_mid inst) (map snd a2)" using Cons(2) by auto
-
-      {
-        fix x 
-        assume "x \<in> set (zip (map fst a2) (map snd a2))" 
-        then have "element_in_bounds s inst (fst x) (snd x)" 
-          using Cons(3) case_prod_unfold zip_map_fst_snd unfolding list_all2_iff
-          by (metis (no_types, lifting) set_subset_Cons subset_code(1))
-
-        moreover have "list_all2 tab_extension (tabs s) (tabs s_mid)" 
-          using init_tab_form(1)[OF s_mid_def] by -
-         
-        ultimately have "element_in_bounds s_mid inst (fst x) (snd x)" 
-          unfolding element_in_bounds_def tab_extension_def Let_def 
-          by (metis (no_types, lifting) le_trans list_all2_conv_all_nth)
-      }
-      then have 3:"list_all2 (element_in_bounds s_mid inst) (map fst a2) (map snd a2)"
-        unfolding list_all2_iff by auto
-
-      have "element_funcs_in_bounds s inst (snd a1)" using Cons(2) by auto 
-      moreover have "element_in_bounds s inst (fst a1) (snd a1)" using Cons(3) by auto 
-      ultimately have 4:"list_all (tab_agree s_mid) (tabs s_mid)" 
-        using init_tab_form(3)[OF s_mid_def] Cons(4)  by auto
-      then show ?case using Cons(1)[OF 2 3 4 1] by -
-    qed
-  }
-  then show ?thesis using assms unfolding init_tabs_def
-    by (metis (no_types, lifting) list_all2_lengthD map_fst_zip map_snd_zip) 
-qed
-
-
-
-lemma init_mems_mem_agree:
-  assumes "s' = init_mems s inst d_inds ds" 
-"list_all2 (data_in_bounds s inst) d_inds ds"
-"list_all mem_agree (mems s)"
-  shows "list_all mem_agree (mems s')"
-proof - 
-  {
-    fix a 
-    have "list_all2 (data_in_bounds s inst) (map fst a) (map snd a)
-      \<Longrightarrow> list_all mem_agree (mems s)
-      \<Longrightarrow> s' = foldl (\<lambda>s' (d_ind,d). init_mem s' inst d_ind d) s a
-      \<Longrightarrow> list_all mem_agree (mems s')"
-    proof(induct a arbitrary: s)
-      case Nil
-      then show ?case by simp 
-    next
-      case (Cons a1 a2)
-      define s_mid where "s_mid = init_mem s inst (fst a1) (snd a1)" 
-      then have 1:"s' = foldl (\<lambda>s' (d_ind,d). init_mem s' inst d_ind d) s_mid a2" 
-        using Cons foldl_Cons
-        by(simp add: case_prod_beta')
-
-      have 2:"data_in_bounds s inst (fst a1) (snd a1)" using Cons(2) by auto
-
-      {
-        fix x 
-        assume "x \<in> set (zip (map fst a2) (map snd a2))" 
-        then have "data_in_bounds s inst (fst x) (snd x)" 
-          using Cons(2) case_prod_unfold zip_map_fst_snd unfolding list_all2_iff
-          by (metis (no_types, lifting) set_subset_Cons subset_code(1))
-
-        moreover have "list_all2 (\<lambda>m1 m2. mem_length m1 = mem_length m2) (mems s) (mems s_mid)" 
-          using init_mem_form(4)[OF s_mid_def 2] by -
-         
-        ultimately have "data_in_bounds s_mid inst (fst x) (snd x)" 
-          unfolding data_in_bounds_def Let_def list_all2_conv_all_nth
-          by force
-      }
-      then have 3:"list_all2 (data_in_bounds s_mid inst) (map fst a2) (map snd a2)"
-        unfolding list_all2_iff by auto
-
-      have 4:"list_all mem_agree (mems s_mid)" 
-        using init_mem_form(3)[OF s_mid_def 2 Cons(3)] by -
-      then show ?case using Cons(1)[OF 3 4 1] by -
-    qed
-  }
-  then show ?thesis using assms unfolding init_mems_def
-    by (metis (no_types, lifting) list_all2_lengthD map_fst_zip map_snd_zip) 
-qed
 
 (* while mathematically superfluous, this form makes the following lemmas easier to prove *)
 lemma store_extension_intros_with_refl: 
@@ -430,28 +38,12 @@ proof -
     by (metis (full_types) unit.exhaust s.surjective) 
 qed
 
-lemma init_tabs_preserve_store_extension: 
-  assumes "s' = init_tabs s inst e_inds es" 
-  shows "store_extension s s'"
-  using init_tabs_tab_extension[OF assms] init_tabs_only_modify_tabs[OF assms] 
-      store_extension_intros_with_refl
-  by (metis append_Nil2 s.ext_inject s.surjective s.update_convs(2))   
-
-lemma init_mems_preserve_store_extension: 
-  assumes "s' = init_mems s inst d_inds ds" 
-  shows "store_extension s s'"
-  using init_mems_mem_extension[OF assms] init_mems_only_modify_mems[OF assms] 
-      store_extension_intros_with_refl
-  by (metis append_Nil2 s.ext_inject s.surjective s.update_convs(3))   
-
 lemma alloc_module_preserve_store_extension:
   assumes "alloc_module s m imps gvs (s',inst,exps)" 
   shows "store_extension s s'"
   using alloc_module_ext_arb[OF assms] 
   store_extension_intros_with_refl list_all2_refl tab_extension_refl mem_extension_refl global_extension_refl
   by metis
-
-
 
 definition alloc_func_simple :: "module_func \<Rightarrow> inst \<Rightarrow> cl" where
   "alloc_func_simple m_f inst =
@@ -479,8 +71,6 @@ definition alloc_glob_simple :: "(module_glob \<times> v) \<Rightarrow> global" 
 
 lemma alloc_glob_equiv:"fst (alloc_glob s m_g_v) = s\<lparr>globs := globs s @ [alloc_glob_simple m_g_v]\<rparr>"
   unfolding alloc_glob_def alloc_glob_simple_def by(simp split:prod.splits)
-
-
 
 abbreviation "alloc_funcs_simple m_fs i \<equiv> map (\<lambda>m_f. alloc_func_simple m_f i) m_fs"
 
@@ -539,8 +129,6 @@ next
     unfolding alloc_glob_equiv Cons(1)[OF 1] by(simp)
   finally show ?case by(simp add: zip_map_fst_snd Cons(2)) 
 qed
-
-
 
 lemma alloc_tabs_store_agnostic: 
   assumes "tabs s1 = tabs s2"
@@ -662,8 +250,6 @@ proof -
   then show ?thesis using alloc_globs_equiv assms(2) by auto
 qed
 
-
-
 lemma ext_typing_imp_helper:
   assumes "list_all2 (external_typing s) v_imps t_imps" 
           "\<And>v t. external_typing s v t \<Longrightarrow> (\<exists>v'. f v = Some v') \<longleftrightarrow> (\<exists>e'. g t = Some e')"
@@ -700,7 +286,6 @@ proof -
   then show ?thesis using assms
     by (metis list.in_rel) 
 qed
-
 
 lemma ext_typing_imp_funci_agree:
   assumes "list_all2 (external_typing s) v_imps t_imps"

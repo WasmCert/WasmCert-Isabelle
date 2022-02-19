@@ -151,33 +151,30 @@ definition interp_get_i32_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> b_e list 
      v \<leftarrow> interp_get_v_m s inst b_es;
       (case v of ConstInt32 c \<Rightarrow> return c | _ \<Rightarrow> return 0) }"
 
-definition init_tab_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> nat \<Rightarrow> module_elem \<Rightarrow> unit Heap" where
-  "init_tab_m s inst e_ind e =
+definition get_init_tab_m :: "inst_m \<Rightarrow> nat \<Rightarrow> module_elem \<Rightarrow> e Heap" where
+  "get_init_tab_m inst e_ind e =
      do {
-       t_ind \<leftarrow> Array.nth (inst_m.tabs inst) (e_tab e);
-       (tab_e,max) \<leftarrow> Array.nth (s_m.tabs s) t_ind;
-       array_blit_map (e_init e) (\<lambda>i. do { i_cl \<leftarrow> Array.nth (inst_m.funcs inst) i; return (Some i_cl) }) tab_e e_ind }"
+       i_cls \<leftarrow> Heap_Monad.fold_map (\<lambda>i. (Array.nth (inst_m.funcs inst) i)) (e_init e);
+       return (Init_tab e_ind i_cls) }"
 
-definition init_mem_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> nat \<Rightarrow> module_data \<Rightarrow> unit Heap" where
-  "init_mem_m s inst d_ind d =
-     do {
-       m_ind \<leftarrow> Array.nth (inst_m.mems inst) (d_data d);
-       mem \<leftarrow> Array.nth (s_m.mems s) m_ind;
-       store_uint8_list (fst mem) d_ind (d_init d) }"
+definition get_init_tabs_m :: "inst_m \<Rightarrow> nat list \<Rightarrow> module_elem list \<Rightarrow> (e list) Heap" where
+  "get_init_tabs_m inst e_inds es = Heap_Monad.fold_map (\<lambda>(e_ind,e). get_init_tab_m inst e_ind e) (zip e_inds es)"
 
-definition init_tabs_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> nat list \<Rightarrow> module_elem list \<Rightarrow> unit Heap" where
-  "init_tabs_m s inst e_inds es = do {Heap_Monad.fold_map (\<lambda>(e_ind,e). init_tab_m s inst e_ind e) (zip e_inds es); return () }"
+definition get_init_mems_m :: "nat list \<Rightarrow> module_data list \<Rightarrow> (e list) Heap" where
+  "get_init_mems_m d_inds ds = return (map2 (\<lambda>d_ind d. Init_mem d_ind (d_init d)) d_inds ds)"
 
-definition init_mems_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> nat list \<Rightarrow> module_data list \<Rightarrow> unit Heap" where
-  "init_mems_m s inst d_inds ds = do {Heap_Monad.fold_map (\<lambda>(d_ind,d). init_mem_m s inst d_ind d) (zip d_inds ds); return () }"
-
-definition get_start_m :: "inst_m \<Rightarrow> nat option \<Rightarrow> (nat option) Heap" where
+definition get_start_m :: "inst_m \<Rightarrow> nat option \<Rightarrow> (e list) Heap" where
   "get_start_m inst i_s =
    (case i_s of
-      None \<Rightarrow> return None
-    | Some i_s' \<Rightarrow> do { i_s_s \<leftarrow> Array.nth (inst_m.funcs inst) i_s'; return (Some i_s_s) })"
+      None \<Rightarrow> return []
+    | Some i_s' \<Rightarrow> do { i_s_s \<leftarrow> Array.nth (inst_m.funcs inst) i_s'; return [Invoke i_s_s] })"
 
-fun interp_instantiate_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (((s_m \<times> inst_m \<times> (module_export list)) \<times> (nat option)) option) Heap" where
+datatype res_inst_m =
+    RI_crash_m res_error
+  | RI_trap_m String.literal
+  | RI_res_m inst_m "module_export list" "e list"
+
+fun interp_instantiate_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (s_m \<times> res_inst_m) Heap" where
   "interp_instantiate_m s_m m v_imps =
      (case (module_type_checker m) of
         Some (t_imps, t_exps) \<Rightarrow> do {
@@ -211,12 +208,25 @@ fun interp_instantiate_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Righ
                 return (((nat_of_int d_off) + (length (d_init d))) \<le> mem_e_len) } ) d_offs (m_data m);
             (if (e_in_bounds \<and> d_in_bounds) then do {
               start \<leftarrow> get_start_m inst_m (m_start m);
-              init_tabs_m s_m' inst_m (map nat_of_int e_offs) (m_elem m);
-              init_mems_m s_m' inst_m (map nat_of_int d_offs) (m_data m);
-              return (Some ((s_m', inst_m, v_exps), start))
-            } else return None) }
+              e_init_tabs \<leftarrow> get_init_tabs_m inst_m (map nat_of_int e_offs) (m_elem m);
+              e_init_mems \<leftarrow> get_init_mems_m (map nat_of_int d_offs) (m_data m);
+              return (s_m', RI_res_m inst_m v_exps (e_init_tabs@e_init_mems@start))
+            } else return (s_m', RI_trap_m (STR ''segment out of bounds''))) }
           else
-            return None
+            return (s_m, RI_trap_m (STR ''invalid import''))
         }
-      | _ \<Rightarrow> return None)"
+      | _ \<Rightarrow> return (s_m, RI_trap_m (STR ''invalid module'')))"
+
+definition interp_instantiate_m' :: "s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (s_m \<times> res_inst_m) Heap" where
+  "interp_instantiate_m' s m v_imps = do { i_res \<leftarrow> interp_instantiate_m s m v_imps;
+                                           case i_res of
+                                             (s', RI_res_m inst v_exps init_es) \<Rightarrow>
+                                               do {
+                                                 res \<leftarrow> run_instantiate_m (2^63) 300 (s', inst, init_es);
+                                                 (case res of
+                                                    (s'', RCrash r) \<Rightarrow> return (s'', RI_crash_m r)
+                                                  | (s'', RTrap r) \<Rightarrow> return (s'', RI_trap_m r)
+                                                  | (s'', RValue []) \<Rightarrow> return (s'', RI_res_m inst v_exps [])
+                                                  | (s'', RValue (x#xs)) \<Rightarrow> return (s'', RI_crash_m (Error_invalid (STR ''start function''))))}
+                                            | x \<Rightarrow> return x }"
 end
