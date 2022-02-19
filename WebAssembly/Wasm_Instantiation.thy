@@ -1199,8 +1199,8 @@ theorem instantiate_equiv_interp_instantiate:
   using instantiate_imp_interp_instantiate interp_instantiate_imp_instantiate
   by blast
 
-definition interp_instantiate' :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (s \<times> res_inst)" where
-  "interp_instantiate' s m v_imps = (case (interp_instantiate s m v_imps) of
+definition interp_instantiate_init :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (s \<times> res_inst)" where
+  "interp_instantiate_init s m v_imps = (case (interp_instantiate s m v_imps) of
                                        (s', RI_res inst v_exps init_es) \<Rightarrow>
                                          (case (run_instantiate (2^63) 300 (s', inst, init_es)) of
                                            (s'', RCrash r) \<Rightarrow> (s'', RI_crash r)

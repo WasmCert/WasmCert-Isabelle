@@ -217,8 +217,8 @@ fun interp_instantiate_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Righ
         }
       | _ \<Rightarrow> return (s_m, RI_trap_m (STR ''invalid module'')))"
 
-definition interp_instantiate_m' :: "s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (s_m \<times> res_inst_m) Heap" where
-  "interp_instantiate_m' s m v_imps = do { i_res \<leftarrow> interp_instantiate_m s m v_imps;
+definition interp_instantiate_init_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (s_m \<times> res_inst_m) Heap" where
+  "interp_instantiate_init_m s m v_imps = do { i_res \<leftarrow> interp_instantiate_m s m v_imps;
                                            case i_res of
                                              (s', RI_res_m inst v_exps init_es) \<Rightarrow>
                                                do {

@@ -1379,7 +1379,7 @@ module WasmRef_Isa : sig
   val interp_instantiate_m :
     unit s_m_ext ->
       unit m_ext -> v_ext list -> (unit -> (unit s_m_ext * res_inst_m))
-  val interp_instantiate_ma :
+  val interp_instantiate_init_m :
     unit s_m_ext ->
       unit m_ext -> v_ext list -> (unit -> (unit s_m_ext * res_inst_m))
 end = struct
@@ -6819,7 +6819,7 @@ e_offs (m_elem m))
               else (fun () -> (s_m, RI_trap_m "invalid import")))
               ())));;
 
-let rec interp_instantiate_ma
+let rec interp_instantiate_init_m
   s m v_imps =
     (fun () ->
       (let a = interp_instantiate_m s m v_imps () in
