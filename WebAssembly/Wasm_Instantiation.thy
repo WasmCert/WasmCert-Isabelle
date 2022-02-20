@@ -358,26 +358,7 @@ lemma alloc_module_equiv_interp_alloc_module:
   using alloc_module_imp_interp_alloc_module interp_alloc_module_imp_alloc_module
   by blast
 
-definition init_tab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> module_elem \<Rightarrow> s" where
-  "init_tab s inst e_ind e = (let t_ind = ((inst.tabs inst)!(e_tab e)) in
-                               let (tab_e,max) = (tabs s)!t_ind in
-                               let e_pay = map (\<lambda>i. Some ((inst.funcs inst)!i)) (e_init e) in
-                               let tab'_e = ((take e_ind tab_e) @ e_pay @ (drop (e_ind + length e_pay) tab_e)) in
-                               s\<lparr>tabs := (tabs s)[t_ind := (tab'_e,max)]\<rparr>)"
-
-definition init_tabs :: "s \<Rightarrow> inst \<Rightarrow> nat list \<Rightarrow> module_elem list \<Rightarrow> s" where
-  "init_tabs s inst e_inds es = foldl (\<lambda>s' (e_ind,e). init_tab s' inst e_ind e) s (zip e_inds es)"
-
-definition init_mem :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> module_data \<Rightarrow> s" where
-  "init_mem s inst d_ind d = (let m_ind = ((inst.mems inst)!(d_data d)) in
-                               let mem = (mems s)!m_ind in
-                               let mem' = write_bytes mem d_ind (d_init d) in
-                               s\<lparr>mems := (mems s)[m_ind := mem']\<rparr>)"
-
-definition init_mems :: "s \<Rightarrow> inst \<Rightarrow> nat list \<Rightarrow> module_data list \<Rightarrow> s" where
-  "init_mems s inst d_inds ds = foldl (\<lambda>s' (d_ind,d). init_mem s' inst d_ind d) s (zip d_inds ds)"
-
-inductive instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> ((s \<times> inst \<times> (module_export list)) \<times> (nat option)) \<Rightarrow> bool" where
+inductive instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> ((s \<times> inst \<times> (module_export list)) \<times> (e list)) \<Rightarrow> bool" where
   "\<lbrakk>module_typing m t_imps t_exps;
     list_all2 (external_typing s) v_imps t_imps;
     alloc_module s m v_imps g_inits (s', inst, v_exps);
@@ -385,12 +366,12 @@ inductive instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarro
     list_all2 (\<lambda>g v. reduce_trans (s',f,$*(g_init g)) (s',f,[$C v])) (m_globs m) g_inits;
     list_all2 (\<lambda>e c. reduce_trans (s',f,$*(e_off e)) (s',f,[$C ConstInt32 c])) (m_elem m) e_offs;
     list_all2 (\<lambda>d c. reduce_trans (s',f,$*(d_off d)) (s',f,[$C ConstInt32 c])) (m_data m) d_offs;
-    list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m);
+    list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> tab_size ((tabs s')!((inst.tabs inst)!(e_tab e)))) e_offs (m_elem m);
     list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs (m_data m);
-    map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) (m_start m) = start;
-    init_tabs s' inst (map nat_of_int e_offs) (m_elem m) = s'';
-    init_mems s'' inst (map nat_of_int d_offs) (m_data m) = s_end
-    \<rbrakk> \<Longrightarrow> instantiate s m v_imps ((s_end, inst, v_exps), start)"
+    (case (m_start m) of None \<Rightarrow> [] | Some i_s \<Rightarrow> [Invoke ((inst.funcs inst)!i_s)]) = start;
+    List.map2 (\<lambda>n e. Init_tab n (map (\<lambda>i. (inst.funcs inst)!i) (e_init e))) (map nat_of_int e_offs) (m_elem m) = e_init_tabs;
+    List.map2 (\<lambda>n d. Init_mem n (d_init d)) (map nat_of_int d_offs) (m_data m) = e_init_mems
+    \<rbrakk> \<Longrightarrow> instantiate s m v_imps ((s', inst, v_exps), e_init_tabs@e_init_mems@start)"
 
 definition interp_get_v :: "s \<Rightarrow> inst \<Rightarrow> b_e list \<Rightarrow> v" where
   "interp_get_v s inst b_es = 
@@ -403,7 +384,12 @@ definition interp_get_i32 :: "s \<Rightarrow> inst \<Rightarrow> b_e list \<Righ
         ConstInt32 c \<Rightarrow> c
       | _ \<Rightarrow> 0)"
 
-fun interp_instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> ((s \<times> inst \<times> (module_export list)) \<times> (nat option)) option" where
+datatype res_inst =
+    RI_crash res_error
+  | RI_trap String.literal
+  | RI_res inst "module_export list" "e list"
+
+fun interp_instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (s \<times> res_inst)" where
   "interp_instantiate s m v_imps =
      (case (module_type_checker m) of
         Some (t_imps, t_exps) \<Rightarrow>
@@ -415,13 +401,13 @@ fun interp_instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarr
             let d_offs = map (\<lambda>d. interp_get_i32 s' inst (d_off d)) (m_data m) in
             if (list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m) \<and>
                 list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs (m_data m)) then
-              let start = map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) (m_start m) in
-              let s'' = init_tabs s' inst (map nat_of_int e_offs) (m_elem m) in
-              let s_end = init_mems s'' inst (map nat_of_int d_offs) (m_data m) in
-              Some ((s_end, inst, v_exps), start)
-            else None
-          else None
-      | _ \<Rightarrow> None)"
+            let start = (case (m_start m) of None \<Rightarrow> [] | Some i_s \<Rightarrow> [Invoke ((inst.funcs inst)!i_s)]) in
+            let e_init_tabs = List.map2 (\<lambda>n e. Init_tab n (map (\<lambda>i. (inst.funcs inst)!i) (e_init e))) (map nat_of_int e_offs) (m_elem m) in
+            let e_init_mems = List.map2 (\<lambda>n d. Init_mem n (d_init d)) (map nat_of_int d_offs) (m_data m) in
+              (s', RI_res inst v_exps (e_init_tabs@e_init_mems@start))
+            else (s', RI_trap (STR ''segment out of bounds''))
+          else (s, RI_trap (STR ''invalid import''))
+      | _ \<Rightarrow> (s, RI_trap (STR ''invalid module'')))"
 
 lemma const_expr_is:
   assumes "const_expr \<C> b_e"
@@ -771,10 +757,10 @@ proof -
 qed
 
 lemma interp_instantiate_imp_instantiate:
-  assumes "(interp_instantiate s m v_imps = Some ((s_end, inst, v_exps), start))"
-  shows "(instantiate s m v_imps ((s_end, inst, v_exps), start))"
+  assumes "(interp_instantiate s m v_imps = (s', RI_res inst v_exps init_es))"
+  shows "(instantiate s m v_imps ((s', inst, v_exps), init_es))"
 proof -
-  obtain t_imps t_exps g_inits s' e_offs d_offs s'' inst' where s_end_is:
+  obtain t_imps t_exps g_inits e_offs d_offs inst' start e_init_tabs e_init_mems where s_end_is:
     "module_type_checker m = Some (t_imps, t_exps)"
     "(list_all2 (external_typing s) v_imps t_imps)"
     "g_inits = map (\<lambda>g. interp_get_v s inst' (g_init g)) (m_globs m)"
@@ -783,10 +769,11 @@ proof -
     "d_offs = map (\<lambda>d. interp_get_i32 s' inst (d_off d)) (m_data m)"
     "list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m)"
     "list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs (m_data m)"
-    "start = map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) (m_start m)"
-    "s'' = init_tabs s' inst (map nat_of_int e_offs) (m_elem m)"
-    "s_end = init_mems s'' inst (map nat_of_int d_offs) (m_data m)"
+    "start = (case (m_start m) of None \<Rightarrow> [] | Some i_s \<Rightarrow> [Invoke ((inst.funcs inst)!i_s)])"
+    "e_init_tabs = List.map2 (\<lambda>n e. Init_tab n (map (\<lambda>i. (inst.funcs inst)!i) (e_init e))) (map nat_of_int e_offs) (m_elem m)"
+    "e_init_mems = List.map2 (\<lambda>n d. Init_mem n (d_init d)) (map nat_of_int d_offs) (m_data m)"
     "inst' = \<lparr>types=[],funcs=[],tabs=[],mems=[],globs=ext_globs v_imps\<rparr>"
+    "init_es = e_init_tabs@e_init_mems@start"
     using assms
     by (fastforce simp add: Let_def split: if_splits option.splits prod.splits)
 
@@ -975,7 +962,8 @@ proof -
    show ?thesis
      using instantiate.intros
            1 s_end_is(2) 2 3 4 5 s_end_is(7,8) s_end_is(9,10,11)[symmetric]
-      by blast
+           s_end_is(13)
+     by blast
 qed
 
 lemma map_intro_length:
@@ -986,8 +974,8 @@ lemma map_intro_length:
   by (metis length_map nth_equalityI nth_map)
 
 lemma instantiate_imp_interp_instantiate:
-  assumes "(instantiate s m v_imps ((s_end, inst, v_exps), start))"
-  shows "(interp_instantiate s m v_imps = Some ((s_end, inst, v_exps), start))"
+  assumes "(instantiate s m v_imps ((s', inst, v_exps), init_es))"
+  shows "(interp_instantiate s m v_imps = (s', RI_res inst v_exps init_es))"
 proof -
   obtain fs ts ms gs els ds i_opt imps exps tfs where m_is:
     "m = \<lparr>m_types = tfs,
@@ -1007,7 +995,7 @@ proof -
     using inst.cases
     by blast
 
-  obtain t_imps t_exps g_inits s' e_offs d_offs s'' f where s_end_is:
+  obtain t_imps t_exps g_inits e_offs d_offs f start e_init_tabs e_init_mems where s_end_is:
     "module_typing m t_imps t_exps"
     "list_all2 (external_typing s) v_imps t_imps"
     "alloc_module s m v_imps g_inits (s', inst, v_exps)"
@@ -1016,10 +1004,11 @@ proof -
     "list_all2 (\<lambda>d c. reduce_trans (s',f,$*(d_off d)) (s',f,[$C ConstInt32 c])) ds d_offs"
     "list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs els"
     "list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs ds"
-    "map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) i_opt = start"
-    "init_tabs s' inst (map nat_of_int e_offs) els = s''"
-    "init_mems s'' inst (map nat_of_int d_offs) ds = s_end"
+    "(case (m_start m) of None \<Rightarrow> [] | Some i_s \<Rightarrow> [Invoke ((inst.funcs inst)!i_s)]) = start"
+    "List.map2 (\<lambda>n e. Init_tab n (map (\<lambda>i. (inst.funcs inst)!i) (e_init e))) (map nat_of_int e_offs) (m_elem m) = e_init_tabs"
+    "List.map2 (\<lambda>n d. Init_mem n (d_init d)) (map nat_of_int d_offs) (m_data m) = e_init_mems"
     "f = \<lparr> f_locs=[], f_inst=inst \<rparr>"
+    "init_es = e_init_tabs@e_init_mems@start"
     using assms m_is
     unfolding instantiate.simps
     by fastforce
@@ -1201,12 +1190,22 @@ proof -
   qed
   ultimately
   show ?thesis
-    using s_end_is(2,7,8,9,10,11) m_is inst'_is
+    using s_end_is(2,7,8,9,10,11,13) m_is inst'_is
     by simp
 qed
 
 theorem instantiate_equiv_interp_instantiate:
-  "(instantiate s m v_imps ((s_end, inst, v_exps), start)) = (interp_instantiate s m v_imps = Some ((s_end, inst, v_exps), start))"
+  "(instantiate s m v_imps ((s', inst, v_exps), init_es)) = (interp_instantiate s m v_imps = (s', RI_res inst v_exps init_es))"
   using instantiate_imp_interp_instantiate interp_instantiate_imp_instantiate
   by blast
+
+definition interp_instantiate_init :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (s \<times> res_inst)" where
+  "interp_instantiate_init s m v_imps = (case (interp_instantiate s m v_imps) of
+                                       (s', RI_res inst v_exps init_es) \<Rightarrow>
+                                         (case (run_instantiate (2^63) 300 (s', inst, init_es)) of
+                                           (s'', RCrash r) \<Rightarrow> (s'', RI_crash r)
+                                         | (s'', RTrap r) \<Rightarrow> (s'', RI_trap r)
+                                         | (s'', RValue []) \<Rightarrow> (s'', RI_res inst v_exps [])
+                                         | (s'', RValue (x#xs)) \<Rightarrow> (s'', RI_crash (Error_invalid (STR ''start function''))))
+                                     | x \<Rightarrow> x)"
 end
