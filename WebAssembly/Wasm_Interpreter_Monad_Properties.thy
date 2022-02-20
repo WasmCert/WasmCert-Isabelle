@@ -308,55 +308,6 @@ next
     by sep_auto
 qed
 
-lemma list_blit_array_triple:
-  assumes "length l + n < length la"
-  shows "<a \<mapsto>\<^sub>a la> 
-           list_blit_array l a n
-         <\<lambda>r. a \<mapsto>\<^sub>a (take n la @ l @ drop (n+length l) la)>"
-  using assms
-proof (induct l arbitrary: la n)
-  case Nil
-  thus ?case
-    by sep_auto
-next
-  case (Cons x xl)
-  have 1:"length xl + (Suc n) < length (list_update la n x)"
-    using Cons(2)
-    by auto
-  have 2:"<a \<mapsto>\<^sub>a (list_update la n x)>
-            list_blit_array xl a (Suc n)
-          <\<lambda>r. a \<mapsto>\<^sub>a
-            (take (Suc n) (list_update la n x) @
-             xl @ drop ((Suc n) + length xl) (list_update la n x))>"
-    using Cons(1)[OF 1]
-    by blast
-  have 3:"take n la @
-             x #
-             xl @
-             drop (Suc (n + length xl)) la = (take (Suc n) (list_update la n x) @
-             xl @ drop ((Suc n) + length xl) (list_update la n x))"
-    by simp (metis 1 ab_semigroup_add_class.add.commute add_Suc add_lessD1 length_list_update take_update_last)
-  show ?case
-    apply sep_auto
-    using upd_conv_take_nth_drop[of n la x] Cons(2) apply simp
-    using 2 3 apply simp apply (metis append_Cons append_assoc empty_append_eq_id)
-    done
-qed
-
-lemma array_blit_map_triple:
-  assumes  "length l = length l'"
-           "length l + n < length la"
-           "<P> Heap_Monad.fold_map f l <\<lambda>res. \<up>(res = l') * Q >"
-  shows " <a \<mapsto>\<^sub>a la * P> 
-            array_blit_map l f a n
-          <\<lambda>r. a \<mapsto>\<^sub>a (take n la @ l' @ drop (n+length l') la) * Q >"
-proof -
-  have 1:"length l' + n < length la"
-    using assms
-    by auto
-  show ?thesis
-    by (sep_auto simp del: list_blit_array.simps heap: list_blit_array_triple[OF 1] assms(3))
-qed
 
 (* hoare triples for run_step_b_e_m *)
 

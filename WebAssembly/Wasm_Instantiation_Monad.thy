@@ -67,6 +67,32 @@ fun external_typing_m :: "s_m \<Rightarrow> v_ext \<Rightarrow> extern_t \<Right
 
 | "external_typing_m s_m _ _ = return False"
 
+
+definition alloc_funcs_m :: "cl_m array \<Rightarrow> nat \<Rightarrow> module_func list \<Rightarrow>  inst_m \<Rightarrow> tf array \<Rightarrow> unit Heap" 
+  where 
+  "alloc_funcs_m s_funcs n m_fs inst_m inst_types = array_blit_map m_fs
+    (\<lambda>(i, tlocs, b_es). do { ft \<leftarrow> Array.nth inst_types i; return (Func_native inst_m ft tlocs b_es) })
+    s_funcs
+    n"
+
+definition alloc_tabs_m :: "tabinst_m array \<Rightarrow> nat \<Rightarrow> tab_t list \<Rightarrow> unit Heap" where 
+  "alloc_tabs_m s_tabs n m_ts = array_blit_map m_ts
+    (\<lambda>tt. do { t' \<leftarrow> Array.new (l_min tt) None; return (t', (l_max tt)) })
+    s_tabs
+    n"
+
+definition alloc_mems_m :: "mem_m array \<Rightarrow> nat \<Rightarrow> mem_t list \<Rightarrow> unit Heap" where 
+  "alloc_mems_m s_mems n m_ms = array_blit_map m_ms
+    (\<lambda>mt. do { m' \<leftarrow> new_zeroed_byte_array (l_min mt * Ki64); return (m', (l_max mt)) })
+    s_mems
+    n"
+
+definition alloc_globs_m :: "global array \<Rightarrow> nat \<Rightarrow> module_glob list \<Rightarrow> v list \<Rightarrow> unit Heap" where 
+  "alloc_globs_m s_globs n m_gs gvs = array_blit_map (zip m_gs gvs)
+    (\<lambda>(m_g, v). return \<lparr>g_mut=(tg_mut (module_glob.g_type m_g)), g_val=v\<rparr>)
+    s_globs
+    n"
+
 definition export_get_v_ext_m :: "inst_m \<Rightarrow> exp_desc \<Rightarrow> v_ext Heap" where
   "export_get_v_ext_m inst exp =
      (case exp of
@@ -74,6 +100,12 @@ definition export_get_v_ext_m :: "inst_m \<Rightarrow> exp_desc \<Rightarrow> v_
       | Ext_tab i \<Rightarrow>  do { x \<leftarrow> Array.nth (inst_m.tabs inst) i; return (Ext_tab x) }
       | Ext_mem i \<Rightarrow>  do { x \<leftarrow> Array.nth (inst_m.mems inst) i; return (Ext_mem x) }
       | Ext_glob i \<Rightarrow>   do { x \<leftarrow> Array.nth (inst_m.globs inst) i; return (Ext_glob x) })"
+
+definition get_exports_m :: "inst_m \<Rightarrow> module_export list \<Rightarrow> module_export list Heap" where 
+  "get_exports_m inst m_exps = Heap_Monad.fold_map
+    (\<lambda>m_exp. do { desc \<leftarrow> (export_get_v_ext_m inst (E_desc m_exp));
+                  return \<lparr>E_name=(E_name m_exp), E_desc=desc\<rparr> })
+    m_exps"
 
 definition interp_alloc_module_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> v list \<Rightarrow> (s_m \<times> inst_m \<times> module_export list) Heap" where
   "interp_alloc_module_m s_m m imps gvs = do {
@@ -110,26 +142,11 @@ definition interp_alloc_module_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext lis
     blit (s_m.tabs s_m) 0 s_tabs 0 length_tabs_s;
     blit (s_m.mems s_m) 0 s_mems 0 length_mems_s;
     blit (s_m.globs s_m) 0 s_globs 0 length_globs_s;
-    array_blit_map (m_funcs m)
-      (\<lambda>(i, tlocs, b_es). do { ft \<leftarrow> Array.nth inst_types i; return (Func_native inst_m ft tlocs b_es) })
-      s_funcs
-      length_funcs_s;
-    array_blit_map (m_tabs m)
-      (\<lambda>tt. do { t' \<leftarrow> Array.new (l_min tt) None; return (t', (l_max tt)) })
-      s_tabs
-      length_tabs_s;
-    array_blit_map (m_mems m)
-      (\<lambda>mt. do { m' \<leftarrow> new_zeroed_byte_array (l_min mt * Ki64); return (m', (l_max mt)) })
-      s_mems
-      length_mems_s;
-    array_blit_map (zip (m_globs m) gvs)
-      (\<lambda>(m_g, v). return \<lparr>g_mut=(tg_mut (module_glob.g_type m_g)), g_val=v\<rparr>)
-      s_globs
-      length_globs_s;
-    exps \<leftarrow> Heap_Monad.fold_map
-              (\<lambda>m_exp. do { desc \<leftarrow> (export_get_v_ext_m inst_m (E_desc m_exp));
-                            return \<lparr>E_name=(E_name m_exp), E_desc=desc\<rparr> })
-              (m_exports m);
+    alloc_funcs_m s_funcs length_funcs_s (m_funcs m) inst_m inst_types;
+    alloc_tabs_m s_tabs length_tabs_s (m_tabs m);
+    alloc_mems_m s_mems length_mems_s (m_mems m); 
+    alloc_globs_m s_globs length_globs_s (m_globs m) gvs;
+    exps \<leftarrow> get_exports_m inst_m (m_exports m);
     let s_res = \<lparr>s_m.funcs=s_funcs, s_m.tabs=s_tabs, s_m.mems=s_mems, s_m.globs=s_globs\<rparr>;
     return (s_res, inst_m, exps)
     }"
