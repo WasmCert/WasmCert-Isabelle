@@ -16,7 +16,7 @@ export_code open nat_of_byte byte_of_nat
                  ocaml_char_to_isabelle_byte
                  isabelle_byte_to_ocaml_char
                  zero_byte negone_byte m_imports
-                 make_empty_store_m module_type_checker interp_instantiate_m typing run_m run_invoke_m
+                 make_empty_store_m module_type_checker interp_instantiate_init_m typing run_m run_invoke_m
   in OCaml_imp module_name WasmRef_Isa file_prefix WasmRef_Isa_m
 
 end

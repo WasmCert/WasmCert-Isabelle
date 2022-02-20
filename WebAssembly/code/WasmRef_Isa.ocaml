@@ -896,7 +896,8 @@ module WasmRef_Isa : sig
     Inst_ext of tf list * nat list * nat list * nat list * nat list * 'a
   type 'a f_ext = F_ext of v list * unit inst_ext * 'a
   type e = Basic of b_e | Trap | Invoke of nat | Label of nat * e list * e list
-    | Frame of nat * unit f_ext * e list
+    | Frame of nat * unit f_ext * e list | Init_mem of nat * uint8 list |
+    Init_tab of nat * nat list
   type 'a seq = Empty | Insert of 'a * 'a pred | Join of 'a pred * 'a seq
   and 'a pred = Seq of (unit -> 'a seq)
   type v_ext = Ext_func of nat | Ext_tab of nat | Ext_mem of nat |
@@ -936,6 +937,8 @@ module WasmRef_Isa : sig
     T_context_ext of
       tf list * tf list * unit tg_ext list * unit limit_t_ext list *
         unit limit_t_ext list * t list * (t list) list * (t list) option * 'a
+  type res_inst_m = RI_crash_m of res_error | RI_trap_m of string |
+    RI_res_m of unit inst_m_ext * unit module_export_ext list * e list
   val nth : 'a list -> nat -> 'a
   val zip : 'a list -> 'b list -> ('a * 'b) list
   val len : 'a heap -> 'a array -> (unit -> nat)
@@ -1274,6 +1277,21 @@ module WasmRef_Isa : sig
   val app_v_s_testop : testop -> v list -> v list * res_step
   val app_v_s_select : v list -> v list * res_step
   val run_step_b_e_m : b_e -> config_m -> (unit -> (config_m * res_step))
+  val list_blit_array : 'a heap -> 'a list -> 'a array -> nat -> (unit -> unit)
+  val init_tab_m_v :
+    (nat option) array * nat option ->
+      nat -> nat list -> (unit -> (unit option))
+  val app_s_f_init_tab_m :
+    nat ->
+      nat list ->
+        ((nat option) array * nat option) array ->
+          unit inst_m_ext -> (unit -> res_step)
+  val init_mem_m_v :
+    Bytes.t * nat option -> nat -> uint8 list -> (unit -> (unit option))
+  val app_s_f_init_mem_m :
+    nat ->
+      uint8 list ->
+        (Bytes.t * nat option) array -> unit inst_m_ext -> (unit -> res_step)
   val rep_host_m :
     host -> unit s_m_ext * v list -> (unit -> ((unit s_m_ext * v list) option))
   val host_apply_impl_m :
@@ -1301,28 +1319,16 @@ module WasmRef_Isa : sig
   val e_desc : 'a module_export_ext -> v_ext
   val e_name : 'a module_export_ext -> string
   val i_desc : 'a module_import_ext -> imp_desc
-  val init_mem_m :
-    unit s_m_ext ->
-      unit inst_m_ext -> nat -> unit module_data_ext -> (unit -> unit)
-  val array_blit_map :
-    'b heap ->
-      'a list -> ('a -> (unit -> 'b)) -> 'b array -> nat -> (unit -> unit)
-  val init_tab_m :
-    unit s_m_ext ->
-      unit inst_m_ext -> nat -> unit module_elem_ext -> (unit -> unit)
   val gather_m_f_type : tf list -> nat * (t list * b_e list) -> tf option
-  val get_start_m : unit inst_m_ext -> nat option -> (unit -> (nat option))
-  val init_mems_m :
-    unit s_m_ext ->
-      unit inst_m_ext -> nat list -> unit module_data_ext list -> (unit -> unit)
-  val init_tabs_m :
-    unit s_m_ext ->
-      unit inst_m_ext -> nat list -> unit module_elem_ext list -> (unit -> unit)
+  val get_start_m : unit inst_m_ext -> nat option -> (unit -> (e list))
   val list_all2_m :
     ('a -> 'b -> (unit -> bool)) -> 'a list -> 'b list -> (unit -> bool)
   val mem_typing_m : Bytes.t * nat option -> unit limit_t_ext -> (unit -> bool)
   val tab_typing_m :
     (nat option) array * nat option -> unit limit_t_ext -> (unit -> bool)
+  val array_blit_map :
+    'b heap ->
+      'a list -> ('a -> (unit -> 'b)) -> 'b array -> nat -> (unit -> unit)
   val make_empty_inst_m : (unit -> unit inst_m_ext)
   val make_empty_frame_m : 'a heap -> (unit -> ('a array * unit inst_m_ext))
   val run_invoke_v_m :
@@ -1331,6 +1337,8 @@ module WasmRef_Isa : sig
   val run_m :
     unit s_m_ext * (v array * (unit inst_m_ext * b_e list)) ->
       (unit -> (unit s_m_ext * res))
+  val get_init_tab_m :
+    unit inst_m_ext -> nat -> unit module_elem_ext -> (unit -> e)
   val interp_get_v_m :
     unit s_m_ext -> unit inst_m_ext -> b_e list -> (unit -> v)
   val module_export_typer : unit t_context_ext -> v_ext -> extern_t option
@@ -1344,6 +1352,16 @@ module WasmRef_Isa : sig
   val module_data_type_checker :
     unit t_context_ext -> unit module_data_ext -> bool
   val module_type_checker : unit m_ext -> (extern_t list * extern_t list) option
+  val get_init_mems_m :
+    nat list -> unit module_data_ext list -> (unit -> (e list))
+  val get_init_tabs_m :
+    unit inst_m_ext ->
+      nat list -> unit module_elem_ext list -> (unit -> (e list))
+  val run_instantiate_m :
+    nat ->
+      nat ->
+        unit s_m_ext * (unit inst_m_ext * e list) ->
+          (unit -> (unit s_m_ext * res))
   val interp_get_i32_m :
     unit s_m_ext -> unit inst_m_ext -> b_e list -> (unit -> i32)
   val make_empty_store_m : (unit -> unit s_m_ext)
@@ -1360,11 +1378,10 @@ module WasmRef_Isa : sig
               (unit s_m_ext * (unit inst_m_ext * unit module_export_ext list)))
   val interp_instantiate_m :
     unit s_m_ext ->
-      unit m_ext ->
-        v_ext list ->
-          (unit ->
-            (((unit s_m_ext * (unit inst_m_ext * unit module_export_ext list)) *
-               nat option) option))
+      unit m_ext -> v_ext list -> (unit -> (unit s_m_ext * res_inst_m))
+  val interp_instantiate_init_m :
+    unit s_m_ext ->
+      unit m_ext -> v_ext list -> (unit -> (unit s_m_ext * res_inst_m))
 end = struct
 
 type int = Int_of_integer of Z.t;;
@@ -3716,7 +3733,8 @@ type 'a inst_ext =
 type 'a f_ext = F_ext of v list * unit inst_ext * 'a;;
 
 type e = Basic of b_e | Trap | Invoke of nat | Label of nat * e list * e list |
-  Frame of nat * unit f_ext * e list;;
+  Frame of nat * unit f_ext * e list | Init_mem of nat * uint8 list |
+  Init_tab of nat * nat list;;
 
 type 'a seq = Empty | Insert of 'a * 'a pred | Join of 'a pred * 'a seq
 and 'a pred = Seq of (unit -> 'a seq);;
@@ -3778,6 +3796,9 @@ type 'a t_context_ext =
   T_context_ext of
     tf list * tf list * unit tg_ext list * unit limit_t_ext list *
       unit limit_t_ext list * t list * (t list) list * (t list) option * 'a;;
+
+type res_inst_m = RI_crash_m of res_error | RI_trap_m of string |
+  RI_res_m of unit inst_m_ext * unit module_export_ext list * e list;;
 
 let rec nth
   x0 n = match x0, n with [], n -> failwith "nth"
@@ -5188,7 +5209,7 @@ let rec store_packed_m_v
   m n off v tp =
     (fun () ->
       (let m_len = len_byte_array (fst m) () in
-        (if less_eq_nat (plus_nat (plus_nat n off) (t_length (typeof v))) m_len
+        (if less_eq_nat (plus_nat (plus_nat n off) (tp_length tp)) m_len
           then (match v
                  with ConstInt32 c ->
                    (fun f_ () -> f_
@@ -5851,6 +5872,63 @@ let rec run_step_b_e_m
             (fun () ->
               (Config_m (d, s, update_fc_step_m fc v_sa [], fcs), res)))));;
 
+let rec list_blit_array _A
+  src_list dst dst_pos =
+    (match src_list with [] -> (fun () -> ())
+      | y :: ys ->
+        (fun () ->
+          (let _ = upd _A dst_pos y dst () in
+            list_blit_array _A ys dst (plus_nat dst_pos one_nata) ())));;
+
+let rec init_tab_m_v
+  t n icls =
+    (fun () ->
+      (let t_len = len (heap_option heap_nat) (fst t) () in
+        (if less_eq_nat (plus_nat n (size_list icls)) t_len
+          then (fun f_ () -> f_
+                 ((list_blit_array (heap_option heap_nat)
+                    (map (fun a -> Some a) icls) (fst t) n)
+                 ()) ())
+                 (fun _ -> (fun () -> (Some ())))
+          else (fun () -> None))
+          ()));;
+
+let rec app_s_f_init_tab_m
+  off icls ts i_m =
+    (fun () ->
+      (let j = array_nth heap_nat (tabsa i_m) zero_nat () in
+       let t =
+         array_nth
+           (heap_prod (heap_array (typerep_option typerep_nat))
+             (heap_option heap_nat))
+           ts j ()
+         in
+       let a = init_tab_m_v t off icls () in
+        (match a with None -> (fun () -> (Res_trap "init_tab"))
+          | Some _ -> (fun () -> Step_normal))
+          ()));;
+
+let rec init_mem_m_v
+  m n bs =
+    (fun () ->
+      (let m_len = len_byte_array (fst m) () in
+        (if less_eq_nat (plus_nat n (size_list bs)) m_len
+          then (fun f_ () -> f_ ((store_uint8_list (fst m) n bs) ()) ())
+                 (fun _ -> (fun () -> (Some ())))
+          else (fun () -> None))
+          ()));;
+
+let rec app_s_f_init_mem_m
+  off bs ms i_m =
+    (fun () ->
+      (let j = array_nth heap_nat (memsa i_m) zero_nat () in
+       let m =
+         array_nth (heap_prod heap_byte_array (heap_option heap_nat)) ms j () in
+       let a = init_mem_m_v m off bs () in
+        (match a with None -> (fun () -> (Res_trap "init_mem"))
+          | Some _ -> (fun () -> Step_normal))
+          ()));;
+
 let rec rep_host_m (Abs_host_m x) = x;;
 
 let rec host_apply_impl_m s tf h vs = rep_host_m h (s, vs);;
@@ -5928,7 +6006,15 @@ let rec run_step_e_m
         | Label (_, _, _) ->
           (fun () -> (Config_m (d, s, fc, fcs), crash_invariant))
         | Frame (_, _, _) ->
-          (fun () -> (Config_m (d, s, fc, fcs), crash_invariant))));;
+          (fun () -> (Config_m (d, s, fc, fcs), crash_invariant))
+        | Init_mem (n, bs) ->
+          (fun () ->
+            (let res = app_s_f_init_mem_m n bs (mems s) f_inst2 () in
+              (Config_m (d, s, fc, fcs), res)))
+        | Init_tab (n, icls) ->
+          (fun () ->
+            (let res = app_s_f_init_tab_m n icls (tabs s) f_inst2 () in
+              (Config_m (d, s, fc, fcs), res)))));;
 
 let res_crash_fuel : res = RCrash (Error_invariant "fuel exhausted");;
 
@@ -6076,43 +6162,6 @@ let rec e_name (Module_export_ext (e_name, e_desc, more)) = e_name;;
 
 let rec i_desc (Module_import_ext (i_module, i_name, i_desc, more)) = i_desc;;
 
-let rec init_mem_m
-  s inst d_ind d =
-    (fun () ->
-      (let m_ind = array_nth heap_nat (memsa inst) (d_data d) () in
-       let mem =
-         array_nth (heap_prod heap_byte_array (heap_option heap_nat)) (mems s)
-           m_ind ()
-         in
-        store_uint8_list (fst mem) d_ind (d_init d) ()));;
-
-let rec array_blit_map _B
-  src_list src_f dst dst_pos =
-    (match src_list with [] -> (fun () -> ())
-      | y :: ys ->
-        (fun () ->
-          (let x = src_f y () in
-           let _ = upd _B dst_pos x dst () in
-            array_blit_map _B ys src_f dst (plus_nat dst_pos one_nata) ())));;
-
-let rec init_tab_m
-  s inst e_ind e =
-    (fun () ->
-      (let t_ind = array_nth heap_nat (tabsa inst) (e_tab e) () in
-       let a =
-         array_nth
-           (heap_prod (heap_array (typerep_option typerep_nat))
-             (heap_option heap_nat))
-           (tabs s) t_ind ()
-         in
-        (let (tab_e, _) = a in
-          array_blit_map (heap_option heap_nat) (e_init e)
-            (fun i ->
-              (fun f_ () -> f_ ((array_nth heap_nat (funcsa inst) i) ()) ())
-                (fun i_cl -> (fun () -> (Some i_cl))))
-            tab_e e_ind)
-          ()));;
-
 let rec gather_m_f_type
   tfs m_f =
     (if less_nat (fst m_f) (size_list tfs) then Some (nth tfs (fst m_f))
@@ -6120,25 +6169,11 @@ let rec gather_m_f_type
 
 let rec get_start_m
   inst i_s =
-    (match i_s with None -> (fun () -> None)
+    (match i_s with None -> (fun () -> [])
       | Some i_sa ->
         (fun () ->
           (let i_s_s = array_nth heap_nat (funcsa inst) i_sa () in
-            Some i_s_s)));;
-
-let rec init_mems_m
-  s inst d_inds ds =
-    (fun () ->
-      (let _ = fold_map (fun (a, b) -> init_mem_m s inst a b) (zip d_inds ds) ()
-         in
-        ()));;
-
-let rec init_tabs_m
-  s inst e_inds es =
-    (fun () ->
-      (let _ = fold_map (fun (a, b) -> init_tab_m s inst a b) (zip e_inds es) ()
-         in
-        ()));;
+            [Invoke i_s_s])));;
 
 let rec list_all2_m
   r x1 x2 = match r, x1, x2 with r, [], [] -> (fun () -> true)
@@ -6160,6 +6195,12 @@ let rec tab_typing_m
     (fun () ->
       (let t_min = len (heap_option heap_nat) (fst t) () in
         limits_compat (Limit_t_ext (t_min, snd t, ())) tt));;
+
+let rec array_blit_map _B
+  src_list src_f dst dst_pos =
+    (fun () ->
+      (let ys = fold_map src_f src_list () in
+        list_blit_array _B ys dst dst_pos ()));;
 
 let make_empty_inst_m : (unit -> unit inst_m_ext)
   = (fun () ->
@@ -6204,6 +6245,12 @@ let rec run_m
         (power power_nat (nat_of_integer (Z.of_int 2))
           (nat_of_integer (Z.of_int 63)))
         (nat_of_integer (Z.of_int 300)) x;;
+
+let rec get_init_tab_m
+  inst e_ind e =
+    (fun () ->
+      (let i_cls = fold_map (array_nth heap_nat (funcsa inst)) (e_init e) () in
+        Init_tab (e_ind, i_cls)));;
 
 let rec interp_get_v_m
   s inst b_es =
@@ -6262,16 +6309,18 @@ let rec module_func_type_checker
 
 let rec module_elem_type_checker
   c (Module_elem_ext (t, es, is, ())) =
-    list_all (const_expr c) es &&
-      (b_e_type_checker c es (Tf ([], [T_i32])) &&
-        (less_nat t (size_list (table c)) &&
-          list_all (fun i -> less_nat i (size_list (func_t c))) is));;
+    equal_nat t zero_nat &&
+      (list_all (const_expr c) es &&
+        (b_e_type_checker c es (Tf ([], [T_i32])) &&
+          (less_nat t (size_list (table c)) &&
+            list_all (fun i -> less_nat i (size_list (func_t c))) is)));;
 
 let rec module_data_type_checker
   c (Module_data_ext (d, es, bs, ())) =
-    list_all (const_expr c) es &&
-      (b_e_type_checker c es (Tf ([], [T_i32])) &&
-        less_nat d (size_list (memory c)));;
+    equal_nat d zero_nat &&
+      (list_all (const_expr c) es &&
+        (b_e_type_checker c es (Tf ([], [T_i32])) &&
+          less_nat d (size_list (memory c))));;
 
 let rec module_type_checker
   (M_ext (tfs, fs, ts, ms, gs, els, ds, i_opt, imps, exps, ())) =
@@ -6342,6 +6391,29 @@ let rec module_type_checker
                            exps)
                    with None -> None | Some expts -> Some (impts, expts))
             else None)));;
+
+let rec get_init_mems_m
+  d_inds ds =
+    (fun () -> (map (fun (x, y) -> Init_mem (x, d_init y)) (zip d_inds ds)));;
+
+let rec get_init_tabs_m
+  inst e_inds es =
+    fold_map (fun (a, b) -> get_init_tab_m inst a b) (zip e_inds es);;
+
+let rec run_instantiate_m
+  n d (s, (f_inst2, es)) =
+    (fun () ->
+      (let f_locs1 = (fun () -> Array.of_list []) () in
+       let a =
+         run_iter_m n
+           (Config_m
+             (d, s,
+               Frame_context_m
+                 (Redex ([], es, []), [], zero_nat, f_locs1, f_inst2),
+               []))
+           ()
+         in
+        (let (Config_m (_, sa, _, _), res) = a in (fun () -> (sa, res))) ()));;
 
 let rec interp_get_i32_m
   s inst b_es =
@@ -6632,7 +6704,8 @@ let rec interp_alloc_module_m
 
 let rec interp_instantiate_m
   s_m m v_imps =
-    (match module_type_checker m with None -> (fun () -> None)
+    (match module_type_checker m
+      with None -> (fun () -> (s_m, RI_trap_m "invalid module"))
       | Some (t_imps, _) ->
         (fun () ->
           (let exps_well_typed =
@@ -6730,18 +6803,45 @@ e_offs (m_elem m))
      then (fun f_ () -> f_ ((get_start_m inst_m (m_start m)) ()) ())
             (fun start ->
               (fun f_ () -> f_
-                ((init_tabs_m s_ma inst_m (map nat_of_int_i32 e_offs)
-                   (m_elem m))
+                ((get_init_tabs_m inst_m (map nat_of_int_i32 e_offs) (m_elem m))
                 ()) ())
-                (fun _ ->
+                (fun e_init_tabs ->
                   (fun f_ () -> f_
-                    ((init_mems_m s_ma inst_m (map nat_of_int_i32 d_offs)
-                       (m_data m))
+                    ((get_init_mems_m (map nat_of_int_i32 d_offs) (m_data m))
                     ()) ())
-                    (fun _ ->
-                      (fun () -> (Some ((s_ma, (inst_m, v_exps)), start))))))
-     else (fun () -> None))))))))
-              else (fun () -> None))
+                    (fun e_init_mems ->
+                      (fun () ->
+                        (s_ma,
+                          RI_res_m
+                            (inst_m, v_exps,
+                              e_init_tabs @ e_init_mems @ start))))))
+     else (fun () -> (s_ma, RI_trap_m "segment out of bounds")))))))))
+              else (fun () -> (s_m, RI_trap_m "invalid import")))
               ())));;
+
+let rec interp_instantiate_init_m
+  s m v_imps =
+    (fun () ->
+      (let a = interp_instantiate_m s m v_imps () in
+        (match a
+          with (sa, RI_crash_m res_error) ->
+            (fun () -> (sa, RI_crash_m res_error))
+          | (sa, RI_trap_m literal) -> (fun () -> (sa, RI_trap_m literal))
+          | (sa, RI_res_m (inst, v_exps, init_es)) ->
+            (fun f_ () -> f_
+              ((run_instantiate_m
+                 (power power_nat (nat_of_integer (Z.of_int 2))
+                   (nat_of_integer (Z.of_int 63)))
+                 (nat_of_integer (Z.of_int 300)) (sa, (inst, init_es)))
+              ()) ())
+              (fun aa ->
+                (match aa with (sb, RCrash r) -> (fun () -> (sb, RI_crash_m r))
+                  | (sb, RTrap r) -> (fun () -> (sb, RI_trap_m r))
+                  | (sb, RValue []) ->
+                    (fun () -> (sb, RI_res_m (inst, v_exps, [])))
+                  | (sb, RValue (_ :: _)) ->
+                    (fun () ->
+                      (sb, RI_crash_m (Error_invalid "start function"))))))
+          ()));;
 
 end;; (*struct WasmRef_Isa*)
