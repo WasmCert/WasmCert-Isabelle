@@ -193,19 +193,9 @@ qed
 
 (*  heap rules, lemmas etc. about the assertions *)
 
-lemma ex_assn_pure_conv:"(\<exists>\<^sub>Ax. \<up>(P x)) = \<up>(\<exists>x. P x)"
-  by (smt (z3) ent_ex_preI ent_iffI ent_pure_pre_iff_sng ent_refl triv_exI)
-
-lemma cl_m_assn_pure:"is_pure_assn (cl_m_assn i_s cl cl_m)"
-  unfolding cl_m_assn_def 
-  by(simp split: cl.split cl_m.split add:ex_assn_pure_conv)
-
-lemma cl_m_assn_type:
-  assumes "h \<Turnstile> cl_m_assn i_s cl cl_m" 
-  shows "cl_type cl = cl_m_type cl_m"
-  using assms
-  unfolding cl_m_assn_def cl_type_def cl_m_type_def
-  by(simp split:cl.splits cl_m.splits)
+lemma cl_m_agree_type: "cl_m_agree i_s cl cl_m \<Longrightarrow> cl_type cl = cl_m_type cl_m"
+  unfolding cl_m_agree_j_def cl_type_def cl_m_type_def
+  by (auto, simp split:cl.splits cl_m.splits)
 
 lemma pure_dup:
   assumes "is_pure_assn P" 
@@ -225,6 +215,7 @@ lemma [sep_heap_rules]: "<tabinst_m_assn t t_m>
   unfolding tabinst_m_assn_def
   by (sep_auto split: prod.splits)
 
+
 lemma funcs_nth_type_triple:"<funcs_m_assn i_s cls cls_m> 
     Array.nth cls_m i  
     <\<lambda>r. \<up>(cl_m_type r = cl_type (cls!i)) * funcs_m_assn i_s cls cls_m>" 
@@ -232,9 +223,8 @@ lemma funcs_nth_type_triple:"<funcs_m_assn i_s cls cls_m>
   apply(sep_auto heap del:nth_rule)
   apply(extract_pre_pure)
   apply(sep_auto)
-  apply(simp add: listI_assn_extract[of i])
-  using cl_m_assn_type 
-  by (metis mod_starD)
+  using cl_m_agree_type unfolding list_all2_conv_all_nth
+  by metis  
 
 lemma [sep_heap_rules]: "<mem_m_assn m mi> 
     len_byte_array (fst mi) 
@@ -902,26 +892,20 @@ lemma host_apply_impl_m_triple:
   sorry
 
 lemma funcs_nth_triple:
-  "< fs_m\<mapsto>\<^sub>a fs_i * list_assn (cl_m_assn i_s) fs fs_i> 
+  assumes "list_all2 (cl_m_agree i_s) fs fs_i" 
+  shows "< fs_m\<mapsto>\<^sub>a fs_i> 
   Array.nth fs_m i 
-  <\<lambda>r. \<up>(i < length fs_i \<and> r = fs_i!i) 
-  * cl_m_assn i_s (fs!i) r * fs_m \<mapsto>\<^sub>a fs_i * list_assn (cl_m_assn i_s) fs fs_i>"
+  <\<lambda>r. \<up>(i < length fs_i \<and> r = fs_i!i) * fs_m \<mapsto>\<^sub>a fs_i>"
   unfolding funcs_m_assn_def list_assn_conv_idx 
-  apply(sep_auto)
-  apply(extract_pre_pure)
-  apply(extract_list_idx i)
-  apply(subst pure_dup[OF cl_m_assn_pure])
-  apply(reinsert_list_idx i)
-  apply(sep_auto)
-  done
+  by(sep_auto)
 
 lemma funcs_nth_triple_s:
   "< s_m_assn i_s s s_m> 
   Array.nth (s_m.funcs s_m) i 
-  <\<lambda>r. \<up>(i < length (s.funcs s)) 
-  * cl_m_assn i_s (s.funcs s!i) r * s_m_assn i_s s s_m>"
+  <\<lambda>r. \<up>(i < length (s.funcs s) \<and> cl_m_agree i_s (s.funcs s!i) r) * s_m_assn i_s s s_m>"
   unfolding s_m_assn_def funcs_m_assn_def
-  by (sep_auto heap:funcs_nth_triple heap del:nth_rule, extract_pre_pure)
+  by (sep_auto heap:funcs_nth_triple heap del:nth_rule simp:list_all2_conv_all_nth)
+
 
 lemma run_step_e_m_triple:
     "<cfg_m_assn i_s cfg cfg_m> 
@@ -961,8 +945,8 @@ proof -
       supply [simp] = Let_def and 
         [split] = v.splits option.splits 
         cl.splits cl_m.splits tf.splits nat.splits
-       apply(sep_auto simp:cl_m_assn_def locs_m_assn_def s_m_assn_def funcs_m_assn_def fc_m_assn_def)
-      apply(sep_auto heap:host_apply_impl_m_triple simp:cl_m_assn_def)
+       apply(sep_auto simp:cl_m_agree_j_def locs_m_assn_def s_m_assn_def funcs_m_assn_def fc_m_assn_def)
+      apply(sep_auto heap:host_apply_impl_m_triple simp:cl_m_agree_j_def)
       done
   next
     case Trap

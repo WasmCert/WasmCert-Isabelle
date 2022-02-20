@@ -149,16 +149,22 @@ lemma alloc_funcs_simple_conv:
 
 lemma list_assn_map1:"list_assn P (map f xs) ys = list_assn (\<lambda>x y. P (f x) y) xs ys"
   by(induct "(\<lambda>x y. P (f x) y)"  xs ys rule: list_assn.induct, auto)
+
+lemma list_assn_pure:"list_assn (\<lambda>x y. \<up>(P x y)) xs ys = \<up>(list_all2 P xs ys)"
+  by(induct "\<lambda>x y. \<up>(P x y)"  xs ys rule: list_assn.induct, auto)
   
 lemma alloc_funcs_m_triple:
   "< s_funcs \<mapsto>\<^sub>a fs * inst_types \<mapsto>\<^sub>a m_tfs> 
   alloc_funcs_m s_funcs n m_fs inst_m inst_types
   <\<lambda>r.\<exists>\<^sub>Ays. \<up>(fits_at_in m_fs n fs)
   *  s_funcs \<mapsto>\<^sub>a insert_at_in ys n fs
-  *  list_assn (cl_m_assn ([inst], [inst_m])) (alloc_funcs_simple' m_fs inst m_tfs) ys
+  *  \<up>(list_all2 (cl_m_agree ([inst], [inst_m])) (alloc_funcs_simple' m_fs inst m_tfs) ys)
   *  inst_types \<mapsto>\<^sub>a m_tfs>"
-  unfolding alloc_funcs_m_def cl_m_assn_def
-  by(simp only: list_assn_map1, rule array_blit_map_triple, sep_auto)
+  unfolding alloc_funcs_m_def cl_m_agree_j_def
+  apply(simp only: list_all2_map1 flip:list_assn_pure)
+  apply(rule array_blit_map_triple) 
+  apply(sep_auto)
+  done
 
 lemma alloc_tabs_m_triple: 
   "< s_tabs \<mapsto>\<^sub>a ts> 
@@ -182,8 +188,7 @@ lemma alloc_mems_m_triple:
   done
 
 
-lemma list_assn_pure:"list_assn (\<lambda>x y. \<up>(P x y)) xs ys = \<up>(list_all2 P xs ys)"
-  by(induct "\<lambda>x y. \<up>(P x y)"  xs ys rule: list_assn.induct, auto)
+
 
 (* todo: learn how to make this nicer *)
 lemma alloc_globs_m_triple': 

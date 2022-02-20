@@ -61,23 +61,25 @@ abbreviation "inst_store_assn \<equiv> \<lambda>(is, i_ms). list_assn inst_m_ass
 
 abbreviation "inst_at \<equiv> \<lambda>(is, i_ms) (i, i_m) j. j < length is \<and> is!j = i \<and> i_ms!j = i_m"
 
-abbreviation "contains_inst_assn i_s i \<equiv> \<exists>\<^sub>A j. \<up>(inst_at i_s i j)"
+abbreviation "contains_inst i_s i \<equiv> \<exists> j. inst_at i_s i j"
 
-definition cl_m_assn :: "inst_store \<Rightarrow> cl \<Rightarrow> cl_m \<Rightarrow> assn" where 
-  "cl_m_assn i_s cl cl_m = (case cl of 
+definition cl_m_agree_j :: "inst_store \<Rightarrow> nat \<Rightarrow> cl \<Rightarrow> cl_m \<Rightarrow> bool" where 
+  "cl_m_agree_j i_s j cl cl_m = (case cl of 
   cl.Func_native i tf ts b_es \<Rightarrow> 
     (case cl_m of 
     cl_m.Func_native i_m tf_m ts_m b_es_m \<Rightarrow> 
-     contains_inst_assn i_s (i, i_m) * \<up>(tf = tf_m \<and> ts = ts_m \<and> b_es = b_es_m) 
-  | cl_m.Func_host tf_m host_m \<Rightarrow> false)
+    inst_at i_s (i, i_m) j \<and> tf = tf_m \<and> ts = ts_m \<and> b_es = b_es_m
+  | cl_m.Func_host tf_m host_m \<Rightarrow> False)
 | cl.Func_host tf host \<Rightarrow> 
     (case cl_m of 
-    cl_m.Func_native i_m tf_m ts_m b_es_m \<Rightarrow> false 
-  | cl_m.Func_host tf_m host_m \<Rightarrow> \<up>(tf = tf_m \<and> host = host_m))
+    cl_m.Func_native i_m tf_m ts_m b_es_m \<Rightarrow> False 
+  | cl_m.Func_host tf_m host_m \<Rightarrow> tf = tf_m \<and> host = host_m)
 )"
 
+abbreviation "cl_m_agree i_s cl cl_m \<equiv> \<exists>j. cl_m_agree_j i_s j cl cl_m"
+
 definition funcs_m_assn :: "inst_store \<Rightarrow> cl list \<Rightarrow> cl_m array \<Rightarrow> assn" where
-  "funcs_m_assn i_s fs fs_m = (\<exists>\<^sub>A fs_i. fs_m \<mapsto>\<^sub>a fs_i * list_assn (cl_m_assn i_s) fs fs_i)"
+  "funcs_m_assn i_s fs fs_m = (\<exists>\<^sub>A fs_i. fs_m \<mapsto>\<^sub>a fs_i *\<up>(list_all2 (cl_m_agree i_s)  fs fs_i))"
 
 definition tabinst_m_assn :: "tabinst \<Rightarrow> tabinst_m \<Rightarrow> assn" where 
   "tabinst_m_assn = (\<lambda>(tr,tm) (tr_m,tm_m). tr_m \<mapsto>\<^sub>a tr * \<up>(tm = tm_m))"
@@ -106,8 +108,7 @@ definition fc_m_assn :: "inst_store \<Rightarrow> frame_context \<Rightarrow> fr
   "fc_m_assn i_s fc fc_m = (
   case fc of Frame_context redex lcs nf f \<Rightarrow> 
   case fc_m of Frame_context_m redex_m lcs_m nf_m f_locs1 f_inst2 \<Rightarrow>
-  \<up>(redex = redex_m \<and> lcs = lcs_m \<and> nf = nf_m)
-  * contains_inst_assn i_s (f_inst f, f_inst2)
+  \<up>(redex = redex_m \<and> lcs = lcs_m \<and> nf = nf_m \<and> contains_inst i_s (f_inst f, f_inst2))
   * locs_m_assn (f_locs f) f_locs1
 )"
 
