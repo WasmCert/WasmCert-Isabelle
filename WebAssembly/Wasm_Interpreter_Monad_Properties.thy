@@ -742,11 +742,13 @@ lemma init_mem_triple:
             init_mem_m_v_def store_def mem_length_def mem_rep_length.rep_eq)
 
 lemma init_tab_triple: 
-  "<a \<mapsto>\<^sub>a tabrep * \<up>(tab_m=(a,t_max))>
-  init_tab_m_v tab_m n icls
-  <\<lambda>r_opt. expect_assn (\<lambda>t' r_m. a \<mapsto>\<^sub>a (fst t') * \<up>(tab_m=(a,(snd t')))) (a \<mapsto>\<^sub>a t * \<up>(tab_m=(a,t_max)))
-    (store_tab (tabrep, t_max) n icls) r_opt>"
-  sorry
+  shows "<tabinst_m_assn t t_m>
+  init_tab_m_v t_m n icls
+  <\<lambda>r_opt. expect_assn (\<lambda>t' r_m. tabinst_m_assn t' t_m) (tabinst_m_assn t t_m)
+    (store_tab t n icls) r_opt>"
+  unfolding init_tab_m_v_def tabinst_m_assn_def
+  supply [simp del] = list_blit_array.simps
+  by (sep_auto heap:list_blit_array_triple simp:store_tab_def split:option.splits prod.splits)
 
 (* run_step_b_e *)
 
@@ -915,17 +917,37 @@ lemma app_s_f_init_mem_m_triple:
   \<up>(r = res) *  mems_m_assn ms' ms_m * inst_store_assn (is, i_ms)>"
   using assms
   unfolding mems_m_assn_def app_s_f_init_mem_m_def list_assn_conv_idx inst_m_assn_def
-  supply [sep_heap_rules] = init_mem_triple
   apply(sep_auto)
    apply(knock_down j)
   apply(sep_auto)
    apply(extract_list_idx "inst.mems (f_inst f) ! 0")
-   apply(sep_auto)
+   apply(sep_auto heap: init_mem_triple)
   apply(sep_auto simp:app_s_f_init_mem_def smem_ind_def 
       split:prod.splits option.splits list.splits)
     apply(rule listI_assn_reinsert, frame_inference, simp, simp, sep_auto)
   apply(sep_auto)
   apply(rule listI_assn_reinsert_upd, frame_inference, simp, simp, sep_auto)
+  done
+
+lemma app_s_f_init_tab_m_triple: 
+  assumes "inst_at (is, i_ms) (f_inst f, f_inst2) j"
+  shows
+ "< tabs_m_assn ts ts_m * inst_store_assn (is, i_ms)> 
+  app_s_f_init_tab_m n icls ts_m f_inst2
+  <\<lambda>r. let (ts', res) = app_s_f_init_tab n icls ts f in
+  \<up>(r = res) *  tabs_m_assn ts' ts_m * inst_store_assn (is, i_ms)>"
+  using assms
+  unfolding tabs_m_assn_def app_s_f_init_tab_m_def list_assn_conv_idx inst_m_assn_def
+  apply(sep_auto)
+   apply(knock_down j)
+  apply(sep_auto)
+   apply(extract_list_idx "inst.tabs (f_inst f) ! 0")
+   apply(sep_auto heap:init_tab_triple)
+  apply(sep_auto simp:app_s_f_init_tab_def store_tab_def stab_ind_def 
+      split:prod.splits option.splits list.splits)
+   apply(rule listI_assn_reinsert_upd, frame_inference, simp, simp, sep_auto)
+  apply(sep_auto)
+  apply(rule listI_assn_reinsert, frame_inference, simp, simp, sep_auto)
   done
 
 lemma run_step_e_m_triple:
@@ -984,7 +1006,8 @@ proof -
       by (sep_auto heap:app_s_f_init_mem_m_triple split:prod.splits)
   next
     case (Init_tab x71 x72)
-    then show ?thesis sorry
+    then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
+      by (sep_auto heap:app_s_f_init_tab_m_triple split:prod.splits)
   qed
 qed 
 

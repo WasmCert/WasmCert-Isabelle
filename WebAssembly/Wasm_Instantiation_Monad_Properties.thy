@@ -2,26 +2,6 @@ theory Wasm_Instantiation_Monad_Properties
   imports "../libs/Misc_Generic_Lemmas" "../libs/List_Assn" 
     Wasm_Instantiation_Monad Wasm_Monad_Assertions Wasm_Instantiation_Properties begin
 
-abbreviation "fits_at_in l n la \<equiv> case l of [] \<Rightarrow> True | x#xs \<Rightarrow> n+length l \<le> length la"
-
-abbreviation "insert_at_in l n la \<equiv> take n la @ l @ drop (n+length l) la"
-
-lemma list_blit_array_triple:
-  "<a \<mapsto>\<^sub>a la> 
-  list_blit_array l a n
-  <\<lambda>r. \<up>(fits_at_in l n la) 
-    * a \<mapsto>\<^sub>a insert_at_in l n la>"
-proof(induct l arbitrary:a la n)
-case Nil
-  then show ?case by sep_auto
-next
-  case (Cons a l)
-  show ?case 
-    supply [simp del] = list_blit_array.simps
-    apply(subst list_blit_array.simps)
-    apply(sep_auto heap:Cons split:list.splits simp: take_update_last)
-    done
-qed
 
 lemma fold_map_triple:
   assumes "\<And> x. <F> f x <\<lambda>r. Q x r * F>"
