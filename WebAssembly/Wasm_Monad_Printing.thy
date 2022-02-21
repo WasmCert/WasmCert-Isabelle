@@ -10,7 +10,7 @@ lemmas[code] = blit.simps
 
 fun run_fuzz :: "fuel \<Rightarrow> depth \<Rightarrow> s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> v list \<Rightarrow> (s_m \<times> res) Heap" where
   "run_fuzz n d s m v_imps v_args = do {
-   i_res \<leftarrow> interp_instantiate_m s m v_imps;
+   i_res \<leftarrow> interp_instantiate_init_m s m v_imps;
    case i_res of
      (s', RI_res_m inst v_exps init_es) \<Rightarrow>
        do {

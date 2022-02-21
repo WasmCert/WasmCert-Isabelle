@@ -1370,6 +1370,9 @@ module WasmRef_Isa : sig
       nat ->
         unit s_m_ext * (unit inst_m_ext * e list) ->
           (unit -> (unit s_m_ext * res))
+  val interp_instantiate_init_m :
+    unit s_m_ext ->
+      unit m_ext -> v_ext list -> (unit -> (unit s_m_ext * res_inst_m))
   val make_empty_frame_m : 'a heap -> (unit -> ('a array * unit inst_m_ext))
   val run_invoke_v_m :
     nat ->
@@ -1385,9 +1388,6 @@ module WasmRef_Isa : sig
   val make_empty_store_m : (unit -> unit s_m_ext)
   val run_invoke_m :
     unit s_m_ext * (v list * nat) -> (unit -> (unit s_m_ext * res))
-  val interp_instantiate_init_m :
-    unit s_m_ext ->
-      unit m_ext -> v_ext list -> (unit -> (unit s_m_ext * res_inst_m))
 end = struct
 
 type int = Int_of_integer of Z.t;;
@@ -6785,6 +6785,31 @@ let rec run_instantiate_m
          in
         (let (Config_m (_, sa, _, _), res) = a in (fun () -> (sa, res))) ()));;
 
+let rec interp_instantiate_init_m
+  s m v_imps =
+    (fun () ->
+      (let a = interp_instantiate_m s m v_imps () in
+        (match a
+          with (sa, RI_crash_m res_error) ->
+            (fun () -> (sa, RI_crash_m res_error))
+          | (sa, RI_trap_m literal) -> (fun () -> (sa, RI_trap_m literal))
+          | (sa, RI_res_m (inst, v_exps, init_es)) ->
+            (fun f_ () -> f_
+              ((run_instantiate_m
+                 (power power_nat (nat_of_integer (Z.of_int 2))
+                   (nat_of_integer (Z.of_int 63)))
+                 (nat_of_integer (Z.of_int 300)) (sa, (inst, init_es)))
+              ()) ())
+              (fun aa ->
+                (match aa with (sb, RCrash r) -> (fun () -> (sb, RI_crash_m r))
+                  | (sb, RTrap r) -> (fun () -> (sb, RI_trap_m r))
+                  | (sb, RValue []) ->
+                    (fun () -> (sb, RI_res_m (inst, v_exps, [])))
+                  | (sb, RValue (_ :: _)) ->
+                    (fun () ->
+                      (sb, RI_crash_m (Error_invalid "start function"))))))
+          ()));;
+
 let rec make_empty_frame_m _A
   = (fun () ->
       (let f_locs1 = (fun () -> Array.of_list []) () in
@@ -6811,7 +6836,7 @@ let rec run_invoke_v_m
 let rec run_fuzz
   n d s m v_imps v_args =
     (fun () ->
-      (let a = interp_instantiate_m s m v_imps () in
+      (let a = interp_instantiate_init_m s m v_imps () in
         (match a with (sa, RI_crash_m res) -> (fun () -> (sa, RCrash res))
           | (sa, RI_trap_m msg) -> (fun () -> (sa, RTrap msg))
           | (sa, RI_res_m (inst, v_exps, init_es)) ->
@@ -6858,30 +6883,5 @@ let rec run_invoke_m
         (power power_nat (nat_of_integer (Z.of_int 2))
           (nat_of_integer (Z.of_int 63)))
         (nat_of_integer (Z.of_int 300)) x;;
-
-let rec interp_instantiate_init_m
-  s m v_imps =
-    (fun () ->
-      (let a = interp_instantiate_m s m v_imps () in
-        (match a
-          with (sa, RI_crash_m res_error) ->
-            (fun () -> (sa, RI_crash_m res_error))
-          | (sa, RI_trap_m literal) -> (fun () -> (sa, RI_trap_m literal))
-          | (sa, RI_res_m (inst, v_exps, init_es)) ->
-            (fun f_ () -> f_
-              ((run_instantiate_m
-                 (power power_nat (nat_of_integer (Z.of_int 2))
-                   (nat_of_integer (Z.of_int 63)))
-                 (nat_of_integer (Z.of_int 300)) (sa, (inst, init_es)))
-              ()) ())
-              (fun aa ->
-                (match aa with (sb, RCrash r) -> (fun () -> (sb, RI_crash_m r))
-                  | (sb, RTrap r) -> (fun () -> (sb, RI_trap_m r))
-                  | (sb, RValue []) ->
-                    (fun () -> (sb, RI_res_m (inst, v_exps, [])))
-                  | (sb, RValue (_ :: _)) ->
-                    (fun () ->
-                      (sb, RI_crash_m (Error_invalid "start function"))))))
-          ()));;
 
 end;; (*struct WasmRef_Isa*)
