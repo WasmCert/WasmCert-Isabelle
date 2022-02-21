@@ -193,28 +193,11 @@ qed
 
 (*  heap rules, lemmas etc. about the assertions *)
 
-lemma cl_m_agree_type: "cl_m_agree i_s cl cl_m \<Longrightarrow> cl_type cl = cl_m_type cl_m"
-  unfolding cl_m_agree_j_def cl_type_def cl_m_type_def
-  by (auto, simp split:cl.splits cl_m.splits)
-
 lemma pure_dup:
   assumes "is_pure_assn P" 
   shows "P = P*P" 
   using assms unfolding is_pure_assn_def
   by auto
-
-lemma [sep_heap_rules]: "<tabinst_m_assn t t_m> 
-    Array.len (fst t_m) 
-    <\<lambda>r. tabinst_m_assn t t_m * \<up>(r=length (fst t))>"
-  unfolding tabinst_m_assn_def
-  by (sep_auto split: prod.splits)
-
-lemma [sep_heap_rules]: "<tabinst_m_assn t t_m> 
-    Array.nth (fst t_m) x
-    <\<lambda>r. tabinst_m_assn t t_m * \<up>(r=(fst t)!x)>"
-  unfolding tabinst_m_assn_def
-  by (sep_auto split: prod.splits)
-
 
 lemma funcs_nth_type_triple:"<funcs_m_assn i_s cls cls_m> 
     Array.nth cls_m i  
@@ -225,12 +208,6 @@ lemma funcs_nth_type_triple:"<funcs_m_assn i_s cls cls_m>
   apply(sep_auto)
   using cl_m_agree_type unfolding list_all2_conv_all_nth
   by metis  
-
-lemma [sep_heap_rules]: "<mem_m_assn m mi> 
-    len_byte_array (fst mi) 
-    <\<lambda>r. mem_m_assn m mi * \<up>(r=length (Rep_mem_rep (fst m)))>"
-  unfolding mem_m_assn_def
-  by (sep_auto split: prod.splits)
 
 definition "fc_m_assn_pure fc fc_m \<equiv> (
   case fc of Frame_context redex lcs nf f \<Rightarrow> 
@@ -1086,4 +1063,24 @@ next
 qed
 
 
+lemma run_v_m_triple: 
+  assumes "inst_at (is, i_ms) (f_inst f, f_inst2) j" 
+  shows "< s_m_assn (is, i_ms) s s_m * inst_store_assn (is, i_ms) * locs_m_assn (f_locs f) f_locs1 > 
+  run_v_m n d (s_m, f_locs1, f_inst2, b_es) 
+  <\<lambda>(s_m', res_m). let (s', res) = run_v n d (s, f, b_es) in \<up>(res_m = res) 
+  * s_m_assn (is, i_ms) s' s_m' * inst_store_assn (is, i_ms) >\<^sub>t"
+proof - 
+  have 1:"s_m_assn (is, i_ms) s s_m * inst_store_assn (is, i_ms) * locs_m_assn (f_locs f) f_locs1
+      \<Longrightarrow>\<^sub>A cfg_m_assn (is, i_ms)
+      (Config d s (Frame_context (Redex [] [] b_es) [] 0 f) [])
+      (Config_m d s_m (Frame_context_m (Redex [] [] b_es) [] 0 f_locs1 f_inst2) [])"
+    using assms
+    unfolding cfg_m_assn_def fc_m_assn_def fcs_m_assn_def by (sep_auto)
+    
+  show ?thesis 
+    apply(rule cons_pre_rule[OF 1])
+    apply(sep_auto heap:run_iter_m_triple split:config.splits config_m.splits prod.splits)
+    apply(sep_auto simp:cfg_m_assn_def)
+    done
+qed
 end

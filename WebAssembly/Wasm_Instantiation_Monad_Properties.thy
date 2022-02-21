@@ -1,7 +1,7 @@
 theory Wasm_Instantiation_Monad_Properties 
   imports "../libs/Misc_Generic_Lemmas" "../libs/List_Assn" 
     Wasm_Instantiation_Monad Wasm_Monad_Assertions Wasm_Instantiation_Properties     
-    
+    Wasm_Interpreter_Monad_Properties
     
 begin
 
@@ -281,4 +281,134 @@ proof -
   apply(sep_auto)
   done
 qed
+
+lemma list_all2_m_decon: 
+  assumes "\<And> x y. <P> f_m x y <\<lambda>r. \<up>(r = f x y) * P>"
+  assumes "P \<Longrightarrow>\<^sub>A Q' (list_all2 f xs ys)"
+  shows 
+    "<P> list_all2_m f_m xs ys <Q'>"
+  using assms
+proof(induct xs ys arbitrary:P Q' rule:list_induct2')
+  case 1
+  then show ?case by sep_auto
+next
+  case (2 x xs) then show ?case by sep_auto
+next
+  case (3 y ys) then show ?case by sep_auto
+next
+  case (4 x xs y ys)
+
+  show ?case 
+  apply(sep_auto)
+    apply(sep_auto heap:4(2))
+    apply(sep_auto heap:4(1)[where Q'="\<lambda>r. Q' (f x y \<and> r) ",OF 4(2) 4(3)[simplified]])
+    done
+qed
+
+abbreviation "external_typing_m_triple_abbv i_s s s_m v_imp t_imp \<equiv> 
+  < s_m_assn i_s s s_m > 
+  external_typing_m s_m v_imp t_imp 
+  <\<lambda>r. \<up>(r = external_typing s v_imp t_imp) * s_m_assn i_s s s_m>"
+
+lemma external_typing_m_func_triple:
+  "external_typing_m_triple_abbv i_s s s_m (Ext_func i) (Te_func tf)"
+  unfolding s_m_assn_def funcs_m_assn_def external_typing.simps list_all2_conv_all_nth
+  apply(sep_auto)
+    apply(metis cl_m_agree_type)
+   apply(metis cl_m_agree_type)
+  apply(sep_auto)
+  done
+
+lemma external_typing_m_tab_triple:
+  "external_typing_m_triple_abbv i_s s s_m (Ext_tab i) (Te_tab tt)"
+  unfolding s_m_assn_def tabs_m_assn_def  external_typing.simps list_assn_conv_idx
+  apply(sep_auto)
+    apply(extract_pre_pure)
+    apply(extract_list_idx i)
+    apply(sep_auto)
+   apply(extract_pre_pure)
+   apply(sep_auto)
+     apply(sep_auto simp:tab_typing_def tabinst_m_assn_def split:prod.splits)
+    apply(sep_auto simp:tab_typing_def tabinst_m_assn_def split:prod.splits)
+   apply(reinsert_list_idx i, sep_auto)
+  apply(extract_pre_pure, sep_auto)
+  done    
+
+lemma external_typing_m_mem_triple:
+  "external_typing_m_triple_abbv i_s s s_m (Ext_mem i) (Te_mem mt)"
+  unfolding s_m_assn_def mems_m_assn_def external_typing.simps list_assn_conv_idx
+  apply(sep_auto)
+    apply(extract_pre_pure)
+    apply(extract_list_idx i)
+    apply(sep_auto)
+   apply(extract_pre_pure)
+   apply(sep_auto)
+     apply(sep_auto simp:mem_typing_def mem_m_assn_def mem_size_def mem_length_def mem_rep_length_def
+    mem_max_def split:prod.splits)
+    apply(sep_auto simp:mem_typing_def mem_m_assn_def mem_size_def mem_length_def mem_rep_length_def
+    mem_max_def split:prod.splits)
+   apply(reinsert_list_idx i, sep_auto)
+  apply(extract_pre_pure, sep_auto)
+  done
+
+lemma external_typing_m_glob_triple:
+  "external_typing_m_triple_abbv i_s s s_m (Ext_glob i) (Te_glob gt)"
+  unfolding s_m_assn_def globs_m_assn_def external_typing.simps by sep_auto
+
+fun v_ext_extern_t_agree :: "v_ext \<Rightarrow> extern_t \<Rightarrow> bool" where 
+  "v_ext_extern_t_agree (Ext_func i) (Te_func tf) = True" 
+| "v_ext_extern_t_agree (Ext_tab i) (Te_tab tt)   = True" 
+| "v_ext_extern_t_agree (Ext_mem i) (Te_mem mt)   = True" 
+| "v_ext_extern_t_agree (Ext_glob i) (Te_glob gt) = True" 
+| "v_ext_extern_t_agree _ _                       = False" 
+
+lemma external_typing_m_triple: 
+  "external_typing_m_triple_abbv i_s s s_m v_imp t_imp"
+proof(cases "v_ext_extern_t_agree v_imp t_imp")
+  case True
+  show ?thesis 
+    supply [sep_heap_rules] = external_typing_m_func_triple external_typing_m_tab_triple
+    external_typing_m_mem_triple external_typing_m_glob_triple
+    and [simp del] = external_typing_m.simps
+    by(insert True, cases v_imp, (cases t_imp, sep_auto+)+)
+next
+  case False
+  show ?thesis 
+    supply [simp] = external_typing.simps
+    by(insert False, cases v_imp, (cases t_imp, sep_auto+)+)
+qed
+
+
+lemma interp_get_v_m_triple:
+  "< s_m_assn is s s_m * inst_m_assn inst inst_m > 
+  interp_get_v_m s_m inst_m b_es
+  <\<lambda>r.\<up>(r = interp_get_v s inst b_es) * s_m_assn is s s_m * inst_m_assn inst inst_m >"
+proof - 
+  note 1 = run_iter_m_triple[of _ 
+      "Config _ _ (Frame_context (Redex [] [] b_es) [] 0 _) _"
+      "Config_m _ _ (Frame_context_m (Redex [] [] b_es) [] 0 _ inst_m) _", 
+      simplified cfg_m_assn_def fc_m_assn_def 
+      config.case config_m.case frame_context.case frame_context_m.case]
+
+  show ?thesis
+  unfolding interp_get_v_m_def
+  apply(sep_auto)
+  
+  sorry
+
+qed 
+
+lemma interp_instantiate_m_triple: 
+  "< s_m_assn i_s s s_m * inst_store_assn i_s > 
+  interp_instantiate_m s_m m v_imps 
+  <\<lambda>(s_m', res_m). let (s', res) = interp_instantiate s m v_imps in 
+  \<exists>\<^sub>Ai_s'. s_m_assn i_s' s' s_m' * inst_store_assn i_s'  >"
+  supply [simp del] = list_all2_m.simps
+  apply(sep_auto)
+    apply(vcg decon:list_all2_m_decon)
+     apply(sep_auto heap:external_typing_m_triple)
+    apply(solve_entails)
+  apply(sep_auto)
+  sorry
+
 end

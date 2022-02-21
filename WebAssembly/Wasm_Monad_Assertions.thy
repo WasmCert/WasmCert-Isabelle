@@ -124,6 +124,29 @@ definition cfg_m_assn :: "inst_store \<Rightarrow> config \<Rightarrow> config_m
 
 
 
+lemma cl_m_agree_type: "cl_m_agree i_s cl cl_m \<Longrightarrow> cl_type cl = cl_m_type cl_m"
+  unfolding cl_m_agree_j_def cl_type_def cl_m_type_def
+  by (auto, simp split:cl.splits cl_m.splits)
+
+
+lemma [sep_heap_rules]: "<tabinst_m_assn t t_m> 
+    Array.len (fst t_m) 
+    <\<lambda>r. tabinst_m_assn t t_m * \<up>(r=length (fst t))>"
+  unfolding tabinst_m_assn_def
+  by (sep_auto split: prod.splits)
+
+lemma [sep_heap_rules]: "<tabinst_m_assn t t_m> 
+    Array.nth (fst t_m) x
+    <\<lambda>r. tabinst_m_assn t t_m * \<up>(r=(fst t)!x)>"
+  unfolding tabinst_m_assn_def
+  by (sep_auto split: prod.splits)
+
+lemma [sep_heap_rules]: "<mem_m_assn m mi> 
+    len_byte_array (fst mi) 
+    <\<lambda>r. mem_m_assn m mi * \<up>(r=length (Rep_mem_rep (fst m)))>"
+  unfolding mem_m_assn_def
+  by (sep_auto split: prod.splits)
+
 (* misc triples *)
 
 abbreviation "fits_at_in l n la \<equiv> (length l > 0 \<longrightarrow> n+length l \<le> length la)"
