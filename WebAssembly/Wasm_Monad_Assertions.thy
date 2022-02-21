@@ -126,7 +126,7 @@ definition cfg_m_assn :: "inst_store \<Rightarrow> config \<Rightarrow> config_m
 
 (* misc triples *)
 
-abbreviation "fits_at_in l n la \<equiv> case l of [] \<Rightarrow> True | x#xs \<Rightarrow> n+length l \<le> length la"
+abbreviation "fits_at_in l n la \<equiv> (length l > 0 \<longrightarrow> n+length l \<le> length la)"
 
 abbreviation "insert_at_in l n la \<equiv> take n la @ l @ drop (n+length l) la"
 
