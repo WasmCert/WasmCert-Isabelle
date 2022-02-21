@@ -906,6 +906,27 @@ lemma funcs_nth_triple_s:
   unfolding s_m_assn_def funcs_m_assn_def
   by (sep_auto heap:funcs_nth_triple heap del:nth_rule simp:list_all2_conv_all_nth)
 
+lemma app_s_f_init_mem_m_triple: 
+  assumes "inst_at (is, i_ms) (f_inst f, f_inst2) j"
+  shows
+ "< mems_m_assn ms ms_m * inst_store_assn (is, i_ms)> 
+  app_s_f_init_mem_m n bs ms_m f_inst2
+  <\<lambda>r. let (ms', res) = app_s_f_init_mem n bs ms f in
+  \<up>(r = res) *  mems_m_assn ms' ms_m * inst_store_assn (is, i_ms)>"
+  using assms
+  unfolding mems_m_assn_def app_s_f_init_mem_m_def list_assn_conv_idx inst_m_assn_def
+  supply [sep_heap_rules] = init_mem_triple
+  apply(sep_auto)
+   apply(knock_down j)
+  apply(sep_auto)
+   apply(extract_list_idx "inst.mems (f_inst f) ! 0")
+   apply(sep_auto)
+  apply(sep_auto simp:app_s_f_init_mem_def smem_ind_def 
+      split:prod.splits option.splits list.splits)
+    apply(rule listI_assn_reinsert, frame_inference, simp, simp, sep_auto)
+  apply(sep_auto)
+  apply(rule listI_assn_reinsert_upd, frame_inference, simp, simp, sep_auto)
+  done
 
 lemma run_step_e_m_triple:
     "<cfg_m_assn i_s cfg cfg_m> 
@@ -959,7 +980,8 @@ proof -
     then show ?thesis unfolding unfold_vars by sep_auto
   next
     case (Init_mem x61 x62)
-    then show ?thesis sorry
+    then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
+      by (sep_auto heap:app_s_f_init_mem_m_triple split:prod.splits)
   next
     case (Init_tab x71 x72)
     then show ?thesis sorry
