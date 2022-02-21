@@ -191,26 +191,25 @@ lemma alloc_globs_equiv_full:"alloc_globs s m_gs gvs
   using alloc_globs_equiv alloc_globs_range
   by (metis surjective_pairing) 
 
-lemma cl_m_assn_mono_l: 
-  assumes "length i1 = length i_m1" "cl_m_agree (i1, i_m1) cl cl_m" 
-  shows "cl_m_agree (i1@i2, i_m1@i_m2) cl cl_m"
+lemma cl_m_agree_extend: 
+  assumes "cl_m_agree (is, i_ms) cl cl_m" 
+  shows "length is = length i_ms   \<Longrightarrow> cl_m_agree (is@is', i_ms@i_ms') cl cl_m"
+        "length is' = length i_ms' \<Longrightarrow> cl_m_agree (is'@is, i_ms'@i_ms) cl cl_m"
 proof -
-  obtain j where "cl_m_agree_j (i1, i_m1) j cl cl_m" using assms(2) by auto
-  then have "cl_m_agree_j (i1@i2, i_m1@i_m2) j cl cl_m" 
-    unfolding cl_m_agree_j_def using assms(1) by (simp split:cl.splits cl_m.splits) 
-  then show ?thesis by auto
+  obtain j where j_def:"cl_m_agree_j (is, i_ms) j cl cl_m" using assms(1) by auto
+  
+  have "length is = length i_ms \<Longrightarrow> cl_m_agree_j (is@is', i_ms@i_ms') j cl cl_m"
+    using assms(1) j_def unfolding cl_m_agree_j_def by (simp split:cl.splits cl_m.splits) 
+  then show 
+    "length is = length i_ms \<Longrightarrow> cl_m_agree (is@is', i_ms@i_ms') cl cl_m" by auto
+
+  have "length is' = length i_ms' \<Longrightarrow> cl_m_agree_j (is'@is, i_ms'@i_ms) (j+length is') cl cl_m" 
+    using assms(1) j_def unfolding cl_m_agree_j_def 
+    by (simp split:cl.splits cl_m.splits add:nth_append) 
+  then show 
+    "length is' = length i_ms' \<Longrightarrow> cl_m_agree (is'@is, i_ms'@i_ms) cl cl_m" by auto
 qed
 
-lemma cl_m_assn_mono_r: 
-  assumes "length i1 = length i_m1" "cl_m_agree (i2, i_m2) cl cl_m" 
-  shows "cl_m_agree (i1@i2, i_m1@i_m2) cl cl_m"
-proof -
-  obtain j where "cl_m_agree_j (i2, i_m2) j cl cl_m" using assms(2) by auto
-  then have "cl_m_agree_j (i1@i2, i_m1@i_m2) (j+length i1) cl cl_m" 
-    unfolding cl_m_agree_j_def using assms(1) 
-    by (simp split:cl.splits cl_m.splits add:nth_append) 
-  then show ?thesis by auto
-qed
 
 lemma list_assn_split:"list_assn P xs1 ys1 * list_assn P xs2 ys2
    \<Longrightarrow>\<^sub>A list_assn P (xs1 @ xs2) (ys1 @ ys2) "
@@ -260,9 +259,9 @@ proof -
     todo: possibly a better way *)
    apply(rule list_all2_appendI)
     apply(rule_tac list_all2_mono[of "cl_m_agree (is, i_ms)"])
-     apply(auto simp add:cl_m_assn_mono_l)
+     apply(auto simp add:cl_m_agree_extend(1))
    apply(rule_tac list_all2_mono[of "cl_m_agree ([_], [_])"])
-    apply (auto, metis (no_types, lifting) cl_m_assn_mono_r)
+    apply (auto, metis (no_types, lifting) cl_m_agree_extend(2))
 
   apply(subst (asm) (1) list_all2_extract_length, auto)
     (* split the list_assn containing @ *)
