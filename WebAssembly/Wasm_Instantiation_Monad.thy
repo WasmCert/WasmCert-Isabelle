@@ -137,7 +137,7 @@ definition interp_alloc_module_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext lis
     s_funcs \<leftarrow> Array.new (length_funcs_s + length (m_funcs m)) dummy_func;
     s_tabs \<leftarrow> Array.new (length_tabs_s + length (m_tabs m)) dummy_tab;
     s_mems \<leftarrow> Array.new (length_mems_s + length (m_mems m)) dummy_mem;
-    s_globs \<leftarrow> Array.new (length_globs_s + length (m_globs m)) dummy_glob;
+    s_globs \<leftarrow> Array.new (length_globs_s + min (length (m_globs m)) (length gvs)) dummy_glob;
     blit (s_m.funcs s_m) 0 s_funcs 0 length_funcs_s;
     blit (s_m.tabs s_m) 0 s_tabs 0 length_tabs_s;
     blit (s_m.mems s_m) 0 s_mems 0 length_mems_s;

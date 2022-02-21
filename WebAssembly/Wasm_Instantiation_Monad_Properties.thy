@@ -23,33 +23,6 @@ next
     done
 qed
 
-(*todo: better name *)
-(*abbreviation "list1_assn P xs \<equiv> List.fold (\<lambda>x acc. acc * P x) xs emp" *)
-fun list1_assn :: "('a \<Rightarrow> assn) \<Rightarrow> 'a list \<Rightarrow> assn" where
-  "list1_assn P [] = emp"
-| "list1_assn P (a#as) = P a * list1_assn P as"
-
-
-lemma fold_map_triple':
-  assumes "\<And> i. i < length xs \<Longrightarrow> <P (xs!i)> f (xs!i) <\<lambda>r. Q (xs!i) r>"
-  shows "<list1_assn P xs> 
-  Heap_Monad.fold_map f xs 
-  <\<lambda>r. list_assn Q xs r>"
-  using assms 
-proof(induct xs)
-  case Nil
-  then show ?case by sep_auto
-next
-  case (Cons a xs)
-
-  have 1:"<P a> f a <\<lambda>r. Q a r>" using Cons(2)[of 0] by simp
-  have 2:"\<And> i. i < length xs \<Longrightarrow> <P (xs!i)> f (xs!i) <\<lambda>r. Q (xs!i) r>" 
-    using Cons(2) 
-    by (metis Suc_less_eq length_Cons nth_Cons_Suc)
-  show ?case 
-    by (sep_auto heap:1 Cons(1)[OF 2])
-qed
-
 lemma fold_map_triple:
   assumes "\<And> x. <F> f x <\<lambda>r. Q x r * F>"
   shows "<F> 
@@ -65,36 +38,6 @@ next
     by (sep_auto heap:Cons(2) Cons(1)[OF Cons(2)])
 qed
 
-
-lemma array_blit_map_triple':
-  assumes  "\<And> i. i < length xs \<Longrightarrow> <P (xs!i)> f (xs!i) <\<lambda>r. Q (xs!i) r>"
-  shows 
-    "<a \<mapsto>\<^sub>a la * list1_assn P xs> 
-    array_blit_map xs f a n
-    <\<lambda>r. \<exists>\<^sub>Ays. \<up>(fits_at_in xs n la)
-  *  a \<mapsto>\<^sub>a insert_at_in ys n la 
-  * list_assn Q xs ys>"
-proof -
-  {
-    fix ys
-    have "<a \<mapsto>\<^sub>a la * list_assn Q xs ys> 
-    list_blit_array ys a n
-    <\<lambda>r.\<up>(fits_at_in xs n la)
-  *  a \<mapsto>\<^sub>a insert_at_in ys n la 
-  * list_assn Q xs ys>"
-      supply [simp del] = list_blit_array.simps
-      apply(extract_pre_pure)
-      apply(sep_auto heap: list_blit_array_triple split:list.splits)
-      done
-  }
-  note 1 = this
-
-  show ?thesis 
-    supply [simp del] = list_blit_array.simps
-    apply(sep_auto heap:fold_map_triple'[where P=P and Q=Q, OF assms] )
-    apply(sep_auto heap:1)
-    done 
-qed 
 
 lemma array_blit_map_triple:
   assumes  "\<And> x. <F> f x <\<lambda>r. Q x r * F>"
@@ -138,7 +81,6 @@ lemma array_blit_map_triple_emp:
 
 abbreviation "module_func_to_cl inst inst_types \<equiv> 
   (\<lambda>(i_t, loc_ts, b_es). cl.Func_native inst (inst_types!i_t) loc_ts b_es)"
-
 
 abbreviation "alloc_funcs_simple' m_fs inst inst_types \<equiv> 
   map (\<lambda>m_f. module_func_to_cl inst inst_types m_f) m_fs" 
@@ -186,8 +128,6 @@ lemma alloc_mems_m_triple:
   apply(sep_auto simp:mem_mk_def mem_rep_mk_def bytes_replicate_def 
       zero_byte_def mem_rep.Abs_mem_rep_inverse)
   done
-
-
 
 
 (* todo: learn how to make this nicer *)
@@ -251,31 +191,83 @@ lemma alloc_globs_equiv_full:"alloc_globs s m_gs gvs
   using alloc_globs_equiv alloc_globs_range
   by (metis surjective_pairing) 
 
+lemma cl_m_assn_mono_l: 
+  assumes "length i1 = length i_m1" "cl_m_agree (i1, i_m1) cl cl_m" 
+  shows "cl_m_agree (i1@i2, i_m1@i_m2) cl cl_m"
+proof -
+  obtain j where "cl_m_agree_j (i1, i_m1) j cl cl_m" using assms(2) by auto
+  then have "cl_m_agree_j (i1@i2, i_m1@i_m2) j cl cl_m" 
+    unfolding cl_m_agree_j_def using assms(1) by (simp split:cl.splits cl_m.splits) 
+  then show ?thesis by auto
+qed
+
+lemma cl_m_assn_mono_r: 
+  assumes "length i1 = length i_m1" "cl_m_agree (i2, i_m2) cl cl_m" 
+  shows "cl_m_agree (i1@i2, i_m1@i_m2) cl cl_m"
+proof -
+  obtain j where "cl_m_agree_j (i2, i_m2) j cl cl_m" using assms(2) by auto
+  then have "cl_m_agree_j (i1@i2, i_m1@i_m2) (j+length i1) cl cl_m" 
+    unfolding cl_m_agree_j_def using assms(1) 
+    by (simp split:cl.splits cl_m.splits add:nth_append) 
+  then show ?thesis by auto
+qed
+
+lemma list_assn_split:"list_assn P xs1 ys1 * list_assn P xs2 ys2
+   \<Longrightarrow>\<^sub>A list_assn P (xs1 @ xs2) (ys1 @ ys2) "
+  by (extract_pre_pure, sep_auto)
 
 
-lemma "< s_m_assn (is, i_ms) s s_m * inst_store_assn (is, i_ms)>
+lemma interp_alloc_module_m_triple:"< s_m_assn (is, i_ms) s s_m * inst_store_assn (is, i_ms)>
   interp_alloc_module_m s_m m imps gvs
   <\<lambda>(s_m', i_m, exps_m). let (s', i, exps) = interp_alloc_module s m imps gvs in 
-  \<up>(exps=exps_m) * inst_store_assn (is@[i], i_ms@[i_m]) * s_m_assn (is@[i], i_ms@[i_m]) s' s_m' >"
-  unfolding interp_alloc_module_m_def make_empty_inst_m_def
-    s_m_assn_def funcs_m_assn_def tabs_m_assn_def mems_m_assn_def globs_m_assn_def
-  supply [simp del] = array_blit_map.simps
-  
-  apply(sep_auto)
-   apply(sep_auto heap:alloc_funcs_m_triple)
-  apply(sep_auto)
-   apply(sep_auto heap:alloc_tabs_m_triple)
-  apply(sep_auto)
-   apply(sep_auto heap:alloc_mems_m_triple)
-  apply(sep_auto)
-   apply(sep_auto heap:alloc_globs_m_triple)
-  apply(sep_auto)
-   apply(sep_auto heap:get_exports_m_triple)
-  apply(sep_auto)
+  \<up>(exps=exps_m) * inst_store_assn (is@[i], i_ms@[i_m]) * s_m_assn (is@[i], i_ms@[i_m]) s' s_m' >\<^sub>t"
+proof - 
+  have list_all2_extract_length:
+    "\<And>P xs ys. list_all2 P xs ys = (length xs = length ys \<and> list_all2 P xs ys)"
+    using list_all2_lengthD by auto
 
+  have post_star_assoc:"\<And>A P Q R. (A \<Longrightarrow>\<^sub>A P * (Q * R)) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A P * Q * R)"
+    by (simp add: assn_aci(9))
+
+  have post_rule:"\<And>A P Q1 Q2 R. (Q1 \<Longrightarrow>\<^sub>A Q2) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A P * Q1 * R) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A P * Q2 * R)"
+    by (meson ent_refl ent_star_mono ent_trans)
+
+  show ?thesis
+  unfolding s_m_assn_def funcs_m_assn_def tabs_m_assn_def 
+    mems_m_assn_def globs_m_assn_def inst_m_assn_def
+    (* unfolding and simplifying interp_alloc_module immediately
+    to reduce the load on sep_auto later *)
+    interp_alloc_module_def alloc_funcs_equiv_full alloc_funcs_simple_conv 
+      alloc_tabs_equiv_full alloc_mems_equiv_full alloc_globs_equiv_full
+  apply(sep_auto simp:Let_def)
+
+    (* now proceeding with vcg steps *)
+  supply [simp del] = array_blit_map.simps
+  unfolding interp_alloc_module_m_def make_empty_inst_m_def
+    (* each line separately to have it look less stuck *)
+  apply(sep_auto heap:alloc_funcs_m_triple)
+   apply(sep_auto heap:alloc_tabs_m_triple)
+   apply(sep_auto heap:alloc_mems_m_triple)
+   apply(sep_auto heap:alloc_globs_m_triple)
+  apply(sep_auto, sep_auto heap:get_exports_m_triple)
   apply(extract_pre_pure)
-  apply(sep_auto simp:interp_alloc_module_def Let_def split:prod.splits) (* takes a while *)
-  apply(sep_auto simp:alloc_funcs_equiv_full alloc_funcs_simple_conv 
-      alloc_tabs_equiv_full alloc_mems_equiv_full alloc_globs_equiv_full)
-  sorry
+    (* todo: find a better way of extracting length information from the hypotheses *)
+  apply(subst (asm) (1) list_all2_extract_length)  
+
+  apply(sep_auto) (* takes a while *)
+
+  (* deal with the list_all2 schematic goals 
+    todo: possibly a better way *)
+   apply(rule list_all2_appendI)
+    apply(rule_tac list_all2_mono[of "cl_m_agree (is, i_ms)"])
+     apply(auto simp add:cl_m_assn_mono_l)
+   apply(rule_tac list_all2_mono[of "cl_m_agree ([_], [_])"])
+    apply (auto, metis (no_types, lifting) cl_m_assn_mono_r)
+
+  apply(subst (asm) (1) list_all2_extract_length, auto)
+    (* split the list_assn containing @ *)
+  apply(rule post_rule[OF list_assn_split] | rule post_star_assoc)+
+  apply(sep_auto)
+  done
+qed
 end
