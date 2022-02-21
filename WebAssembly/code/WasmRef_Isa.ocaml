@@ -946,6 +946,7 @@ module WasmRef_Isa : sig
   val array_nth : 'a heap -> 'a array -> nat -> (unit -> 'a)
   val upd : 'a heap -> nat -> 'a -> 'a array -> (unit -> ('a array))
   val drop : nat -> 'a list -> 'a list
+  val find : ('a -> bool) -> 'a list -> 'a option
   val null : 'a list -> bool
   val last : 'a list -> 'a
   val take_tr : nat -> 'a list -> 'a list -> 'a list
@@ -1178,19 +1179,37 @@ module WasmRef_Isa : sig
     tf -> b_e list -> b_e list -> v list -> v list * (e list * res_step)
   val g_val_update : (v -> v) -> 'a global_ext -> 'a global_ext
   val typing : unit t_context_ext -> b_e list -> tf -> bool
-  val app_v_s_drop : v list -> v list * res_step
-  val app_v_s_unop : unop -> v list -> v list * res_step
-  val d_off : 'a module_data_ext -> b_e list
-  val e_off : 'a module_elem_ext -> b_e list
-  val e_tab : 'a module_elem_ext -> nat
-  val int32_minus_one : i32
-  val app_v_s_binop : binop -> v list -> v list * res_step
-  val app_v_s_br_if : nat -> v list -> v list * (e list * res_step)
-  val app_v_s_cvtop :
-    cvtop -> t -> t -> (sat * sx) option -> v list -> v list * res_step
-  val app_v_s_relop : relop -> v list -> v list * res_step
-  val split_v_s_b_s_aux : v list -> b_e list -> v list * b_e list
-  val split_v_s_b_s : b_e list -> v list * b_e list
+  val globsa : 'a inst_m_ext -> nat array
+  val funcsa : 'a inst_m_ext -> nat array
+  val tabsa : 'a inst_m_ext -> nat array
+  val memsa : 'a inst_m_ext -> nat array
+  val export_get_v_ext_m : unit inst_m_ext -> v_ext -> (unit -> v_ext)
+  val make_empty_inst_m : (unit -> unit inst_m_ext)
+  val list_blit_array : 'a heap -> 'a list -> 'a array -> nat -> (unit -> unit)
+  val array_blit_map :
+    'b heap ->
+      'a list -> ('a -> (unit -> 'b)) -> 'b array -> nat -> (unit -> unit)
+  val e_name : 'a module_export_ext -> string
+  val e_desc : 'a module_export_ext -> v_ext
+  val globs : 'a s_m_ext -> unit global_ext array
+  val funcs : 'a s_m_ext -> cl_m array
+  val new_zeroed_byte_array : nat -> (unit -> Bytes.t)
+  val tabs : 'a s_m_ext -> ((nat option) array * nat option) array
+  val mems : 'a s_m_ext -> (Bytes.t * nat option) array
+  val g_type : 'a module_glob_ext -> unit tg_ext
+  val interp_alloc_module_m :
+    unit s_m_ext ->
+      unit m_ext ->
+        v_ext list ->
+          v list ->
+            (unit ->
+              (unit s_m_ext * (unit inst_m_ext * unit module_export_ext list)))
+  val cl_m_type : cl_m -> tf
+  val tab_typing_m :
+    (nat option) array * nat option -> unit limit_t_ext -> (unit -> bool)
+  val divide_nat : nat -> nat -> nat
+  val mem_typing_m : Bytes.t * nat option -> unit limit_t_ext -> (unit -> bool)
+  val external_typing_m : unit s_m_ext -> v_ext -> extern_t -> (unit -> bool)
   val update_redex_return : redex -> v list -> redex
   val update_fc_return_m : frame_context_m -> v list -> frame_context_m
   val store_uint32_of_uint64 : Bytes.t -> nat -> int64 -> (unit -> unit)
@@ -1204,7 +1223,6 @@ module WasmRef_Isa : sig
   val i32_impl_rep : i32 -> int32
   val store_packed_m_v :
     Bytes.t * nat option -> nat -> nat -> v -> tp -> (unit -> (unit option))
-  val memsa : 'a inst_m_ext -> nat array
   val store_m_v :
     Bytes.t * nat option -> nat -> nat -> v -> (unit -> (unit option))
   val app_s_f_v_s_store_maybe_packed_m :
@@ -1232,15 +1250,12 @@ module WasmRef_Isa : sig
            nat ->
              (Bytes.t * nat option) array ->
                unit inst_m_ext -> v list -> (unit -> (v list * res_step))
-  val cl_m_type : cl_m -> tf
   val types : 'a inst_m_ext -> tf array
-  val tabsa : 'a inst_m_ext -> nat array
   val app_s_f_v_s_call_indirect_m :
     nat ->
       ((nat option) array * nat option) array ->
         cl_m array ->
           unit inst_m_ext -> v list -> (unit -> (v list * (e list * res_step)))
-  val globsa : 'a inst_m_ext -> nat array
   val app_s_f_v_s_set_global_m :
     nat ->
       unit global_ext array ->
@@ -1249,12 +1264,11 @@ module WasmRef_Isa : sig
     nat ->
       unit global_ext array ->
         unit inst_m_ext -> v list -> (unit -> (v list * res_step))
-  val divide_nat : nat -> nat -> nat
   val app_s_f_v_s_mem_size_m :
     (Bytes.t * nat option) array ->
       unit inst_m_ext -> v list -> (unit -> (v list * res_step))
-  val new_zeroed_byte_array : nat -> (unit -> Bytes.t)
   val grow_zeroed_byte_array : Bytes.t -> nat -> (unit -> Bytes.t)
+  val int32_minus_one : i32
   val app_s_f_v_s_mem_grow_m :
     (Bytes.t * nat option) array ->
       unit inst_m_ext -> v list -> (unit -> (v list * res_step))
@@ -1264,20 +1278,21 @@ module WasmRef_Isa : sig
     nat -> v array -> v list -> (unit -> (v list * res_step))
   val update_redex_step : redex -> v list -> e list -> redex
   val update_fc_step_m : frame_context_m -> v list -> e list -> frame_context_m
-  val funcsa : 'a inst_m_ext -> nat array
   val app_f_call_m : nat -> unit inst_m_ext -> (unit -> (e list * res_step))
   val app_v_s_tee_local : nat -> v list -> v list * (e list * res_step)
   val app_v_s_br_table :
     nat list -> nat -> v list -> v list * (e list * res_step)
-  val globs : 'a s_m_ext -> unit global_ext array
-  val funcs : 'a s_m_ext -> cl_m array
   val crash_invariant : res_step
-  val tabs : 'a s_m_ext -> ((nat option) array * nat option) array
-  val mems : 'a s_m_ext -> (Bytes.t * nat option) array
   val app_v_s_testop : testop -> v list -> v list * res_step
   val app_v_s_select : v list -> v list * res_step
+  val app_v_s_relop : relop -> v list -> v list * res_step
+  val app_v_s_cvtop :
+    cvtop -> t -> t -> (sat * sx) option -> v list -> v list * res_step
+  val app_v_s_br_if : nat -> v list -> v list * (e list * res_step)
+  val app_v_s_binop : binop -> v list -> v list * res_step
+  val app_v_s_unop : unop -> v list -> v list * res_step
+  val app_v_s_drop : v list -> v list * res_step
   val run_step_b_e_m : b_e -> config_m -> (unit -> (config_m * res_step))
-  val list_blit_array : 'a heap -> 'a list -> 'a array -> nat -> (unit -> unit)
   val init_tab_m_v :
     (nat option) array * nat option ->
       nat -> nat list -> (unit -> (unit option))
@@ -1300,85 +1315,76 @@ module WasmRef_Isa : sig
   val crash_exhaustion : res_step
   val run_step_e_m : e -> config_m -> (unit -> (config_m * res_step))
   val res_crash_fuel : res
+  val split_v_s_b_s_aux : v list -> b_e list -> v list * b_e list
+  val split_v_s_b_s : b_e list -> v list * b_e list
   val run_iter_m : nat -> config_m -> (unit -> (config_m * res))
   val run_v_m :
     nat ->
       nat ->
         unit s_m_ext * (v array * (unit inst_m_ext * b_e list)) ->
           (unit -> (unit s_m_ext * res))
-  val d_data : 'a module_data_ext -> nat
-  val d_init : 'a module_data_ext -> uint8 list
-  val e_init : 'a module_elem_ext -> nat list
-  val g_init : 'a module_glob_ext -> b_e list
-  val g_type : 'a module_glob_ext -> unit tg_ext
-  val local_update : (t list -> t list) -> 'a t_context_ext -> 'a t_context_ext
-  val module_start_type_checker_p : unit t_context_ext -> nat -> unit pred
-  val module_start_typing : unit t_context_ext -> nat -> bool
-  val return_update :
-    ((t list) option -> (t list) option) -> 'a t_context_ext -> 'a t_context_ext
-  val e_desc : 'a module_export_ext -> v_ext
-  val e_name : 'a module_export_ext -> string
-  val i_desc : 'a module_import_ext -> imp_desc
-  val gather_m_f_type : tf list -> nat * (t list * b_e list) -> tf option
-  val get_start_m : unit inst_m_ext -> nat option -> (unit -> (e list))
-  val list_all2_m :
-    ('a -> 'b -> (unit -> bool)) -> 'a list -> 'b list -> (unit -> bool)
-  val mem_typing_m : Bytes.t * nat option -> unit limit_t_ext -> (unit -> bool)
-  val tab_typing_m :
-    (nat option) array * nat option -> unit limit_t_ext -> (unit -> bool)
-  val array_blit_map :
-    'b heap ->
-      'a list -> ('a -> (unit -> 'b)) -> 'b array -> nat -> (unit -> unit)
-  val make_empty_inst_m : (unit -> unit inst_m_ext)
-  val make_empty_frame_m : 'a heap -> (unit -> ('a array * unit inst_m_ext))
-  val run_invoke_v_m :
-    nat ->
-      nat -> unit s_m_ext * (v list * nat) -> (unit -> (unit s_m_ext * res))
-  val run_m :
-    unit s_m_ext * (v array * (unit inst_m_ext * b_e list)) ->
-      (unit -> (unit s_m_ext * res))
-  val get_init_tab_m :
-    unit inst_m_ext -> nat -> unit module_elem_ext -> (unit -> e)
   val interp_get_v_m :
     unit s_m_ext -> unit inst_m_ext -> b_e list -> (unit -> v)
-  val module_export_typer : unit t_context_ext -> v_ext -> extern_t option
-  val module_import_typer : tf list -> imp_desc -> extern_t option
+  val interp_get_i32_m :
+    unit s_m_ext -> unit inst_m_ext -> b_e list -> (unit -> i32)
+  val e_init : 'a module_elem_ext -> nat list
+  val get_init_tab_m :
+    unit inst_m_ext -> nat -> unit module_elem_ext -> (unit -> e)
+  val get_init_tabs_m :
+    unit inst_m_ext ->
+      nat list -> unit module_elem_ext list -> (unit -> (e list))
+  val d_init : 'a module_data_ext -> uint8 list
+  val get_init_mems_m :
+    nat list -> unit module_data_ext list -> (unit -> (e list))
   val module_glob_type_checker :
     unit t_context_ext -> unit module_glob_ext -> bool
+  val return_update :
+    ((t list) option -> (t list) option) -> 'a t_context_ext -> 'a t_context_ext
+  val local_update : (t list -> t list) -> 'a t_context_ext -> 'a t_context_ext
   val module_func_type_checker :
     unit t_context_ext -> nat * (t list * b_e list) -> bool
   val module_elem_type_checker :
     unit t_context_ext -> unit module_elem_ext -> bool
   val module_data_type_checker :
     unit t_context_ext -> unit module_data_ext -> bool
+  val module_import_typer : tf list -> imp_desc -> extern_t option
+  val module_export_typer : unit t_context_ext -> v_ext -> extern_t option
+  val gather_m_f_type : tf list -> nat * (t list * b_e list) -> tf option
+  val i_desc : 'a module_import_ext -> imp_desc
+  val module_start_type_checker_p : unit t_context_ext -> nat -> unit pred
+  val module_start_typing : unit t_context_ext -> nat -> bool
   val module_type_checker : unit m_ext -> (extern_t list * extern_t list) option
-  val get_init_mems_m :
-    nat list -> unit module_data_ext list -> (unit -> (e list))
-  val get_init_tabs_m :
-    unit inst_m_ext ->
-      nat list -> unit module_elem_ext list -> (unit -> (e list))
+  val list_all2_m :
+    ('a -> 'b -> (unit -> bool)) -> 'a list -> 'b list -> (unit -> bool)
+  val get_start_m : unit inst_m_ext -> nat option -> (unit -> (e list))
+  val g_init : 'a module_glob_ext -> b_e list
+  val d_data : 'a module_data_ext -> nat
+  val e_tab : 'a module_elem_ext -> nat
+  val e_off : 'a module_elem_ext -> b_e list
+  val d_off : 'a module_data_ext -> b_e list
+  val interp_instantiate_m :
+    unit s_m_ext ->
+      unit m_ext -> v_ext list -> (unit -> (unit s_m_ext * res_inst_m))
   val run_instantiate_m :
     nat ->
       nat ->
         unit s_m_ext * (unit inst_m_ext * e list) ->
           (unit -> (unit s_m_ext * res))
-  val interp_get_i32_m :
-    unit s_m_ext -> unit inst_m_ext -> b_e list -> (unit -> i32)
+  val make_empty_frame_m : 'a heap -> (unit -> ('a array * unit inst_m_ext))
+  val run_invoke_v_m :
+    nat ->
+      nat -> unit s_m_ext * (v list * nat) -> (unit -> (unit s_m_ext * res))
+  val run_fuzz :
+    nat ->
+      nat ->
+        unit s_m_ext ->
+          unit m_ext -> v_ext list -> v list -> (unit -> (unit s_m_ext * res))
+  val run_m :
+    unit s_m_ext * (v array * (unit inst_m_ext * b_e list)) ->
+      (unit -> (unit s_m_ext * res))
   val make_empty_store_m : (unit -> unit s_m_ext)
-  val external_typing_m : unit s_m_ext -> v_ext -> extern_t -> (unit -> bool)
-  val export_get_v_ext_m : unit inst_m_ext -> v_ext -> (unit -> v_ext)
   val run_invoke_m :
     unit s_m_ext * (v list * nat) -> (unit -> (unit s_m_ext * res))
-  val interp_alloc_module_m :
-    unit s_m_ext ->
-      unit m_ext ->
-        v_ext list ->
-          v list ->
-            (unit ->
-              (unit s_m_ext * (unit inst_m_ext * unit module_export_ext list)))
-  val interp_instantiate_m :
-    unit s_m_ext ->
-      unit m_ext -> v_ext list -> (unit -> (unit s_m_ext * res_inst_m))
   val interp_instantiate_init_m :
     unit s_m_ext ->
       unit m_ext -> v_ext list -> (unit -> (unit s_m_ext * res_inst_m))
@@ -3832,6 +3838,9 @@ let rec drop
         (if equal_nat n zero_nat then x :: xs
           else drop (minus_nat n one_nata) xs);;
 
+let rec find uu x1 = match uu, x1 with uu, [] -> None
+               | p, x :: xs -> (if p x then Some x else find p xs);;
+
 let rec null = function [] -> true
                | x :: xs -> false;;
 
@@ -5068,95 +5077,340 @@ let rec g_val_update
 
 let rec typing x = b_e_type_checker x;;
 
-let rec app_v_s_drop
-  v_s = (match v_s with [] -> (v_s, crash_invalid)
-          | _ :: v_sa -> (v_sa, Step_normal));;
+let rec globsa (Inst_m_ext (types, funcs, tabs, mems, globs, more)) = globs;;
 
-let rec app_v_s_unop
-  unop v_s =
-    (match v_s with [] -> (v_s, crash_invalid)
-      | v1 :: v_sa -> (app_unop unop v1 :: v_sa, Step_normal));;
+let rec funcsa (Inst_m_ext (types, funcs, tabs, mems, globs, more)) = funcs;;
 
-let rec d_off (Module_data_ext (d_data, d_off, d_init, more)) = d_off;;
+let rec tabsa (Inst_m_ext (types, funcs, tabs, mems, globs, more)) = tabs;;
 
-let rec e_off (Module_elem_ext (e_tab, e_off, e_init, more)) = e_off;;
+let rec memsa (Inst_m_ext (types, funcs, tabs, mems, globs, more)) = mems;;
 
-let rec e_tab (Module_elem_ext (e_tab, e_off, e_init, more)) = e_tab;;
+let rec export_get_v_ext_m
+  inst exp =
+    (match exp
+      with Ext_func i ->
+        (fun () ->
+          (let x = array_nth heap_nat (funcsa inst) i () in Ext_func x))
+      | Ext_tab i ->
+        (fun () -> (let x = array_nth heap_nat (tabsa inst) i () in Ext_tab x))
+      | Ext_mem i ->
+        (fun () -> (let x = array_nth heap_nat (memsa inst) i () in Ext_mem x))
+      | Ext_glob i ->
+        (fun () ->
+          (let x = array_nth heap_nat (globsa inst) i () in Ext_glob x)));;
 
-let int32_minus_one : i32 = I32_impl_abs (Int32.neg Int32.one);;
+let make_empty_inst_m : (unit -> unit inst_m_ext)
+  = (fun () ->
+      (let f_inst2_types = (fun () -> Array.of_list []) () in
+       let f_inst2_funcs = (fun () -> Array.of_list []) () in
+       let f_inst2_tabs = (fun () -> Array.of_list []) () in
+       let f_inst2_mems = (fun () -> Array.of_list []) () in
+       let f_inst2_globs = (fun () -> Array.of_list []) () in
+        (let a =
+           Inst_m_ext
+             (f_inst2_types, f_inst2_funcs, f_inst2_tabs, f_inst2_mems,
+               f_inst2_globs, ())
+           in
+          (fun () -> a))
+          ()));;
 
-let rec app_v_s_binop
-  binop v_s =
-    (match v_s with [] -> (v_s, crash_invalid) | [_] -> (v_s, crash_invalid)
-      | v2 :: v1 :: v_sa ->
-        (match app_binop binop v1 v2
-          with None -> (v_sa, Res_trap (name typerep_binop binop))
-          | Some a -> (a :: v_sa, Step_normal)));;
+let rec list_blit_array _A
+  src_list dst dst_pos =
+    (match src_list with [] -> (fun () -> ())
+      | y :: ys ->
+        (fun () ->
+          (let _ = upd _A dst_pos y dst () in
+            list_blit_array _A ys dst (plus_nat dst_pos one_nata) ())));;
 
-let rec app_v_s_br_if
-  k v_s =
-    (match v_s with [] -> (v_s, ([], crash_invalid))
-      | ConstInt32 c :: v_sa ->
-        (if int_eq_i32 c zero_i32a then (v_sa, ([], Step_normal))
-          else (v_sa, ([Basic (Br k)], Step_normal)))
-      | ConstInt64 _ :: _ -> (v_s, ([], crash_invalid))
-      | ConstFloat32 _ :: _ -> (v_s, ([], crash_invalid))
-      | ConstFloat64 _ :: _ -> (v_s, ([], crash_invalid)));;
+let rec array_blit_map _B
+  src_list src_f dst dst_pos =
+    (fun () ->
+      (let ys = fold_map src_f src_list () in
+        list_blit_array _B ys dst dst_pos ()));;
 
-let rec app_v_s_cvtop
-  cvtop t1 t2 tp_sx v_s =
-    (match v_s with [] -> (v_s, crash_invalid)
-      | v1 :: v_sa ->
-        (if types_agree t1 v1
-          then (match cvtop
-                 with Convert ->
-                   (match cvt t2 tp_sx v1
-                     with None -> (v_sa, Res_trap (name typerep_cvtop cvtop))
-                     | Some a -> (a :: v_sa, Step_normal))
-                 | Reinterpret ->
-                   (if is_none tp_sx
-                     then (wasm_deserialise (bits v1) t2 :: v_sa, Step_normal)
-                     else (v_s, crash_invalid)))
-          else (v_s, crash_invalid)));;
+let rec e_name (Module_export_ext (e_name, e_desc, more)) = e_name;;
 
-let rec app_v_s_relop
-  relop v_s =
-    (match v_s with [] -> (v_s, crash_invalid) | [_] -> (v_s, crash_invalid)
-      | v2 :: v1 :: v_sa -> (app_relop relop v1 v2 :: v_sa, Step_normal));;
+let rec e_desc (Module_export_ext (e_name, e_desc, more)) = e_desc;;
 
-let rec split_v_s_b_s_aux
-  v_s x1 = match v_s, x1 with
-    v_s, EConst v :: b_es -> split_v_s_b_s_aux (v :: v_s) b_es
-    | v_s, [] -> (v_s, [])
-    | v_s, Unreachable :: va -> (v_s, Unreachable :: va)
-    | v_s, Nop :: va -> (v_s, Nop :: va)
-    | v_s, Drop :: va -> (v_s, Drop :: va)
-    | v_s, Select :: va -> (v_s, Select :: va)
-    | v_s, Block (vb, vc) :: va -> (v_s, Block (vb, vc) :: va)
-    | v_s, Loop (vb, vc) :: va -> (v_s, Loop (vb, vc) :: va)
-    | v_s, If (vb, vc, vd) :: va -> (v_s, If (vb, vc, vd) :: va)
-    | v_s, Br vb :: va -> (v_s, Br vb :: va)
-    | v_s, Br_if vb :: va -> (v_s, Br_if vb :: va)
-    | v_s, Br_table (vb, vc) :: va -> (v_s, Br_table (vb, vc) :: va)
-    | v_s, Return :: va -> (v_s, Return :: va)
-    | v_s, Call vb :: va -> (v_s, Call vb :: va)
-    | v_s, Call_indirect vb :: va -> (v_s, Call_indirect vb :: va)
-    | v_s, Get_local vb :: va -> (v_s, Get_local vb :: va)
-    | v_s, Set_local vb :: va -> (v_s, Set_local vb :: va)
-    | v_s, Tee_local vb :: va -> (v_s, Tee_local vb :: va)
-    | v_s, Get_global vb :: va -> (v_s, Get_global vb :: va)
-    | v_s, Set_global vb :: va -> (v_s, Set_global vb :: va)
-    | v_s, Load (vb, vc, vd, ve) :: va -> (v_s, Load (vb, vc, vd, ve) :: va)
-    | v_s, Store (vb, vc, vd, ve) :: va -> (v_s, Store (vb, vc, vd, ve) :: va)
-    | v_s, Current_memory :: va -> (v_s, Current_memory :: va)
-    | v_s, Grow_memory :: va -> (v_s, Grow_memory :: va)
-    | v_s, Unop (vb, vc) :: va -> (v_s, Unop (vb, vc) :: va)
-    | v_s, Binop (vb, vc) :: va -> (v_s, Binop (vb, vc) :: va)
-    | v_s, Testop (vb, vc) :: va -> (v_s, Testop (vb, vc) :: va)
-    | v_s, Relop (vb, vc) :: va -> (v_s, Relop (vb, vc) :: va)
-    | v_s, Cvtop (vb, vc, vd, ve) :: va -> (v_s, Cvtop (vb, vc, vd, ve) :: va);;
+let rec globs (S_m_ext (funcs, tabs, mems, globs, more)) = globs;;
 
-let rec split_v_s_b_s es = split_v_s_b_s_aux [] es;;
+let rec funcs (S_m_ext (funcs, tabs, mems, globs, more)) = funcs;;
+
+let rec new_zeroed_byte_array
+  n = (fun () ->  Bytes.make (Z.to_int (integer_of_nat n)) (Char.chr 0));;
+
+let rec tabs (S_m_ext (funcs, tabs, mems, globs, more)) = tabs;;
+
+let rec mems (S_m_ext (funcs, tabs, mems, globs, more)) = mems;;
+
+let rec g_type (Module_glob_ext (g_type, g_init, more)) = g_type;;
+
+let rec interp_alloc_module_m
+  s_m m imps gvs =
+    (fun () ->
+      (let length_funcs_s = len heap_cl_m (funcs s_m) () in
+       let length_tabs_s =
+         len (heap_prod (heap_array (typerep_option typerep_nat))
+               (heap_option heap_nat))
+           (tabs s_m) ()
+         in
+       let length_mems_s =
+         len (heap_prod heap_byte_array (heap_option heap_nat)) (mems s_m) () in
+       let length_globs_s = len (heap_global_ext heap_unit) (globs s_m) () in
+        (let i_fs =
+           upt length_funcs_s (plus_nat length_funcs_s (size_list (m_funcs m)))
+           in
+         let i_ts =
+           upt length_tabs_s (plus_nat length_tabs_s (size_list (m_tabs m))) in
+         let i_ms =
+           upt length_mems_s (plus_nat length_mems_s (size_list (m_mems m))) in
+         let i_gs =
+           upt length_globs_s
+             (plus_nat length_globs_s
+               (min ord_nat (size_list (m_globs m)) (size_list gvs)))
+           in
+          (fun f_ () -> f_ (((fun () -> Array.of_list (m_types m))) ()) ())
+            (fun inst_types ->
+              (fun f_ () -> f_
+                (((fun () -> Array.of_list
+                   (map_filter
+                      (fun a ->
+                        (match a with Ext_func aa -> Some aa | Ext_tab _ -> None
+                          | Ext_mem _ -> None | Ext_glob _ -> None))
+                      imps @
+                     i_fs)))
+                ()) ())
+                (fun inst_funcs ->
+                  (fun f_ () -> f_
+                    (((fun () -> Array.of_list
+                       (map_filter
+                          (fun a ->
+                            (match a with Ext_func _ -> None
+                              | Ext_tab aa -> Some aa | Ext_mem _ -> None
+                              | Ext_glob _ -> None))
+                          imps @
+                         i_ts)))
+                    ()) ())
+                    (fun inst_tabs ->
+                      (fun f_ () -> f_
+                        (((fun () -> Array.of_list
+                           (map_filter
+                              (fun a ->
+                                (match a with Ext_func _ -> None
+                                  | Ext_tab _ -> None | Ext_mem aa -> Some aa
+                                  | Ext_glob _ -> None))
+                              imps @
+                             i_ms)))
+                        ()) ())
+                        (fun inst_mems ->
+                          (fun f_ () -> f_
+                            (((fun () -> Array.of_list
+                               (map_filter
+                                  (fun a ->
+                                    (match a with Ext_func _ -> None
+                                      | Ext_tab _ -> None | Ext_mem _ -> None
+                                      | Ext_glob aa -> Some aa))
+                                  imps @
+                                 i_gs)))
+                            ()) ())
+                            (fun inst_globs ->
+                              (let inst_m =
+                                 Inst_m_ext
+                                   (inst_types, inst_funcs, inst_tabs,
+                                     inst_mems, inst_globs, ())
+                                 in
+                                (fun f_ () -> f_ (make_empty_inst_m ()) ())
+                                  (fun empty_inst ->
+                                    (fun f_ () -> f_
+                                      (((fun () -> Array.of_list [])) ()) ())
+                                      (fun empty_tab ->
+(fun f_ () -> f_ ((new_zeroed_byte_array zero_nat) ()) ())
+  (fun empty_mem ->
+    (let dummy_func = Func_native (empty_inst, Tf ([], []), [], []) in
+     let dummy_tab = (empty_tab, None) in
+     let dummy_mem = (empty_mem, None) in
+     let dummy_glob = Global_ext (T_mut, ConstInt32 zero_i32a, ()) in
+      (fun f_ () -> f_
+        ((newa heap_cl_m (plus_nat length_funcs_s (size_list (m_funcs m)))
+           dummy_func)
+        ()) ())
+        (fun s_funcs ->
+          (fun f_ () -> f_
+            ((newa (heap_prod (heap_array (typerep_option typerep_nat))
+                     (heap_option heap_nat))
+               (plus_nat length_tabs_s (size_list (m_tabs m))) dummy_tab)
+            ()) ())
+            (fun s_tabs ->
+              (fun f_ () -> f_
+                ((newa (heap_prod heap_byte_array (heap_option heap_nat))
+                   (plus_nat length_mems_s (size_list (m_mems m))) dummy_mem)
+                ()) ())
+                (fun s_mems ->
+                  (fun f_ () -> f_
+                    ((newa (heap_global_ext heap_unit)
+                       (plus_nat length_globs_s (size_list (m_globs m)))
+                       dummy_glob)
+                    ()) ())
+                    (fun s_globs ->
+                      (fun f_ () -> f_
+                        ((blit heap_cl_m (funcs s_m) zero_nat s_funcs zero_nat
+                           length_funcs_s)
+                        ()) ())
+                        (fun _ ->
+                          (fun f_ () -> f_
+                            ((blit (heap_prod
+                                     (heap_array (typerep_option typerep_nat))
+                                     (heap_option heap_nat))
+                               (tabs s_m) zero_nat s_tabs zero_nat
+                               length_tabs_s)
+                            ()) ())
+                            (fun _ ->
+                              (fun f_ () -> f_
+                                ((blit (heap_prod heap_byte_array
+ (heap_option heap_nat))
+                                   (mems s_m) zero_nat s_mems zero_nat
+                                   length_mems_s)
+                                ()) ())
+                                (fun _ ->
+                                  (fun f_ () -> f_
+                                    ((blit (heap_global_ext heap_unit)
+                                       (globs s_m) zero_nat s_globs zero_nat
+                                       length_globs_s)
+                                    ()) ())
+                                    (fun _ ->
+                                      (fun f_ () -> f_
+((array_blit_map heap_cl_m (m_funcs m)
+   (fun (i, (tlocs, b_es)) ->
+     (fun f_ () -> f_ ((array_nth heap_tf inst_types i) ()) ())
+       (fun ft -> (fun () -> (Func_native (inst_m, ft, tlocs, b_es)))))
+   s_funcs length_funcs_s)
+()) ())
+(fun _ ->
+  (fun f_ () -> f_
+    ((array_blit_map
+       (heap_prod (heap_array (typerep_option typerep_nat))
+         (heap_option heap_nat))
+       (m_tabs m)
+       (fun tt ->
+         (fun f_ () -> f_ ((newa (heap_option heap_nat) (l_min tt) None) ()) ())
+           (fun t -> (fun () -> (t, l_max tt))))
+       s_tabs length_tabs_s)
+    ()) ())
+    (fun _ ->
+      (fun f_ () -> f_
+        ((array_blit_map (heap_prod heap_byte_array (heap_option heap_nat))
+           (m_mems m)
+           (fun mt ->
+             (fun f_ () -> f_
+               ((new_zeroed_byte_array (times_nata (l_min mt) ki64)) ()) ())
+               (fun ma -> (fun () -> (ma, l_max mt))))
+           s_mems length_mems_s)
+        ()) ())
+        (fun _ ->
+          (fun f_ () -> f_
+            ((array_blit_map (heap_global_ext heap_unit) (zip (m_globs m) gvs)
+               (fun (m_g, v) ->
+                 (fun () -> (Global_ext (tg_mut (g_type m_g), v, ()))))
+               s_globs length_globs_s)
+            ()) ())
+            (fun _ ->
+              (fun f_ () -> f_
+                ((fold_map
+                   (fun m_exp ->
+                     (fun f_ () -> f_
+                       ((export_get_v_ext_m inst_m (e_desc m_exp)) ()) ())
+                       (fun desc ->
+                         (fun () ->
+                           (Module_export_ext (e_name m_exp, desc, ())))))
+                   (m_exports m))
+                ()) ())
+                (fun exps ->
+                  (let s_res = S_m_ext (s_funcs, s_tabs, s_mems, s_globs, ()) in
+                    (fun () -> (s_res, (inst_m, exps))))))))))))))))))))))))))))
+          ()));;
+
+let rec cl_m_type = function Func_native (x11, x12, x13, x14) -> x12
+                    | Func_host (x21, x22) -> x21;;
+
+let rec tab_typing_m
+  t tt =
+    (fun () ->
+      (let t_min = len (heap_option heap_nat) (fst t) () in
+        limits_compat (Limit_t_ext (t_min, snd t, ())) tt));;
+
+let rec divide_nat
+  m n = Nat (divide_integer (integer_of_nat m) (integer_of_nat n));;
+
+let rec mem_typing_m
+  m mt =
+    (fun () ->
+      (let m_min = len_byte_array (fst m) () in
+        limits_compat (Limit_t_ext (divide_nat m_min ki64, snd m, ())) mt));;
+
+let rec external_typing_m
+  s_m x1 x2 = match s_m, x1, x2 with
+    s_m, Ext_func i, Te_func tf ->
+      (fun () ->
+        (let f_len = len heap_cl_m (funcs s_m) () in
+          (if less_nat i f_len
+            then (fun f_ () -> f_ ((array_nth heap_cl_m (funcs s_m) i) ()) ())
+                   (fun f -> (fun () -> (equal_tfa (cl_m_type f) tf)))
+            else (fun () -> false))
+            ()))
+    | s_m, Ext_tab i, Te_tab tt ->
+        (fun () ->
+          (let t_len =
+             len (heap_prod (heap_array (typerep_option typerep_nat))
+                   (heap_option heap_nat))
+               (tabs s_m) ()
+             in
+            (if less_nat i t_len
+              then (fun f_ () -> f_
+                     ((array_nth
+                        (heap_prod (heap_array (typerep_option typerep_nat))
+                          (heap_option heap_nat))
+                        (tabs s_m) i)
+                     ()) ())
+                     (fun t -> tab_typing_m t tt)
+              else (fun () -> false))
+              ()))
+    | s_m, Ext_mem i, Te_mem mt ->
+        (fun () ->
+          (let m_len =
+             len (heap_prod heap_byte_array (heap_option heap_nat)) (mems s_m)
+               ()
+             in
+            (if less_nat i m_len
+              then (fun f_ () -> f_
+                     ((array_nth
+                        (heap_prod heap_byte_array (heap_option heap_nat))
+                        (mems s_m) i)
+                     ()) ())
+                     (fun m -> mem_typing_m m mt)
+              else (fun () -> false))
+              ()))
+    | s_m, Ext_glob i, Te_glob gt ->
+        (fun () ->
+          (let g_len = len (heap_global_ext heap_unit) (globs s_m) () in
+            (if less_nat i g_len
+              then (fun f_ () -> f_
+                     ((array_nth (heap_global_ext heap_unit) (globs s_m) i) ())
+                     ())
+                     (fun g -> (fun () -> (glob_typing g gt)))
+              else (fun () -> false))
+              ()))
+    | s_m, Ext_tab v, Te_func va -> (fun () -> false)
+    | s_m, Ext_tab v, Te_mem va -> (fun () -> false)
+    | s_m, Ext_tab v, Te_glob va -> (fun () -> false)
+    | s_m, Ext_mem v, Te_func va -> (fun () -> false)
+    | s_m, Ext_mem v, Te_tab va -> (fun () -> false)
+    | s_m, Ext_mem v, Te_glob va -> (fun () -> false)
+    | s_m, Ext_glob v, Te_func va -> (fun () -> false)
+    | s_m, Ext_glob v, Te_tab va -> (fun () -> false)
+    | s_m, Ext_glob v, Te_mem va -> (fun () -> false)
+    | s_m, Ext_func va, Te_tab v -> (fun () -> false)
+    | s_m, Ext_func va, Te_mem v -> (fun () -> false)
+    | s_m, Ext_func va, Te_glob v -> (fun () -> false);;
 
 let rec update_redex_return
   (Redex (v_sa, es, b_es)) v_s = Redex (v_s @ v_sa, es, b_es);;
@@ -5237,8 +5491,6 @@ let rec store_packed_m_v
                      (fun _ -> (fun () -> (Some ()))))
           else (fun () -> None))
           ()));;
-
-let rec memsa (Inst_m_ext (types, funcs, tabs, mems, globs, more)) = mems;;
 
 let rec store_m_v
   m n off v =
@@ -5469,12 +5721,7 @@ let rec app_s_f_v_s_load_maybe_packed_m
       | ConstFloat32 _ :: _ -> (fun () -> (v_s, crash_invalid))
       | ConstFloat64 _ :: _ -> (fun () -> (v_s, crash_invalid)));;
 
-let rec cl_m_type = function Func_native (x11, x12, x13, x14) -> x12
-                    | Func_host (x21, x22) -> x21;;
-
 let rec types (Inst_m_ext (types, funcs, tabs, mems, globs, more)) = types;;
-
-let rec tabsa (Inst_m_ext (types, funcs, tabs, mems, globs, more)) = tabs;;
 
 let rec app_s_f_v_s_call_indirect_m
   k tinsts cls inst_m v_s =
@@ -5516,8 +5763,6 @@ let rec app_s_f_v_s_call_indirect_m
       | ConstFloat32 _ :: _ -> (fun () -> (v_s, ([], crash_invalid)))
       | ConstFloat64 _ :: _ -> (fun () -> (v_s, ([], crash_invalid))));;
 
-let rec globsa (Inst_m_ext (types, funcs, tabs, mems, globs, more)) = globs;;
-
 let rec app_s_f_v_s_set_global_m
   k gs inst_m v_s =
     (match v_s with [] -> (fun () -> (v_s, crash_invalid))
@@ -5538,9 +5783,6 @@ let rec app_s_f_v_s_get_global_m
        let g = array_nth (heap_global_ext heap_unit) gs g_ind () in
         (g_val g :: v_s, Step_normal)));;
 
-let rec divide_nat
-  m n = Nat (divide_integer (integer_of_nat m) (integer_of_nat n));;
-
 let rec app_s_f_v_s_mem_size_m
   ms i_m v_s =
     (fun () ->
@@ -5551,9 +5793,6 @@ let rec app_s_f_v_s_mem_size_m
         (ConstInt32 (int_of_nat_i32 (divide_nat m_len ki64)) :: v_s,
           Step_normal)));;
 
-let rec new_zeroed_byte_array
-  n = (fun () ->  Bytes.make (Z.to_int (integer_of_nat n)) (Char.chr 0));;
-
 let rec grow_zeroed_byte_array
   a n = (if equal_nat n zero_nat then (fun () -> a)
           else (fun () ->
@@ -5561,6 +5800,8 @@ let rec grow_zeroed_byte_array
                   let aa = new_zeroed_byte_array (plus_nat l n) () in
                   let _ = blit_byte_array a zero_nat aa zero_nat l () in
                    aa)));;
+
+let int32_minus_one : i32 = I32_impl_abs (Int32.neg Int32.one);;
 
 let rec app_s_f_v_s_mem_grow_m
   ms i_m v_s =
@@ -5621,8 +5862,6 @@ let rec update_fc_step_m
   (Frame_context_m (rdx, lcs, nf, f1, f2)) v_s es_cont =
     Frame_context_m (update_redex_step rdx v_s es_cont, lcs, nf, f1, f2);;
 
-let rec funcsa (Inst_m_ext (types, funcs, tabs, mems, globs, more)) = funcs;;
-
 let rec app_f_call_m
   k inst_m =
     (fun () ->
@@ -5647,16 +5886,8 @@ let rec app_v_s_br_table
       | ConstFloat32 _ :: _ -> (v_s, ([], crash_invalid))
       | ConstFloat64 _ :: _ -> (v_s, ([], crash_invalid)));;
 
-let rec globs (S_m_ext (funcs, tabs, mems, globs, more)) = globs;;
-
-let rec funcs (S_m_ext (funcs, tabs, mems, globs, more)) = funcs;;
-
 let crash_invariant : res_step
   = Res_crash (Error_invariant "interpreter invariant violation");;
-
-let rec tabs (S_m_ext (funcs, tabs, mems, globs, more)) = tabs;;
-
-let rec mems (S_m_ext (funcs, tabs, mems, globs, more)) = mems;;
 
 let rec app_v_s_testop
   testop v_s =
@@ -5673,6 +5904,54 @@ let rec app_v_s_select
           | ConstInt64 _ :: _ -> (v_s, crash_invalid)
           | ConstFloat32 _ :: _ -> (v_s, crash_invalid)
           | ConstFloat64 _ :: _ -> (v_s, crash_invalid));;
+
+let rec app_v_s_relop
+  relop v_s =
+    (match v_s with [] -> (v_s, crash_invalid) | [_] -> (v_s, crash_invalid)
+      | v2 :: v1 :: v_sa -> (app_relop relop v1 v2 :: v_sa, Step_normal));;
+
+let rec app_v_s_cvtop
+  cvtop t1 t2 tp_sx v_s =
+    (match v_s with [] -> (v_s, crash_invalid)
+      | v1 :: v_sa ->
+        (if types_agree t1 v1
+          then (match cvtop
+                 with Convert ->
+                   (match cvt t2 tp_sx v1
+                     with None -> (v_sa, Res_trap (name typerep_cvtop cvtop))
+                     | Some a -> (a :: v_sa, Step_normal))
+                 | Reinterpret ->
+                   (if is_none tp_sx
+                     then (wasm_deserialise (bits v1) t2 :: v_sa, Step_normal)
+                     else (v_s, crash_invalid)))
+          else (v_s, crash_invalid)));;
+
+let rec app_v_s_br_if
+  k v_s =
+    (match v_s with [] -> (v_s, ([], crash_invalid))
+      | ConstInt32 c :: v_sa ->
+        (if int_eq_i32 c zero_i32a then (v_sa, ([], Step_normal))
+          else (v_sa, ([Basic (Br k)], Step_normal)))
+      | ConstInt64 _ :: _ -> (v_s, ([], crash_invalid))
+      | ConstFloat32 _ :: _ -> (v_s, ([], crash_invalid))
+      | ConstFloat64 _ :: _ -> (v_s, ([], crash_invalid)));;
+
+let rec app_v_s_binop
+  binop v_s =
+    (match v_s with [] -> (v_s, crash_invalid) | [_] -> (v_s, crash_invalid)
+      | v2 :: v1 :: v_sa ->
+        (match app_binop binop v1 v2
+          with None -> (v_sa, Res_trap (name typerep_binop binop))
+          | Some a -> (a :: v_sa, Step_normal)));;
+
+let rec app_v_s_unop
+  unop v_s =
+    (match v_s with [] -> (v_s, crash_invalid)
+      | v1 :: v_sa -> (app_unop unop v1 :: v_sa, Step_normal));;
+
+let rec app_v_s_drop
+  v_s = (match v_s with [] -> (v_s, crash_invalid)
+          | _ :: v_sa -> (v_sa, Step_normal));;
 
 let rec run_step_b_e_m
   b_e (Config_m (d, s, fc, fcs)) =
@@ -5872,14 +6151,6 @@ let rec run_step_b_e_m
             (fun () ->
               (Config_m (d, s, update_fc_step_m fc v_sa [], fcs), res)))));;
 
-let rec list_blit_array _A
-  src_list dst dst_pos =
-    (match src_list with [] -> (fun () -> ())
-      | y :: ys ->
-        (fun () ->
-          (let _ = upd _A dst_pos y dst () in
-            list_blit_array _A ys dst (plus_nat dst_pos one_nata) ())));;
-
 let rec init_tab_m_v
   t n icls =
     (fun () ->
@@ -6018,6 +6289,40 @@ let rec run_step_e_m
 
 let res_crash_fuel : res = RCrash (Error_invariant "fuel exhausted");;
 
+let rec split_v_s_b_s_aux
+  v_s x1 = match v_s, x1 with
+    v_s, EConst v :: b_es -> split_v_s_b_s_aux (v :: v_s) b_es
+    | v_s, [] -> (v_s, [])
+    | v_s, Unreachable :: va -> (v_s, Unreachable :: va)
+    | v_s, Nop :: va -> (v_s, Nop :: va)
+    | v_s, Drop :: va -> (v_s, Drop :: va)
+    | v_s, Select :: va -> (v_s, Select :: va)
+    | v_s, Block (vb, vc) :: va -> (v_s, Block (vb, vc) :: va)
+    | v_s, Loop (vb, vc) :: va -> (v_s, Loop (vb, vc) :: va)
+    | v_s, If (vb, vc, vd) :: va -> (v_s, If (vb, vc, vd) :: va)
+    | v_s, Br vb :: va -> (v_s, Br vb :: va)
+    | v_s, Br_if vb :: va -> (v_s, Br_if vb :: va)
+    | v_s, Br_table (vb, vc) :: va -> (v_s, Br_table (vb, vc) :: va)
+    | v_s, Return :: va -> (v_s, Return :: va)
+    | v_s, Call vb :: va -> (v_s, Call vb :: va)
+    | v_s, Call_indirect vb :: va -> (v_s, Call_indirect vb :: va)
+    | v_s, Get_local vb :: va -> (v_s, Get_local vb :: va)
+    | v_s, Set_local vb :: va -> (v_s, Set_local vb :: va)
+    | v_s, Tee_local vb :: va -> (v_s, Tee_local vb :: va)
+    | v_s, Get_global vb :: va -> (v_s, Get_global vb :: va)
+    | v_s, Set_global vb :: va -> (v_s, Set_global vb :: va)
+    | v_s, Load (vb, vc, vd, ve) :: va -> (v_s, Load (vb, vc, vd, ve) :: va)
+    | v_s, Store (vb, vc, vd, ve) :: va -> (v_s, Store (vb, vc, vd, ve) :: va)
+    | v_s, Current_memory :: va -> (v_s, Current_memory :: va)
+    | v_s, Grow_memory :: va -> (v_s, Grow_memory :: va)
+    | v_s, Unop (vb, vc) :: va -> (v_s, Unop (vb, vc) :: va)
+    | v_s, Binop (vb, vc) :: va -> (v_s, Binop (vb, vc) :: va)
+    | v_s, Testop (vb, vc) :: va -> (v_s, Testop (vb, vc) :: va)
+    | v_s, Relop (vb, vc) :: va -> (v_s, Relop (vb, vc) :: va)
+    | v_s, Cvtop (vb, vc, vd, ve) :: va -> (v_s, Cvtop (vb, vc, vd, ve) :: va);;
+
+let rec split_v_s_b_s es = split_v_s_b_s_aux [] es;;
+
 let rec run_iter_m
   n cfg =
     (if equal_nat n zero_nat then (fun () -> (cfg, res_crash_fuel))
@@ -6119,139 +6424,6 @@ let rec run_v_m
          in
         (let (Config_m (_, sa, _, _), res) = a in (fun () -> (sa, res))) ()));;
 
-let rec d_data (Module_data_ext (d_data, d_off, d_init, more)) = d_data;;
-
-let rec d_init (Module_data_ext (d_data, d_off, d_init, more)) = d_init;;
-
-let rec e_init (Module_elem_ext (e_tab, e_off, e_init, more)) = e_init;;
-
-let rec g_init (Module_glob_ext (g_type, g_init, more)) = g_init;;
-
-let rec g_type (Module_glob_ext (g_type, g_init, more)) = g_type;;
-
-let rec local_update
-  locala
-    (T_context_ext
-      (types_t, func_t, global, table, memory, local, label, return, more))
-    = T_context_ext
-        (types_t, func_t, global, table, memory, locala local, label, return,
-          more);;
-
-let rec module_start_type_checker_p
-  x xa =
-    bind (single (x, xa))
-      (fun (c, i) ->
-        bind (if_pred (less_nat i (size_list (func_t c))))
-          (fun () ->
-            bind (eq_i_i equal_tf (nth (func_t c) i) (Tf ([], [])))
-              (fun () -> single ())));;
-
-let rec module_start_typing x1 x2 = holds (module_start_type_checker_p x1 x2);;
-
-let rec return_update
-  returna
-    (T_context_ext
-      (types_t, func_t, global, table, memory, local, label, return, more))
-    = T_context_ext
-        (types_t, func_t, global, table, memory, local, label, returna return,
-          more);;
-
-let rec e_desc (Module_export_ext (e_name, e_desc, more)) = e_desc;;
-
-let rec e_name (Module_export_ext (e_name, e_desc, more)) = e_name;;
-
-let rec i_desc (Module_import_ext (i_module, i_name, i_desc, more)) = i_desc;;
-
-let rec gather_m_f_type
-  tfs m_f =
-    (if less_nat (fst m_f) (size_list tfs) then Some (nth tfs (fst m_f))
-      else None);;
-
-let rec get_start_m
-  inst i_s =
-    (match i_s with None -> (fun () -> [])
-      | Some i_sa ->
-        (fun () ->
-          (let i_s_s = array_nth heap_nat (funcsa inst) i_sa () in
-            [Invoke i_s_s])));;
-
-let rec list_all2_m
-  r x1 x2 = match r, x1, x2 with r, [], [] -> (fun () -> true)
-    | r, x :: xs, [] -> (fun () -> false)
-    | r, [], y :: ys -> (fun () -> false)
-    | r, x :: xs, y :: ys ->
-        (fun () -> (let b = r x y () in
-                    let ba = list_all2_m r xs ys () in
-                     b && ba));;
-
-let rec mem_typing_m
-  m mt =
-    (fun () ->
-      (let m_min = len_byte_array (fst m) () in
-        limits_compat (Limit_t_ext (divide_nat m_min ki64, snd m, ())) mt));;
-
-let rec tab_typing_m
-  t tt =
-    (fun () ->
-      (let t_min = len (heap_option heap_nat) (fst t) () in
-        limits_compat (Limit_t_ext (t_min, snd t, ())) tt));;
-
-let rec array_blit_map _B
-  src_list src_f dst dst_pos =
-    (fun () ->
-      (let ys = fold_map src_f src_list () in
-        list_blit_array _B ys dst dst_pos ()));;
-
-let make_empty_inst_m : (unit -> unit inst_m_ext)
-  = (fun () ->
-      (let f_inst2_types = (fun () -> Array.of_list []) () in
-       let f_inst2_funcs = (fun () -> Array.of_list []) () in
-       let f_inst2_tabs = (fun () -> Array.of_list []) () in
-       let f_inst2_mems = (fun () -> Array.of_list []) () in
-       let f_inst2_globs = (fun () -> Array.of_list []) () in
-        (let a =
-           Inst_m_ext
-             (f_inst2_types, f_inst2_funcs, f_inst2_tabs, f_inst2_mems,
-               f_inst2_globs, ())
-           in
-          (fun () -> a))
-          ()));;
-
-let rec make_empty_frame_m _A
-  = (fun () ->
-      (let f_locs1 = (fun () -> Array.of_list []) () in
-       let f_inst2 = make_empty_inst_m () in
-        (f_locs1, f_inst2)));;
-
-let rec run_invoke_v_m
-  n d (s, (vs, i)) =
-    (fun () ->
-      (let a = make_empty_frame_m heap_v () in
-        (let (f_locs1, f_inst2) = a in
-          (fun f_ () -> f_
-            ((run_iter_m n
-               (Config_m
-                 (d, s,
-                   Frame_context_m
-                     (Redex (rev vs, [Invoke i], []), [], zero_nat, f_locs1,
-                       f_inst2),
-                   [])))
-            ()) ())
-            (fun (Config_m (_, sa, _, _), res) -> (fun () -> (sa, res))))
-          ()));;
-
-let rec run_m
-  x = run_v_m
-        (power power_nat (nat_of_integer (Z.of_int 2))
-          (nat_of_integer (Z.of_int 63)))
-        (nat_of_integer (Z.of_int 300)) x;;
-
-let rec get_init_tab_m
-  inst e_ind e =
-    (fun () ->
-      (let i_cls = fold_map (array_nth heap_nat (funcsa inst)) (e_init e) () in
-        Init_tab (e_ind, i_cls)));;
-
 let rec interp_get_v_m
   s inst b_es =
     (fun () ->
@@ -6262,40 +6434,53 @@ let rec interp_get_v_m
          in
         (let (_, RValue [v]) = a in (fun () -> v)) ()));;
 
-let rec module_export_typer
-  c x1 = match c, x1 with
-    c, Ext_func i ->
-      (if less_nat i (size_list (func_t c))
-        then Some (Te_func (nth (func_t c) i)) else None)
-    | c, Ext_tab i ->
-        (if less_nat i (size_list (table c))
-          then Some (Te_tab (nth (table c) i)) else None)
-    | c, Ext_mem i ->
-        (if less_nat i (size_list (memory c))
-          then Some (Te_mem (nth (memory c) i)) else None)
-    | c, Ext_glob i ->
-        (if less_nat i (size_list (global c))
-          then Some (Te_glob (nth (global c) i)) else None);;
+let rec interp_get_i32_m
+  s inst b_es =
+    (fun () ->
+      (let a = interp_get_v_m s inst b_es () in
+        (match a with ConstInt32 aa -> (fun () -> aa)
+          | ConstInt64 _ -> (fun () -> zero_i32a)
+          | ConstFloat32 _ -> (fun () -> zero_i32a)
+          | ConstFloat64 _ -> (fun () -> zero_i32a))
+          ()));;
 
-let rec module_import_typer
-  tfs x1 = match tfs, x1 with
-    tfs, Imp_func i ->
-      (if less_nat i (size_list tfs) then Some (Te_func (nth tfs i)) else None)
-    | tfs, Imp_tab tt ->
-        (if limit_typing tt
-              (power power_nat (nat_of_integer (Z.of_int 2))
-                (nat_of_integer (Z.of_int 32)))
-          then Some (Te_tab tt) else None)
-    | tfs, Imp_mem mt ->
-        (if limit_typing mt
-              (power power_nat (nat_of_integer (Z.of_int 2))
-                (nat_of_integer (Z.of_int 16)))
-          then Some (Te_mem mt) else None)
-    | tfs, Imp_glob gt -> Some (Te_glob gt);;
+let rec e_init (Module_elem_ext (e_tab, e_off, e_init, more)) = e_init;;
+
+let rec get_init_tab_m
+  inst e_ind e =
+    (fun () ->
+      (let i_cls = fold_map (array_nth heap_nat (funcsa inst)) (e_init e) () in
+        Init_tab (e_ind, i_cls)));;
+
+let rec get_init_tabs_m
+  inst e_inds es =
+    fold_map (fun (a, b) -> get_init_tab_m inst a b) (zip e_inds es);;
+
+let rec d_init (Module_data_ext (d_data, d_off, d_init, more)) = d_init;;
+
+let rec get_init_mems_m
+  d_inds ds =
+    (fun () -> (map (fun (x, y) -> Init_mem (x, d_init y)) (zip d_inds ds)));;
 
 let rec module_glob_type_checker
   c (Module_glob_ext (tg, es, ())) =
     list_all (const_expr c) es && b_e_type_checker c es (Tf ([], [tg_t tg]));;
+
+let rec return_update
+  returna
+    (T_context_ext
+      (types_t, func_t, global, table, memory, local, label, return, more))
+    = T_context_ext
+        (types_t, func_t, global, table, memory, local, label, returna return,
+          more);;
+
+let rec local_update
+  locala
+    (T_context_ext
+      (types_t, func_t, global, table, memory, local, label, return, more))
+    = T_context_ext
+        (types_t, func_t, global, table, memory, locala local, label, return,
+          more);;
 
 let rec module_func_type_checker
   c (i, (t_locs, b_es)) =
@@ -6321,6 +6506,55 @@ let rec module_data_type_checker
       (list_all (const_expr c) es &&
         (b_e_type_checker c es (Tf ([], [T_i32])) &&
           less_nat d (size_list (memory c))));;
+
+let rec module_import_typer
+  tfs x1 = match tfs, x1 with
+    tfs, Imp_func i ->
+      (if less_nat i (size_list tfs) then Some (Te_func (nth tfs i)) else None)
+    | tfs, Imp_tab tt ->
+        (if limit_typing tt
+              (power power_nat (nat_of_integer (Z.of_int 2))
+                (nat_of_integer (Z.of_int 32)))
+          then Some (Te_tab tt) else None)
+    | tfs, Imp_mem mt ->
+        (if limit_typing mt
+              (power power_nat (nat_of_integer (Z.of_int 2))
+                (nat_of_integer (Z.of_int 16)))
+          then Some (Te_mem mt) else None)
+    | tfs, Imp_glob gt -> Some (Te_glob gt);;
+
+let rec module_export_typer
+  c x1 = match c, x1 with
+    c, Ext_func i ->
+      (if less_nat i (size_list (func_t c))
+        then Some (Te_func (nth (func_t c) i)) else None)
+    | c, Ext_tab i ->
+        (if less_nat i (size_list (table c))
+          then Some (Te_tab (nth (table c) i)) else None)
+    | c, Ext_mem i ->
+        (if less_nat i (size_list (memory c))
+          then Some (Te_mem (nth (memory c) i)) else None)
+    | c, Ext_glob i ->
+        (if less_nat i (size_list (global c))
+          then Some (Te_glob (nth (global c) i)) else None);;
+
+let rec gather_m_f_type
+  tfs m_f =
+    (if less_nat (fst m_f) (size_list tfs) then Some (nth tfs (fst m_f))
+      else None);;
+
+let rec i_desc (Module_import_ext (i_module, i_name, i_desc, more)) = i_desc;;
+
+let rec module_start_type_checker_p
+  x xa =
+    bind (single (x, xa))
+      (fun (c, i) ->
+        bind (if_pred (less_nat i (size_list (func_t c))))
+          (fun () ->
+            bind (eq_i_i equal_tf (nth (func_t c) i) (Tf ([], [])))
+              (fun () -> single ())));;
+
+let rec module_start_typing x1 x2 = holds (module_start_type_checker_p x1 x2);;
 
 let rec module_type_checker
   (M_ext (tfs, fs, ts, ms, gs, els, ds, i_opt, imps, exps, ())) =
@@ -6392,315 +6626,32 @@ let rec module_type_checker
                    with None -> None | Some expts -> Some (impts, expts))
             else None)));;
 
-let rec get_init_mems_m
-  d_inds ds =
-    (fun () -> (map (fun (x, y) -> Init_mem (x, d_init y)) (zip d_inds ds)));;
+let rec list_all2_m
+  r x1 x2 = match r, x1, x2 with r, [], [] -> (fun () -> true)
+    | r, x :: xs, [] -> (fun () -> false)
+    | r, [], y :: ys -> (fun () -> false)
+    | r, x :: xs, y :: ys ->
+        (fun () -> (let b = r x y () in
+                    let ba = list_all2_m r xs ys () in
+                     b && ba));;
 
-let rec get_init_tabs_m
-  inst e_inds es =
-    fold_map (fun (a, b) -> get_init_tab_m inst a b) (zip e_inds es);;
-
-let rec run_instantiate_m
-  n d (s, (f_inst2, es)) =
-    (fun () ->
-      (let f_locs1 = (fun () -> Array.of_list []) () in
-       let a =
-         run_iter_m n
-           (Config_m
-             (d, s,
-               Frame_context_m
-                 (Redex ([], es, []), [], zero_nat, f_locs1, f_inst2),
-               []))
-           ()
-         in
-        (let (Config_m (_, sa, _, _), res) = a in (fun () -> (sa, res))) ()));;
-
-let rec interp_get_i32_m
-  s inst b_es =
-    (fun () ->
-      (let a = interp_get_v_m s inst b_es () in
-        (match a with ConstInt32 aa -> (fun () -> aa)
-          | ConstInt64 _ -> (fun () -> zero_i32a)
-          | ConstFloat32 _ -> (fun () -> zero_i32a)
-          | ConstFloat64 _ -> (fun () -> zero_i32a))
-          ()));;
-
-let make_empty_store_m : (unit -> unit s_m_ext)
-  = (fun () ->
-      (let s_funcs = (fun () -> Array.of_list []) () in
-       let s_tabs = (fun () -> Array.of_list []) () in
-       let s_mems = (fun () -> Array.of_list []) () in
-       let s_globs = (fun () -> Array.of_list []) () in
-        S_m_ext (s_funcs, s_tabs, s_mems, s_globs, ())));;
-
-let rec external_typing_m
-  s_m x1 x2 = match s_m, x1, x2 with
-    s_m, Ext_func i, Te_func tf ->
-      (fun () ->
-        (let f_len = len heap_cl_m (funcs s_m) () in
-          (if less_nat i f_len
-            then (fun f_ () -> f_ ((array_nth heap_cl_m (funcs s_m) i) ()) ())
-                   (fun f -> (fun () -> (equal_tfa (cl_m_type f) tf)))
-            else (fun () -> false))
-            ()))
-    | s_m, Ext_tab i, Te_tab tt ->
+let rec get_start_m
+  inst i_s =
+    (match i_s with None -> (fun () -> [])
+      | Some i_sa ->
         (fun () ->
-          (let t_len =
-             len (heap_prod (heap_array (typerep_option typerep_nat))
-                   (heap_option heap_nat))
-               (tabs s_m) ()
-             in
-            (if less_nat i t_len
-              then (fun f_ () -> f_
-                     ((array_nth
-                        (heap_prod (heap_array (typerep_option typerep_nat))
-                          (heap_option heap_nat))
-                        (tabs s_m) i)
-                     ()) ())
-                     (fun t -> tab_typing_m t tt)
-              else (fun () -> false))
-              ()))
-    | s_m, Ext_mem i, Te_mem mt ->
-        (fun () ->
-          (let m_len =
-             len (heap_prod heap_byte_array (heap_option heap_nat)) (mems s_m)
-               ()
-             in
-            (if less_nat i m_len
-              then (fun f_ () -> f_
-                     ((array_nth
-                        (heap_prod heap_byte_array (heap_option heap_nat))
-                        (mems s_m) i)
-                     ()) ())
-                     (fun m -> mem_typing_m m mt)
-              else (fun () -> false))
-              ()))
-    | s_m, Ext_glob i, Te_glob gt ->
-        (fun () ->
-          (let g_len = len (heap_global_ext heap_unit) (globs s_m) () in
-            (if less_nat i g_len
-              then (fun f_ () -> f_
-                     ((array_nth (heap_global_ext heap_unit) (globs s_m) i) ())
-                     ())
-                     (fun g -> (fun () -> (glob_typing g gt)))
-              else (fun () -> false))
-              ()))
-    | s_m, Ext_tab v, Te_func va -> (fun () -> false)
-    | s_m, Ext_tab v, Te_mem va -> (fun () -> false)
-    | s_m, Ext_tab v, Te_glob va -> (fun () -> false)
-    | s_m, Ext_mem v, Te_func va -> (fun () -> false)
-    | s_m, Ext_mem v, Te_tab va -> (fun () -> false)
-    | s_m, Ext_mem v, Te_glob va -> (fun () -> false)
-    | s_m, Ext_glob v, Te_func va -> (fun () -> false)
-    | s_m, Ext_glob v, Te_tab va -> (fun () -> false)
-    | s_m, Ext_glob v, Te_mem va -> (fun () -> false)
-    | s_m, Ext_func va, Te_tab v -> (fun () -> false)
-    | s_m, Ext_func va, Te_mem v -> (fun () -> false)
-    | s_m, Ext_func va, Te_glob v -> (fun () -> false);;
+          (let i_s_s = array_nth heap_nat (funcsa inst) i_sa () in
+            [Invoke i_s_s])));;
 
-let rec export_get_v_ext_m
-  inst exp =
-    (match exp
-      with Ext_func i ->
-        (fun () ->
-          (let x = array_nth heap_nat (funcsa inst) i () in Ext_func x))
-      | Ext_tab i ->
-        (fun () -> (let x = array_nth heap_nat (tabsa inst) i () in Ext_tab x))
-      | Ext_mem i ->
-        (fun () -> (let x = array_nth heap_nat (memsa inst) i () in Ext_mem x))
-      | Ext_glob i ->
-        (fun () ->
-          (let x = array_nth heap_nat (globsa inst) i () in Ext_glob x)));;
+let rec g_init (Module_glob_ext (g_type, g_init, more)) = g_init;;
 
-let rec run_invoke_m
-  x = run_invoke_v_m
-        (power power_nat (nat_of_integer (Z.of_int 2))
-          (nat_of_integer (Z.of_int 63)))
-        (nat_of_integer (Z.of_int 300)) x;;
+let rec d_data (Module_data_ext (d_data, d_off, d_init, more)) = d_data;;
 
-let rec interp_alloc_module_m
-  s_m m imps gvs =
-    (fun () ->
-      (let length_funcs_s = len heap_cl_m (funcs s_m) () in
-       let length_tabs_s =
-         len (heap_prod (heap_array (typerep_option typerep_nat))
-               (heap_option heap_nat))
-           (tabs s_m) ()
-         in
-       let length_mems_s =
-         len (heap_prod heap_byte_array (heap_option heap_nat)) (mems s_m) () in
-       let length_globs_s = len (heap_global_ext heap_unit) (globs s_m) () in
-        (let i_fs =
-           upt length_funcs_s (plus_nat length_funcs_s (size_list (m_funcs m)))
-           in
-         let i_ts =
-           upt length_tabs_s (plus_nat length_tabs_s (size_list (m_tabs m))) in
-         let i_ms =
-           upt length_mems_s (plus_nat length_mems_s (size_list (m_mems m))) in
-         let i_gs =
-           upt length_globs_s
-             (plus_nat length_globs_s
-               (min ord_nat (size_list (m_globs m)) (size_list gvs)))
-           in
-          (fun f_ () -> f_ (((fun () -> Array.of_list (m_types m))) ()) ())
-            (fun inst_types ->
-              (fun f_ () -> f_
-                (((fun () -> Array.of_list
-                   (map_filter
-                      (fun a ->
-                        (match a with Ext_func aa -> Some aa | Ext_tab _ -> None
-                          | Ext_mem _ -> None | Ext_glob _ -> None))
-                      imps @
-                     i_fs)))
-                ()) ())
-                (fun inst_funcs ->
-                  (fun f_ () -> f_
-                    (((fun () -> Array.of_list
-                       (map_filter
-                          (fun a ->
-                            (match a with Ext_func _ -> None
-                              | Ext_tab aa -> Some aa | Ext_mem _ -> None
-                              | Ext_glob _ -> None))
-                          imps @
-                         i_ts)))
-                    ()) ())
-                    (fun inst_tabs ->
-                      (fun f_ () -> f_
-                        (((fun () -> Array.of_list
-                           (map_filter
-                              (fun a ->
-                                (match a with Ext_func _ -> None
-                                  | Ext_tab _ -> None | Ext_mem aa -> Some aa
-                                  | Ext_glob _ -> None))
-                              imps @
-                             i_ms)))
-                        ()) ())
-                        (fun inst_mems ->
-                          (fun f_ () -> f_
-                            (((fun () -> Array.of_list
-                               (map_filter
-                                  (fun a ->
-                                    (match a with Ext_func _ -> None
-                                      | Ext_tab _ -> None | Ext_mem _ -> None
-                                      | Ext_glob aa -> Some aa))
-                                  imps @
-                                 i_gs)))
-                            ()) ())
-                            (fun inst_globs ->
-                              (let inst_m =
-                                 Inst_m_ext
-                                   (inst_types, inst_funcs, inst_tabs,
-                                     inst_mems, inst_globs, ())
-                                 in
-                                (fun f_ () -> f_ (make_empty_inst_m ()) ())
-                                  (fun empty_inst ->
-                                    (fun f_ () -> f_
-                                      (((fun () -> Array.of_list [])) ()) ())
-                                      (fun empty_tab ->
-(fun f_ () -> f_ ((new_zeroed_byte_array zero_nat) ()) ())
-  (fun empty_mem ->
-    (let dummy_func = Func_native (empty_inst, Tf ([], []), [], []) in
-     let dummy_tab = (empty_tab, None) in
-     let dummy_mem = (empty_mem, None) in
-     let dummy_glob = Global_ext (T_mut, ConstInt32 zero_i32a, ()) in
-      (fun f_ () -> f_
-        ((newa heap_cl_m (plus_nat length_funcs_s (size_list (m_funcs m)))
-           dummy_func)
-        ()) ())
-        (fun s_funcs ->
-          (fun f_ () -> f_
-            ((newa (heap_prod (heap_array (typerep_option typerep_nat))
-                     (heap_option heap_nat))
-               (plus_nat length_tabs_s (size_list (m_tabs m))) dummy_tab)
-            ()) ())
-            (fun s_tabs ->
-              (fun f_ () -> f_
-                ((newa (heap_prod heap_byte_array (heap_option heap_nat))
-                   (plus_nat length_mems_s (size_list (m_mems m))) dummy_mem)
-                ()) ())
-                (fun s_mems ->
-                  (fun f_ () -> f_
-                    ((newa (heap_global_ext heap_unit)
-                       (plus_nat length_globs_s (size_list (m_globs m)))
-                       dummy_glob)
-                    ()) ())
-                    (fun s_globs ->
-                      (fun f_ () -> f_
-                        ((blit heap_cl_m (funcs s_m) zero_nat s_funcs zero_nat
-                           length_funcs_s)
-                        ()) ())
-                        (fun _ ->
-                          (fun f_ () -> f_
-                            ((blit (heap_prod
-                                     (heap_array (typerep_option typerep_nat))
-                                     (heap_option heap_nat))
-                               (tabs s_m) zero_nat s_tabs zero_nat
-                               length_tabs_s)
-                            ()) ())
-                            (fun _ ->
-                              (fun f_ () -> f_
-                                ((blit (heap_prod heap_byte_array
- (heap_option heap_nat))
-                                   (mems s_m) zero_nat s_mems zero_nat
-                                   length_mems_s)
-                                ()) ())
-                                (fun _ ->
-                                  (fun f_ () -> f_
-                                    ((blit (heap_global_ext heap_unit)
-                                       (globs s_m) zero_nat s_globs zero_nat
-                                       length_globs_s)
-                                    ()) ())
-                                    (fun _ ->
-                                      (fun f_ () -> f_
-((array_blit_map heap_cl_m (m_funcs m)
-   (fun (i, (tlocs, b_es)) ->
-     (fun f_ () -> f_ ((array_nth heap_tf inst_types i) ()) ())
-       (fun ft -> (fun () -> (Func_native (inst_m, ft, tlocs, b_es)))))
-   s_funcs length_funcs_s)
-()) ())
-(fun _ ->
-  (fun f_ () -> f_
-    ((array_blit_map
-       (heap_prod (heap_array (typerep_option typerep_nat))
-         (heap_option heap_nat))
-       (m_tabs m)
-       (fun tt ->
-         (fun f_ () -> f_ ((newa (heap_option heap_nat) (l_min tt) None) ()) ())
-           (fun t -> (fun () -> (t, l_max tt))))
-       s_tabs length_tabs_s)
-    ()) ())
-    (fun _ ->
-      (fun f_ () -> f_
-        ((array_blit_map (heap_prod heap_byte_array (heap_option heap_nat))
-           (m_mems m)
-           (fun mt ->
-             (fun f_ () -> f_
-               ((new_zeroed_byte_array (times_nata (l_min mt) ki64)) ()) ())
-               (fun ma -> (fun () -> (ma, l_max mt))))
-           s_mems length_mems_s)
-        ()) ())
-        (fun _ ->
-          (fun f_ () -> f_
-            ((array_blit_map (heap_global_ext heap_unit) (zip (m_globs m) gvs)
-               (fun (m_g, v) ->
-                 (fun () -> (Global_ext (tg_mut (g_type m_g), v, ()))))
-               s_globs length_globs_s)
-            ()) ())
-            (fun _ ->
-              (fun f_ () -> f_
-                ((fold_map
-                   (fun m_exp ->
-                     (fun f_ () -> f_
-                       ((export_get_v_ext_m inst_m (e_desc m_exp)) ()) ())
-                       (fun desc ->
-                         (fun () ->
-                           (Module_export_ext (e_name m_exp, desc, ())))))
-                   (m_exports m))
-                ()) ())
-                (fun exps ->
-                  (let s_res = S_m_ext (s_funcs, s_tabs, s_mems, s_globs, ()) in
-                    (fun () -> (s_res, (inst_m, exps))))))))))))))))))))))))))))
-          ()));;
+let rec e_tab (Module_elem_ext (e_tab, e_off, e_init, more)) = e_tab;;
+
+let rec e_off (Module_elem_ext (e_tab, e_off, e_init, more)) = e_off;;
+
+let rec d_off (Module_data_ext (d_data, d_off, d_init, more)) = d_off;;
 
 let rec interp_instantiate_m
   s_m m v_imps =
@@ -6818,6 +6769,95 @@ e_offs (m_elem m))
      else (fun () -> (s_ma, RI_trap_m "segment out of bounds")))))))))
               else (fun () -> (s_m, RI_trap_m "invalid import")))
               ())));;
+
+let rec run_instantiate_m
+  n d (s, (f_inst2, es)) =
+    (fun () ->
+      (let f_locs1 = (fun () -> Array.of_list []) () in
+       let a =
+         run_iter_m n
+           (Config_m
+             (d, s,
+               Frame_context_m
+                 (Redex ([], es, []), [], zero_nat, f_locs1, f_inst2),
+               []))
+           ()
+         in
+        (let (Config_m (_, sa, _, _), res) = a in (fun () -> (sa, res))) ()));;
+
+let rec make_empty_frame_m _A
+  = (fun () ->
+      (let f_locs1 = (fun () -> Array.of_list []) () in
+       let f_inst2 = make_empty_inst_m () in
+        (f_locs1, f_inst2)));;
+
+let rec run_invoke_v_m
+  n d (s, (vs, i)) =
+    (fun () ->
+      (let a = make_empty_frame_m heap_v () in
+        (let (f_locs1, f_inst2) = a in
+          (fun f_ () -> f_
+            ((run_iter_m n
+               (Config_m
+                 (d, s,
+                   Frame_context_m
+                     (Redex (rev vs, [Invoke i], []), [], zero_nat, f_locs1,
+                       f_inst2),
+                   [])))
+            ()) ())
+            (fun (Config_m (_, sa, _, _), res) -> (fun () -> (sa, res))))
+          ()));;
+
+let rec run_fuzz
+  n d s m v_imps v_args =
+    (fun () ->
+      (let a = interp_instantiate_m s m v_imps () in
+        (match a with (sa, RI_crash_m res) -> (fun () -> (sa, RCrash res))
+          | (sa, RI_trap_m msg) -> (fun () -> (sa, RTrap msg))
+          | (sa, RI_res_m (inst, v_exps, init_es)) ->
+            (fun f_ () -> f_ ((run_instantiate_m n d (sa, (inst, init_es))) ())
+              ())
+              (fun aa ->
+                (match aa
+                  with (sb, RCrash res_error) ->
+                    (fun () -> (sb, RCrash res_error))
+                  | (sb, RTrap literal) -> (fun () -> (sb, RTrap literal))
+                  | (sb, RValue []) ->
+                    (match
+                      find (fun exp ->
+                             (match e_desc exp with Ext_func _ -> true
+                               | Ext_tab _ -> false | Ext_mem _ -> false
+                               | Ext_glob _ -> false))
+                        v_exps
+                      with None ->
+                        (fun () ->
+                          (sb, RCrash (Error_invariant "no import to invoke")))
+                      | Some exp ->
+                        (let Ext_func i = e_desc exp in
+                          run_invoke_v_m n d (sb, (v_args, i))))
+                  | (sb, RValue (_ :: _)) ->
+                    (fun () -> (sb, RCrash (Error_invalid "start function"))))))
+          ()));;
+
+let rec run_m
+  x = run_v_m
+        (power power_nat (nat_of_integer (Z.of_int 2))
+          (nat_of_integer (Z.of_int 63)))
+        (nat_of_integer (Z.of_int 300)) x;;
+
+let make_empty_store_m : (unit -> unit s_m_ext)
+  = (fun () ->
+      (let s_funcs = (fun () -> Array.of_list []) () in
+       let s_tabs = (fun () -> Array.of_list []) () in
+       let s_mems = (fun () -> Array.of_list []) () in
+       let s_globs = (fun () -> Array.of_list []) () in
+        S_m_ext (s_funcs, s_tabs, s_mems, s_globs, ())));;
+
+let rec run_invoke_m
+  x = run_invoke_v_m
+        (power power_nat (nat_of_integer (Z.of_int 2))
+          (nat_of_integer (Z.of_int 63)))
+        (nat_of_integer (Z.of_int 300)) x;;
 
 let rec interp_instantiate_init_m
   s m v_imps =

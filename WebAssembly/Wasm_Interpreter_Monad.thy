@@ -677,4 +677,5 @@ fun run_invoke_v_m :: "fuel \<Rightarrow> depth \<Rightarrow> (s_m \<times> v li
    (f_locs1, f_inst2) \<leftarrow> make_empty_frame_m;
    (cfg',res) \<leftarrow> run_iter_m n (Config_m d s (Frame_context_m (Redex (rev vs) [Invoke i] []) [] 0 f_locs1 f_inst2) []);
    case cfg' of (Config_m d s fc fcs) \<Rightarrow> return (s,res) }"
+
 end
