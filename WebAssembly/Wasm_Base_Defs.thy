@@ -354,7 +354,7 @@ definition app_unop_f_v :: "unop_f \<Rightarrow> v \<Rightarrow> v" where
 
 definition app_extend_s :: "tp \<Rightarrow> v \<Rightarrow> v" where
   "app_extend_s tp v =
-     wasm_deserialise (sign_extend S (size_t (typeof v)) (take (size_tp tp) (bits v))) (typeof v)"
+     wasm_deserialise (sign_extend S (t_length (typeof v)) (take (tp_length tp) (bits v))) (typeof v)"
 
 definition app_unop :: "unop \<Rightarrow> v \<Rightarrow> v" where
   "app_unop uop v =
