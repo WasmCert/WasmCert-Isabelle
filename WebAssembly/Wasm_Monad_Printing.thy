@@ -8,8 +8,8 @@ code_identifier constant  Array.nth \<rightharpoonup> (OCaml) "WasmRef_Isa.array
 declare [[code drop: blit]]
 lemmas[code] = blit.simps
 
-fun run_fuzz :: "fuel \<Rightarrow> depth \<Rightarrow> s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (s_m \<times> res) Heap" where
-  "run_fuzz n d s m v_imps = do {
+fun run_fuzz :: "fuel \<Rightarrow> depth \<Rightarrow> s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (v list) option \<Rightarrow> (s_m \<times> res) Heap" where
+  "run_fuzz n d s m v_imps opt_vs = do {
    i_res \<leftarrow> interp_instantiate_init_m s m v_imps;
    case i_res of
      (s', RI_res_m inst v_exps init_es) \<Rightarrow>
@@ -21,7 +21,9 @@ fun run_fuzz :: "fuel \<Rightarrow> depth \<Rightarrow> s_m \<Rightarrow> m \<Ri
                 Some exp \<Rightarrow> (case (E_desc exp) of Ext_func i \<Rightarrow> do {
                                cl \<leftarrow> Array.nth (s_m.funcs s'') i;
                                case (cl_m_type cl) of
-                                 (t1 _> t2) \<Rightarrow> run_invoke_v_m n d (s'', (map bitzero t1), i) })
+                                 (t1 _> t2) \<Rightarrow>
+                                   let params = case opt_vs of Some vs \<Rightarrow> (rev vs) | None \<Rightarrow> (map bitzero t1) in
+                                   run_invoke_v_m n d (s'', params, i) })
               | None \<Rightarrow> return (s'', RCrash (Error_invariant (STR ''no import to invoke''))))
           | (s'', RValue (x#xs)) \<Rightarrow> return (s'', RCrash (Error_invalid (STR ''start function'')))
           | x \<Rightarrow> return x)}

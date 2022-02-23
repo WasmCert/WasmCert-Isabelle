@@ -1379,7 +1379,8 @@ module WasmRef_Isa : sig
     nat ->
       nat ->
         unit s_m_ext ->
-          unit m_ext -> v_ext list -> (unit -> (unit s_m_ext * res))
+          unit m_ext ->
+            v_ext list -> (v list) option -> (unit -> (unit s_m_ext * res))
   val run_m :
     unit s_m_ext * (v array * (unit inst_m_ext * b_e list)) ->
       (unit -> (unit s_m_ext * res))
@@ -6823,7 +6824,7 @@ let rec run_invoke_v_m
           ()));;
 
 let rec run_fuzz
-  n d s m v_imps =
+  n d s m v_imps opt_vs =
     (fun () ->
       (let a = interp_instantiate_init_m s m v_imps () in
         (match a with (sa, RI_crash_m res) -> (fun () -> (sa, RCrash res))
@@ -6852,7 +6853,11 @@ let rec run_fuzz
                             ()) ())
                             (fun cl ->
                               (let Tf (t1, _) = cl_m_type cl in
-                                run_invoke_v_m n d (sb, (map bitzero t1, i))))))
+                               let params =
+                                 (match opt_vs with None -> map bitzero t1
+                                   | Some ab -> rev ab)
+                                 in
+                                run_invoke_v_m n d (sb, (params, i))))))
                   | (sb, RValue (_ :: _)) ->
                     (fun () -> (sb, RCrash (Error_invalid "start function"))))))
           ()));;
