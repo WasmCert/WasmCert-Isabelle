@@ -224,6 +224,116 @@ lemma list_assn_split:"list_assn P xs1 ys1 * list_assn P xs2 ys2
   by (extract_pre_pure, sep_auto)
 
 
+
+lemma ent_frame_bwd:
+  assumes R: "R \<Longrightarrow>\<^sub>A Q"
+  assumes F: "Q*F \<Longrightarrow>\<^sub>A Qs"
+  assumes I: "P \<Longrightarrow>\<^sub>A R*F"
+  shows "P \<Longrightarrow>\<^sub>A Qs"
+  using assms
+  by (metis ent_refl ent_star_mono ent_trans)
+
+lemma left_guard:"(A \<Longrightarrow>\<^sub>A emp * P) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A P)" by simp
+
+lemma right_guard:"(A \<Longrightarrow>\<^sub>A P * emp) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A P)" by simp
+
+lemma post_star_assoc_right:"(A \<Longrightarrow>\<^sub>A P * (Q * R)) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A (P * Q) * R)"
+  by (simp add: assn_aci(9))
+
+(*
+lemma post_star_assoc_left:"(A \<Longrightarrow>\<^sub>A (P * Q) * R) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A P * (Q * R))"
+    by (simp add: assn_aci(9))
+*)
+
+lemma post_rule:"(Q1 \<Longrightarrow>\<^sub>A Q2) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A (P * Q1) * R) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A (P * Q2) * R)"
+    by (meson ent_refl ent_star_mono ent_trans)
+
+method ent_backward_prepare = rule left_guard, rule right_guard, (simp only: flip:star_assoc)?
+
+method ent_backward_process uses r = repeat_all_new \<open>(rule post_rule[OF r] | rule post_star_assoc_right)\<close>
+
+method ent_backward_finish = simp only:assn_one_left mult_1_right[where 'a=assn] flip:star_assoc
+
+method ent_backward_all uses r = (ent_backward_prepare, ent_backward_process r:r); ent_backward_finish?
+
+notepad begin
+  fix A B D D1 D2 D3 P
+  assume 1:"A \<Longrightarrow>\<^sub>A B" 
+  have "D * A \<Longrightarrow>\<^sub>A D * B"
+    apply(ent_backward_all r:1) 
+    apply(rule ent_refl)
+    done
+
+  have "A \<Longrightarrow>\<^sub>A B" 
+    apply(ent_backward_all r:1)
+    apply(rule ent_refl)
+    done
+
+  have "A * D1 * D2 * D3 \<Longrightarrow>\<^sub>A B * D1 * D2 * D3"
+    apply(ent_backward_all r:1)
+    apply(rule ent_refl) 
+    done
+
+  have "D1 * D2 * D3 * A \<Longrightarrow>\<^sub>A D1 * D2 * D3 * B"
+    apply(ent_backward_all r:1)
+    apply(rule ent_refl) 
+    done
+
+  have "D1 * A * D2 * D3 \<Longrightarrow>\<^sub>A D1 * B * D2 * D3"
+    apply(ent_backward_all r:1)
+    apply(rule ent_refl) 
+    done
+
+  have "A * A \<Longrightarrow>\<^sub>A B * B" 
+    apply(ent_backward_all r:1)
+    apply(rule ent_refl) 
+    done
+
+  have "D1 * A * D2 * A * D3 \<Longrightarrow>\<^sub>A D1 * B * D2 * B * D3"
+    apply(ent_backward_all r:1)
+    apply(rule ent_refl) 
+    done
+
+
+  assume 2:"P \<Longrightarrow> A \<Longrightarrow>\<^sub>A B" 
+  assume "P"
+  have "D * A \<Longrightarrow>\<^sub>A D * B"
+    apply(ent_backward_all r:2) 
+    apply(rule \<open>P\<close> ent_refl)+
+    done
+
+  have "A \<Longrightarrow>\<^sub>A B" 
+    apply(ent_backward_all r:2) 
+    apply(rule \<open>P\<close> ent_refl)+
+    done
+
+  have "A * D1 * D2 * D3 \<Longrightarrow>\<^sub>A B * D1 * D2 * D3"
+    apply(ent_backward_all r:2) 
+    apply(rule \<open>P\<close> ent_refl)+
+    done
+
+  have "D1 * D2 * D3 * A \<Longrightarrow>\<^sub>A D1 * D2 * D3 * B"
+    apply(ent_backward_all r:2) 
+    apply(rule \<open>P\<close> ent_refl)+
+    done
+
+  have "D1 * A * D2 * D3 \<Longrightarrow>\<^sub>A D1 * B * D2 * D3"
+    apply(ent_backward_all r:2) 
+    apply(rule \<open>P\<close> ent_refl)+
+    done
+
+  have "A * A \<Longrightarrow>\<^sub>A B * B" 
+    apply(ent_backward_all r:2) 
+    apply(rule \<open>P\<close> ent_refl)+
+    done
+
+  have "D1 * A * D2 * A * D3 \<Longrightarrow>\<^sub>A D1 * B * D2 * B * D3"
+    apply(ent_backward_all r:2) 
+    apply(rule \<open>P\<close> ent_refl)+
+    done
+end
+
+
 lemma interp_alloc_module_m_triple:"< s_m_assn (is, i_ms) s s_m * inst_store_assn (is, i_ms)>
   interp_alloc_module_m s_m m imps gvs
   <\<lambda>(s_m', i_m, exps_m). let (s', i, exps) = interp_alloc_module s m imps gvs in 
@@ -232,12 +342,6 @@ proof -
   have list_all2_extract_length:
     "\<And>P xs ys. list_all2 P xs ys = (length xs = length ys \<and> list_all2 P xs ys)"
     using list_all2_lengthD by auto
-
-  have post_star_assoc:"\<And>A P Q R. (A \<Longrightarrow>\<^sub>A P * (Q * R)) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A P * Q * R)"
-    by (simp add: assn_aci(9))
-
-  have post_rule:"\<And>A P Q1 Q2 R. (Q1 \<Longrightarrow>\<^sub>A Q2) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A P * Q1 * R) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A P * Q2 * R)"
-    by (meson ent_refl ent_star_mono ent_trans)
 
   show ?thesis
   unfolding s_m_assn_def funcs_m_assn_def tabs_m_assn_def 
@@ -277,7 +381,7 @@ proof -
 
   apply(subst (asm) (1) list_all2_extract_length, auto)
     (* split the list_assn containing @ *)
-  apply(rule post_rule[OF list_assn_split] | rule post_star_assoc)+
+  apply(ent_backward_all r:list_assn_split)
   apply(sep_auto)
   done
 qed
@@ -379,20 +483,68 @@ next
 qed
 
 
+lemma funcs_m_assn_extend: 
+  "length is = length i_ms \<Longrightarrow> 
+  funcs_m_assn (is, i_ms) fs fs_m \<Longrightarrow>\<^sub>A funcs_m_assn (is@is', i_ms@i_ms') fs fs_m"
+  "length is' = length i_ms' \<Longrightarrow> 
+  funcs_m_assn (is, i_ms) fs fs_m \<Longrightarrow>\<^sub>A funcs_m_assn (is'@is, i_ms'@i_ms) fs fs_m"
+  unfolding funcs_m_assn_def list_all2_conv_all_nth
+  by (sep_auto, simp add: cl_m_agree_extend)+
+
+
+lemma s_m_assn_extend: 
+  "length is = length i_ms \<Longrightarrow>
+  s_m_assn (is, i_ms) s s_m \<Longrightarrow>\<^sub>A s_m_assn (is@is', i_ms@i_ms') s s_m"
+  "length is' = length i_ms' \<Longrightarrow>
+  s_m_assn (is, i_ms) s s_m \<Longrightarrow>\<^sub>A s_m_assn (is'@is, i_ms'@i_ms) s s_m"
+  unfolding s_m_assn_def
+  by ((rule fr_refl)+, rule funcs_m_assn_extend, simp)+
+
+
+abbreviation "cfg_m_const cfg_m cfg_m' \<equiv> (
+  case cfg_m of Config_m d s_m fc fcs \<Rightarrow>
+  case cfg_m' of Config_m d' s_m' fc' fcs' \<Rightarrow> s_m = s_m')"
+
+lemma run_step_b_e_m_triple_const:
+    assumes "const_expr \<C> b_e"
+    shows "<cfg_m_assn i_s cfg cfg_m> 
+    run_step_b_e_m b_e cfg_m 
+    <\<lambda>(cfg_m', res). \<up>(cfg_m_const cfg_m cfg_m') * 
+    cfg_m_pair_assn i_s (run_step_b_e b_e cfg) (cfg_m', res)>\<^sub>t" 
+  using assms unfolding const_expr.simps
+  apply(simp split:b_e.splits)
+  unfolding cfg_m_assn_def s_m_assn_def fc_m_assn_def 
+  apply(sep_auto split:config.splits config_m.splits frame_context_m.splits frame_context.splits 
+      redex.splits heap:get_global_triple)
+  done
+
 lemma interp_get_v_m_triple:
-  "< s_m_assn is s s_m * inst_m_assn inst inst_m > 
+  "< s_m_assn (is, i_ms) s s_m * inst_store_assn (is, i_ms)  * inst_m_assn inst inst_m > 
   interp_get_v_m s_m inst_m b_es
-  <\<lambda>r.\<up>(r = interp_get_v s inst b_es) * s_m_assn is s s_m * inst_m_assn inst inst_m >"
+  <\<lambda>r.\<up>(r = interp_get_v s inst b_es) 
+  * s_m_assn (inst#is, inst_m#i_ms) s s_m * inst_store_assn (inst#is, inst_m#i_ms) >\<^sub>t"
 proof - 
-  note 1 = run_iter_m_triple[of _ 
-      "Config _ _ (Frame_context (Redex [] [] b_es) [] 0 _) _"
-      "Config_m _ _ (Frame_context_m (Redex [] [] b_es) [] 0 _ inst_m) _", 
-      simplified cfg_m_assn_def fc_m_assn_def 
-      config.case config_m.case frame_context.case frame_context_m.case]
+  have 1:"s_m_assn (is, i_ms) s s_m * inst_store_assn (is, i_ms)  * inst_m_assn inst inst_m
+    \<Longrightarrow>\<^sub>A s_m_assn (inst#is, inst_m#i_ms) s s_m * inst_store_assn (inst#is, inst_m#i_ms)"
+    apply(sep_auto) 
+    using s_m_assn_extend(2)[of "[inst]" "[inst_m]", simplified]
+    by (metis (no_types, lifting) assn_times_assoc fr_refl star_aci(2))
+
+  have 2:"inst_at (inst#is, inst_m#i_ms) (inst, inst_m) 0" by auto
+
+  note 3 = run_v_m_triple[where f="\<lparr> f_locs = [], f_inst = inst \<rparr>", simplified locs_m_assn_def f.simps]
+
+  have 4:"2 = Suc (Suc 0)" by simp 
 
   show ?thesis
-  unfolding interp_get_v_m_def
-  apply(sep_auto)
+
+    unfolding interp_get_v_m_def interp_get_v_def
+    supply [simp del] = run_v_m.simps 
+    apply(rule cons_pre_rule[OF 1])  
+    apply(sep_auto heap:3 simp del: list_assn_simps list_assn.simps)
+    apply(sep_auto split:res.splits config.splits prod.splits)
+      (* fails: b_es might do something to the store *)
+    
   
   sorry
 
@@ -404,6 +556,7 @@ lemma interp_instantiate_m_triple:
   <\<lambda>(s_m', res_m). let (s', res) = interp_instantiate s m v_imps in 
   \<exists>\<^sub>Ai_s'. s_m_assn i_s' s' s_m' * inst_store_assn i_s'  >"
   supply [simp del] = list_all2_m.simps
+
   apply(sep_auto)
     apply(vcg decon:list_all2_m_decon)
      apply(sep_auto heap:external_typing_m_triple)

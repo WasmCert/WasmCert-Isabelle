@@ -161,7 +161,7 @@ definition interp_get_v_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> b_e list \<
   "interp_get_v_m s inst b_es = do {
      f_locs1 \<leftarrow> Array.of_list [];
      res \<leftarrow> run_v_m 2 0 (s, f_locs1, inst, b_es);
-     case res of (_,RValue [v]) \<Rightarrow> return v }"
+     case res of (_,RValue [v]) \<Rightarrow> return v | _ \<Rightarrow> return undefined}"
 
 definition interp_get_i32_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> b_e list \<Rightarrow> i32 Heap" where
   "interp_get_i32_m s inst b_es = do {

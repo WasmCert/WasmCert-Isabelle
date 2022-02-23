@@ -304,15 +304,15 @@ lemma get_local_triple:
   by sep_auto
 
 lemma get_global_triple:
-  assumes "inst_at (is, i_ms) (f_inst f, f_inst2) j"
-  shows "<globs_m_assn gs gs_m * inst_store_assn (is, i_ms)>
+  assumes "inst_at i_s (f_inst f, f_inst2) j"
+  shows "<globs_m_assn gs gs_m * inst_store_assn i_s>
   app_s_f_v_s_get_global_m k gs_m f_inst2 v_s
   <\<lambda>r.\<up>(r = app_s_f_v_s_get_global k gs f v_s)
-  * globs_m_assn gs gs_m * inst_store_assn (is, i_ms)>"
+  * globs_m_assn gs gs_m * inst_store_assn i_s>"
   using assms
   unfolding globs_m_assn_def inst_m_assn_def app_s_f_v_s_get_global_m_def app_s_f_v_s_get_global_def
     sglob_ind_def list_assn_conv_idx
-  apply (sep_auto)
+  apply (sep_auto split:prod.splits)
    apply (knock_down j)
   apply (sep_auto)
   done
@@ -763,7 +763,7 @@ proof -
   proof (cases b_e)
     case (Get_global k)
     then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
-      by (sep_auto heap:get_global_triple split:prod.splits)
+      by (sep_auto heap:get_global_triple)
   next
     case (Set_global k)
     then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
@@ -1082,5 +1082,6 @@ proof -
     apply(sep_auto heap:run_iter_m_triple split:config.splits config_m.splits prod.splits)
     apply(sep_auto simp:cfg_m_assn_def)
     done
-qed
+qed                                                                 
+
 end
