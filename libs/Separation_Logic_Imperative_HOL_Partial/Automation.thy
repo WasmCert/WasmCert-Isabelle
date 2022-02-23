@@ -886,6 +886,28 @@ method_setup fr_rot_rhs = \<open>
 \<close>
 
 
+subsubsection \<open>Backward reasoning in entailment\<close>
+
+lemma ent_post_left_guard:"(A \<Longrightarrow>\<^sub>A emp * P) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A P)" by simp
+
+lemma ent_post_right_guard:"(A \<Longrightarrow>\<^sub>A P * emp) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A P)" by simp
+
+lemma post_star_assoc_right:"(A \<Longrightarrow>\<^sub>A P * (Q * R)) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A (P * Q) * R)"
+  by (simp add: assn_aci(9))
+
+lemma ent_cons_post_rule:"(Q1 \<Longrightarrow>\<^sub>A Q2) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A (P * Q1) * R) \<Longrightarrow> (A \<Longrightarrow>\<^sub>A (P * Q2) * R)"
+    by (meson ent_refl ent_star_mono ent_trans)
+
+method ent_backward_prepare = 
+  rule ent_post_left_guard, rule ent_post_right_guard, (simp only: flip:star_assoc)?
+
+method ent_backward_process uses r = 
+  repeat_all_new \<open>(rule ent_cons_post_rule[OF r] | rule post_star_assoc_right)\<close>
+
+method ent_backward_finish = simp only:assn_one_left mult_1_right[where 'a=assn] flip:star_assoc
+
+method ent_backward_all uses r = (ent_backward_prepare, ent_backward_process r:r); ent_backward_finish?
+
 
 (*<*)
 subsection \<open>Test Cases\<close>
@@ -981,6 +1003,85 @@ lemma "<P * x\<mapsto>\<^sub>a[1,2,3]>
   <\<lambda>r. P * x\<mapsto>\<^sub>a[1,2,3] * \<up>(r=2)>"
   apply sep_auto
   done
+
+
+notepad begin
+  fix A B D D1 D2 D3 P
+  assume 1:"A \<Longrightarrow>\<^sub>A B" 
+  have "D * A \<Longrightarrow>\<^sub>A D * B"
+    apply(ent_backward_all r:1) 
+    apply(rule ent_refl)
+    done
+
+  have "A \<Longrightarrow>\<^sub>A B" 
+    apply(ent_backward_all r:1)
+    apply(rule ent_refl)
+    done
+
+  have "A * D1 * D2 * D3 \<Longrightarrow>\<^sub>A B * D1 * D2 * D3"
+    apply(ent_backward_all r:1)
+    apply(rule ent_refl) 
+    done
+
+  have "D1 * D2 * D3 * A \<Longrightarrow>\<^sub>A D1 * D2 * D3 * B"
+    apply(ent_backward_all r:1)
+    apply(rule ent_refl) 
+    done
+
+  have "D1 * A * D2 * D3 \<Longrightarrow>\<^sub>A D1 * B * D2 * D3"
+    apply(ent_backward_all r:1)
+    apply(rule ent_refl) 
+    done
+
+  have "A * A \<Longrightarrow>\<^sub>A B * B" 
+    apply(ent_backward_all r:1)
+    apply(rule ent_refl) 
+    done
+
+  have "D1 * A * D2 * A * D3 \<Longrightarrow>\<^sub>A D1 * B * D2 * B * D3"
+    apply(ent_backward_all r:1)
+    apply(rule ent_refl) 
+    done
+
+
+  assume 2:"P \<Longrightarrow> A \<Longrightarrow>\<^sub>A B" 
+  assume "P"
+  have "D * A \<Longrightarrow>\<^sub>A D * B"
+    apply(ent_backward_all r:2) 
+    apply(rule \<open>P\<close> ent_refl)+
+    done
+
+  have "A \<Longrightarrow>\<^sub>A B" 
+    apply(ent_backward_all r:2) 
+    apply(rule \<open>P\<close> ent_refl)+
+    done
+
+  have "A * D1 * D2 * D3 \<Longrightarrow>\<^sub>A B * D1 * D2 * D3"
+    apply(ent_backward_all r:2) 
+    apply(rule \<open>P\<close> ent_refl)+
+    done
+
+  have "D1 * D2 * D3 * A \<Longrightarrow>\<^sub>A D1 * D2 * D3 * B"
+    apply(ent_backward_all r:2) 
+    apply(rule \<open>P\<close> ent_refl)+
+    done
+
+  have "D1 * A * D2 * D3 \<Longrightarrow>\<^sub>A D1 * B * D2 * D3"
+    apply(ent_backward_all r:2) 
+    apply(rule \<open>P\<close> ent_refl)+
+    done
+
+  have "A * A \<Longrightarrow>\<^sub>A B * B" 
+    apply(ent_backward_all r:2) 
+    apply(rule \<open>P\<close> ent_refl)+
+    done
+
+  have "D1 * A * D2 * A * D3 \<Longrightarrow>\<^sub>A D1 * B * D2 * B * D3"
+    apply(ent_backward_all r:2) 
+    apply(rule \<open>P\<close> ent_refl)+
+    done
+end
+
 
 (*>*)
 
