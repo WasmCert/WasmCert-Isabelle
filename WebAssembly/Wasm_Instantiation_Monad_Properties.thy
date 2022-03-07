@@ -253,6 +253,8 @@ lemma interp_alloc_module_m_triple:
   <\<lambda>(s_m', i_m, exps_m). let (s', i, exps) = interp_alloc_module s m imps gvs in 
   \<up>(exps=exps_m) * inst_store_assn (i#is, i_m#i_ms) * s_m_assn (i#is', i_m#i_ms') s' s_m' >\<^sub>t"
 proof - 
+  
+
   have list_all2_extract_length:
     "\<And>P xs ys. list_all2 P xs ys = (length xs = length ys \<and> list_all2 P xs ys)"
     using list_all2_lengthD by auto
@@ -731,14 +733,22 @@ lemma list_assn_true:"list_assn (\<lambda>x y. true) xs ys =
 
 lemma list_assn_true':"list_assn (\<lambda>x y. true) xs ys \<Longrightarrow>\<^sub>A true"
   by simp 
-
+                             
+fun res_inst_m_agree :: "inst_store \<Rightarrow> res_inst \<Rightarrow> res_inst_m \<Rightarrow> bool " where
+  "res_inst_m_agree i_s (RI_crash e) (RI_crash_m e_m) = (e = e_m)"
+| "res_inst_m_agree i_s (RI_trap t) (RI_trap_m t_m) = (t = t_m)"
+| "res_inst_m_agree i_s (RI_res i v_exps es) (RI_res_m i_m v_exps_m es_m) = 
+  (contains_inst i_s (i, i_m) \<and> v_exps = v_exps_m \<and> es = es_m)"
+| "res_inst_m_agree i_s _ _ = False"
 
 lemma interp_instantiate_m_triple: 
-  "< s_m_assn (is, i_ms)  s s_m * inst_store_assn (is, i_ms)  > 
+  "< s_m_assn i_s  s s_m * inst_store_assn i_s  > 
   interp_instantiate_m s_m m v_imps 
   <\<lambda>(s_m', res_m). let (s', res) = interp_instantiate s m v_imps in 
-  \<exists>\<^sub>Ai_s'. s_m_assn i_s' s' s_m' * inst_store_assn i_s'  >\<^sub>t"
+  \<exists>\<^sub>Ai_s'. \<up>(res_inst_m_agree i_s' res res_m) * s_m_assn i_s' s' s_m' * inst_store_assn i_s'  >\<^sub>t"
 proof - 
+  obtain iss i_ms where i_s:"i_s = (iss, i_ms)" using surjective_pairing by blast
+
   note 1 = interp_get_v_m_triple'
     [where inst="\<lparr>inst.types = _, funcs = _, tabs = _, mems = _, globs = _\<rparr>"
       and inst_m="\<lparr>inst_m.types = _, funcs = _, tabs = _, mems = _, globs = _\<rparr>",
@@ -746,6 +756,7 @@ proof -
 
 
   show ?thesis
+    unfolding i_s
   supply [simp del] = list_all2_m.simps
     apply(simp)
 
@@ -782,7 +793,7 @@ proof -
           heap: interp_get_v_m_triple[where j=0])
       apply(solve_entails)
 
-     apply(sep_auto)
+     apply(sep_auto simp:list_assn_star list_assn_pure list_all2_eq_map_conv)
       apply(vcg decon:fold_map_decon
         [where R="\<lambda>x. module_data_typing _ x" and 
           Q="\<lambda>d r.\<up>(interp_get_i32 _ _ (d_off d) = r) * true"])
@@ -791,16 +802,27 @@ proof -
           heap: interp_get_v_m_triple[where j=0])
       apply(solve_entails)
 
-     apply(sep_auto simp:inst_at_def
-        heap:element_in_bounds_m_triple[where j=0]
-        data_in_bounds_m_triple[where j=0])
-       apply(sep_auto simp:inst_at_def heap:get_start_m_triple[where j=0])
-      apply(sep_auto simp:inst_at_def heap:get_init_tabs_m_triple[where j=0])
-       apply(sep_auto simp:get_init_mems_m_def)
+     apply(sep_auto simp:inst_at_def heap:element_in_bounds_m_triple[where j=0])
+      apply(sep_auto simp:inst_at_def heap:data_in_bounds_m_triple[where j=0])
+     apply(sep_auto simp:inst_at_def heap:get_start_m_triple[where j=0])
+       apply(sep_auto simp:inst_at_def heap:get_init_tabs_m_triple[where j=0])
+      apply(sep_auto simp:get_init_mems_m_def)
 
-      apply(sep_auto simp:Let_def split:prod.splits)
-     apply(sep_auto simp:Let_def split:prod.splits)
-    apply(sep_auto)
+      apply(simp_all add:list_assn_star list_assn_pure list_all2_eq_map_conv)
+      apply(sep_auto simp:Let_def inst_at_def list_all2_map1 comp_def split:prod.splits)+
     done
 qed
+
+lemma interp_instantiate_init_m_triple:
+  "< s_m_assn i_s s s_m * inst_store_assn i_s> 
+  interp_instantiate_init_m s_m m v_imps
+  <\<lambda>(s_m', res_m). let (s', res) = interp_instantiate_init s m v_imps in 
+  \<exists>\<^sub>Ai_s'. \<up>(res_inst_m_agree i_s' res res_m) * s_m_assn i_s' s' s_m' * inst_store_assn i_s' >\<^sub>t" 
+  unfolding interp_instantiate_init_m_def interp_instantiate_init_def 
+  supply [simp del] = interp_instantiate_m.simps interp_instantiate.simps
+    run_instantiate_m.simps run_instantiate.simps
+  apply(sep_auto heap:interp_instantiate_m_triple run_instantiate_m_triple
+      simp:inst_store_subset_def
+      split:res_inst_m.splits res_inst.splits prod.splits res.splits)
+  done
 end

@@ -1096,4 +1096,31 @@ proof -
     done
 qed                                                                 
 
+
+lemma run_instantiate_m_triple:
+  assumes "inst_at i_s (i, i_m) j" "inst_store_subset i_s' i_s"
+  shows "< s_m_assn i_s' s s_m * inst_store_assn i_s> 
+  run_instantiate_m n d (s_m, i_m, es)
+  <\<lambda>(s_m', res_m). let (s', res) = run_instantiate n d (s, i, es) in \<up>(res_m = res) 
+  * s_m_assn i_s' s' s_m' * inst_store_assn i_s >\<^sub>t"
+proof - 
+  note 1 = cfg_m_assn_def fc_m_assn_def fcs_m_assn_def  locs_m_assn_def
+
+  {
+    fix locs
+    have "locs \<mapsto>\<^sub>a [] * s_m_assn i_s' s s_m * inst_store_assn i_s
+      \<Longrightarrow>\<^sub>A cfg_m_assn i_s i_s' 
+          (Config d s (Frame_context (Redex [] es []) [] 0 \<lparr>f_locs = [], f_inst=i\<rparr>) [])
+          (Config_m d s_m (Frame_context_m (Redex [] es []) [] 0 locs i_m) [])"
+      unfolding 1 using assms by sep_auto
+  }
+  note 2 = this
+
+  show ?thesis 
+    apply(sep_auto)
+     apply(rule cons_pre_rule[OF 2])
+     apply(sep_auto heap:run_iter_m_triple)
+    apply(sep_auto simp:cfg_m_assn_def split:config.splits config_m.splits prod.splits)
+    done
+qed
 end
