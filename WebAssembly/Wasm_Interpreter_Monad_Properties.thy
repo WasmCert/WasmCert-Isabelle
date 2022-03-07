@@ -1123,4 +1123,28 @@ proof -
     apply(sep_auto simp:cfg_m_assn_def split:config.splits config_m.splits prod.splits)
     done
 qed
+
+
+lemma make_empty_inst_m_triple:
+  "<emp> 
+  make_empty_inst_m 
+  <\<lambda>r. inst_m_assn \<lparr>inst.types = [], funcs = [], tabs = [], mems = [], globs = [] \<rparr> r>"
+  unfolding make_empty_inst_m_def inst_m_assn_def by sep_auto
+
+lemma make_empty_store_m_triple: 
+  "<emp>
+  make_empty_store_m
+  <\<lambda>r. s_m_assn ([], []) \<lparr>s.funcs = [], tabs = [], mems = [], globs = [] \<rparr> r>"
+  unfolding make_empty_store_m_def s_m_assn_def 
+    funcs_m_assn_def tabs_m_assn_def mems_m_assn_def globs_m_assn_def
+  by sep_auto 
+
+lemma make_empty_frame_m_triple: 
+  "<emp>
+  make_empty_frame_m 
+  <\<lambda>(f_locs1, f_inst2). 
+  inst_m_assn (f_inst empty_frame) f_inst2 * locs_m_assn (f_locs empty_frame) f_locs1>"
+  unfolding make_empty_frame_m_def empty_frame_def locs_m_assn_def 
+  by (sep_auto heap:make_empty_inst_m_triple)
+
 end
