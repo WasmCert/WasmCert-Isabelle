@@ -525,19 +525,46 @@ lemma run_v_m_triple_const:
         split:config_m.splits config.splits prod.splits
         simp:cfg_m_assn_def)
 
-abbreviation "interp_get_v_m_triple s s_m i_s i_s' inst inst_m b_es \<equiv> 
-  < s_m_assn i_s' s s_m * inst_store_assn i_s  * inst_m_assn inst inst_m > 
-  interp_get_v_m s_m inst_m b_es
-  <\<lambda>r.\<up>(r = interp_get_v s inst b_es) 
-  * s_m_assn i_s' s s_m * inst_store_assn i_s * inst_m_assn inst inst_m >\<^sub>t"
+(* simpler version of const_exprs_run_v to not have to carry around so many assumptions *)
+lemma const_exprs_run_v':
+  assumes "const_exprs \<C> b_es"
+          "\<C> \<turnstile> b_es : ([] _> [t])"
+  shows "\<exists>r. run_v 2 0 (s, \<lparr> f_locs=[], f_inst=inst \<rparr>,b_es) = (s, r)"
+proof -
+  consider (1) v where "b_es = [C v] \<and> typeof v = t"
+         | (2) j where "b_es = [Get_global j]"
+                       "j < length (global \<C>)"
+                       "tg_mut (global \<C> ! j) = T_immut"
+                       "tg_t (global \<C> ! j) = t"
+    using const_exprs_is[OF assms(1,2)]
+    by blast
+  thus ?thesis
+  proof cases
+    case 1
+    thus ?thesis
+      by (auto simp add: const_list_def is_const_def Suc_1[symmetric])
+  next
+    case 2
+    thus ?thesis
+      using assms
+      unfolding list_all2_conv_all_nth external_typing.simps
+      by (auto simp add: const_list_def is_const_def Suc_1[symmetric] glob_typing_def nth_append 
+          sglob_def sglob_ind_def sglob_val_def app_s_f_v_s_get_global_def)
+  qed
+qed
+
+
+
 
 lemma interp_get_v_m_triple:
   assumes  
     "const_exprs \<C> b_es" "\<C> \<turnstile> b_es : ([] _> [t])" 
-    "list_all2 (\<lambda>ig tg. external_typing s (Ext_glob ig) (Te_glob tg)) igs (global \<C>)"
-    "inst.globs inst = igs @ arb"
+    "inst_at i_s (inst, inst_m) j" 
     "inst_store_subset i_s' i_s" 
-  shows "interp_get_v_m_triple s s_m i_s i_s' inst inst_m b_es"
+  shows "< s_m_assn i_s' s s_m * inst_store_assn i_s  > 
+  interp_get_v_m s_m inst_m b_es
+  <\<lambda>r.\<up>(r = interp_get_v s inst b_es) 
+  * s_m_assn i_s' s s_m * inst_store_assn i_s >\<^sub>t"
 proof -
   obtain iss i_ms where i_s:"i_s = (iss, i_ms)" by fastforce 
 
@@ -545,61 +572,152 @@ proof -
     \<Longrightarrow>\<^sub>A s_m_assn i_s' s s_m * inst_store_assn (inst#iss, inst_m#i_ms)"
     unfolding i_s inst_store_assn_def by sep_auto
 
-  have 2:"inst_at (inst#iss, inst_m#i_ms) (inst, inst_m) 0" unfolding inst_at_def by auto
-
-  have 3:"inst_store_subset i_s' (inst#iss, inst_m#i_ms)" 
-    using assms(5) unfolding inst_store_subset_def i_s by auto
-
   note 4 = run_v_m_triple_const
     [simplified locs_m_assn_def,
-      OF 2 3 assms(1)]
-
-  obtain v where 5:"run_v 2 0 (s, \<lparr>f_locs = [], f_inst = inst\<rparr>, b_es) = (s, RValue [v])" 
-    using const_exprs_run_v[OF assms(1) assms(2) _ assms(3) assms(4)] by auto
-  show ?thesis 
+      OF assms(3, 4, 1)]
+  obtain v where 7:"run_v 2 0 (s, \<lparr>f_locs = [], f_inst = inst\<rparr>, b_es) = (s, v)" 
+    using const_exprs_run_v'[OF assms(1) assms(2)] by auto
+  show ?thesis          
     unfolding interp_get_v_m_def interp_get_v_def
     supply [simp del] = run_v_m.simps run_v.simps
-    apply(rule cons_pre_rule[OF 1])
+  (*  apply(rule cons_pre_rule[OF 1])*)
     apply(sep_auto heap:4)
-    apply(sep_auto split:res.splits prod.splits simp:inst_store_assn_def i_s 5)
+    apply(sep_auto split:res.splits prod.splits simp:inst_store_assn_def i_s 7)
     done 
 qed
 
-
-lemma interp_get_v_m_triple_glob: 
-  assumes "module_glob_typing \<C> g gt"  
-    "global \<C> = ext_t_globs t_imps"
-    "list_all2 (external_typing s) v_imps t_imps" 
-    "inst.globs inst = ext_globs v_imps "
-    "inst_store_subset i_s' i_s" 
-  shows 
-    "interp_get_v_m_triple s s_m i_s i_s' inst inst_m (g_init g)"
-proof - 
-  have 1:"const_exprs \<C> (g_init g)" and 2:"\<C> \<turnstile> (g_init g) : ([] _> [tg_t gt])"  
-    using assms(1) unfolding module_glob_typing.simps by auto
-
-  have 3:
-    "list_all2 (\<lambda>ig tg. external_typing s (Ext_glob ig) (Te_glob tg)) (ext_globs v_imps) (global \<C>)"
-    unfolding assms(2) 
-    using ext_typing_imp_globi_agree[OF assms(3)]
-    unfolding globi_agree_def external_typing.simps
-    by auto
-
-  have 4:"inst.globs inst = (ext_globs v_imps) @ []" using assms(4) by auto
-
-  show ?thesis using interp_get_v_m_triple[OF 1 2 3 4 assms(5)] by -
-qed
+lemma inst_store_assn_cons:
+  "inst_store_assn (i#is, i_m#i_ms) = inst_m_assn i i_m * inst_store_assn (is, i_ms)"
+  unfolding inst_store_assn_def by auto
 
 lemma interp_get_v_m_triple':
-  assumes  "module_typing m t_imps t_exps" "list_all2 (external_typing s) v_imps t_imps" 
-    "inst.globs inst = ext_globs v_imps "
-  shows "< s_m_assn i_s' s s_m * inst_store_assn i_s  * inst_m_assn inst inst_m > 
+  assumes  
+    "const_exprs \<C> b_es" "\<C> \<turnstile> b_es : ([] _> [t])" 
+    "inst_store_subset i_s' i_s" 
+  shows "< s_m_assn i_s' s s_m * inst_store_assn i_s * inst_m_assn inst inst_m > 
   interp_get_v_m s_m inst_m b_es
   <\<lambda>r.\<up>(r = interp_get_v s inst b_es) 
   * s_m_assn i_s' s s_m * inst_store_assn i_s * inst_m_assn inst inst_m >\<^sub>t"
-proof -
-  show ?thesis sorry
-qed
+  using interp_get_v_m_triple[where i_s="(inst#fst i_s, inst_m#snd i_s)" and j = 0, 
+      OF assms(1, 2), simplified inst_store_assn_cons mult.left_ac] assms(3)
+  unfolding inst_at_def inst_store_subset_def 
+  apply(auto)
+(*too lazy to do it properly *)
+  by (smt (z3) cons_post_rule entails_def mult.left_ac(2) star_aci(2) subset_insertI2)
+
+
+lemma prod_pack:"(x = (y, z)) = (y = fst x \<and> z = snd x) " by auto
+
+
+abbreviation element_in_bounds' where 
+"element_in_bounds' s inst e_ind e \<equiv>
+   let i = inst.tabs inst ! e_tab e 
+   in e_ind + length (e_init e) \<le> length (fst (s.tabs s ! i))"
+
+abbreviation data_in_bounds' where 
+"data_in_bounds' s inst d_ind d \<equiv> 
+  let i = inst.mems inst ! d_data d
+  in d_ind + length (d_init d) \<le> mem_length (s.mems s ! i)"
+
+lemma element_in_bounds_m_triple: 
+  assumes "inst_at i_s (i, i_m) j"
+  shows "< s_m_assn i_s' s s_m * inst_store_assn i_s> 
+  element_in_bounds_m s_m i_m e_offs m_elems 
+  <\<lambda>r. \<up>(r = list_all2 (element_in_bounds' s i) (map nat_of_int e_offs) m_elems) * 
+  s_m_assn i_s' s s_m * inst_store_assn i_s>"
+  using assms 
+  unfolding element_in_bounds_m_def s_m_assn_def tabs_m_assn_def 
+    inst_at_def inst_store_assn_def inst_m_assn_def list_assn_conv_idx 
+  apply(sep_auto split:prod.splits)
+  apply(vcg decon:list_all2_m_decon[where Q'="\<lambda>r. _ * \<up>(r = _)"])
+     apply(knock_down j)
+    apply(sep_auto)
+ (*hack to convert it to the form I like *)
+     apply(subst (asm) (2) prod_pack)
+     apply(sep_auto)
+ (* for whatever reason the automated method doesn't work with dummy patterns *)
+     apply(subst listI_assn_extract[of "inst.tabs (_ ! j) ! e_tab _"], simp, simp)
+     apply(sep_auto)
+    apply(rule listI_assn_reinsert'[where i="inst.tabs (_ ! j) ! e_tab _"], frame_inference, simp, simp)
+    apply(sep_auto)
+   apply(solve_entails)
+  apply(sep_auto simp:list_all2_map1)
+  done
+
+
+lemma data_in_bounds_m_triple: 
+  assumes "inst_at i_s (i, i_m) j"
+  shows "< s_m_assn i_s' s s_m * inst_store_assn i_s> 
+  data_in_bounds_m s_m i_m d_offs m_datas 
+  <\<lambda>r. \<up>(r = list_all2 (data_in_bounds' s i) (map nat_of_int d_offs) m_datas) * 
+  s_m_assn i_s' s s_m * inst_store_assn i_s>"
+  using assms 
+  unfolding data_in_bounds_m_def s_m_assn_def  mems_m_assn_def
+    inst_at_def inst_store_assn_def inst_m_assn_def list_assn_conv_idx 
+  apply(sep_auto split:prod.splits)
+  apply(vcg decon:list_all2_m_decon[where Q'="\<lambda>r. _ * \<up>(r = _)"])
+     apply(knock_down j)
+    apply(sep_auto)
+ (*hack to convert it to the form I like *)
+     apply(subst (asm) (2) prod_pack)
+     apply(sep_auto)
+ (* for whatever reason the automated method doesn't work with dummy patterns *)
+     apply(subst listI_assn_extract[of "inst.mems (_ ! j) ! d_data _"], simp, simp)
+     apply(sep_auto)
+    apply(rule listI_assn_reinsert'[where i="inst.mems (_ ! j) ! d_data _"], frame_inference, simp, simp)
+    apply(sep_auto)
+   apply(solve_entails)
+  apply(sep_auto simp:list_all2_map1)
+  done
+
+abbreviation get_start where "get_start inst st \<equiv> 
+  (case st of None \<Rightarrow> [] | Some i_s_s \<Rightarrow> [Invoke ((inst.funcs inst)!i_s_s)])"
+
+lemma get_start_m_triple: 
+  assumes "inst_at i_s (i, i_m) j"
+  shows "< inst_store_assn i_s> 
+  get_start_m i_m st 
+  <\<lambda>r. \<up>(r = get_start i st) * inst_store_assn i_s>"
+  using assms 
+  unfolding get_start_m_def inst_at_def inst_store_assn_def inst_m_assn_def list_assn_conv_idx 
+  apply(sep_auto split:prod.splits)
+   apply(knock_down j)
+  apply(sep_auto)
+  done
+
+abbreviation get_init_tab where "get_init_tab inst e_ind e \<equiv>
+  Init_tab e_ind (map (\<lambda>i. (inst.funcs inst)!i) (e_init e))"
+
+abbreviation get_init_tabs where "get_init_tabs inst e_inds es \<equiv>
+  List.map2 (get_init_tab inst) e_inds es"
+
+lemma get_init_tab_m_triple: 
+  assumes "inst_at i_s (i, i_m) j"
+  shows "< inst_store_assn i_s> 
+  get_init_tab_m i_m e_ind e 
+  <\<lambda>r. \<up>(r = get_init_tab i e_ind e) * inst_store_assn i_s>"
+  using assms 
+  unfolding get_init_tab_m_def inst_at_def inst_store_assn_def inst_m_assn_def list_assn_conv_idx
+  apply(sep_auto split:prod.splits)
+   apply(vcg decon:fold_map_decon'[where Q="\<lambda>x r. \<up>((inst.funcs i)!x = r)"])
+    apply(knock_down j)
+    apply(sep_auto)
+   apply(solve_entails)
+  apply(sep_auto simp:list_assn_pure list_all2_eq_map_conv)
+  done
+
+lemma get_init_tabs_m_triple: 
+  assumes "inst_at i_s (i, i_m) j"
+  shows "< inst_store_assn i_s> 
+  get_init_tabs_m i_m e_inds es 
+  <\<lambda>r. \<up>(r = get_init_tabs i e_inds es) * inst_store_assn i_s>"
+  using assms 
+  unfolding get_init_tabs_m_def 
+  apply(sep_auto split:prod.splits)
+  apply(vcg decon:fold_map_decon'[where Q="\<lambda>x r. \<up>(get_init_tab i (fst x) (snd x)  = r)"])
+   apply(sep_auto heap:get_init_tab_m_triple[OF assms])
+  apply(sep_auto simp:list_assn_pure list_all2_eq_map_conv)
+  done
 
 
 
@@ -615,23 +733,13 @@ lemma list_assn_true':"list_assn (\<lambda>x y. true) xs ys \<Longrightarrow>\<^
   by simp 
 
 
-lemma interp_get_i32_m_triple:
-  assumes  "module_typing m t_imps t_exps" "list_all2 (external_typing s) v_imps t_imps" 
-    "inst.globs inst = ext_globs v_imps "
-  shows "< s_m_assn i_s' s s_m * inst_store_assn i_s  * inst_m_assn inst inst_m > 
-  interp_get_i32_m s_m inst_m b_es
-  <\<lambda>r.\<up>(r = interp_get_i32 s inst b_es) 
-  * s_m_assn i_s' s s_m * inst_store_assn i_s * inst_m_assn inst inst_m >\<^sub>t"
-  sorry
-
-
 lemma interp_instantiate_m_triple: 
   "< s_m_assn (is, i_ms)  s s_m * inst_store_assn (is, i_ms)  > 
   interp_instantiate_m s_m m v_imps 
   <\<lambda>(s_m', res_m). let (s', res) = interp_instantiate s m v_imps in 
-  \<exists>\<^sub>Ai_s'. s_m_assn i_s' s' s_m' * inst_store_assn i_s'  >"
+  \<exists>\<^sub>Ai_s'. s_m_assn i_s' s' s_m' * inst_store_assn i_s'  >\<^sub>t"
 proof - 
-  note 1 = interp_get_v_m_triple_glob
+  note 1 = interp_get_v_m_triple'
     [where inst="\<lparr>inst.types = _, funcs = _, tabs = _, mems = _, globs = _\<rparr>"
       and inst_m="\<lparr>inst_m.types = _, funcs = _, tabs = _, mems = _, globs = _\<rparr>",
       simplified inst_m_assn_def inst.simps inst_m.simps]
@@ -639,31 +747,60 @@ proof -
 
   show ?thesis
   supply [simp del] = list_all2_m.simps
+    apply(simp)
 
-  apply(sep_auto)
+(* this weird way because I don't want for an if split to happen before dealing with list_all2_m *)
+    apply(vcg)
+     apply(sep_auto)
+
     apply(vcg decon:list_all2_m_decon[where Q'="\<lambda>r. _ * \<up>(r = _)"])
-     apply(sep_auto heap:external_typing_m_triple)
-    apply(solve_entails)
+      apply(sep_auto heap:external_typing_m_triple)
+     apply(solve_entails)
 
    apply(match premises in  I:"module_type_checker _ = _" 
       \<Rightarrow> \<open>insert module_type_checker_imp_module_typing[OF I]\<close>)
 
-     apply(sep_auto simp:module_typing.simps)
+    apply(sep_auto simp:module_typing.simps)
       apply(match premises in I:"list_all2 (module_glob_typing _) _ _" 
         \<Rightarrow> \<open>insert list_all2_forget[OF I]\<close>)
 
       apply(vcg decon:fold_map_decon
         [where R="\<lambda>x. \<exists>y. module_glob_typing _ x y" and 
           Q="\<lambda>g r.\<up>(interp_get_v s _ (g_init g) = r) * true"])
-       apply(sep_auto heap:1 simp:inst_store_subset_def)
+       apply(sep_auto heap:1 simp:inst_store_subset_def module_glob_typing.simps)
+      apply(solve_entails)
+
+     apply(sep_auto simp:list_assn_star list_assn_pure list_all2_eq_map_conv)
+      apply(sep_auto heap:interp_alloc_module_m_triple)
+     apply(sep_auto split:prod.splits)
+   
+      apply(vcg decon:fold_map_decon
+        [where R="\<lambda>x. module_elem_typing _ x" and 
+          Q="\<lambda>e r.\<up>(interp_get_i32 _ _ (e_off e) = r) * true"])
+       apply(sep_auto simp: interp_get_i32_m_def interp_get_i32_def
+          module_elem_typing.simps inst_at_def inst_store_subset_def
+          heap: interp_get_v_m_triple[where j=0])
       apply(solve_entails)
 
      apply(sep_auto)
-      apply(simp add:list_assn_star list_assn_pure list_all2_eq_map_conv)
-      apply(sep_auto heap:interp_alloc_module_m_triple)
-    apply(sep_auto split:prod.splits)
-   
+      apply(vcg decon:fold_map_decon
+        [where R="\<lambda>x. module_data_typing _ x" and 
+          Q="\<lambda>d r.\<up>(interp_get_i32 _ _ (d_off d) = r) * true"])
+       apply(sep_auto simp: interp_get_i32_m_def interp_get_i32_def
+          module_data_typing.simps inst_at_def inst_store_subset_def
+          heap: interp_get_v_m_triple[where j=0])
+      apply(solve_entails)
 
-  sorry
+     apply(sep_auto simp:inst_at_def
+        heap:element_in_bounds_m_triple[where j=0]
+        data_in_bounds_m_triple[where j=0])
+       apply(sep_auto simp:inst_at_def heap:get_start_m_triple[where j=0])
+      apply(sep_auto simp:inst_at_def heap:get_init_tabs_m_triple[where j=0])
+       apply(sep_auto simp:get_init_mems_m_def)
+
+      apply(sep_auto simp:Let_def split:prod.splits)
+     apply(sep_auto simp:Let_def split:prod.splits)
+    apply(sep_auto)
+    done
 qed
 end

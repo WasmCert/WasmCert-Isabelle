@@ -552,7 +552,7 @@ lemma load_packed_triple:
       (load_packed sx m n off (tp_length tp) (t_length t)) r_opt
   * mem_m_assn m m_m>"
   unfolding load_packed_m_v_def load_packed_def 
-  supply [simp] = t_length_def load_def wasm_deserialise_def mem_length_def mem_rep_length_def
+  supply [simp] = t_length_def load_def wasm_deserialise_def 
     and [sep_heap_rules] = load_rules
     and [split] = option.splits t.splits
   apply(sep_auto)

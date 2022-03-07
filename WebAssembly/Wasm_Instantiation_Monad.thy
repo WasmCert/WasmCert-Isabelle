@@ -166,7 +166,7 @@ definition interp_get_v_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> b_e list \<
 definition interp_get_i32_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> b_e list \<Rightarrow> i32 Heap" where
   "interp_get_i32_m s inst b_es = do {
      v \<leftarrow> interp_get_v_m s inst b_es;
-      (case v of ConstInt32 c \<Rightarrow> return c | _ \<Rightarrow> return 0) }"
+     return (case v of ConstInt32 c \<Rightarrow> c | _ \<Rightarrow> 0) }"
 
 definition get_init_tab_m :: "inst_m \<Rightarrow> nat \<Rightarrow> module_elem \<Rightarrow> e Heap" where
   "get_init_tab_m inst e_ind e =
@@ -191,6 +191,22 @@ datatype res_inst_m =
   | RI_trap_m String.literal
   | RI_res_m inst_m "module_export list" "e list"
 
+definition element_in_bounds_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> i32 list \<Rightarrow> module_elem list \<Rightarrow> bool Heap" where
+  "element_in_bounds_m s_m' inst_m e_offs m_elems = list_all2_m (\<lambda>e_off e. do {
+        t_ind \<leftarrow> Array.nth (inst_m.tabs inst_m) (e_tab e);
+        (tab_e,max) \<leftarrow> Array.nth (s_m.tabs s_m') t_ind;
+        tab_e_len \<leftarrow> Array.len tab_e;
+        return (((nat_of_int e_off) + (length (e_init e))) \<le> tab_e_len) } ) e_offs m_elems
+  "
+
+definition data_in_bounds_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> i32 list \<Rightarrow> module_data list \<Rightarrow> bool Heap" where
+  "data_in_bounds_m s_m' inst_m d_offs m_datas = list_all2_m (\<lambda>d_off d. do {
+        m_ind \<leftarrow> Array.nth (inst_m.mems inst_m) (d_data d);
+        (mem_e,max) \<leftarrow> Array.nth (s_m.mems s_m') m_ind;
+        mem_e_len \<leftarrow> len_byte_array mem_e;
+        return (((nat_of_int d_off) + (length (d_init d))) \<le> mem_e_len) } ) d_offs m_datas
+  "
+
 fun interp_instantiate_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (s_m \<times> res_inst_m) Heap" where
   "interp_instantiate_m s_m m v_imps =
      (case (module_type_checker m) of
@@ -211,18 +227,8 @@ fun interp_instantiate_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Righ
             (s_m', inst_m, v_exps) \<leftarrow> interp_alloc_module_m s_m m v_imps g_inits;
             e_offs \<leftarrow> Heap_Monad.fold_map (\<lambda>e. interp_get_i32_m s_m' inst_m (e_off e)) (m_elem m);
             d_offs \<leftarrow> Heap_Monad.fold_map (\<lambda>d. interp_get_i32_m s_m' inst_m (d_off d)) (m_data m);
-            e_in_bounds \<leftarrow>
-              list_all2_m (\<lambda>e_off e. do {
-                t_ind \<leftarrow> Array.nth (inst_m.tabs inst_m) (e_tab e);
-                (tab_e,max) \<leftarrow> Array.nth (s_m.tabs s_m') t_ind;
-                tab_e_len \<leftarrow> Array.len tab_e;
-                return (((nat_of_int e_off) + (length (e_init e))) \<le> tab_e_len) } ) e_offs (m_elem m);
-            d_in_bounds \<leftarrow>
-              list_all2_m (\<lambda>d_off d. do {
-                m_ind \<leftarrow> Array.nth (inst_m.mems inst_m) (d_data d);
-                (mem_e,max) \<leftarrow> Array.nth (s_m.mems s_m') m_ind;
-                mem_e_len \<leftarrow> len_byte_array mem_e;
-                return (((nat_of_int d_off) + (length (d_init d))) \<le> mem_e_len) } ) d_offs (m_data m);
+            e_in_bounds \<leftarrow> element_in_bounds_m s_m' inst_m e_offs (m_elem m);
+            d_in_bounds \<leftarrow> data_in_bounds_m s_m' inst_m d_offs (m_data m);
             (if (e_in_bounds \<and> d_in_bounds) then do {
               start \<leftarrow> get_start_m inst_m (m_start m);
               e_init_tabs \<leftarrow> get_init_tabs_m inst_m (map nat_of_int e_offs) (m_elem m);

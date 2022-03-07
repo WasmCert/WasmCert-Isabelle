@@ -155,8 +155,8 @@ lemma [sep_heap_rules]: "<tabinst_m_assn t t_m>
 
 lemma [sep_heap_rules]: "<mem_m_assn m mi> 
     len_byte_array (fst mi) 
-    <\<lambda>r. mem_m_assn m mi * \<up>(r=length (Rep_mem_rep (fst m)))>"
-  unfolding mem_m_assn_def
+    <\<lambda>r. mem_m_assn m mi * \<up>(r=mem_length m)>"
+  unfolding mem_m_assn_def mem_length_def mem_rep_length_def
   by (sep_auto split: prod.splits)
 
 (* misc triples *)
