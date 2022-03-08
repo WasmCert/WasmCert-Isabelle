@@ -57,7 +57,8 @@ definition "inst_m_assn i i_m \<equiv>
 
 type_synonym inst_store = "(inst list \<times> inst_m list)"
 
-definition "inst_store_assn \<equiv> \<lambda>(is, i_ms). list_assn inst_m_assn is i_ms"
+definition inst_store_assn :: "inst_store \<Rightarrow> assn" where
+  "inst_store_assn \<equiv> \<lambda>(is, i_ms). list_assn inst_m_assn is i_ms"
 
 definition "inst_at \<equiv> \<lambda>(is, i_ms) (i, i_m) j. j < min (length is) (length i_ms) 
   \<and> is!j = i \<and> i_ms!j = i_m"

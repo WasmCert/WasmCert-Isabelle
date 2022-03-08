@@ -212,13 +212,6 @@ lemma alloc_globs_equiv_full:"alloc_globs s m_gs gvs
   using alloc_globs_equiv alloc_globs_range
   by (metis surjective_pairing) 
 
-lemma cl_m_agree_set_extend: 
-  assumes "cl_m_agree i_s' cl cl_m" "inst_store_subset i_s' i_s" 
-  shows "cl_m_agree i_s cl cl_m" 
-  using assms(1) inst_store_extend_preserve_contains[OF _ assms(2)] 
-  unfolding cl_m_agree_j_def  
-  by (auto, simp split:cl.splits cl_m.splits)
-
 lemma cl_m_agree_extend: 
   assumes "cl_m_agree (is, i_ms) cl cl_m" 
   shows "length is = length i_ms   \<Longrightarrow> cl_m_agree (is@is', i_ms@i_ms') cl cl_m"
@@ -431,7 +424,7 @@ qed
 lemma const_exprs_run_v_m_triple:
   assumes "const_exprs \<C> b_es"
           "\<C> \<turnstile> b_es : ([] _> [t])"
-          "inst_at i_s (inst, f_inst2) j"  "inst_store_subset i_s' i_s"
+          "inst_at i_s (inst, f_inst2) j"  
   shows "< s_m_assn i_s' s s_m * inst_store_assn i_s * locs_m_assn locs f_locs1>
         run_v_m 2 0 (s_m, f_locs1, f_inst2, b_es)
         <\<lambda>(s_m', res_m). let (s', res) = 
@@ -466,7 +459,6 @@ lemma interp_get_v_m_triple:
   assumes  
     "const_exprs \<C> b_es" "\<C> \<turnstile> b_es : ([] _> [t])" 
     "inst_at i_s (inst, inst_m) j" 
-    "inst_store_subset i_s' i_s" 
   shows "< s_m_assn i_s' s s_m * inst_store_assn i_s  > 
   interp_get_v_m s_m inst_m b_es
   <\<lambda>r.\<up>(r = interp_get_v s inst b_es) 
@@ -493,23 +485,26 @@ proof -
 qed
 
 lemma inst_store_assn_cons:
-  "inst_store_assn (i#is, i_m#i_ms) = inst_m_assn i i_m * inst_store_assn (is, i_ms)"
-  unfolding inst_store_assn_def by auto
+  "inst_store_assn (i#is, i_m#i_ms) = inst_store_assn (is, i_ms) * inst_m_assn i i_m"
+  unfolding inst_store_assn_def 
+  by (simp add: assn_times_comm)
+
+
+lemma ent_refl':"P = Q \<Longrightarrow> P \<Longrightarrow>\<^sub>A Q"
+  by auto 
 
 lemma interp_get_v_m_triple':
   assumes  
     "const_exprs \<C> b_es" "\<C> \<turnstile> b_es : ([] _> [t])" 
-    "inst_store_subset i_s' i_s" 
   shows "< s_m_assn i_s' s s_m * inst_store_assn i_s * inst_m_assn inst inst_m > 
   interp_get_v_m s_m inst_m b_es
   <\<lambda>r.\<up>(r = interp_get_v s inst b_es) 
   * s_m_assn i_s' s s_m * inst_store_assn i_s * inst_m_assn inst inst_m >\<^sub>t"
-  using interp_get_v_m_triple[where i_s="(inst#fst i_s, inst_m#snd i_s)" and j = 0, 
-      OF assms(1, 2), simplified inst_store_assn_cons mult.left_ac] assms(3)
-  unfolding inst_at_def inst_store_subset_def 
-  apply(auto)
-(*too lazy to do it properly *)
-  by (smt (z3) cons_post_rule entails_def mult.left_ac(2) star_aci(2) subset_insertI2)
+  apply(cases i_s)
+  apply(sep_auto decon: cons_rule[OF _ _ interp_get_v_m_triple
+        [where i_s="(_#_,_#_)", OF assms]])
+    apply(sep_auto simp:inst_store_assn_cons inst_at_def)+
+  done
 
 
 lemma prod_pack:"(x = (y, z)) = (y = fst x \<and> z = snd x) " by auto

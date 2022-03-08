@@ -1134,9 +1134,9 @@ lemma make_empty_inst_m_triple:
 lemma make_empty_store_m_triple: 
   "<emp>
   make_empty_store_m
-  <\<lambda>r. s_m_assn ([], []) \<lparr>s.funcs = [], tabs = [], mems = [], globs = [] \<rparr> r>"
+  <\<lambda>r. s_m_assn ([], []) \<lparr>s.funcs = [], tabs = [], mems = [], globs = [] \<rparr> r * inst_store_assn ([], [])>"
   unfolding make_empty_store_m_def s_m_assn_def 
-    funcs_m_assn_def tabs_m_assn_def mems_m_assn_def globs_m_assn_def
+    funcs_m_assn_def tabs_m_assn_def mems_m_assn_def globs_m_assn_def inst_store_assn_def
   by sep_auto 
 
 lemma make_empty_frame_m_triple: 
