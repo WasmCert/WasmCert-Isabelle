@@ -67,6 +67,32 @@ fun external_typing_m :: "s_m \<Rightarrow> v_ext \<Rightarrow> extern_t \<Right
 
 | "external_typing_m s_m _ _ = return False"
 
+
+definition alloc_funcs_m :: "cl_m array \<Rightarrow> nat \<Rightarrow> module_func list \<Rightarrow>  inst_m \<Rightarrow> tf array \<Rightarrow> unit Heap" 
+  where 
+  "alloc_funcs_m s_funcs n m_fs inst_m inst_types = array_blit_map m_fs
+    (\<lambda>(i, tlocs, b_es). do { ft \<leftarrow> Array.nth inst_types i; return (Func_native inst_m ft tlocs b_es) })
+    s_funcs
+    n"
+
+definition alloc_tabs_m :: "tabinst_m array \<Rightarrow> nat \<Rightarrow> tab_t list \<Rightarrow> unit Heap" where 
+  "alloc_tabs_m s_tabs n m_ts = array_blit_map m_ts
+    (\<lambda>tt. do { t' \<leftarrow> Array.new (l_min tt) None; return (t', (l_max tt)) })
+    s_tabs
+    n"
+
+definition alloc_mems_m :: "mem_m array \<Rightarrow> nat \<Rightarrow> mem_t list \<Rightarrow> unit Heap" where 
+  "alloc_mems_m s_mems n m_ms = array_blit_map m_ms
+    (\<lambda>mt. do { m' \<leftarrow> new_zeroed_byte_array (l_min mt * Ki64); return (m', (l_max mt)) })
+    s_mems
+    n"
+
+definition alloc_globs_m :: "global array \<Rightarrow> nat \<Rightarrow> module_glob list \<Rightarrow> v list \<Rightarrow> unit Heap" where 
+  "alloc_globs_m s_globs n m_gs gvs = array_blit_map (zip m_gs gvs)
+    (\<lambda>(m_g, v). return \<lparr>g_mut=(tg_mut (module_glob.g_type m_g)), g_val=v\<rparr>)
+    s_globs
+    n"
+
 definition export_get_v_ext_m :: "inst_m \<Rightarrow> exp_desc \<Rightarrow> v_ext Heap" where
   "export_get_v_ext_m inst exp =
      (case exp of
@@ -74,6 +100,12 @@ definition export_get_v_ext_m :: "inst_m \<Rightarrow> exp_desc \<Rightarrow> v_
       | Ext_tab i \<Rightarrow>  do { x \<leftarrow> Array.nth (inst_m.tabs inst) i; return (Ext_tab x) }
       | Ext_mem i \<Rightarrow>  do { x \<leftarrow> Array.nth (inst_m.mems inst) i; return (Ext_mem x) }
       | Ext_glob i \<Rightarrow>   do { x \<leftarrow> Array.nth (inst_m.globs inst) i; return (Ext_glob x) })"
+
+definition get_exports_m :: "inst_m \<Rightarrow> module_export list \<Rightarrow> module_export list Heap" where 
+  "get_exports_m inst m_exps = Heap_Monad.fold_map
+    (\<lambda>m_exp. do { desc \<leftarrow> (export_get_v_ext_m inst (E_desc m_exp));
+                  return \<lparr>E_name=(E_name m_exp), E_desc=desc\<rparr> })
+    m_exps"
 
 definition interp_alloc_module_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> v list \<Rightarrow> (s_m \<times> inst_m \<times> module_export list) Heap" where
   "interp_alloc_module_m s_m m imps gvs = do {
@@ -105,31 +137,16 @@ definition interp_alloc_module_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext lis
     s_funcs \<leftarrow> Array.new (length_funcs_s + length (m_funcs m)) dummy_func;
     s_tabs \<leftarrow> Array.new (length_tabs_s + length (m_tabs m)) dummy_tab;
     s_mems \<leftarrow> Array.new (length_mems_s + length (m_mems m)) dummy_mem;
-    s_globs \<leftarrow> Array.new (length_globs_s + length (m_globs m)) dummy_glob;
+    s_globs \<leftarrow> Array.new (length_globs_s + min (length (m_globs m)) (length gvs)) dummy_glob;
     blit (s_m.funcs s_m) 0 s_funcs 0 length_funcs_s;
     blit (s_m.tabs s_m) 0 s_tabs 0 length_tabs_s;
     blit (s_m.mems s_m) 0 s_mems 0 length_mems_s;
     blit (s_m.globs s_m) 0 s_globs 0 length_globs_s;
-    array_blit_map (m_funcs m)
-      (\<lambda>(i, tlocs, b_es). do { ft \<leftarrow> Array.nth inst_types i; return (Func_native inst_m ft tlocs b_es) })
-      s_funcs
-      length_funcs_s;
-    array_blit_map (m_tabs m)
-      (\<lambda>tt. do { t' \<leftarrow> Array.new (l_min tt) None; return (t', (l_max tt)) })
-      s_tabs
-      length_tabs_s;
-    array_blit_map (m_mems m)
-      (\<lambda>mt. do { m' \<leftarrow> new_zeroed_byte_array (l_min mt * Ki64); return (m', (l_max mt)) })
-      s_mems
-      length_mems_s;
-    array_blit_map (zip (m_globs m) gvs)
-      (\<lambda>(m_g, v). return \<lparr>g_mut=(tg_mut (module_glob.g_type m_g)), g_val=v\<rparr>)
-      s_globs
-      length_globs_s;
-    exps \<leftarrow> Heap_Monad.fold_map
-              (\<lambda>m_exp. do { desc \<leftarrow> (export_get_v_ext_m inst_m (E_desc m_exp));
-                            return \<lparr>E_name=(E_name m_exp), E_desc=desc\<rparr> })
-              (m_exports m);
+    alloc_funcs_m s_funcs length_funcs_s (m_funcs m) inst_m inst_types;
+    alloc_tabs_m s_tabs length_tabs_s (m_tabs m);
+    alloc_mems_m s_mems length_mems_s (m_mems m); 
+    alloc_globs_m s_globs length_globs_s (m_globs m) gvs;
+    exps \<leftarrow> get_exports_m inst_m (m_exports m);
     let s_res = \<lparr>s_m.funcs=s_funcs, s_m.tabs=s_tabs, s_m.mems=s_mems, s_m.globs=s_globs\<rparr>;
     return (s_res, inst_m, exps)
     }"
@@ -144,12 +161,12 @@ definition interp_get_v_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> b_e list \<
   "interp_get_v_m s inst b_es = do {
      f_locs1 \<leftarrow> Array.of_list [];
      res \<leftarrow> run_v_m 2 0 (s, f_locs1, inst, b_es);
-     case res of (_,RValue [v]) \<Rightarrow> return v }"
+     case res of (_,RValue [v]) \<Rightarrow> return v | _ \<Rightarrow> return undefined}"
 
 definition interp_get_i32_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> b_e list \<Rightarrow> i32 Heap" where
   "interp_get_i32_m s inst b_es = do {
      v \<leftarrow> interp_get_v_m s inst b_es;
-      (case v of ConstInt32 c \<Rightarrow> return c | _ \<Rightarrow> return 0) }"
+     return (case v of ConstInt32 c \<Rightarrow> c | _ \<Rightarrow> 0) }"
 
 definition get_init_tab_m :: "inst_m \<Rightarrow> nat \<Rightarrow> module_elem \<Rightarrow> e Heap" where
   "get_init_tab_m inst e_ind e =
@@ -174,6 +191,22 @@ datatype res_inst_m =
   | RI_trap_m String.literal
   | RI_res_m inst_m "module_export list" "e list"
 
+definition element_in_bounds_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> i32 list \<Rightarrow> module_elem list \<Rightarrow> bool Heap" where
+  "element_in_bounds_m s_m' inst_m e_offs m_elems = list_all2_m (\<lambda>e_off e. do {
+        t_ind \<leftarrow> Array.nth (inst_m.tabs inst_m) (e_tab e);
+        (tab_e,max) \<leftarrow> Array.nth (s_m.tabs s_m') t_ind;
+        tab_e_len \<leftarrow> Array.len tab_e;
+        return (((nat_of_int e_off) + (length (e_init e))) \<le> tab_e_len) } ) e_offs m_elems
+  "
+
+definition data_in_bounds_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> i32 list \<Rightarrow> module_data list \<Rightarrow> bool Heap" where
+  "data_in_bounds_m s_m' inst_m d_offs m_datas = list_all2_m (\<lambda>d_off d. do {
+        m_ind \<leftarrow> Array.nth (inst_m.mems inst_m) (d_data d);
+        (mem_e,max) \<leftarrow> Array.nth (s_m.mems s_m') m_ind;
+        mem_e_len \<leftarrow> len_byte_array mem_e;
+        return (((nat_of_int d_off) + (length (d_init d))) \<le> mem_e_len) } ) d_offs m_datas
+  "
+
 fun interp_instantiate_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (s_m \<times> res_inst_m) Heap" where
   "interp_instantiate_m s_m m v_imps =
      (case (module_type_checker m) of
@@ -194,18 +227,8 @@ fun interp_instantiate_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Righ
             (s_m', inst_m, v_exps) \<leftarrow> interp_alloc_module_m s_m m v_imps g_inits;
             e_offs \<leftarrow> Heap_Monad.fold_map (\<lambda>e. interp_get_i32_m s_m' inst_m (e_off e)) (m_elem m);
             d_offs \<leftarrow> Heap_Monad.fold_map (\<lambda>d. interp_get_i32_m s_m' inst_m (d_off d)) (m_data m);
-            e_in_bounds \<leftarrow>
-              list_all2_m (\<lambda>e_off e. do {
-                t_ind \<leftarrow> Array.nth (inst_m.tabs inst_m) (e_tab e);
-                (tab_e,max) \<leftarrow> Array.nth (s_m.tabs s_m') t_ind;
-                tab_e_len \<leftarrow> Array.len tab_e;
-                return (((nat_of_int e_off) + (length (e_init e))) \<le> tab_e_len) } ) e_offs (m_elem m);
-            d_in_bounds \<leftarrow>
-              list_all2_m (\<lambda>d_off d. do {
-                m_ind \<leftarrow> Array.nth (inst_m.mems inst_m) (d_data d);
-                (mem_e,max) \<leftarrow> Array.nth (s_m.mems s_m') m_ind;
-                mem_e_len \<leftarrow> len_byte_array mem_e;
-                return (((nat_of_int d_off) + (length (d_init d))) \<le> mem_e_len) } ) d_offs (m_data m);
+            e_in_bounds \<leftarrow> element_in_bounds_m s_m' inst_m e_offs (m_elem m);
+            d_in_bounds \<leftarrow> data_in_bounds_m s_m' inst_m d_offs (m_data m);
             (if (e_in_bounds \<and> d_in_bounds) then do {
               start \<leftarrow> get_start_m inst_m (m_start m);
               e_init_tabs \<leftarrow> get_init_tabs_m inst_m (map nat_of_int e_offs) (m_elem m);
