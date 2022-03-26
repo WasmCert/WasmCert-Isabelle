@@ -489,10 +489,6 @@ lemma inst_store_assn_cons:
   unfolding inst_store_assn_def 
   by (simp add: assn_times_comm)
 
-
-lemma ent_refl':"P = Q \<Longrightarrow> P \<Longrightarrow>\<^sub>A Q"
-  by auto 
-
 lemma interp_get_v_m_triple':
   assumes  
     "const_exprs \<C> b_es" "\<C> \<turnstile> b_es : ([] _> [t])" 
