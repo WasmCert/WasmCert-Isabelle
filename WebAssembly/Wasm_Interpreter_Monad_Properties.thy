@@ -186,7 +186,6 @@ proof -
     by (simp add: Abs_uint64_inverse map_takefill Abs_uint8'.abs_eq zero_uint8.abs_eq)
 qed
 
-
 (*  heap rules, lemmas etc. about the assertions *)
 
 lemma pure_dup:
