@@ -351,9 +351,9 @@ definition app_s_f_v_s_load_vec_m :: "loadop_vec \<Rightarrow> nat \<Rightarrow>
         (V_num (ConstInt32 c))#v_s' \<Rightarrow> do {
              j \<leftarrow> Array.nth (inst_m.mems i_m) 0;
              m \<leftarrow> Array.nth ms j;
-             v_maybe \<leftarrow> undefined;
+             v_maybe \<leftarrow> load_vec_m_v lv m (nat_of_int c) off;
              (case v_maybe of
-                Some v \<Rightarrow> return ((V_num v)#v_s', Step_normal)
+                Some v \<Rightarrow> return ((V_vec (ConstVec128 (deserialise_v128 v)))#v_s', Step_normal)
               | None \<Rightarrow> return (v_s', (Res_trap (STR ''load_vec'')))) }
          | _ \<Rightarrow> return (v_s, crash_invalid))"
 
