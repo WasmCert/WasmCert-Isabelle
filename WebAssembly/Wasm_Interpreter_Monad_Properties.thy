@@ -794,14 +794,13 @@ proof -
     done
 qed
 
-lemma store_uint8_list_spec_abs:
- "<mem_m_assn m m_m>
-    store_uint8_list (fst m_m) n bs
-  <\<lambda>r. \<up>(case bs of [] \<Rightarrow> True | x#xs \<Rightarrow> n+length bs \<le> mem_length m ) * mem_m_assn (write_bytes m n (bytes_takefill zero_byte (length bs) bs)) m_m>"
-proof - 
-  show ?thesis
-    by (sep_auto simp add: add.commute upd_conv_take_nth_drop mem_length_def mem_rep_length_def mem_m_assn_def bytes_takefill_def write_bytes_def mem_rep_write_bytes_def Abs_mem_rep_inverse split: prod.splits list.splits)
-qed
+lemma store_uint8_list_triple: "<mem_m_assn m m_m> 
+  store_uint8_list (fst m_m) n bs
+   <\<lambda>r. \<up>(length bs > 0 \<longrightarrow> n+length bs \<le> mem_length m)
+   * mem_m_assn (write_bytes m n bs) m_m >"
+  unfolding mem_m_assn_def write_bytes_def mem_rep_write_bytes_def
+    mem_length_def mem_rep_length_def
+  by (sep_auto split:prod.splits list.splits simp:Abs_mem_rep_inverse)
 
 lemma store_vec_triple:
   assumes "inst_at i_s (f_inst f, f_inst2) j"
@@ -810,7 +809,25 @@ lemma store_vec_triple:
   <\<lambda>r. let (ms', v_s', res) = app_s_f_v_s_store_vec sv off ms f v_s in 
   \<up>(r = (v_s', res))
   * mems_m_assn ms' ms_m * inst_store_assn i_s>\<^sub>t"
-  sorry
+  using assms
+  unfolding app_s_f_v_s_store_vec_m_def app_s_f_v_s_store_vec_def
+    inst_store_assn_def inst_m_assn_def inst_at_def list_assn_conv_idx mems_m_assn_def
+  apply(sep_auto split:v_num.splits v.splits v_vec.splits prod.splits)
+       apply(knock_down j)
+      apply(sep_auto)
+       apply(knock_down "inst.mems (f_inst f) ! 0")
+      apply(sep_auto)
+        apply(extract_list_idx "inst.mems (f_inst f) ! 0")
+        apply(sep_auto heap:store_uint8_list_triple)
+       apply(sep_auto)
+       apply(sep_auto simp:smem_ind_def split:list.splits prod.splits)
+         apply(sep_auto simp:store_def Let_def)
+        apply(sep_auto simp:store_def Let_def)
+       apply(rule listI_assn_reinsert_upd, frame_inference, simp, simp)
+       apply(sep_auto simp:store_def Let_def bytes_takefill_def)
+      apply(sep_auto simp:smem_ind_def store_def split:list.splits)
+     apply(sep_auto)+
+  done
 
 lemma init_mem_triple: 
   "<mem_m_assn m m_m>
