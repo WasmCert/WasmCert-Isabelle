@@ -133,14 +133,14 @@ lemma store_tab_max:
   unfolding store_tab_def
   by (fastforce split: if_splits)
 
-lemma wasm_deserialise_type:"typeof (wasm_deserialise bs t) = t"
-  unfolding wasm_deserialise_def typeof_def
-  by (simp split: t.splits)
+lemma wasm_deserialise_num_type:"typeof_num (wasm_deserialise_num bs t) = t"
+  unfolding wasm_deserialise_num_def typeof_num_def
+  by (simp split: t_num.splits)
 
 axiomatization where
     host_apply_preserve_store1:"host_apply s (t1s _> t2s) f vs hs (Some (s', vs')) \<Longrightarrow> store_extension s s'"
 and host_apply_preserve_store2:"host_apply s (t1s _> t2s) f vs hs (Some (s', vs')) \<Longrightarrow> store_typing s \<Longrightarrow> store_typing s'"
-and host_apply_respect_type:"list_all2 types_agree t1s vs \<Longrightarrow> host_apply s (t1s _> t2s) f vs hs (Some (s', vs')) \<Longrightarrow> list_all2 types_agree t2s vs'"
+and host_apply_respect_type:"list_all2 (\<lambda>t v. typeof v = t) t1s vs \<Longrightarrow> host_apply s (t1s _> t2s) f vs hs (Some (s', vs')) \<Longrightarrow> list_all2 (\<lambda>t v. typeof v = t) t2s vs'"
 
 lemma host_apply_preserve_store:
   assumes "host_apply s (t1s _> t2s) f vs hs (Some (s', vs'))"

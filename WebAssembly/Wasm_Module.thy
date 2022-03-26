@@ -91,14 +91,14 @@ inductive module_glob_typing :: "t_context \<Rightarrow> module_glob \<Rightarro
 inductive module_elem_typing :: "t_context \<Rightarrow> module_elem \<Rightarrow> bool" where
   "\<lbrakk>t = 0;
     const_exprs \<C> es;
-    \<C> \<turnstile> es : ([] _> [T_i32]);
+    \<C> \<turnstile> es : ([] _> [T_num T_i32]);
     t < length (table \<C>);
     list_all (\<lambda>i. i < length (func_t \<C>)) is\<rbrakk> \<Longrightarrow> module_elem_typing \<C> \<lparr>e_tab=t, e_off=es, e_init=is\<rparr>"
 
 inductive module_data_typing :: "t_context \<Rightarrow> module_data \<Rightarrow> bool" where
   "\<lbrakk>d = 0;
     const_exprs \<C> es;
-    \<C> \<turnstile> es : ([] _> [T_i32]);
+    \<C> \<turnstile> es : ([] _> [T_num T_i32]);
     d < length (memory \<C>)\<rbrakk> \<Longrightarrow> module_data_typing \<C> \<lparr>d_data=d, d_off=es, d_init=bs\<rparr>"
 
 inductive module_start_typing :: "t_context \<Rightarrow> i \<Rightarrow> bool" where

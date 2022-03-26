@@ -158,7 +158,7 @@ lemma app_v_s_unop_is:
          (res = crash_invalid)"
   using progress_L0_left[OF reduce.basic[OF reduce_simple.unop]] assms
   unfolding app_v_s_unop_def
-  by (auto split: list.splits)
+  by (auto split: v.splits list.splits)
 
 lemma app_v_s_testop_is:
   assumes "app_v_s_testop op v_s = (v_s',res)"
@@ -166,7 +166,7 @@ lemma app_v_s_testop_is:
          (res = crash_invalid)"
   using progress_L0_left[OF reduce.basic[OF reduce_simple.testop]] assms
   unfolding app_v_s_testop_def
-  by (auto split: list.splits)
+  by (auto split: v.splits list.splits)
 
 lemma app_v_s_binop_is:
   assumes "app_v_s_binop op v_s = (v_s',res)"
@@ -176,7 +176,7 @@ lemma app_v_s_binop_is:
   using progress_L0_left[OF reduce.basic[OF reduce_simple.binop_Some]]
         progress_L0_left[OF reduce.basic[OF reduce_simple.binop_None]] assms
   unfolding app_v_s_binop_def
-  apply (simp split: list.splits cvtop.splits if_splits option.splits)
+  apply (simp split: v.splits list.splits cvtop.splits if_splits option.splits)
   apply blast
   apply fastforce
   done
@@ -187,7 +187,84 @@ lemma app_v_s_relop_is:
          (res = crash_invalid)"
   using progress_L0_left[OF reduce.basic[OF reduce_simple.relop]] assms
   unfolding app_v_s_relop_def
-  by (auto split: list.splits)
+  by (auto split: v.splits list.splits)
+
+lemma app_v_s_unop_vec_is:
+  assumes "app_v_s_unop_vec op v_s = (v_s',res)"
+  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Unop_vec op]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+         (res = crash_invalid)"
+  using progress_L0_left[OF reduce.basic[OF reduce_simple.unop_vec]] assms
+  unfolding app_v_s_unop_vec_def
+  by (auto split: v.splits list.splits)
+
+lemma app_v_s_binop_vec_is:
+  assumes "app_v_s_binop_vec op v_s = (v_s',res)"
+  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Binop_vec op]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+         (\<exists>str. res = Res_trap str \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Binop_vec op]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@[Trap]\<rparr>)) \<or>
+         (res = crash_invalid)"
+  using progress_L0_left[OF reduce.basic[OF reduce_simple.binop_vec_Some]]
+        progress_L0_left[OF reduce.basic[OF reduce_simple.binop_vec_None]] assms
+  unfolding app_v_s_binop_vec_def
+  apply (simp split: v.splits list.splits cvtop.splits if_splits option.splits)
+  apply blast
+  apply fastforce
+  done
+
+lemma app_v_s_shuffle_vec_is:
+  assumes "app_v_s_shuffle_vec is v_s = (v_s',res)"
+  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Shuffle_i8_16 is]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+         (res = crash_invalid)"
+  using progress_L0_left[OF reduce.basic[OF reduce_simple.shuffle_vec]] assms
+  unfolding app_v_s_shuffle_vec_def
+  by (auto split: v.splits list.splits)
+
+lemma app_v_s_ternop_vec_is:
+  assumes "app_v_s_ternop_vec op v_s = (v_s',res)"
+  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Ternop_vec op]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+         (res = crash_invalid)"
+  using progress_L0_left[OF reduce.basic[OF reduce_simple.ternop_vec]] assms
+  unfolding app_v_s_ternop_vec_def
+  by (auto split: v.splits list.splits)
+
+lemma app_v_s_test_vec_is:
+  assumes "app_v_s_test_vec op v_s = (v_s',res)"
+  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Test_vec op]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+         (res = crash_invalid)"
+  using progress_L0_left[OF reduce.basic[OF reduce_simple.test_vec]] assms
+  unfolding app_v_s_test_vec_def
+  by (auto split: v.splits list.splits)
+
+lemma app_v_s_shift_vec_is:
+  assumes "app_v_s_shift_vec op v_s = (v_s',res)"
+  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Shift_vec op]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+         (res = crash_invalid)"
+  using progress_L0_left[OF reduce.basic[OF reduce_simple.shift_vec]] assms
+  unfolding app_v_s_shift_vec_def
+  by (auto split: v.splits v_num.splits list.splits)
+
+lemma app_v_s_splat_vec_is:
+  assumes "app_v_s_splat_vec sv v_s = (v_s',res)"
+  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Splat_vec sv]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+         (res = crash_invalid)"
+  using progress_L0_left[OF reduce.basic[OF reduce_simple.splat_vec]] assms
+  unfolding app_v_s_splat_vec_def
+  by (auto split: v.splits list.splits)
+
+lemma app_v_s_extract_vec_is:
+  assumes "app_v_s_extract_vec sv sx i v_s = (v_s',res)"
+  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Extract_vec sv sx i]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+         (res = crash_invalid)"
+  using progress_L0_left[OF reduce.basic[OF reduce_simple.extract_vec]] assms
+  unfolding app_v_s_extract_vec_def
+  by (auto split: v.splits list.splits)
+
+lemma app_v_s_replace_vec_is:
+  assumes "app_v_s_replace_vec sv i v_s = (v_s',res)"
+  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Replace_vec sv i]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+         (res = crash_invalid)"
+  using progress_L0_left[OF reduce.basic[OF reduce_simple.replace_vec]] assms
+  unfolding app_v_s_replace_vec_def
+  by (auto split: v.splits list.splits)
 
 lemma app_v_s_cvtop_cvt_is:
   assumes "app_v_s_cvtop Convert t1 t2 sx v_s = (v_s',res)"
@@ -197,7 +274,7 @@ lemma app_v_s_cvtop_cvt_is:
   using progress_L0_left[OF reduce.basic[OF reduce_simple.convert_Some]]
         progress_L0_left[OF reduce.basic[OF reduce_simple.convert_None]] assms
   unfolding app_v_s_cvtop_def
-  apply (simp split: list.splits cvtop.splits if_splits option.splits)
+  apply (simp split: v.splits list.splits cvtop.splits if_splits option.splits)
   apply blast
   apply fastforce
   done
@@ -208,7 +285,7 @@ lemma app_v_s_cvtop_reinterpret_is:
          (res = crash_invalid)"
   using progress_L0_left[OF reduce.basic[OF reduce_simple.reinterpret]] assms
   unfolding app_v_s_cvtop_def
-  by (auto split: list.splits cvtop.splits if_splits)
+  by (auto split: v.splits list.splits cvtop.splits if_splits)
 
 lemma app_v_s_cvtop_is:
   assumes "app_v_s_cvtop op t1 t2 sx v_s = (v_s',res)"
@@ -228,7 +305,7 @@ lemma app_v_s_select_is:
   using progress_L0_left[OF reduce.basic[OF reduce_simple.select_true]]
         progress_L0_left[OF reduce.basic[OF reduce_simple.select_false]] assms
   unfolding app_v_s_select_def
-  by (auto split: if_splits list.splits v.splits)
+  by (auto split: if_splits list.splits v.splits v_num.splits)
 
 lemma app_f_v_s_get_local_is:
   assumes "app_f_v_s_get_local k f v_s = (v_s',res)"
@@ -296,7 +373,7 @@ lemma app_v_s_if_is:
   using progress_L0_left[OF reduce.basic[OF reduce_simple.if_false]]
         progress_L0_left[OF reduce.basic[OF reduce_simple.if_true]] assms
   unfolding app_v_s_if_def
-  by (auto split: list.splits cvtop.splits if_splits option.splits v.splits)
+  by (auto split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
 
 lemma app_v_s_br_if_is:
   assumes "app_v_s_br_if k v_s = (v_s', es_c, res)"
@@ -305,7 +382,7 @@ lemma app_v_s_br_if_is:
   using progress_L0_left[OF reduce.basic[OF reduce_simple.br_if_false]]
         progress_L0_left[OF reduce.basic[OF reduce_simple.br_if_true]] assms
   unfolding app_v_s_br_if_def
-  by (auto split: list.splits cvtop.splits if_splits option.splits v.splits)
+  by (auto split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
 
 lemma app_v_s_br_table_is:
   assumes "app_v_s_br_table ks k v_s = (v_s', es_c, res)"
@@ -314,7 +391,7 @@ lemma app_v_s_br_table_is:
   using progress_L0_left[OF reduce.basic[OF reduce_simple.br_table]]
         progress_L0_left[OF reduce.basic[OF reduce_simple.br_table_length]] assms
   unfolding app_v_s_br_table_def
-  by (auto simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits)
+  by (auto simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
 
 lemma app_f_call_is:
   assumes "app_f_call k f = (es_c,res)"
@@ -334,18 +411,18 @@ proof (cases "res")
   thus ?thesis
     using assms
     unfolding app_s_f_v_s_call_indirect_def
-    by (auto simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits)
+    by (auto simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
 next
   case (Res_trap x2)
   then obtain i j js i_cl c where 0:"(f_inst f) = i"
                                     "inst.tabs i = j#js"
-                                    "v_s = (ConstInt32 c)#v_s'"
+                                    "v_s = (V_num (ConstInt32 c))#v_s'"
                                     "es_c = []"
                                     "(tab_cl_ind tinsts j (nat_of_int c)) = None \<or>
                                      (tab_cl_ind tinsts j (nat_of_int c)) = Some i_cl \<and> (stypes i k \<noteq> cl_type (cls!i_cl))"
     using assms
     unfolding app_s_f_v_s_call_indirect_def crash_invalid_def
-    by (auto simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits)
+    by (auto simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
   have 1:"tabs s = tinsts \<Longrightarrow> funcs s = cls \<Longrightarrow> (stab s i (nat_of_int c) = Some i_cl \<and> stypes i k \<noteq> cl_type (funcs s!i_cl)) \<or> stab s i (nat_of_int c) = None"
     using 0
     unfolding stab_def stab_cl_ind_def
@@ -360,11 +437,11 @@ next
                                     "inst.tabs i = j#js"
                                     "(tab_cl_ind tinsts j (nat_of_int c)) = Some i_cl"
                                     "(stypes i k = cl_type (cls!i_cl))"
-                                    "v_s = (ConstInt32 c)#v_s'"
+                                    "v_s = (V_num (ConstInt32 c))#v_s'"
                                     "es_c = [Invoke i_cl]"
     using assms
     unfolding app_s_f_v_s_call_indirect_def crash_invalid_def
-    by (auto simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits)
+    by (auto simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
   have 1:"tabs s = tinsts \<Longrightarrow> stab s i (nat_of_int c) = Some i_cl"
     using 0(2,3)
     by (simp add: stab_def stab_cl_ind_def split: list.splits)
@@ -396,7 +473,7 @@ lemma app_s_f_v_s_load_is:
          (res = crash_invalid)"
   using progress_L0_left[OF reduce.load_Some] progress_L0_left[OF reduce.load_None] assms
   unfolding app_s_f_v_s_load_def
-  apply (simp split: list.splits cvtop.splits if_splits option.splits v.splits)
+  apply (simp split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
   apply metis
   apply fastforce
   done
@@ -408,7 +485,7 @@ lemma app_s_f_v_s_load_packed_is:
          (res = crash_invalid)"
   using progress_L0_left[OF reduce.load_packed_Some] progress_L0_left[OF reduce.load_packed_None] assms
   unfolding app_s_f_v_s_load_packed_def
-  apply (simp split: list.splits cvtop.splits if_splits option.splits v.splits)
+  apply (simp split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
   apply metis
   apply fastforce
   done
@@ -432,7 +509,7 @@ lemma app_s_f_v_s_store_is:
          (res = crash_invalid)"
   using progress_L0_left[OF reduce.store_Some] progress_L0_left[OF reduce.store_None] assms
   unfolding app_s_f_v_s_store_def
-  apply (simp split: list.splits cvtop.splits if_splits option.splits v.splits)
+  apply (simp split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
   apply metis
   apply fastforce
   done
@@ -444,7 +521,7 @@ lemma app_s_f_v_s_store_packed_is:
          (res = crash_invalid)"
   using progress_L0_left[OF reduce.store_packed_Some] progress_L0_left[OF reduce.store_packed_None] assms
   unfolding app_s_f_v_s_store_packed_def
-  apply (simp split: list.splits cvtop.splits if_splits option.splits v.splits)
+  apply (simp split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
   apply metis
   apply fastforce
   done
@@ -468,6 +545,42 @@ lemma app_s_f_v_s_mem_size_is:
   unfolding app_s_f_v_s_mem_size_def
   by (fastforce split: list.splits cvtop.splits if_splits option.splits v.splits)
 
+lemma app_s_f_v_s_load_vec_is:
+  assumes "app_s_f_v_s_load_vec lv off ms f v_s = (v_s',res)"
+  shows "(res = Step_normal \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Load_vec lv a off]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+         (\<exists>str. res = Res_trap str \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Load_vec lv a off]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@[Trap]\<rparr>)) \<or>
+         (res = crash_invalid)"
+  using progress_L0_left[OF reduce.load_vec_Some] progress_L0_left[OF reduce.load_vec_None] assms
+  unfolding app_s_f_v_s_load_vec_def
+  apply (simp split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
+  apply metis
+  apply fastforce
+  done
+
+lemma app_s_f_v_s_load_lane_vec_is:
+  assumes "app_s_f_v_s_load_lane_vec svi i off ms f v_s = (v_s',res)"
+  shows "(res = Step_normal \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Load_lane_vec svi i a off]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+         (\<exists>str. res = Res_trap str \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Load_lane_vec svi i a off]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@[Trap]\<rparr>)) \<or>
+         (res = crash_invalid)"
+  using progress_L0_left[OF reduce.load_lane_vec_Some] progress_L0_left[OF reduce.load_lane_vec_None] assms
+  unfolding app_s_f_v_s_load_lane_vec_def
+  apply (simp split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits v_vec.splits)
+  apply metis
+  apply fastforce
+  done
+
+lemma app_s_f_v_s_store_vec_is:
+  assumes "app_s_f_v_s_store_vec sv off ms f v_s = (ms', v_s', res)"
+  shows "(res = Step_normal \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Store_vec sv a off]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:=ms'\<rparr>;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+         (\<exists>str. res = Res_trap str \<and> ms = ms' \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Store_vec sv a off]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@[Trap]\<rparr>)) \<or>
+         (res = crash_invalid)"
+  using progress_L0_left[OF reduce.store_vec_Some] progress_L0_left[OF reduce.store_vec_None] assms
+  unfolding app_s_f_v_s_store_vec_def
+  apply (simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits v_vec.splits)
+  apply metis
+  apply fastforce
+  done
+
 lemma app_s_f_v_s_mem_grow_is:
   assumes "app_s_f_v_s_mem_grow ms f v_s = (ms', v_s', res)"
   shows "(res = Step_normal \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Grow_memory]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:=ms'\<rparr>;f;(v_stack_to_es v_s')\<rparr>)) \<or>
@@ -477,24 +590,24 @@ proof (cases res)
   thus ?thesis
     using assms
     unfolding app_s_f_v_s_mem_grow_def
-    by (simp split: list.splits cvtop.splits if_splits option.splits v.splits)
+    by (simp split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
 next
   case (Res_trap x2)
   thus ?thesis
     using assms
     unfolding app_s_f_v_s_mem_grow_def
-    by (simp split: list.splits cvtop.splits if_splits option.splits v.splits)
+    by (simp split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
 next
   case (Step_normal)
   then obtain c c' j m' v_s'' where 0:
-    "v_s = (ConstInt32 c)#v_s''"
-    "v_s' = (ConstInt32 c')#v_s''"
+    "v_s = (V_num (ConstInt32 c))#v_s''"
+    "v_s' = (V_num (ConstInt32 c'))#v_s''"
     "smem_ind (f_inst f) = Some j"
     "((mem_grow (ms!j) (nat_of_int c)) = Some m' \<and> ms' = ms[j:=m'] \<and> c' = (int_of_nat (mem_size (ms!j)))) \<or>
        ((mem_grow (ms!j) (nat_of_int c)) = None \<and> ms' = ms \<and> c' = (int32_minus_one))"
     using assms
     unfolding app_s_f_v_s_mem_grow_def crash_invalid_def
-    by (auto split: list.splits cvtop.splits if_splits option.splits v.splits)
+    by (auto split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
   show ?thesis
     using 0(4)
   proof (rule disjE)
@@ -1575,6 +1688,100 @@ proof -
         by simp blast
     qed auto
   next
+    case (Load_vec lv a off)
+    consider
+        (a) v_s' where
+              "s' = s"
+              "fcs' = fcs"
+              "fc' = (update_fc_step fc v_s' [])"
+              "res = Step_normal"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Load_vec lv a off]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+      | (b) str v_s' where
+              "s' = s"
+              "fcs' = fcs"
+              "fc' = (update_fc_step fc v_s' [])"
+              "res = Res_trap str"
+              "\<lparr>s;f;v_stack_to_es v_s @ [$Load_vec lv a off]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s') @ [Trap]\<rparr>"
+      | (c) "(res = crash_invalid)"
+      using app_s_f_v_s_load_vec_is[of _ _ "mems s"] assms Load_vec Cons fc_is
+      by (fastforce split: prod.splits)
+    thus ?thesis
+    proof (cases)
+      case a
+      thus ?thesis
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Load_vec fc_is 0
+        by fastforce
+    next
+      case b
+      thus ?thesis
+        using es_frame_contexts_to_config_trap_ctx[OF b(5)] Load_vec fc_is 0
+        by fastforce
+    qed auto
+  next
+    case (Load_lane_vec svi i a off)
+    consider
+        (a) v_s' where
+              "s' = s"
+              "fcs' = fcs"
+              "fc' = (update_fc_step fc v_s' [])"
+              "res = Step_normal"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Load_lane_vec svi i a off]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+      | (b) str v_s' where
+              "s' = s"
+              "fcs' = fcs"
+              "fc' = (update_fc_step fc v_s' [])"
+              "res = Res_trap str"
+              "\<lparr>s;f;v_stack_to_es v_s @ [$Load_lane_vec svi i a off]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s') @ [Trap]\<rparr>"
+      | (c) "(res = crash_invalid)"
+      using app_s_f_v_s_load_lane_vec_is[of _ _ _ "mems s"] assms Load_lane_vec Cons fc_is
+      by (fastforce split: prod.splits)
+    thus ?thesis
+    proof (cases)
+      case a
+      thus ?thesis
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Load_lane_vec fc_is 0
+        by fastforce
+    next
+      case b
+      thus ?thesis
+        using es_frame_contexts_to_config_trap_ctx[OF b(5)] Load_lane_vec fc_is 0
+        by fastforce
+    qed auto
+  next
+    case (Store_vec sv a off)
+    obtain ms' v_s' where ms'_is:
+      "fcs' = fcs"
+      "fc' = (update_fc_step fc v_s' [])"
+      "app_s_f_v_s_store_vec sv off (s.mems s) f  v_s = (ms', v_s', res)"
+      "s' = s\<lparr>mems:=ms'\<rparr>"
+      using Store_vec Cons assms fc_is
+      by (fastforce split: prod.splits)
+    consider
+        (a)   "res = Step_normal"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Store_vec sv a off]\<rparr> \<leadsto> \<lparr>s';f;(v_stack_to_es v_s')\<rparr>)"
+      | (b) str where
+              "mems s = ms'"
+              "res = Res_trap str"
+              "\<lparr>s;f;v_stack_to_es v_s @ [$Store_vec sv a off]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s') @ [Trap]\<rparr>"
+      | (c) "(res = crash_invalid)"
+      using app_s_f_v_s_store_vec_is[OF ms'_is(3), of s] Store_vec ms'_is(4)
+      by fastforce
+    thus ?thesis
+    proof (cases)
+      case a
+      thus ?thesis
+        using es_frame_contexts_to_config_ctx2[OF a(2)] Store_vec fc_is ms'_is(1,2) 0
+        by simp blast
+    next
+      case b
+      have "s = s'"
+        using b(1) ms'_is(4)
+        by simp
+      thus ?thesis
+        using es_frame_contexts_to_config_trap_ctx[OF b(3)] Store_vec fc_is Cons ms'_is(1,2) b 0
+        by simp blast
+    qed auto
+  next
     case Current_memory
     consider
         (a) v_s' where
@@ -1733,6 +1940,188 @@ proof -
       case b
       thus ?thesis
         using es_frame_contexts_to_config_trap_ctx[OF b(5)] Cvtop fc_is 0
+        by simp blast
+    qed auto
+  next
+    case (Unop_vec op)
+    consider
+        (a) v_s' where
+              "s' = s"
+              "fcs' = fcs"
+              "fc' = (update_fc_step fc v_s' [])"
+              "res = Step_normal"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Unop_vec op]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+      | (b) "(res = crash_invalid)"
+      using app_v_s_unop_vec_is assms Unop_vec fc_is
+      by (fastforce split: prod.splits)
+    thus ?thesis
+    proof (cases)
+      case a
+      thus ?thesis
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Unop_vec fc_is 0
+        by simp blast
+    qed auto
+  next
+    case (Binop_vec op)
+    consider
+        (a) v_s' where
+              "s' = s"
+              "fcs' = fcs"
+              "fc' = (update_fc_step fc v_s' [])"
+              "res = Step_normal"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Binop_vec op]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+      | (b) str v_s' where
+              "s' = s"
+              "fcs' = fcs"
+              "fc' = (update_fc_step fc v_s' [])"
+              "res = Res_trap str"
+              "\<lparr>s;f;v_stack_to_es v_s @ [$Binop_vec op]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s') @ [Trap]\<rparr>"
+      | (c) "(res = crash_invalid)"
+      using app_v_s_binop_vec_is assms Binop_vec fc_is
+      by (fastforce split: prod.splits)
+    thus ?thesis
+    proof (cases)
+      case a
+      thus ?thesis
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Binop_vec fc_is 0
+        by simp blast
+    next
+      case b
+      thus ?thesis
+        using es_frame_contexts_to_config_trap_ctx[OF b(5)] Binop_vec fc_is 0
+        by simp blast
+    qed auto
+  next
+    case (Shuffle_i8_16 "is")
+    consider
+        (a) v_s' where
+              "s' = s"
+              "fcs' = fcs"
+              "fc' = (update_fc_step fc v_s' [])"
+              "res = Step_normal"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Shuffle_i8_16 is]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+      | (b) "(res = crash_invalid)"
+      using app_v_s_shuffle_vec_is assms Shuffle_i8_16 fc_is
+      by (fastforce split: prod.splits)
+    thus ?thesis
+    proof (cases)
+      case a
+      thus ?thesis
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Shuffle_i8_16 fc_is 0
+        by simp blast
+    qed auto
+  next
+    case (Ternop_vec op)
+    consider
+        (a) v_s' where
+              "s' = s"
+              "fcs' = fcs"
+              "fc' = (update_fc_step fc v_s' [])"
+              "res = Step_normal"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Ternop_vec op]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+      | (b) "(res = crash_invalid)"
+      using app_v_s_ternop_vec_is assms Ternop_vec fc_is
+      by (fastforce split: prod.splits)
+    thus ?thesis
+    proof (cases)
+      case a
+      thus ?thesis
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Ternop_vec fc_is 0
+        by simp blast
+    qed auto
+  next
+    case (Test_vec op)
+    consider
+        (a) v_s' where
+              "s' = s"
+              "fcs' = fcs"
+              "fc' = (update_fc_step fc v_s' [])"
+              "res = Step_normal"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Test_vec op]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+      | (b) "(res = crash_invalid)"
+      using app_v_s_test_vec_is assms Test_vec fc_is
+      by (fastforce split: prod.splits)
+    thus ?thesis
+    proof (cases)
+      case a
+      thus ?thesis
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Test_vec fc_is 0
+        by simp blast
+    qed auto
+  next
+    case (Shift_vec op)
+    consider
+        (a) v_s' where
+              "s' = s"
+              "fcs' = fcs"
+              "fc' = (update_fc_step fc v_s' [])"
+              "res = Step_normal"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Shift_vec op]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+      | (b) "(res = crash_invalid)"
+      using app_v_s_shift_vec_is assms Shift_vec fc_is
+      by (fastforce split: prod.splits)
+    thus ?thesis
+    proof (cases)
+      case a
+      thus ?thesis
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Shift_vec fc_is 0
+        by simp blast
+    qed auto
+  next
+    case (Splat_vec op)
+    consider
+        (a) v_s' where
+              "s' = s"
+              "fcs' = fcs"
+              "fc' = (update_fc_step fc v_s' [])"
+              "res = Step_normal"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Splat_vec op]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+      | (b) "(res = crash_invalid)"
+      using app_v_s_splat_vec_is assms Splat_vec fc_is
+      by (fastforce split: prod.splits)
+    thus ?thesis
+    proof (cases)
+      case a
+      thus ?thesis
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Splat_vec fc_is 0
+        by simp blast
+    qed auto
+  next
+    case (Extract_vec sv sx i)
+    consider
+        (a) v_s' where
+              "s' = s"
+              "fcs' = fcs"
+              "fc' = (update_fc_step fc v_s' [])"
+              "res = Step_normal"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Extract_vec sv sx i]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+      | (b) "(res = crash_invalid)"
+      using app_v_s_extract_vec_is assms Extract_vec fc_is
+      by (fastforce split: prod.splits)
+    thus ?thesis
+    proof (cases)
+      case a
+      thus ?thesis
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Extract_vec fc_is 0
+        by simp blast
+    qed auto
+  next
+    case (Replace_vec sv i)
+    consider
+        (a) v_s' where
+              "s' = s"
+              "fcs' = fcs"
+              "fc' = (update_fc_step fc v_s' [])"
+              "res = Step_normal"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Replace_vec sv i]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+      | (b) "(res = crash_invalid)"
+      using app_v_s_replace_vec_is assms Replace_vec fc_is
+      by (fastforce split: prod.splits)
+    thus ?thesis
+    proof (cases)
+      case a
+      thus ?thesis
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Replace_vec fc_is 0
         by simp blast
     qed auto
   qed

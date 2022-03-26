@@ -2,9 +2,9 @@ section {* Executable Type Checker *}
 
 theory Wasm_Checker imports Wasm_Checker_Types begin
 
-fun convert_cond :: "t \<Rightarrow> t \<Rightarrow> (sat \<times> sx) option \<Rightarrow> bool" where
-  "convert_cond t1 t2 sat_sx = ((t1 \<noteq> t2) \<and> (sat_sx = None) = ((is_float_t t1 \<and> is_float_t t2)
-                                                                 \<or> (is_int_t t1 \<and> is_int_t t2 \<and> (t_length t1 < t_length t2))))"
+fun convert_cond :: "t_num \<Rightarrow> t_num \<Rightarrow> (sat \<times> sx) option \<Rightarrow> bool" where
+  "convert_cond t1 t2 sat_sx = ((t1 \<noteq> t2) \<and> (sat_sx = None) = ((is_float_t_num t1 \<and> is_float_t_num t2)
+                                                                 \<or> (is_int_t_num t1 \<and> is_int_t_num t2 \<and> (t_num_length t1 < t_num_length t2))))"
 
 fun same_lab_h :: "nat list \<Rightarrow> (t list) list \<Rightarrow> t list \<Rightarrow> (t list) option" where
   "same_lab_h [] _ ts = Some ts"
@@ -63,12 +63,12 @@ qed auto
 fun b_e_type_checker :: "t_context \<Rightarrow>  b_e list \<Rightarrow> tf \<Rightarrow> bool"
 and check :: "t_context \<Rightarrow> b_e list \<Rightarrow> checker_type \<Rightarrow> checker_type"
 and check_single :: "t_context \<Rightarrow>  b_e \<Rightarrow> checker_type \<Rightarrow> checker_type" where
-  "b_e_type_checker \<C> es (tn _> tm) = c_types_agree (check \<C> es (Type tn)) tm"
-| "check \<C> es ts = (case es of
-                     [] \<Rightarrow> ts
-                   | (e#es) \<Rightarrow> (case ts of 
-                                  Bot \<Rightarrow> Bot
-                                | _ \<Rightarrow> check \<C> es (check_single \<C> e ts)))"
+  check_top:"b_e_type_checker \<C> es (tn _> tm) = c_types_agree (check \<C> es (Type tn)) tm"
+| check_iter:"check \<C> es ts = (case es of
+                                 [] \<Rightarrow> ts
+                               | (e#es) \<Rightarrow> (case ts of 
+                                              Bot \<Rightarrow> Bot
+                                           | _ \<Rightarrow> check \<C> es (check_single \<C> e ts)))"
 (*
 foldl (\<lambda> ts e. (case ts of Bot \<Rightarrow> Bot | _ \<Rightarrow> check_single \<C> e ts)) es
 
@@ -79,106 +79,134 @@ foldl_Nil:  "foldl f a [] = a" |
 foldl_Cons: "foldl f a (x # xs) = foldl f (f a x) xs"
 *)
   (* num ops *)
-| "check_single \<C> (C v) ts = type_update ts [] (Type [typeof v])"
-| "check_single \<C> (Unop t op) ts = (if unop_t_agree op t
-                                       then type_update ts [TSome t] (Type [t])
-                                       else Bot)"
-| "check_single \<C> (Binop t op) ts = (if binop_t_agree op t
-                                       then type_update ts [TSome t, TSome t] (Type [t])
-                                       else Bot)"
-| "check_single \<C> (Testop t _) ts = (if is_int_t t
-                                       then type_update ts [TSome t] (Type [T_i32])
-                                       else Bot)"
-| "check_single \<C> (Relop t op) ts = (if relop_t_agree op t
-                                       then type_update ts [TSome t, TSome t] (Type [T_i32])
-                                       else Bot)"
-  (* convert *)
-| "check_single \<C> (Cvtop t1 Convert t2 sat_sx) ts = (if (convert_cond t1 t2 sat_sx)
-                                                   then type_update ts [TSome t2] (Type [t1])
+| check_const:"check_single \<C> (C v) ts = type_update ts [] (Type [typeof v])"
+| check_unop:"check_single \<C> (Unop t op) ts = (if unop_t_num_agree op t
+                                                then type_update ts [TSome (T_num t)] (Type [T_num t])
+                                                else Bot)"
+| check_binop:"check_single \<C> (Binop t op) ts = (if binop_t_num_agree op t
+                                                   then type_update ts [TSome (T_num t), TSome (T_num t)] (Type [T_num t])
                                                    else Bot)"
+| check_testop:"check_single \<C> (Testop t _) ts = (if is_int_t_num t
+                                                    then type_update ts [TSome (T_num t)] (Type [T_num T_i32])
+                                                    else Bot)"
+| check_relop:"check_single \<C> (Relop t op) ts = (if relop_t_num_agree op t
+                                                   then type_update ts [TSome (T_num t), TSome (T_num t)] (Type [T_num T_i32])
+                                                   else Bot)"
+  (* vector ops *)
+| check_unop_vec:"check_single \<C> (Unop_vec op) ts = (type_update ts [TSome (T_vec T_v128)] (Type [T_vec T_v128]))"
+| check_binop_vec:"check_single \<C> (Binop_vec op) ts = (type_update ts [TSome (T_vec T_v128), TSome (T_vec T_v128)] (Type [T_vec T_v128]))"
+| check_shuffle_vec:"check_single \<C> (Shuffle_i8_16 is) ts = (if length is = 16 \<and> list_all (\<lambda>i. i < 32) is
+                                                               then type_update ts [TSome (T_vec T_v128), TSome (T_vec T_v128)] (Type [T_vec T_v128])
+                                                               else Bot)"
+| check_ternop_vec:"check_single \<C> (Ternop_vec op) ts = (type_update ts [TSome (T_vec T_v128), TSome (T_vec T_v128), TSome (T_vec T_v128)] (Type [T_vec T_v128]))"
+| check_test_vec:"check_single \<C> (Test_vec op) ts = (type_update ts [TSome (T_vec T_v128)] (Type [T_num T_i32]))"
+| check_shift_vec:"check_single \<C> (Shift_vec op) ts = (type_update ts [TSome (T_vec T_v128), TSome (T_num T_i32)] (Type [T_vec T_v128]))"
+| check_splat_vec:"check_single \<C> (Splat_vec sv) ts = (type_update ts [TSome (T_num (vec_lane_t sv))] (Type [T_vec T_v128]))"
+| check_extract_vec:"check_single \<C> (Extract_vec sv sx i) ts = (if i < vec_num sv \<and> (sx = U \<or> vec_length sv \<le> 2)
+                                                                 then type_update ts [TSome (T_vec T_v128)] (Type [T_num (vec_lane_t sv)])
+                                                                 else Bot)"
+| check_replace_vec:"check_single \<C> (Replace_vec sv i) ts = (if i < vec_num sv
+                                                               then type_update ts [TSome (T_vec T_v128), TSome (T_num (vec_lane_t sv))] (Type [T_vec T_v128])
+                                                               else Bot)"
+  (* convert *)
+| check_convert:"check_single \<C> (Cvtop t1 Convert t2 sat_sx) ts = (if (convert_cond t1 t2 sat_sx)
+                                                                     then type_update ts [TSome (T_num t2)] (Type [T_num t1])
+                                                                     else Bot)"
   (* reinterpret *)
-| "check_single \<C> (Cvtop t1 Reinterpret t2 sx) ts = (if ((t1 \<noteq> t2) \<and> t_length t1 = t_length t2 \<and> sx = None)
-                                                         then type_update ts [TSome t2] (Type [t1])
-                                                         else Bot)"
+| check_reinterpret:"check_single \<C> (Cvtop t1 Reinterpret t2 sx) ts = (if ((t1 \<noteq> t2) \<and> t_num_length t1 = t_num_length t2 \<and> sx = None)
+                                                                         then type_update ts [TSome (T_num t2)] (Type [T_num t1])
+                                                                         else Bot)"
   (* unreachable, nop, drop, select *)
-| "check_single \<C> (Unreachable) ts = type_update ts [] (TopType [])"
-| "check_single \<C> (Nop) ts = ts"
-| "check_single \<C> (Drop) ts = type_update ts [TAny] (Type [])"
-| "check_single \<C> (Select) ts = type_update_select ts"
+| check_unreachable:"check_single \<C> (Unreachable) ts = type_update ts [] (TopType [])"
+| check_nop:"check_single \<C> (Nop) ts = ts"
+| check_drop:"check_single \<C> (Drop) ts = type_update ts [TAny] (Type [])"
+| check_select:"check_single \<C> (Select) ts = type_update_select ts"
   (* block *)                                 
-| "check_single \<C> (Block (tn _> tm) es) ts = (if (b_e_type_checker (\<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr>) es (tn _> tm))
-                                                then type_update ts (to_ct_list tn) (Type tm)
-                                                else Bot)"
+| check_block:"check_single \<C> (Block (tn _> tm) es) ts = (if (b_e_type_checker (\<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr>) es (tn _> tm))
+                                                            then type_update ts (to_ct_list tn) (Type tm)
+                                                            else Bot)"
   (* loop *)
-| "check_single \<C> (Loop (tn _> tm) es) ts = (if (b_e_type_checker (\<C>\<lparr>label := ([tn] @ (label \<C>))\<rparr>) es (tn _> tm))
-                                                then type_update ts (to_ct_list tn) (Type tm)
-                                                else Bot)"
+| check_loop:"check_single \<C> (Loop (tn _> tm) es) ts = (if (b_e_type_checker (\<C>\<lparr>label := ([tn] @ (label \<C>))\<rparr>) es (tn _> tm))
+                                                          then type_update ts (to_ct_list tn) (Type tm)
+                                                          else Bot)"
   (* if *)
-| "check_single \<C> (If (tn _> tm) es1 es2) ts = (if (b_e_type_checker (\<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr>) es1 (tn _> tm)
-                                                    \<and> b_e_type_checker (\<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr>) es2 (tn _> tm))
-                                                then type_update ts (to_ct_list (tn@[T_i32])) (Type tm)
-                                                else Bot)"
+| check_if:"check_single \<C> (If (tn _> tm) es1 es2) ts = (if (b_e_type_checker (\<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr>) es1 (tn _> tm)
+                                                              \<and> b_e_type_checker (\<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr>) es2 (tn _> tm))
+                                                            then type_update ts (to_ct_list (tn@[T_num T_i32])) (Type tm)
+                                                            else Bot)"
   (* br *)
-| "check_single \<C> (Br i) ts = (if i < length (label \<C>)
-                                 then type_update ts (to_ct_list ((label \<C>)!i)) (TopType [])
-                                 else Bot)"
+| check_br:"check_single \<C> (Br i) ts = (if i < length (label \<C>)
+                                         then type_update ts (to_ct_list ((label \<C>)!i)) (TopType [])
+                                         else Bot)"
   (* br_if *)
-| "check_single \<C> (Br_if i) ts = (if i < length (label \<C>)
-                                    then type_update ts (to_ct_list ((label \<C>)!i @ [T_i32])) (Type ((label \<C>)!i))
-                                    else Bot)"
+| check_br_if:"check_single \<C> (Br_if i) ts = (if i < length (label \<C>)
+                                                then type_update ts (to_ct_list ((label \<C>)!i @ [T_num T_i32])) (Type ((label \<C>)!i))
+                                                else Bot)"
   (* br_table *)
-| "check_single \<C> (Br_table is i) ts = (case (same_lab (is@[i]) (label \<C>)) of
-                                        None \<Rightarrow> Bot
-                                      | Some tls \<Rightarrow> type_update ts (to_ct_list (tls @ [T_i32])) (TopType []))"
+| check_br_table:"check_single \<C> (Br_table is i) ts = (case (same_lab (is@[i]) (label \<C>)) of
+                                                        None \<Rightarrow> Bot
+                                                      | Some tls \<Rightarrow> type_update ts (to_ct_list (tls @ [T_num T_i32])) (TopType []))"
   (* return *)
-| "check_single \<C> (Return) ts = (case (return \<C>) of
-                                   None \<Rightarrow> Bot
-                                 | Some tls \<Rightarrow> type_update ts (to_ct_list tls) (TopType []))"
+| check_return:"check_single \<C> (Return) ts = (case (return \<C>) of
+                                               None \<Rightarrow> Bot
+                                             | Some tls \<Rightarrow> type_update ts (to_ct_list tls) (TopType []))"
   (* call *)
-| "check_single \<C> (Call i) ts = (if i < length (func_t \<C>)
-                                    then (case ((func_t \<C>)!i) of
-                                            (tn _> tm) \<Rightarrow> type_update ts (to_ct_list tn) (Type tm))
-                                    else Bot)"
+| check_call:"check_single \<C> (Call i) ts = (if i < length (func_t \<C>)
+                                              then (case ((func_t \<C>)!i) of
+                                                      (tn _> tm) \<Rightarrow> type_update ts (to_ct_list tn) (Type tm))
+                                              else Bot)"
   (* call_indirect *)
-| "check_single \<C> (Call_indirect i) ts = (if length (table \<C>) \<ge> 1  \<and> i < length (types_t \<C>)
-                                            then (case ((types_t \<C>)!i) of
-                                                    (tn _> tm) \<Rightarrow> type_update ts (to_ct_list (tn@[T_i32])) (Type tm))
-                                            else Bot)"
+| check_call_indirect:"check_single \<C> (Call_indirect i) ts = (if length (table \<C>) \<ge> 1  \<and> i < length (types_t \<C>)
+                                                                then (case ((types_t \<C>)!i) of
+                                                                        (tn _> tm) \<Rightarrow> type_update ts (to_ct_list (tn@[T_num T_i32])) (Type tm))
+                                                                else Bot)"
   (* get_local *)
-| "check_single \<C> (Get_local i) ts = (if i < length (local \<C>)
-                                        then type_update ts [] (Type [(local \<C>)!i])
-                                        else Bot)"
+| check_get_local:"check_single \<C> (Get_local i) ts = (if i < length (local \<C>)
+                                                        then type_update ts [] (Type [(local \<C>)!i])
+                                                        else Bot)"
   (* set_local *)
-| "check_single \<C> (Set_local i) ts = (if i < length (local \<C>)
-                                        then type_update ts [TSome ((local \<C>)!i)] (Type [])
-                                        else Bot)"
+| check_set_local:"check_single \<C> (Set_local i) ts = (if i < length (local \<C>)
+                                                        then type_update ts [TSome ((local \<C>)!i)] (Type [])
+                                                        else Bot)"
   (* tee_local *)
-| "check_single \<C> (Tee_local i) ts = (if i < length (local \<C>)
-                                 then type_update ts [TSome ((local \<C>)!i)] (Type [(local \<C>)!i])
-                                 else Bot)"
+| check_tee_local:"check_single \<C> (Tee_local i) ts = (if i < length (local \<C>)
+                                                       then type_update ts [TSome ((local \<C>)!i)] (Type [(local \<C>)!i])
+                                                       else Bot)"
   (* get_global *)
-| "check_single \<C> (Get_global i) ts = (if i < length (global \<C>)
-                                         then type_update ts [] (Type [tg_t ((global \<C>)!i)])
-                                         else Bot)"
+| check_get_global:"check_single \<C> (Get_global i) ts = (if i < length (global \<C>)
+                                                         then type_update ts [] (Type [tg_t ((global \<C>)!i)])
+                                                         else Bot)"
   (* set_global *)
-| "check_single \<C> (Set_global i) ts = (if i < length (global \<C>) \<and> is_mut (global \<C> ! i)
-                                         then type_update ts [TSome (tg_t ((global \<C>)!i))] (Type [])
-                                         else Bot)"
+| check_set_global:"check_single \<C> (Set_global i) ts = (if i < length (global \<C>) \<and> is_mut (global \<C> ! i)
+                                                         then type_update ts [TSome (tg_t ((global \<C>)!i))] (Type [])
+                                                         else Bot)"
   (* load *)
-| "check_single \<C> (Load t tp_sx a off) ts = (if length (memory \<C>) \<ge> 1 \<and> load_store_t_bounds a (option_projl tp_sx) t
-                                 then type_update ts [TSome T_i32] (Type [t])
-                                 else Bot)"
+| check_load:"check_single \<C> (Load t tp_sx a off) ts = (if length (memory \<C>) \<ge> 1 \<and> load_store_t_bounds a (option_projl tp_sx) t
+                                                         then type_update ts [TSome (T_num T_i32)] (Type [T_num t])
+                                                         else Bot)"
   (* store *)
-| "check_single \<C> (Store t tp a off) ts = (if length (memory \<C>) \<ge> 1 \<and> load_store_t_bounds a tp t
-                                             then type_update ts [TSome T_i32,TSome t] (Type [])
-                                             else Bot)"
+| check_store:"check_single \<C> (Store t tp a off) ts = (if length (memory \<C>) \<ge> 1 \<and> load_store_t_bounds a tp t
+                                                         then type_update ts [TSome (T_num T_i32),TSome (T_num t)] (Type [])
+                                                         else Bot)"
+  (* load_vec *)
+| check_load_vec:"check_single \<C> (Load_vec lv a off) ts = (if length (memory \<C>) \<ge> 1 \<and> load_vec_t_bounds lv a
+                                                             then type_update ts [TSome (T_num T_i32)] (Type [T_vec T_v128])
+                                                             else Bot)"
+  (* load_lane_vec *)
+| check_load_lane_vec:"check_single \<C> (Load_lane_vec svi i a off) ts = (if length (memory \<C>) \<ge> 1 \<and> (i < vec_i_num svi \<and> 2^a < (vec_i_length svi))
+                                                                         then type_update ts [TSome (T_num T_i32), TSome (T_vec T_v128)] (Type [T_vec T_v128])
+                                                                         else Bot)"
+  (* store_vec *)
+| check_store_vec:"check_single \<C> (Store_vec sv a off) ts = (if length (memory \<C>) \<ge> 1 \<and> store_vec_t_bounds sv a
+                                                               then type_update ts [TSome (T_num T_i32),TSome (T_vec T_v128)] (Type [])
+                                                               else Bot)"
   (* current_memory *)
-| "check_single \<C> Current_memory ts = (if length (memory \<C>) \<ge> 1
-                                         then type_update ts [] (Type [T_i32])
-                                         else Bot)"
+| check_current_memory:"check_single \<C> Current_memory ts = (if length (memory \<C>) \<ge> 1
+                                                             then type_update ts [] (Type [T_num T_i32])
+                                                             else Bot)"
   (* grow_memory *)
-| "check_single \<C> Grow_memory ts = (if length (memory \<C>) \<ge> 1
-                                      then type_update ts [TSome T_i32] (Type [T_i32])
-                                      else Bot)"
+| check_grow_memory:"check_single \<C> Grow_memory ts = (if length (memory \<C>) \<ge> 1
+                                                        then type_update ts [TSome (T_num T_i32)] (Type [T_num T_i32])
+                                                        else Bot)"
 
 end

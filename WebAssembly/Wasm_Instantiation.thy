@@ -364,8 +364,8 @@ inductive instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarro
     alloc_module s m v_imps g_inits (s', inst, v_exps);
     f = \<lparr> f_locs = [], f_inst = inst \<rparr>;
     list_all2 (\<lambda>g v. reduce_trans (s',f,$*(g_init g)) (s',f,[$C v])) (m_globs m) g_inits;
-    list_all2 (\<lambda>e c. reduce_trans (s',f,$*(e_off e)) (s',f,[$C ConstInt32 c])) (m_elem m) e_offs;
-    list_all2 (\<lambda>d c. reduce_trans (s',f,$*(d_off d)) (s',f,[$C ConstInt32 c])) (m_data m) d_offs;
+    list_all2 (\<lambda>e c. reduce_trans (s',f,$*(e_off e)) (s',f,[$C\<^sub>n (ConstInt32 c)])) (m_elem m) e_offs;
+    list_all2 (\<lambda>d c. reduce_trans (s',f,$*(d_off d)) (s',f,[$C\<^sub>n (ConstInt32 c)])) (m_data m) d_offs;
     list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> tab_size ((tabs s')!((inst.tabs inst)!(e_tab e)))) e_offs (m_elem m);
     list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs (m_data m);
     (case (m_start m) of None \<Rightarrow> [] | Some i_s \<Rightarrow> [Invoke ((inst.funcs inst)!i_s)]) = start;
@@ -381,7 +381,7 @@ definition interp_get_v :: "s \<Rightarrow> inst \<Rightarrow> b_e list \<Righta
 definition interp_get_i32 :: "s \<Rightarrow> inst \<Rightarrow> b_e list \<Rightarrow> i32" where
   "interp_get_i32 s inst b_es = 
      (case interp_get_v s inst b_es of
-        ConstInt32 c \<Rightarrow> c
+        V_num (ConstInt32 c) \<Rightarrow> c
       | _ \<Rightarrow> 0)"
 
 datatype res_inst =
@@ -905,25 +905,28 @@ proof -
       by fastforce
   qed
 
-  have 4:"list_all2 (\<lambda>e c. reduce_trans (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,$*(e_off e)) (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,[$C ConstInt32 c])) (m_elem m) e_offs"
+  have 4:"list_all2 (\<lambda>e c. reduce_trans (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,$*(e_off e)) (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,[$C\<^sub>n (ConstInt32 c)])) (m_elem m) e_offs"
   proof -
     { fix i
       assume local_assms:"length (m_elem m) = length e_offs" "i<length (m_elem m)"
       hence l1:"const_exprs \<C> (e_off (m_elem m ! i))"
         by (metis m_is(5,16) list_all_length m.select_convs(6) module_elem.select_convs(2) module_elem_typing.cases)
-      have l2:"\<C> \<turnstile> (e_off (m_elem m ! i)) : ([] _> [T_i32])"
+      have l2:"\<C> \<turnstile> (e_off (m_elem m ! i)) : ([] _> [T_num T_i32])"
         using local_assms
         by (metis m_is(5,16) list_all_length m.select_convs(6) module_elem.select_convs(2) module_elem_typing.cases)
-      obtain c_r where "run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, e_off (m_elem m ! i)) =  (s', RValue [ConstInt32 c_r])"
-        using const_exprs_run_v[OF l1 l2 _ 11, of inst "[]"] typeof_i32
-        by auto
-      hence run_v_is:"run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, e_off (m_elem m ! i)) = (s', RValue [ConstInt32 (e_offs ! i)])"
+      obtain c_r where "run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, e_off (m_elem m ! i)) =  (s', RValue [V_num (ConstInt32 c_r)])"
+        using const_exprs_run_v[OF l1 l2 _ 11, of inst "[]"] typeof_num_i32
+        unfolding typeof_def
+        apply (simp split: v.splits)
+        apply (metis v.exhaust)
+        done
+      hence run_v_is:"run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, e_off (m_elem m ! i)) = (s', RValue [V_num (ConstInt32 (e_offs ! i))])"
         using s_end_is(5) local_assms
         by (simp add: interp_get_i32_def interp_get_v_def split: v.splits)
-      obtain f_temp where "reduce_trans (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, $* e_off (m_elem m ! i)) (s', f_temp, [$C ConstInt32 (e_offs ! i)])"
+      obtain f_temp where "reduce_trans (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, $* e_off (m_elem m ! i)) (s', f_temp, [$C\<^sub>n (ConstInt32 (e_offs ! i))])"
         using run_v_sound[OF run_v_is]
         by auto
-      hence "reduce_trans (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, $* e_off (m_elem m ! i)) (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, [$C ConstInt32 (e_offs ! i)])"
+      hence "reduce_trans (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, $* e_off (m_elem m ! i)) (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, [$C\<^sub>n (ConstInt32 (e_offs ! i))])"
         using reduce_trans_length_locals reduce_trans_inst_is
         by (metis (full_types) f.select_convs(1) f.surjective length_greater_0_conv old.unit.exhaust)
     }
@@ -932,25 +935,28 @@ proof -
       unfolding list_all2_conv_all_nth
       by fastforce
   qed
-  have 5:"list_all2 (\<lambda>d c. reduce_trans (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,$*(d_off d)) (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,[$C ConstInt32 c])) (m_data m) d_offs"
+  have 5:"list_all2 (\<lambda>d c. reduce_trans (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,$*(d_off d)) (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,[$C\<^sub>n (ConstInt32 c)])) (m_data m) d_offs"
   proof -
     { fix i
       assume local_assms:"length (m_data m) = length d_offs" "i<length (m_data m)"
       hence l1:"const_exprs \<C> (d_off (m_data m ! i))"
         by (metis list_all_length m.select_convs(7) m_is(6,16) module_data.select_convs(2) module_data_typing.simps)
-      have l2:"\<C> \<turnstile> (d_off (m_data m ! i)) : ([] _> [T_i32])"
+      have l2:"\<C> \<turnstile> (d_off (m_data m ! i)) : ([] _> [T_num T_i32])"
         using local_assms
         by (metis list_all_length m.select_convs(7) m_is(6,16) module_data.select_convs(2) module_data_typing.simps)
-      obtain c_r where "run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, d_off (m_data m ! i)) =  (s', RValue [ConstInt32 c_r])"
-        using const_exprs_run_v[OF l1 l2 _ 11, of inst "[]"] typeof_i32
-        by auto
-      hence run_v_is:"run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, d_off (m_data m ! i)) = (s', RValue [ConstInt32 (d_offs ! i)])"
+      obtain c_r where "run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, d_off (m_data m ! i)) =  (s', RValue [V_num (ConstInt32 c_r)])"
+        using const_exprs_run_v[OF l1 l2 _ 11, of inst "[]"] typeof_num_i32
+        unfolding typeof_def
+        apply (simp split: v.splits)
+        apply (metis v.exhaust)
+        done
+      hence run_v_is:"run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, d_off (m_data m ! i)) = (s', RValue [V_num (ConstInt32 (d_offs ! i))])"
         using s_end_is(6) local_assms
         by (simp add: interp_get_i32_def interp_get_v_def split: v.splits)
-      obtain f_temp where "reduce_trans (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, $* d_off (m_data m ! i)) (s', f_temp, [$C ConstInt32 (d_offs ! i)])"
+      obtain f_temp where "reduce_trans (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, $* d_off (m_data m ! i)) (s', f_temp, [$C\<^sub>n (ConstInt32 (d_offs ! i))])"
         using run_v_sound[OF run_v_is]
         by auto
-      hence "reduce_trans (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, $* d_off (m_data m ! i)) (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, [$C ConstInt32 (d_offs ! i)])"
+      hence "reduce_trans (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, $* d_off (m_data m ! i)) (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, [$C\<^sub>n (ConstInt32 (d_offs ! i))])"
         using reduce_trans_length_locals reduce_trans_inst_is
         by (metis (full_types) f.select_convs(1) f.surjective length_greater_0_conv old.unit.exhaust)
     }
@@ -1000,8 +1006,8 @@ proof -
     "list_all2 (external_typing s) v_imps t_imps"
     "alloc_module s m v_imps g_inits (s', inst, v_exps)"
     "list_all2 (\<lambda>g v. reduce_trans (s',f,$*(g_init g)) (s',f,[$C v])) gs g_inits"
-    "list_all2 (\<lambda>e c. reduce_trans (s',f,$*(e_off e)) (s',f,[$C ConstInt32 c])) els e_offs"
-    "list_all2 (\<lambda>d c. reduce_trans (s',f,$*(d_off d)) (s',f,[$C ConstInt32 c])) ds d_offs"
+    "list_all2 (\<lambda>e c. reduce_trans (s',f,$*(e_off e)) (s',f,[$C\<^sub>n (ConstInt32 c)])) els e_offs"
+    "list_all2 (\<lambda>d c. reduce_trans (s',f,$*(d_off d)) (s',f,[$C\<^sub>n (ConstInt32 c)])) ds d_offs"
     "list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs els"
     "list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs ds"
     "(case (m_start m) of None \<Rightarrow> [] | Some i_s \<Rightarrow> [Invoke ((inst.funcs inst)!i_s)]) = start"
@@ -1142,14 +1148,14 @@ proof -
     { fix i
       assume local_assms: "i < length els"
       have l2:"const_exprs \<C> (e_off (els ! i))"
-              "\<C> \<turnstile> e_off (els ! i) : ([] _> [T_i32])"
+              "\<C> \<turnstile> e_off (els ! i) : ([] _> [T_num T_i32])"
         using m_is_2(5)
         by (metis list_all_length local_assms module_elem.select_convs(2) module_elem_typing.cases)+
-      have l1:"reduce_trans (s',f,$*(e_off (els!i))) (s',f,[$C ConstInt32 (e_offs!i)])"
+      have l1:"reduce_trans (s',f,$*(e_off (els!i))) (s',f,[$C\<^sub>n (ConstInt32 (e_offs!i))])"
         using s_end_is(5) local_assms
         unfolding list_all2_conv_all_nth
         by blast
-      have "run_v 2 0 (s',f,(e_off (els!i))) = (s',RValue [ConstInt32 (e_offs!i)])"
+      have "run_v 2 0 (s',f,(e_off (els!i))) = (s',RValue [V_num (ConstInt32 (e_offs!i))])"
         using const_exprs_reduce_trans[OF l2(1,2) l1 _ 11]
         unfolding s_end_is(12)
         by fastforce
@@ -1168,14 +1174,14 @@ proof -
     { fix i
       assume local_assms: "i < length ds"
       have l2:"const_exprs \<C> (d_off (ds ! i))"
-              "\<C> \<turnstile> d_off (ds ! i) : ([] _> [T_i32])"
+              "\<C> \<turnstile> d_off (ds ! i) : ([] _> [T_num T_i32])"
         using m_is_2(6)
         by (metis list_all_length local_assms module_data.select_convs(2) module_data_typing.cases)+
-      have l1:"reduce_trans (s',f,$*(d_off (ds!i))) (s',f,[$C ConstInt32 (d_offs!i)])"
+      have l1:"reduce_trans (s',f,$*(d_off (ds!i))) (s',f,[$C\<^sub>n (ConstInt32 (d_offs!i))])"
         using s_end_is(6) local_assms
         unfolding list_all2_conv_all_nth
         by blast
-      have "run_v 2 0 (s',f,(d_off (ds!i))) = (s',RValue [ConstInt32 (d_offs!i)])"
+      have "run_v 2 0 (s',f,(d_off (ds!i))) = (s',RValue [V_num (ConstInt32 (d_offs!i))])"
         using const_exprs_reduce_trans[OF l2(1,2) l1 _ 11]
         unfolding s_end_is(12)
         by fastforce

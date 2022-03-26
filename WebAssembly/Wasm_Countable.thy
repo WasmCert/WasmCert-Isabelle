@@ -1,5 +1,11 @@
 theory Wasm_Countable imports Wasm_Base_Defs "HOL-Library.Countable" begin
 
+instance t_num :: countable
+  by countable_datatype
+
+instance t_vec :: countable
+  by countable_datatype
+
 instance t :: countable
   by countable_datatype
 
@@ -10,7 +16,10 @@ instance inst_ext :: (countable) countable
 proof(rule countable_classI[of "\<lambda>i. to_nat (types i, inst.funcs i, inst.tabs i, inst.mems i, inst.globs i, inst.more i)"])
 qed auto
 
-instance tp :: countable
+instance tp_num :: countable
+  by countable_datatype
+
+instance tp_vec :: countable
   by countable_datatype
 
 instance sx :: countable
@@ -29,13 +38,23 @@ qed (simp add: Rep_i64_inject nat_of_int_i64.rep_eq)
 
 axiomatization where
   f32_countable: "OFCLASS(f32, countable_class)" and
-  f64_countable: "OFCLASS(f64, countable_class)"
+  f64_countable: "OFCLASS(f64, countable_class)" and
+  v128_countable: "OFCLASS(v128, countable_class)"
 
 instance f32 :: countable
   by (rule f32_countable)
 
 instance f64 :: countable
   by (rule f64_countable)
+
+instance v128 :: countable
+  by (rule v128_countable)
+
+instance v_num :: countable
+  by countable_datatype
+
+instance v_vec :: countable
+  by countable_datatype
 
 instance v :: countable
   by countable_datatype
@@ -71,6 +90,72 @@ instance relop :: countable
   by countable_datatype
 
 instance cvtop :: countable
+  by countable_datatype
+
+instance unop_vec_v :: countable
+  by countable_datatype
+
+instance unop_vec_i :: countable
+  by countable_datatype
+
+instance unop_vec_f :: countable
+  by countable_datatype
+
+instance shape_vec_i :: countable
+  by countable_datatype
+
+instance shape_vec_f :: countable
+  by countable_datatype
+
+instance shape_vec :: countable
+  by countable_datatype
+
+instance half_vec :: countable
+  by countable_datatype
+
+instance cvtop_vec :: countable
+  by countable_datatype
+
+instance unop_vec :: countable
+  by countable_datatype
+
+instance binop_vec_v :: countable
+  by countable_datatype
+
+instance binop_vec_i :: countable
+  by countable_datatype
+
+instance binop_vec_f :: countable
+  by countable_datatype
+
+instance minmaxop_vec_i :: countable
+  by countable_datatype
+
+instance satop_vec_i :: countable
+  by countable_datatype
+
+instance relop_vec_i :: countable
+  by countable_datatype
+
+instance relop_vec_f :: countable
+  by countable_datatype
+
+instance binop_vec :: countable
+  by countable_datatype
+
+instance ternop_vec :: countable
+  by countable_datatype
+
+instance testop_vec :: countable
+  by countable_datatype
+
+instance shiftop_vec :: countable
+  by countable_datatype
+
+instance loadop_vec :: countable
+  by countable_datatype
+
+instance storeop_vec :: countable
   by countable_datatype
 
 instance b_e :: countable

@@ -21,6 +21,8 @@ typedef i64 = "UNIV :: (64 word) set" ..
 typedecl f32
 typedecl f64
 
+typedecl v128
+
 setup_lifting type_definition_i32
 declare Quotient_i32[transfer_rule]
 setup_lifting type_definition_i64
@@ -120,11 +122,21 @@ lemma read_bytes_map:
 typedecl host
 typedecl host_state
 
-datatype \<comment> \<open>value types\<close>
-  t = T_i32 | T_i64 | T_f32 | T_f64
+datatype \<comment> \<open>numeric types\<close>
+  t_num = T_i32 | T_i64 | T_f32 | T_f64
 
-datatype \<comment> \<open>packed types\<close>
-  tp = Tp_i8 | Tp_i16 | Tp_i32
+(* 1.1: vector operators *)
+datatype \<comment> \<open>vector types\<close>
+  t_vec = T_v128
+ 
+datatype \<comment> \<open>value types\<close>
+  t = T_num t_num | T_vec t_vec
+
+datatype \<comment> \<open>packed numeric types\<close>
+  tp_num = Tp_i8 | Tp_i16 | Tp_i32
+
+datatype \<comment> \<open>packed vector types\<close>
+  tp_vec = Tp_v8_8 | Tp_v16_4 | Tp_v32_2
 
 datatype \<comment> \<open>mutability\<close>
   mut = T_immut | T_mut
@@ -151,11 +163,25 @@ record t_context =
   label :: "(t list) list"
   return :: "(t list) option"
 
+datatype \<comment> \<open>numeric values\<close>
+  v_num = ConstInt32 i32
+        | ConstInt64 i64
+        | ConstFloat32 f32
+        | ConstFloat64 f64
+
+datatype \<comment> \<open>vector values\<close>
+  v_vec = ConstVec128 v128
+
+datatype \<comment> \<open>values\<close>
+  v = V_num v_num | V_vec v_vec
+
 datatype
   sx = S | U
 
 datatype
   sat = Sat | Nonsat
+
+(* numeric ops *)
 
 datatype
   unop_i = Clz | Ctz | Popcnt
@@ -166,7 +192,7 @@ datatype
 datatype
   unop = Unop_i unop_i | Unop_f unop_f
            (* 1.1: sign-extension operators *)
-         | Extend_s tp
+         | Extend_s tp_num
 
 datatype
   binop_i = Add | Sub | Mul | Div sx | Rem sx | And | Or | Xor | Shl | Shr sx | Rotl | Rotr
@@ -189,16 +215,141 @@ datatype
 datatype
   relop = Relop_i relop_i | Relop_f relop_f
 
-  
 datatype
   cvtop = Convert | Reinterpret
 
-datatype \<comment> \<open>values\<close>
-  v =
-    ConstInt32 i32
-    | ConstInt64 i64
-    | ConstFloat32 f32
-    | ConstFloat64 f64
+(* vector ops *)
+
+datatype half_vec = High_vec | Low_vec
+
+datatype shape_vec_i = I8_16 | I16_8 | I32_4 | I64_2
+
+datatype shape_vec_f = F32_4 | F64_2
+
+datatype shape_vec = Svi shape_vec_i | Svf shape_vec_f
+
+datatype unop_vec_v = Not_vec
+
+datatype unop_vec_i = Abs_vec | Neg_vec
+
+datatype unop_vec_f =
+    Abs_vecf
+  | Neg_vecf
+  | Sqrt_vecf
+  | Ceil_vecf
+  | Floor_vecf
+  | Trunc_vecf
+  | Nearest_vecf
+
+datatype cvtop_vec =
+    Extend_i16_8_i8_16 half_vec sx
+  | Extend_i32_4_i16_8 half_vec sx
+  | Extend_i64_8_i32_4 half_vec sx
+  | Trunc_sat_i32_4_f_32_4 sx
+  | Trunc_sat_i32_4_f_64_2_zero sx
+  | Convert_f32_4_i32_4 sx
+  | Demote_f32_4_f64_2_zero
+  | Convert_low_f64_2_i32_4 sx
+  | Promote_low_f64_2_f32_4
+
+datatype
+  unop_vec =
+    Unop_vec_v unop_vec_v
+  | Unop_vec_i unop_vec_i shape_vec_i
+  | Unop_vec_f unop_vec_f shape_vec_f
+  | Cvt_vec cvtop_vec
+  | Extadd_pairwise_i16_8_i8_16 sx
+  | Extadd_pairwise_i32_4_i16_8 sx
+
+datatype
+  binop_vec_v = And_vec | Andnot_vec | Or_vec | Xor_vec
+
+datatype
+  binop_vec_i = Add_vec | Sub_vec
+
+datatype
+  binop_vec_f =
+    Add_vecf
+  | Sub_vecf
+  | Mulf_vecf
+  | Div_vecf
+  | Min_vecf
+  | Max_vecf
+  | Pmin_vecf
+  | Pmax_vecf
+
+datatype
+  minmaxop_vec_i = Min_vec sx | Max_vec sx
+
+datatype
+  satop_vec_i = Add_sat_vec sx | Sub_sat_vec sx
+
+datatype
+  relop_vec_i = Eq_vec | Ne_vec | Lt_vec sx | Gt_vec sx | Le_vec sx | Ge_vec sx
+
+datatype
+  relop_vec_f = Eq_vec | Ne_vec | Lt_vec | Gt_vec | Le_vec | Ge_vec
+
+datatype
+  binop_vec =
+    Binop_vec_v binop_vec_v
+    | Swizzle_i8_16
+    | Binop_vec_i binop_vec_i shape_vec_i
+    | Binop_vec_f binop_vec_f shape_vec_f
+    | Minmaxop_i8_16 minmaxop_vec_i
+    | Minmaxop_i16_8 minmaxop_vec_i
+    | Minmaxop_i32_4 minmaxop_vec_i
+    | Satop_i8_16 satop_vec_i
+    | Satop_i16_8 satop_vec_i
+    | Mul_i16_8
+    | Mul_i32_4
+    | Mul_i64_2
+    | Avgr_u_i8_16
+    | Avgr_u_i16_8
+    | Q15mulr_sat_s_i16_8
+    | Relop_i8_16 relop_vec_i
+    | Relop_i16_8 relop_vec_i
+    | Relop_i32_4 relop_vec_i
+    | Relop_i64_2_eq
+    | Relop_i64_2_ne
+    | Relop_i64_2_lt_s
+    | Relop_i64_2_gt_s
+    | Relop_i64_2_le_s
+    | Relop_i64_2_ge_s
+    | Relop_vec_f relop_vec_f shape_vec_f
+    | Narrow_i8_16_i16_8 sx
+    | Narrow_i16_8_i32_4 sx
+    | Dot_s_i32_4_i16_8
+    | Extmul_i16_8_i8_16 half_vec sx
+    | Extmul_i32_4_i16_8 half_vec sx
+    | Extmul_i64_2_i32_4 half_vec sx
+
+datatype
+  ternop_vec = Bitselect_vec
+
+datatype
+  testop_vec =
+    Any_true_vec
+  | All_true_vec shape_vec_i
+  | Bitmask_vec shape_vec_i
+
+datatype
+  shiftop_vec =
+    Shl_vec shape_vec_i
+  | Shr_vec shape_vec_i sx
+
+datatype
+  loadop_vec =
+    Load_128
+  | Load_packed_vec tp_vec sx
+  | Load_32_zero
+  | Load_64_zero
+  | Load_splat shape_vec_i
+
+datatype
+  storeop_vec =
+    Store_128
+  | Store_lane shape_vec_i i
 
 datatype \<comment> \<open>basic instructions\<close>
   b_e =
@@ -220,16 +371,31 @@ datatype \<comment> \<open>basic instructions\<close>
     | Tee_local i
     | Get_global i
     | Set_global i
-    | Load t "(tp \<times> sx) option" a off
-    | Store t "tp option" a off
+    | Load t_num "(tp_num \<times> sx) option" a off
+    | Store t_num "tp_num option" a off
+    | Load_vec loadop_vec a off
+    | Load_lane_vec shape_vec_i i a off
+    | Store_vec storeop_vec a off
     | Current_memory
     | Grow_memory
     | EConst v ("C _" 60)
-    | Unop t unop
-    | Binop t binop
-    | Testop t testop
-    | Relop t relop
-    | Cvtop t cvtop t "(sat \<times> sx) option"
+    | Unop t_num unop
+    | Binop t_num binop
+    | Testop t_num testop
+    | Relop t_num relop
+    | Cvtop t_num cvtop t_num "(sat \<times> sx) option"
+    | Unop_vec unop_vec
+    | Binop_vec binop_vec
+    | Shuffle_i8_16 "i list"
+    | Ternop_vec ternop_vec
+    | Test_vec testop_vec
+    | Shift_vec shiftop_vec
+    | Splat_vec shape_vec
+    | Extract_vec shape_vec sx i
+    | Replace_vec shape_vec i
+
+abbreviation "C\<^sub>n x \<equiv> C (V_num x)"
+abbreviation "C\<^sub>v x \<equiv> C (V_vec x)"
 
 record inst = \<comment> \<open>instances\<close>
   types :: "tf list"
