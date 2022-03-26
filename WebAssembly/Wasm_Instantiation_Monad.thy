@@ -133,7 +133,7 @@ definition interp_alloc_module_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext lis
     let dummy_func = (Func_native empty_inst ([] _> []) [] []);
     let dummy_tab = (empty_tab, None);
     let dummy_mem = (empty_mem, None);
-    let dummy_glob = \<lparr>g_mut = T_mut, g_val = ConstInt32 0\<rparr>;
+    let dummy_glob = \<lparr>g_mut = T_mut, g_val = V_num (ConstInt32 0)\<rparr>;
     s_funcs \<leftarrow> Array.new (length_funcs_s + length (m_funcs m)) dummy_func;
     s_tabs \<leftarrow> Array.new (length_tabs_s + length (m_tabs m)) dummy_tab;
     s_mems \<leftarrow> Array.new (length_mems_s + length (m_mems m)) dummy_mem;
@@ -166,7 +166,7 @@ definition interp_get_v_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> b_e list \<
 definition interp_get_i32_m :: "s_m \<Rightarrow> inst_m \<Rightarrow> b_e list \<Rightarrow> i32 Heap" where
   "interp_get_i32_m s inst b_es = do {
      v \<leftarrow> interp_get_v_m s inst b_es;
-     return (case v of ConstInt32 c \<Rightarrow> c | _ \<Rightarrow> 0) }"
+     return (case v of V_num (ConstInt32 c) \<Rightarrow> c | _ \<Rightarrow> 0) }"
 
 definition get_init_tab_m :: "inst_m \<Rightarrow> nat \<Rightarrow> module_elem \<Rightarrow> e Heap" where
   "get_init_tab_m inst e_ind e =

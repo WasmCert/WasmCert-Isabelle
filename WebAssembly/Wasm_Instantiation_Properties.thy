@@ -151,8 +151,8 @@ proof -
     and f_def:"f = \<lparr> f_locs = [], f_inst = inst \<rparr>"
     and g_inits_def:
     "list_all2 (\<lambda>g v. reduce_trans (s',f,$*(g_init g)) (s',f,[$C v])) (m_globs m) g_inits"
-    and "list_all2 (\<lambda>e c. reduce_trans (s',f,$*(e_off e)) (s',f,[$C ConstInt32 c])) (m_elem m) e_offs"
-    "list_all2 (\<lambda>d c. reduce_trans (s',f,$*(d_off d)) (s',f,[$C ConstInt32 c])) (m_data m) d_offs"
+    and "list_all2 (\<lambda>e c. reduce_trans (s',f,$*(e_off e)) (s',f,[$C\<^sub>n (ConstInt32 c)])) (m_elem m) e_offs"
+    "list_all2 (\<lambda>d c. reduce_trans (s',f,$*(d_off d)) (s',f,[$C\<^sub>n (ConstInt32 c)])) (m_data m) d_offs"
     and s_element_in_bounds:
     "list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m)"
     and s_data_in_bounds:
