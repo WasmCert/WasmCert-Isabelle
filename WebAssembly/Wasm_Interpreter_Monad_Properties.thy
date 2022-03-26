@@ -593,13 +593,58 @@ lemma load_bytes_triple:
   unfolding load_bytes_m_v_def load_def mem_m_assn_def
   by (sep_auto simp add: read_bytes_def mem_rep_read_bytes_def mem_length_def mem_rep_length.rep_eq split: prod.splits)
 
+
+lemma load_uint8_list_triple: "<mem_m_assn m m_m> 
+  load_uint8_list (fst m_m) n x
+   <\<lambda>r. \<up>((x > 0 \<longrightarrow> n+x \<le> mem_length m) \<and> r = read_bytes m n x)
+   * mem_m_assn m m_m >"
+  unfolding mem_m_assn_def read_bytes_def mem_rep_read_bytes_def 
+    mem_length_def mem_rep_length_def
+  by (sep_auto split:prod.splits)
+
+lemma load_bytes_vec_m_v_triple: 
+    "<mem_m_assn m m_m> 
+    load_bytes_vec_m_v n len sx (fst m_m) ind
+    <\<lambda>r. \<up>(r = read_bytes_vec n len sx m ind) * mem_m_assn m m_m>"
+proof(induct n arbitrary:len ind)
+  case 0
+  then show ?case by sep_auto
+next
+  case (Suc n)
+  show ?case by (sep_auto heap:load_uint8_list_triple Suc )
+qed
+
+lemma load_packed_vec_m_v_triple: 
+    "<mem_m_assn m m_m> 
+    load_packed_vec_m_v tp sx m_m  n off
+    <\<lambda>r. \<up>(r = load_packed_vec tp sx m n off) * mem_m_assn m m_m>"
+  unfolding load_packed_vec_m_v_def load_packed_vec_def
+  by (sep_auto heap:load_bytes_vec_m_v_triple)
+
+lemma load_vec_m_v_triple:
+    "<mem_m_assn m m_m> 
+    load_vec_m_v lv m_m n off
+    <\<lambda>r. \<up>(r = load_vec lv m n off) * mem_m_assn m m_m>"
+  unfolding load_vec_m_v_def load_vec_def 
+  by (sep_auto split:loadop_vec.splits heap:load_bytes_triple load_packed_vec_m_v_triple)
+
 lemma load_vec_triple:
   assumes "inst_at i_s (f_inst f, f_inst2) j"
   shows "<mems_m_assn ms ms_m * inst_store_assn i_s>
   app_s_f_v_s_load_vec_m lv off ms_m f_inst2 v_s
   <\<lambda>r.\<up>(r = app_s_f_v_s_load_vec lv off ms f v_s)
   * mems_m_assn ms ms_m * inst_store_assn i_s>\<^sub>t"
-  sorry
+  using assms
+  unfolding app_s_f_v_s_load_vec_m_def app_s_f_v_s_load_vec_def
+    inst_store_assn_def inst_m_assn_def inst_at_def list_assn_conv_idx mems_m_assn_def
+  supply [sep_heap_rules] = load_vec_m_v_triple
+  apply(sep_auto split:v_num.splits v.splits prod.splits )
+       apply(knock_down j)
+      apply(sep_auto)
+       apply(knock_down "inst.mems (f_inst f) ! 0")
+      apply(sep_auto simp:smem_ind_def split:list.splits)
+     apply(sep_auto)+
+  done
 
 lemma load_lane_vec_triple:
   assumes "inst_at i_s (f_inst f, f_inst2) j"
