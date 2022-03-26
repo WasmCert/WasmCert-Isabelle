@@ -44,50 +44,107 @@ definition app_v_s_drop :: "v_stack \<Rightarrow> (v_stack \<times> res_step)" w
 definition app_v_s_unop :: "unop \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
   "app_v_s_unop unop v_s =
      (case v_s of
-       v1#v_s' \<Rightarrow> ((app_unop unop v1)#v_s', Step_normal)
+       (V_num v1)#v_s' \<Rightarrow> ((V_num (app_unop unop v1))#v_s', Step_normal)
      | _ \<Rightarrow> (v_s, crash_invalid))"
 
 definition app_v_s_testop :: "testop \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
   "app_v_s_testop testop v_s =
      (case v_s of
-       v1#v_s' \<Rightarrow> ((app_testop testop v1)#v_s', Step_normal)
+       (V_num v1)#v_s' \<Rightarrow> ((V_num (app_testop testop v1))#v_s', Step_normal)
      | _ \<Rightarrow> (v_s, crash_invalid))"
 
 definition app_v_s_binop :: "binop \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
   "app_v_s_binop binop v_s =
      (case v_s of
-       v2#v1#v_s' \<Rightarrow>
+       (V_num v2)#(V_num v1)#v_s' \<Rightarrow>
          expect (app_binop binop v1 v2)
-                (\<lambda>v. (v#v_s', Step_normal))
+                (\<lambda>v. ((V_num v)#v_s', Step_normal))
                 (v_s', Res_trap (name binop))
      | _ \<Rightarrow> (v_s, crash_invalid))"
 
 definition app_v_s_relop :: "relop \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
   "app_v_s_relop relop v_s =
      (case v_s of
-       v2#v1#v_s' \<Rightarrow> ((app_relop relop v1 v2)#v_s', Step_normal)
+       (V_num v2)#(V_num v1)#v_s' \<Rightarrow> ((V_num (app_relop relop v1 v2))#v_s', Step_normal)
      | _ \<Rightarrow> (v_s, crash_invalid))"
 
-definition app_v_s_cvtop :: "cvtop \<Rightarrow> t \<Rightarrow> t \<Rightarrow> (sat \<times> sx) option \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+definition app_v_s_cvtop :: "cvtop \<Rightarrow> t_num \<Rightarrow> t_num \<Rightarrow> (sat \<times> sx) option \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
   "app_v_s_cvtop cvtop t1 t2 tp_sx v_s =
      (case v_s of
-       v1#v_s' \<Rightarrow>
-       (if types_agree t1 v1 then
+       (V_num v1)#v_s' \<Rightarrow>
+       (if (typeof_num v1 = t1) then
          (case cvtop of
             Convert \<Rightarrow>
               expect (cvt t2 tp_sx v1)
-                     (\<lambda>v. (v#v_s', Step_normal))
+                     (\<lambda>v. ((V_num v)#v_s', Step_normal))
                      (v_s', Res_trap (name cvtop))
           | Reinterpret \<Rightarrow> if tp_sx = None then
-                             ((wasm_deserialise (bits v1) t2)#v_s', Step_normal)
+                             ((V_num (wasm_deserialise_num (bits_num v1) t2))#v_s', Step_normal)
                            else (v_s, crash_invalid))
         else (v_s, crash_invalid))
+     | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_v_s_unop_vec :: "unop_vec \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_unop_vec op v_s =
+     (case v_s of
+       (V_vec v1)#v_s' \<Rightarrow> ((V_vec (app_unop_vec op v1))#v_s', Step_normal)
+     | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_v_s_binop_vec :: "binop_vec \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_binop_vec op v_s =
+     (case v_s of
+       (V_vec v2)#(V_vec v1)#v_s' \<Rightarrow>
+         expect (app_binop_vec op v1 v2)
+                (\<lambda>v. ((V_vec v)#v_s', Step_normal))
+                (v_s', Res_trap (name op))
+     | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_v_s_shuffle_vec :: "i list \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_shuffle_vec is v_s =
+     (case v_s of
+       (V_vec v2)#(V_vec v1)#v_s' \<Rightarrow> ((V_vec (app_shuffle_vec is v1 v2))#v_s', Step_normal)
+     | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_v_s_ternop_vec :: "ternop_vec \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_ternop_vec op v_s =
+     (case v_s of
+       (V_vec v3)#(V_vec v2)#(V_vec v1)#v_s' \<Rightarrow> ((V_vec (app_ternop_vec op v1 v2 v3))#v_s', Step_normal)
+     | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_v_s_test_vec :: "testop_vec \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_test_vec op v_s =
+     (case v_s of
+       (V_vec v1)#v_s' \<Rightarrow> ((V_num (ConstInt32 (wasm_bool (app_test_vec op v1))))#v_s', Step_normal)
+     | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_v_s_shift_vec :: "shiftop_vec \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_shift_vec op v_s =
+     (case v_s of
+       (V_num (ConstInt32 v2))#(V_vec v1)#v_s' \<Rightarrow> ((V_vec (app_shift_vec op v1 v2))#v_s', Step_normal)
+     | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_v_s_splat_vec :: "shape_vec \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_splat_vec sv v_s =
+     (case v_s of
+       (V_num v1)#v_s' \<Rightarrow> ((V_vec (app_splat_vec sv v1))#v_s', Step_normal)
+     | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_v_s_extract_vec :: "shape_vec \<Rightarrow> sx \<Rightarrow> i \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_extract_vec sv sx i v_s =
+     (case v_s of
+       (V_vec v1)#v_s' \<Rightarrow> ((V_num (app_extract_vec sv sx i v1))#v_s', Step_normal)
+     | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_v_s_replace_vec :: "shape_vec \<Rightarrow> i \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_replace_vec sv i v_s =
+     (case v_s of
+       (V_num v2)#(V_vec v1)#v_s' \<Rightarrow> ((V_vec (app_replace_vec sv i v1 v2))#v_s', Step_normal)
      | _ \<Rightarrow> (v_s, crash_invalid))"
 
 definition app_v_s_select :: "v_stack \<Rightarrow> (v_stack \<times> res_step)" where
   "app_v_s_select v_s =
      (case v_s of
-       (ConstInt32 c)#v2#v1#v_s' \<Rightarrow>
+       (V_num (ConstInt32 c))#v2#v1#v_s' \<Rightarrow>
          (if int_eq c 0 then (v2#v_s', Step_normal) else (v1#v_s', Step_normal))
      | _ \<Rightarrow> (v_s, crash_invalid))"
 
@@ -116,21 +173,21 @@ definition app_v_s_tee_local :: "nat \<Rightarrow> v_stack \<Rightarrow> (v_stac
 definition app_v_s_if :: "tf \<Rightarrow> b_e list \<Rightarrow> b_e list \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
   "app_v_s_if tf es1 es2 v_s =
      (case v_s of
-       (ConstInt32 c)#v_s' \<Rightarrow>
+       (V_num (ConstInt32 c))#v_s' \<Rightarrow>
          (if int_eq c 0 then (v_s', [$(Block tf es2)], Step_normal) else (v_s', [$(Block tf es1)], Step_normal))
      | _ \<Rightarrow> (v_s, [], crash_invalid))"
 
 definition app_v_s_br_if :: "nat \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
   "app_v_s_br_if k v_s =
      (case v_s of
-       (ConstInt32 c)#v_s' \<Rightarrow>
+       (V_num (ConstInt32 c))#v_s' \<Rightarrow>
          (if int_eq c 0 then (v_s', [], Step_normal) else (v_s', [$(Br k)], Step_normal))
      | _ \<Rightarrow> (v_s, [], crash_invalid))"
 
 definition app_v_s_br_table :: "nat list \<Rightarrow> nat \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
   "app_v_s_br_table ks k v_s =
      (case v_s of
-       (ConstInt32 c)#v_s' \<Rightarrow>
+       (V_num (ConstInt32 c))#v_s' \<Rightarrow>
              let j = nat_of_int c in
                 if j < length ks
                   then (v_s', [$Br (ks!j)], Step_normal)
@@ -144,7 +201,7 @@ definition app_s_f_v_s_call_indirect :: "nat \<Rightarrow> tabinst list \<Righta
   "app_s_f_v_s_call_indirect k tinsts cls f v_s = 
           (let i = (f_inst f) in
            case v_s of
-             (ConstInt32 c)#v_s' \<Rightarrow>
+             (V_num (ConstInt32 c))#v_s' \<Rightarrow>
                (case (inst.tabs i) of
                   (j#_) => (case (tab_cl_ind tinsts j (nat_of_int c)) of
                              Some i_cl \<Rightarrow> (if (stypes i k = cl_type (cls!i_cl))
@@ -163,88 +220,124 @@ definition app_s_f_v_s_set_global :: "nat \<Rightarrow> global list \<Rightarrow
         v1#v_s' \<Rightarrow> (update_glob gs (f_inst f) k v1, v_s', Step_normal)
       | _ \<Rightarrow> (gs, v_s, crash_invalid))"
 
-definition app_s_f_v_s_load :: "t \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+definition app_s_f_v_s_load :: "t_num \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step)" where
   "app_s_f_v_s_load t off ms f v_s = 
           (let i = (f_inst f) in
            case v_s of
-             (ConstInt32 c)#v_s' \<Rightarrow>
+             (V_num (ConstInt32 c))#v_s' \<Rightarrow>
                (case smem_ind i of
-                  Some j => expect (load (ms!j) (nat_of_int c) off (t_length t))
-                                  (\<lambda>bs. ((wasm_deserialise bs t)#v_s', Step_normal))
+                  Some j => expect (load (ms!j) (nat_of_int c) off (t_num_length t))
+                                  (\<lambda>bs. ((V_num (wasm_deserialise_num bs t))#v_s', Step_normal))
                                   (v_s', (Res_trap (STR ''load'')))
                 | None => (v_s, crash_invalid))
            | _ \<Rightarrow> (v_s, crash_invalid))"
 
-definition app_s_f_v_s_load_packed :: "t \<Rightarrow> tp \<Rightarrow> sx \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+definition app_s_f_v_s_load_packed :: "t_num \<Rightarrow> tp_num \<Rightarrow> sx \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step)" where
   "app_s_f_v_s_load_packed t tp sx off ms f v_s = 
           (let i = (f_inst f) in
            case v_s of
-             (ConstInt32 c)#v_s' \<Rightarrow>
+             (V_num (ConstInt32 c))#v_s' \<Rightarrow>
                (case smem_ind i of
-                  Some j => expect (load_packed sx (ms!j) (nat_of_int c) off (tp_length tp) (t_length t))
-                                  (\<lambda>bs. ((wasm_deserialise bs t)#v_s', Step_normal))
+                  Some j => expect (load_packed sx (ms!j) (nat_of_int c) off (tp_num_length tp) (t_num_length t))
+                                  (\<lambda>bs. ((V_num (wasm_deserialise_num bs t))#v_s', Step_normal))
                                   (v_s', (Res_trap (STR ''load'')))
                 | None => (v_s, crash_invalid))
            | _ \<Rightarrow> (v_s, crash_invalid))"
 
-definition app_s_f_v_s_load_maybe_packed :: "t \<Rightarrow> (tp \<times> sx) option \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+definition app_s_f_v_s_load_maybe_packed :: "t_num \<Rightarrow> (tp_num \<times> sx) option \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step)" where
   "app_s_f_v_s_load_maybe_packed t tp_sx off ms f v_s =
      (case tp_sx of
         Some (tp, sx) \<Rightarrow> app_s_f_v_s_load_packed t tp sx off ms f v_s
       | None \<Rightarrow> app_s_f_v_s_load t off ms f v_s)"
 
-
-definition app_s_f_v_s_store :: "t \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (mem list \<times> v_stack \<times> res_step)" where
+definition app_s_f_v_s_store :: "t_num \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (mem list \<times> v_stack \<times> res_step)" where
   "app_s_f_v_s_store t off ms f v_s = 
           (let i = (f_inst f) in
            case v_s of
-             v#(ConstInt32 c)#v_s' \<Rightarrow>
-               (if (types_agree t v) then
+             (V_num v)#(V_num (ConstInt32 c))#v_s' \<Rightarrow>
+               (if typeof_num v = t then
                  (case smem_ind i of
-                    Some j => expect (store (ms!j) (nat_of_int c) off (bits v) (t_length t))
+                    Some j => expect (store (ms!j) (nat_of_int c) off (bits_num v) (t_num_length t))
                                     (\<lambda>mem'. ((ms[j := mem']), v_s', Step_normal))
                                     (ms, v_s', Res_trap (STR ''store''))
                   | None => (ms, v_s, crash_invalid))
                 else (ms, v_s, crash_invalid))
            | _ \<Rightarrow> (ms, v_s, crash_invalid))"
 
-definition app_s_f_v_s_store_packed :: "t \<Rightarrow> tp \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (mem list \<times> v_stack \<times> res_step)" where
+definition app_s_f_v_s_store_packed :: "t_num \<Rightarrow> tp_num \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (mem list \<times> v_stack \<times> res_step)" where
   "app_s_f_v_s_store_packed t tp off ms f v_s = 
           (let i = (f_inst f) in
            case v_s of
-             v#(ConstInt32 c)#v_s' \<Rightarrow>
-               (if (types_agree t v) then
+             (V_num v)#(V_num (ConstInt32 c))#v_s' \<Rightarrow>
+               (if typeof_num v = t then
                  (case smem_ind i of
-                    Some j => expect (store_packed (ms!j) (nat_of_int c) off (bits v) (tp_length tp))
+                    Some j => expect (store_packed (ms!j) (nat_of_int c) off (bits_num v) (tp_num_length tp))
                                     (\<lambda>mem'. ((ms[j := mem']), v_s', Step_normal))
                                     (ms, v_s', Res_trap (STR ''store''))
                   | None => (ms, v_s, crash_invalid))
                 else (ms, v_s, crash_invalid))
            | _ \<Rightarrow> (ms, v_s, crash_invalid))"
 
-definition app_s_f_v_s_store_maybe_packed :: "t \<Rightarrow> tp option \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (mem list \<times> v_stack \<times> res_step)" where
+definition app_s_f_v_s_store_maybe_packed :: "t_num \<Rightarrow> tp_num option \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (mem list \<times> v_stack \<times> res_step)" where
   "app_s_f_v_s_store_maybe_packed t tp_opt off ms f v_s =
      (case tp_opt of
         Some tp \<Rightarrow> app_s_f_v_s_store_packed t tp off ms f v_s
       | None \<Rightarrow> app_s_f_v_s_store t off ms f v_s)"
 
+definition app_s_f_v_s_load_vec :: "loadop_vec \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_s_f_v_s_load_vec lv off ms f v_s = 
+          (let i = (f_inst f) in
+           case v_s of
+             (V_num (ConstInt32 c))#v_s' \<Rightarrow>
+               (case smem_ind i of
+                  Some j => expect (load_vec lv (ms!j) (nat_of_int c) off)
+                                  (\<lambda>bs. ((V_vec (ConstVec128 (deserialise_v128 bs)))#v_s', Step_normal))
+                                  (v_s', (Res_trap (STR ''load_vec'')))
+                | None => (v_s, crash_invalid))
+           | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_s_f_v_s_load_lane_vec :: "shape_vec_i \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_s_f_v_s_load_lane_vec svi i_n off ms f v_s = 
+          (let i = (f_inst f) in
+           case v_s of
+             (V_vec (ConstVec128 v))#(V_num (ConstInt32 c))#v_s' \<Rightarrow>
+               (case smem_ind i of
+                  Some j => expect (load (ms!j) (nat_of_int c) off (vec_i_length svi))
+                                  (\<lambda>bs. ((V_vec (ConstVec128 (insert_lane_vec svi i_n bs v)))#v_s', Step_normal))
+                                  (v_s', (Res_trap (STR ''load_lane_vec'')))
+                | None => (v_s, crash_invalid))
+           | _ \<Rightarrow> (v_s, crash_invalid))"
+
+definition app_s_f_v_s_store_vec :: "storeop_vec \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (mem list \<times> v_stack \<times> res_step)" where
+  "app_s_f_v_s_store_vec sv off ms f v_s = 
+          (let i = (f_inst f) in
+           case v_s of
+             (V_vec (ConstVec128 v))#(V_num (ConstInt32 c))#v_s' \<Rightarrow>
+               (case smem_ind i of
+                  Some j => let bs = (store_serialise_vec sv v) in
+                            expect (store (ms!j) (nat_of_int c) off bs (length bs))
+                              (\<lambda>mem'. ((ms[j := mem']), v_s', Step_normal))
+                              (ms, v_s', Res_trap (STR ''store_vec''))
+                | None => (ms, v_s, crash_invalid))
+           | _ \<Rightarrow> (ms, v_s, crash_invalid))"
+
 definition app_s_f_v_s_mem_size :: "mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step)" where
   "app_s_f_v_s_mem_size ms f v_s = 
           (let i = (f_inst f) in
           (case smem_ind i of
-             Some j => (((ConstInt32 (int_of_nat (mem_size (ms!j))))#v_s), Step_normal)
+             Some j => (((V_num (ConstInt32 (int_of_nat (mem_size (ms!j)))))#v_s), Step_normal)
            | None => (v_s, crash_invalid)))"
 
 definition app_s_f_v_s_mem_grow :: "mem list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (mem list \<times> v_stack \<times> res_step)" where
   "app_s_f_v_s_mem_grow ms f v_s = 
           (let i = (f_inst f) in
            case v_s of
-             (ConstInt32 c)#v_s' \<Rightarrow>
+             (V_num (ConstInt32 c))#v_s' \<Rightarrow>
                (case smem_ind i of
                   Some j => let l = (mem_size (ms!j)) in
                            expect (mem_grow (ms!j) (nat_of_int c))
-                                  (\<lambda>mem'. ((ms[j := mem']), (ConstInt32 (int_of_nat l))#v_s', Step_normal))
-                                  (ms, (ConstInt32 int32_minus_one)#v_s', Step_normal)
+                                  (\<lambda>mem'. ((ms[j := mem']), (V_num (ConstInt32 (int_of_nat l)))#v_s', Step_normal))
+                                  (ms, (V_num (ConstInt32 int32_minus_one))#v_s', Step_normal)
                 | None => (ms, v_s, crash_invalid))
            | _ \<Rightarrow> (ms, v_s, crash_invalid))"
 
@@ -462,6 +555,42 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
         let (v_s', res) = (app_v_s_cvtop op t1 t2 tp_sx v_s) in
         ((Config d s (update_fc_step fc v_s' []) fcs), res)
 
+    | (Unop_vec op) \<Rightarrow>
+        let (v_s', res) = (app_v_s_unop_vec op v_s) in
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
+
+    | (Binop_vec op) \<Rightarrow>
+        let (v_s', res) = (app_v_s_binop_vec op v_s) in
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
+
+    | (Shuffle_i8_16 is) \<Rightarrow>
+        let (v_s', res) = (app_v_s_shuffle_vec is v_s) in
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
+
+    | (Ternop_vec op) \<Rightarrow>
+        let (v_s', res) = (app_v_s_ternop_vec op v_s) in
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
+
+    | (Test_vec op) \<Rightarrow>
+        let (v_s', res) = (app_v_s_test_vec op v_s) in
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
+
+    | (Shift_vec vs) \<Rightarrow>
+        let (v_s', res) = (app_v_s_shift_vec vs v_s) in
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
+
+    | (Splat_vec is) \<Rightarrow>
+        let (v_s', res) = (app_v_s_splat_vec is v_s) in
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
+
+    | (Extract_vec sv sx i) \<Rightarrow>
+        let (v_s', res) = (app_v_s_extract_vec sv sx i v_s) in
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
+
+    | (Replace_vec sv i) \<Rightarrow>
+        let (v_s', res) = (app_v_s_replace_vec sv i v_s) in
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
+
     | (Unreachable) \<Rightarrow>
         (Config d s fc fcs, Res_trap (STR ''unreachable''))
 
@@ -568,6 +697,18 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
         let (ms', v_s', res) = (app_s_f_v_s_store_maybe_packed t tp off (mems s) f v_s) in
         (Config d (s\<lparr>mems:=ms'\<rparr>) (update_fc_step fc v_s' []) fcs, res)
 
+    | (Load_vec lv a off) \<Rightarrow>
+        let (v_s', res) = (app_s_f_v_s_load_vec lv off (mems s) f v_s) in
+        (Config d s (update_fc_step fc v_s' []) fcs, res)
+
+    | (Load_lane_vec svi i a off) \<Rightarrow>
+        let (v_s', res) = (app_s_f_v_s_load_lane_vec svi i off (mems s) f v_s) in
+        (Config d s (update_fc_step fc v_s' []) fcs, res)
+
+    | (Store_vec sv a off) \<Rightarrow>
+        let (ms', v_s', res) = (app_s_f_v_s_store_vec sv off (mems s) f v_s) in
+        (Config d (s\<lparr>mems:=ms'\<rparr>) (update_fc_step fc v_s' []) fcs, res)
+
     | (Current_memory) \<Rightarrow>
         let (v_s', res) = (app_s_f_v_s_mem_size (mems s) f v_s) in
         (Config d s (update_fc_step fc v_s' []) fcs, res)
@@ -608,7 +749,7 @@ fun run_step_e :: "e \<Rightarrow> config \<Rightarrow> res_step_tuple" where
                    let (v_fs, v_s') = split_n v_s n in
                    case host_apply_impl s (t1s _> t2s) h (rev v_fs) of
                      Some (s',rvs) \<Rightarrow> 
-                       if list_all2 types_agree t2s rvs
+                       if list_all2 (\<lambda>t v. typeof v = t) t2s rvs
                          then
                            let fc' = Frame_context (Redex ((rev rvs)@v_s') es b_es) lcs nf f in
                            (Config d s' fc' fcs, Step_normal)

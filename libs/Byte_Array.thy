@@ -277,7 +277,8 @@ next
     by (metis Cons_nth_drop_Suc take_Suc_Cons)
 qed
 
-lemma [sep_heap_rules]: "<a \<mapsto>\<^sub>b\<^sub>a la> 
+lemma store_uint8_list_spec[sep_heap_rules]:
+  "<a \<mapsto>\<^sub>b\<^sub>a la> 
   store_uint8_list a n bs
    <\<lambda>r. \<up>(case bs of [] \<Rightarrow> True | x#xs \<Rightarrow> n+length bs \<le> length la )
    * a \<mapsto>\<^sub>b\<^sub>a (take n la @ bs @ drop (n+length bs) la) >"
