@@ -129,6 +129,15 @@ instantiation f64 :: wasm_float begin instance .. end
 
 instantiation v128 :: wasm_base begin instance .. end
 
+(* 1.1 vector ops *)
+consts
+  app_unop_vec_v :: "unop_vec \<Rightarrow> v128 \<Rightarrow> v128"
+  app_binop_vec_v :: "binop_vec \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  app_shuffle_vec_v :: "i list \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128"
+  app_ternop_vec_v :: "ternop_vec \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128"
+  app_test_vec_v :: "testop_vec \<Rightarrow> v128 \<Rightarrow> bool"
+  app_shift_vec_v :: "shiftop_vec \<Rightarrow> v128 \<Rightarrow> i32 \<Rightarrow> v128"
+
 consts
   (* inter-type conversions *)
   (* float to i32 *)
@@ -195,6 +204,12 @@ lift_definition deserialise_i64 :: "bytes \<Rightarrow> i64" is "word_rcat_rev\<
 
 lift_definition wasm_bool :: "bool \<Rightarrow> i32" is "(\<lambda>b. if b then 1 else 0)" .
 lift_definition  int32_minus_one :: i32 is "max_word" .
+
+definition sx_b :: "sx \<Rightarrow> bool" where
+  "sx_b sx = (case sx of S \<Rightarrow> True | U \<Rightarrow> False)"
+
+definition half_vec_b :: "half_vec \<Rightarrow> bool" where
+  "half_vec_b h = (case h of High_vec \<Rightarrow> True | Low_vec \<Rightarrow> False)"
 
   (* memory *)
 definition mem_size :: "mem \<Rightarrow> nat" where
@@ -566,39 +581,56 @@ definition app_relop :: "relop \<Rightarrow> v_num \<Rightarrow> v_num \<Rightar
      | Relop_f fop \<Rightarrow> app_relop_f_v fop v1 v2)"
 
 (* vector ops *)
+
+definition insert_lane_vec_bs :: "nat \<Rightarrow> i \<Rightarrow> bytes \<Rightarrow> bytes \<Rightarrow> bytes" where
+  "insert_lane_vec_bs len_lane i bs_lane bs_vec =
+     ((take (i * len_lane) bs_vec) @ bs_lane @ (drop ((i+1) * len_lane) bs_vec))"
+
 definition app_unop_vec :: "unop_vec \<Rightarrow> v_vec \<Rightarrow> v_vec" where
-  "app_unop_vec uop v1 = undefined"
+  "app_unop_vec uop v1 =
+     (case v1 of ConstVec128 c \<Rightarrow> ConstVec128 (app_unop_vec_v uop c))"
 
 definition app_binop_vec :: "binop_vec \<Rightarrow> v_vec \<Rightarrow> v_vec \<Rightarrow> v_vec option" where
-  "app_binop_vec bop v1 v2 = undefined"
+  "app_binop_vec bop v1 v2 =
+    (case (v1,v2) of (ConstVec128 c1,ConstVec128 c2) \<Rightarrow> map_option ConstVec128 (app_binop_vec_v bop c1 c2))"
 
 definition app_shuffle_vec :: "i list \<Rightarrow> v_vec \<Rightarrow> v_vec \<Rightarrow> v_vec" where
-  "app_shuffle_vec is v1 v2 = undefined"
+  "app_shuffle_vec is v1 v2 =
+     (case (v1,v2) of (ConstVec128 c1,ConstVec128 c2) \<Rightarrow> ConstVec128 (app_shuffle_vec_v is c1 c2))"
 
 definition app_ternop_vec :: "ternop_vec \<Rightarrow> v_vec \<Rightarrow> v_vec \<Rightarrow> v_vec \<Rightarrow> v_vec" where
-  "app_ternop_vec op v1 v2 v3 = undefined"
+  "app_ternop_vec op v1 v2 v3 = 
+     (case (v1,v2,v3) of (ConstVec128 c1,ConstVec128 c2,ConstVec128 c3) \<Rightarrow> ConstVec128 (app_ternop_vec_v op c1 c2 c3))"
 
 definition app_test_vec :: "testop_vec \<Rightarrow> v_vec \<Rightarrow> bool" where
-  "app_test_vec op v1 = undefined"
+  "app_test_vec op v1 =
+    (case v1 of ConstVec128 c \<Rightarrow> (app_test_vec_v op c))"
 
 definition app_shift_vec :: "shiftop_vec \<Rightarrow> v_vec \<Rightarrow> i32 \<Rightarrow> v_vec" where
-  "app_shift_vec sop v1 = undefined"
+  "app_shift_vec sop v cn =
+     (case v of ConstVec128 cv \<Rightarrow> ConstVec128 (app_shift_vec_v sop cv cn))"
 
 definition app_splat_vec :: "shape_vec \<Rightarrow> v_num \<Rightarrow> v_vec" where
-  "app_splat_vec sv v1 = undefined"
+  "app_splat_vec sv v = ConstVec128 (deserialise_v128 ((\<lambda>bs. concat (replicate (vec_num sv) bs)) (take (vec_length sv) (bits_num v))))"
 
 definition app_extract_vec :: "shape_vec \<Rightarrow> sx \<Rightarrow> i \<Rightarrow> v_vec \<Rightarrow> v_num" where
-  "app_extract_vec sv sx i v1 =
-     (case sv of
-        Svi I8_16 \<Rightarrow> ConstInt32 undefined
-      | Svi I16_8 \<Rightarrow> ConstInt32 undefined
-      | Svi I32_4 \<Rightarrow> ConstInt32 undefined
-      | Svi I64_2 \<Rightarrow> ConstInt64 undefined
-      | Svf F32_4 \<Rightarrow> ConstFloat32 undefined
-      | Svf F64_2 \<Rightarrow> ConstFloat64 undefined)"
+  "app_extract_vec sv sx i vv =
+     (let bs_v = bits_vec vv in
+      let len_lane = vec_length sv in
+      let bs_n = (take len_lane (drop (i * len_lane) bs_v)) in
+      case sv of
+        Svi I8_16 \<Rightarrow> ConstInt32 (deserialise_i32 (sign_extend sx 4 bs_n))
+      | Svi I16_8 \<Rightarrow> ConstInt32 (deserialise_i32 (sign_extend sx 4 bs_n))
+      | Svi I32_4 \<Rightarrow> ConstInt32 (deserialise_i32 bs_n)
+      | Svi I64_2 \<Rightarrow> ConstInt64 (deserialise_i64 bs_n)
+      | Svf F32_4 \<Rightarrow> ConstFloat32 (deserialise_f32 bs_n)
+      | Svf F64_2 \<Rightarrow> ConstFloat64 (deserialise_f64 bs_n))"
 
 definition app_replace_vec :: "shape_vec \<Rightarrow> i \<Rightarrow> v_vec \<Rightarrow> v_num \<Rightarrow> v_vec" where
-  "app_replace_vec sv i v1 = undefined"
+  "app_replace_vec sv i vv vn =
+     (let bs_v = bits_vec vv in
+      let bs_n = bits_num vn in
+      ConstVec128 (deserialise_v128 (insert_lane_vec_bs (vec_length sv) i bs_n bs_v)))"
 
 fun read_bytes_vec :: "nat \<Rightarrow> nat \<Rightarrow> sx \<Rightarrow> mem \<Rightarrow> nat \<Rightarrow> bytes" where
   "read_bytes_vec 0 len sx m ind = []"
@@ -620,7 +652,7 @@ definition load_vec :: "loadop_vec \<Rightarrow> mem \<Rightarrow> nat \<Rightar
 definition insert_lane_vec :: "shape_vec_i \<Rightarrow> i \<Rightarrow> bytes \<Rightarrow> v128 \<Rightarrow> v128" where
   "insert_lane_vec svi i bs v =
      (let bs_v = (serialise_v128 v) in
-     deserialise_v128 ((take (i * (vec_i_length svi)) bs_v) @ bs @ (drop ((i+1) * (vec_i_length svi)) bs_v)))"
+     deserialise_v128 (insert_lane_vec_bs (vec_i_length svi) i bs bs_v))"
 
 definition store_serialise_vec :: "storeop_vec \<Rightarrow> v128 \<Rightarrow> bytes" where
   "store_serialise_vec svop v = (case svop of

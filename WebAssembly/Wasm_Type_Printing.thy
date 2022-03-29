@@ -607,6 +607,363 @@ axiomatization where
   deserialise_f32_is[code]: "deserialise_f32 \<equiv> f32_deserialise_isabelle_bytes" and
   deserialise_f64_is[code]: "deserialise_f64 \<equiv> f64_deserialise_isabelle_bytes"
 
+(* 1.1 vector ops *)
+code_printing
+  type_constructor v128 \<rightharpoonup> (OCaml) "V128Wrapper.t"
+| constant zero_v128_inst.zero_v128  \<rightharpoonup> (OCaml) "V128Wrapper.zero"
+
+consts
+  v128_serialise_ocaml_char :: "v128 \<Rightarrow> ocaml_char list"
+  v128_deserialise_ocaml_char :: "ocaml_char list \<Rightarrow> v128"
+
+code_printing
+  constant v128_serialise_ocaml_char \<rightharpoonup> (OCaml) "ImplWrapper.serialise'_v128"
+| constant v128_deserialise_ocaml_char  \<rightharpoonup> (OCaml) "ImplWrapper.deserialise'_v128"
+
+definition v128_serialise_isabelle_bytes :: "v128 \<Rightarrow> bytes" where
+  "v128_serialise_isabelle_bytes v = List.map ocaml_char_to_isabelle_byte (v128_serialise_ocaml_char v)"
+
+definition v128_deserialise_isabelle_bytes :: "bytes \<Rightarrow> v128" where
+  "v128_deserialise_isabelle_bytes bs = v128_deserialise_ocaml_char (List.map isabelle_byte_to_ocaml_char bs)"
+
+axiomatization where
+  serialise_v128_is[code]: "serialise_v128 \<equiv> v128_serialise_isabelle_bytes" and
+  deserialise_v128_is[code]: "deserialise_v128 \<equiv> v128_deserialise_isabelle_bytes"
+
+consts
+  ocaml_extadd_pairwise :: "integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128"
+
+  ocaml_not_vec_v  :: "v128 \<Rightarrow> v128"
+
+  ocaml_abs_vec_i  :: "integer \<Rightarrow> v128 \<Rightarrow> v128"
+  ocaml_neg_vec_i  :: "integer \<Rightarrow> v128 \<Rightarrow> v128"
+
+  ocaml_abs_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128"
+  ocaml_neg_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128"
+  ocaml_sqrt_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128"
+  ocaml_ceil_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128"
+  ocaml_floor_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128"
+  ocaml_trunc_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128"
+  ocaml_nearest_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128"
+
+  ocaml_and_vec_v :: "v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_andnot_vec_v :: "v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_or_vec_v :: "v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_xor_vec_v :: "v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+
+  ocaml_add_vec_i :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_sub_vec_i :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+
+  ocaml_add_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_sub_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_mul_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_div_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_min_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_max_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_pmin_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_pmax_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+
+  ocaml_min_vec :: "integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_max_vec :: "integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+
+  ocaml_add_sat_vec :: "integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_sub_sat_vec :: "integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+
+  ocaml_eq_vec_i :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_ne_vec_i :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_lt_vec_i :: "integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_gt_vec_i :: "integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_le_vec_i :: "integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_ge_vec_i :: "integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+
+  ocaml_eq_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_ne_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_lt_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_gt_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_le_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_ge_vec_f :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+
+  ocaml_swizzle_vec :: "v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_mul_vec :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_avgr_u_vec :: "integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_q15_mulr_sat_s_vec :: "v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_narrow_vec :: "integer \<Rightarrow> integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_dot_s_vec :: "integer \<Rightarrow> integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_extmul_vec :: "integer \<Rightarrow> integer \<Rightarrow> bool \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+
+  ocaml_shuffle_vec :: "i list \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128"
+
+  ocaml_cvt_extend_vec :: "integer \<Rightarrow> integer \<Rightarrow> bool \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128"
+  ocaml_cvt_trunc_sat_vec_i_f :: "integer \<Rightarrow> integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128"
+  ocaml_cvt_trunc_sat_zero_vec_i_f :: "integer \<Rightarrow> integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128"
+  ocaml_cvt_convert_vec_f_i :: "integer \<Rightarrow> integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128"
+  ocaml_cvt_demote_vec_f_f :: "integer \<Rightarrow> integer \<Rightarrow> v128 \<Rightarrow> v128"
+  ocaml_cvt_convert_low_vec_f_i :: "integer \<Rightarrow> integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128"
+  ocaml_cvt_promote_low_vec_f_f  :: "integer \<Rightarrow> integer \<Rightarrow> v128 \<Rightarrow> v128"
+
+  ocaml_bitselect_vec :: "v128 \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128"
+
+  ocaml_any_true_vec :: "v128 \<Rightarrow> bool"
+  ocaml_all_true_vec :: "integer \<Rightarrow> v128 \<Rightarrow> bool"
+  ocaml_bitmask_vec :: "integer \<Rightarrow> v128 \<Rightarrow> bool"
+
+  ocaml_shl_vec :: "integer \<Rightarrow> v128 \<Rightarrow> i32 \<Rightarrow> v128"
+  ocaml_shr_vec :: "integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> i32 \<Rightarrow> v128"
+
+code_printing
+  constant ocaml_extadd_pairwise \<rightharpoonup> (OCaml) "V128Wrapper.extadd'_pairwise"
+
+| constant ocaml_not_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.not'_vec'_v"
+
+| constant ocaml_abs_vec_i \<rightharpoonup> (OCaml) "V128Wrapper.abs'_vec'_i"
+| constant ocaml_neg_vec_i \<rightharpoonup> (OCaml) "V128Wrapper.neg'_vec'_i"
+
+| constant ocaml_abs_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.abs'_vec'_f"
+| constant ocaml_neg_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.neg'_vec'_f"
+| constant ocaml_sqrt_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.sqrt'_vec'_f"
+| constant ocaml_ceil_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.ceil'_vec'_f"
+| constant ocaml_floor_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.floor'_vec'_f"
+| constant ocaml_trunc_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.trunc'_vec'_f"
+| constant ocaml_nearest_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.nearest'_vec'_f"
+
+| constant ocaml_and_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.and'_vec'_v"
+| constant ocaml_andnot_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.andnot'_vec'_v"
+| constant ocaml_or_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.or'_vec'_v"
+| constant ocaml_xor_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.xor'_vec'_v"
+
+| constant ocaml_add_vec_i \<rightharpoonup> (OCaml) "V128Wrapper.add'_vec'_i"
+| constant ocaml_sub_vec_i \<rightharpoonup> (OCaml) "V128Wrapper.sub'_vec'_i"
+
+| constant ocaml_add_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.add'_vec'_f"
+| constant ocaml_sub_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.sub'_vec'_f"
+| constant ocaml_mul_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.mul'_vec'_f"
+| constant ocaml_div_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.div'_vec'_f"
+| constant ocaml_min_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.min'_vec'_f"
+| constant ocaml_max_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.max'_vec'_f"
+| constant ocaml_pmin_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.pmin'_vec'_f"
+| constant ocaml_pmax_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.pmax'_vec'_f"
+
+| constant ocaml_min_vec \<rightharpoonup> (OCaml) "V128Wrapper.min'_vec"
+| constant ocaml_max_vec \<rightharpoonup> (OCaml) "V128Wrapper.max'_vec"
+
+| constant ocaml_add_sat_vec \<rightharpoonup> (OCaml) "V128Wrapper.add'_sat'_vec"
+| constant ocaml_sub_sat_vec \<rightharpoonup> (OCaml) "V128Wrapper.sub'_sat'_vec"
+
+| constant ocaml_eq_vec_i \<rightharpoonup> (OCaml) "V128Wrapper.eq'_vec'_i"
+| constant ocaml_ne_vec_i \<rightharpoonup> (OCaml) "V128Wrapper.ne'_vec'_i"
+| constant ocaml_lt_vec_i \<rightharpoonup> (OCaml) "V128Wrapper.lt'_vec'_i"
+| constant ocaml_gt_vec_i \<rightharpoonup> (OCaml) "V128Wrapper.gt'_vec'_i"
+| constant ocaml_le_vec_i \<rightharpoonup> (OCaml) "V128Wrapper.le'_vec'_i"
+| constant ocaml_ge_vec_i \<rightharpoonup> (OCaml) "V128Wrapper.ge'_vec'_i"
+
+| constant ocaml_eq_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.eq'_vec'_f"
+| constant ocaml_ne_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.ne'_vec'_f"
+| constant ocaml_lt_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.lt'_vec'_f"
+| constant ocaml_gt_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.gt'_vec'_f"
+| constant ocaml_le_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.le'_vec'_f"
+| constant ocaml_ge_vec_f \<rightharpoonup> (OCaml) "V128Wrapper.ge'_vec'_f"
+
+| constant ocaml_swizzle_vec \<rightharpoonup> (OCaml) "V128Wrapper.swizzle'_vec"
+| constant ocaml_mul_vec \<rightharpoonup> (OCaml) "V128Wrapper.mul'_vec"
+| constant ocaml_avgr_u_vec \<rightharpoonup> (OCaml) "V128Wrapper.avgr'_u''_vec"
+| constant ocaml_q15_mulr_sat_s_vec \<rightharpoonup> (OCaml) "V128Wrapper.q15'_mulr'_sat'_s'_vec"
+| constant ocaml_narrow_vec \<rightharpoonup> (OCaml) "V128Wrapper.narrow'_vec"
+| constant ocaml_dot_s_vec \<rightharpoonup> (OCaml) "V128Wrapper.dot'_s'_vec"
+| constant ocaml_extmul_vec \<rightharpoonup> (OCaml) "V128Wrapper.extmul'_vec"
+
+| constant ocaml_shuffle_vec \<rightharpoonup> (OCaml) "V128Wrapper.shuffle'_vec"
+
+| constant ocaml_cvt_extend_vec \<rightharpoonup> (OCaml) "V128Wrapper.cvt'_extend'_vec"
+| constant ocaml_cvt_trunc_sat_vec_i_f \<rightharpoonup> (OCaml) "V128Wrapper.cvt'_trunc'_sat'_vec'_i'_f"
+| constant ocaml_cvt_trunc_sat_zero_vec_i_f \<rightharpoonup> (OCaml) "V128Wrapper.cvt'_trunc'_sat'_zero'_vec'_i'_f"
+| constant ocaml_cvt_convert_vec_f_i \<rightharpoonup> (OCaml) "V128Wrapper.cvt'_convert'_vec'_f'_i"
+| constant ocaml_cvt_demote_vec_f_f \<rightharpoonup> (OCaml) "V128Wrapper.cvt'_demote'_vec'_f'_f"
+| constant ocaml_cvt_convert_low_vec_f_i \<rightharpoonup> (OCaml) "V128Wrapper.cvt'_convert'_low'_vec'_f'_i"
+| constant ocaml_cvt_promote_low_vec_f_f \<rightharpoonup> (OCaml) "V128Wrapper.cvt'_promote'_low'_vec'_f'_f"
+
+| constant ocaml_bitselect_vec \<rightharpoonup> (OCaml) "V128Wrapper.bitselect'_vec"
+
+| constant ocaml_any_true_vec \<rightharpoonup> (OCaml) "V128Wrapper.any'_true'_vec"
+| constant ocaml_all_true_vec \<rightharpoonup> (OCaml) "V128Wrapper.all'_true'_vec"
+| constant ocaml_bitmask_vec \<rightharpoonup> (OCaml) "V128Wrapper.bitmask'_vec"
+
+| constant ocaml_shl_vec \<rightharpoonup> (OCaml) "V128Wrapper.shl'_vec"
+| constant ocaml_shr_vec \<rightharpoonup> (OCaml) "V128Wrapper.shr'_vec"
+
+definition ocaml_app_unop_vec_v_v :: "unop_vec_v \<Rightarrow> v128 \<Rightarrow> v128" where
+  "ocaml_app_unop_vec_v_v op v =
+     (case op of
+        Not_vec \<Rightarrow> ocaml_not_vec_v v)"
+
+definition ocaml_app_unop_vec_i_v :: "unop_vec_i \<Rightarrow> shape_vec_i \<Rightarrow> v128 \<Rightarrow> v128" where
+  "ocaml_app_unop_vec_i_v op svi v =
+     (let n = (integer_of_nat (vec_i_length svi)) in
+      case op of
+        Abs_vec \<Rightarrow> ocaml_abs_vec_i n v
+      | Neg_vec \<Rightarrow> ocaml_neg_vec_i n v)"
+
+definition ocaml_app_unop_vec_f_v :: "unop_vec_f \<Rightarrow> shape_vec_f \<Rightarrow> v128 \<Rightarrow> v128" where
+  "ocaml_app_unop_vec_f_v op svf v =
+     (let n = (integer_of_nat (vec_f_length svf)) in
+      case op of
+        Abs_vecf \<Rightarrow> ocaml_abs_vec_f n v
+      | Neg_vecf \<Rightarrow> ocaml_neg_vec_f n v
+      | Sqrt_vecf \<Rightarrow> ocaml_sqrt_vec_f n v
+      | Ceil_vecf \<Rightarrow> ocaml_ceil_vec_f n v
+      | Floor_vecf \<Rightarrow> ocaml_floor_vec_f n v
+      | Trunc_vecf \<Rightarrow> ocaml_trunc_vec_f n v
+      | Nearest_vecf \<Rightarrow> ocaml_nearest_vec_f n v)"
+
+definition ocaml_app_cvt_vec_v :: "cvtop_vec \<Rightarrow> v128 \<Rightarrow> v128" where
+  "ocaml_app_cvt_vec_v op v =
+     (case op of
+        Extend_i16_8_i8_16 h sx \<Rightarrow> ocaml_cvt_extend_vec 2 1 (half_vec_b h) (sx_b sx) v
+      | Extend_i32_4_i16_8 h sx \<Rightarrow> ocaml_cvt_extend_vec 4 2 (half_vec_b h) (sx_b sx) v
+      | Extend_i64_8_i32_4 h sx \<Rightarrow> ocaml_cvt_extend_vec 8 4 (half_vec_b h) (sx_b sx) v
+      | Trunc_sat_i32_4_f_32_4 sx \<Rightarrow> ocaml_cvt_trunc_sat_vec_i_f 4 4 (sx_b sx) v
+      | Trunc_sat_i32_4_f_64_2_zero sx \<Rightarrow> ocaml_cvt_trunc_sat_zero_vec_i_f 4 8 (sx_b sx) v
+      | Convert_f32_4_i32_4 sx \<Rightarrow> ocaml_cvt_convert_vec_f_i 4 4 (sx_b sx) v
+      | Demote_f32_4_f64_2_zero \<Rightarrow> ocaml_cvt_demote_vec_f_f 4 8 v
+      | Convert_low_f64_2_i32_4 sx \<Rightarrow> ocaml_cvt_convert_low_vec_f_i 8 4 (sx_b sx) v
+      | Promote_low_f64_2_f32_4 \<Rightarrow> ocaml_cvt_promote_low_vec_f_f 8 4 v)"
+
+definition ocaml_app_unop_vec_v :: "unop_vec \<Rightarrow> v128 \<Rightarrow> v128" where
+  "ocaml_app_unop_vec_v uop v =
+     (case uop of
+        Unop_vec_v op \<Rightarrow> ocaml_app_unop_vec_v_v op v
+      | Unop_vec_i op sv \<Rightarrow> ocaml_app_unop_vec_i_v op sv v
+      | Unop_vec_f op sv \<Rightarrow> ocaml_app_unop_vec_f_v op sv v
+      | Cvt_vec op \<Rightarrow> ocaml_app_cvt_vec_v op v
+      | Extadd_pairwise_i16_8_i8_16 sx \<Rightarrow> ocaml_extadd_pairwise 2 (sx_b sx) v
+      | Extadd_pairwise_i32_4_i16_8 sx \<Rightarrow> ocaml_extadd_pairwise 4 (sx_b sx) v)"
+
+definition ocaml_app_binop_vec_v_v :: "binop_vec_v \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option" where
+  "ocaml_app_binop_vec_v_v op v1 v2 =
+   (case op of
+      And_vec \<Rightarrow> ocaml_and_vec_v v1 v2
+    | Andnot_vec \<Rightarrow> ocaml_andnot_vec_v v1 v2
+    | Or_vec \<Rightarrow> ocaml_or_vec_v v1 v2
+    | Xor_vec \<Rightarrow> ocaml_xor_vec_v v1 v2)"
+
+definition ocaml_app_binop_vec_i_v :: "binop_vec_i \<Rightarrow> shape_vec_i \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option" where
+  "ocaml_app_binop_vec_i_v op svi v1 v2 =
+   (let i = integer_of_nat (vec_i_length svi) in
+    case op of
+      Add_vec \<Rightarrow> ocaml_add_vec_i i v1 v2
+    | Sub_vec \<Rightarrow> ocaml_sub_vec_i i v1 v2)"
+
+definition ocaml_app_binop_vec_f_v :: "binop_vec_f \<Rightarrow> shape_vec_f \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option" where
+  "ocaml_app_binop_vec_f_v op svf v1 v2 =
+   (let i = integer_of_nat (vec_f_length svf) in
+    case op of
+      Add_vecf \<Rightarrow> ocaml_add_vec_f i v1 v2
+    | Sub_vecf \<Rightarrow> ocaml_sub_vec_f i v1 v2
+    | Mul_vecf \<Rightarrow> ocaml_mul_vec_f i v1 v2
+    | Div_vecf \<Rightarrow> ocaml_div_vec_f i v1 v2
+    | Min_vecf \<Rightarrow> ocaml_min_vec_f i v1 v2
+    | Max_vecf \<Rightarrow> ocaml_max_vec_f i v1 v2
+    | Pmin_vecf \<Rightarrow> ocaml_pmin_vec_f i v1 v2
+    | Pmax_vecf \<Rightarrow> ocaml_pmax_vec_f i v1 v2)"
+
+definition ocaml_app_minmax_vec_i_v :: "minmaxop_vec_i \<Rightarrow> shape_vec_i \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option" where
+  "ocaml_app_minmax_vec_i_v op svi v1 v2 =
+   (let i = integer_of_nat (vec_i_length svi) in
+    case op of
+      Min_vec sx \<Rightarrow> ocaml_min_vec i (sx_b sx) v1 v2
+    | Max_vec sx \<Rightarrow> ocaml_max_vec i (sx_b sx) v1 v2)"
+
+definition ocaml_app_satop_vec_i_v :: "satop_vec_i \<Rightarrow> shape_vec_i \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option" where
+  "ocaml_app_satop_vec_i_v op svi v1 v2 =
+   (let i = integer_of_nat (vec_i_length svi) in
+    case op of
+      Add_sat_vec sx \<Rightarrow> ocaml_add_sat_vec i (sx_b sx) v1 v2
+    | Sub_sat_vec sx \<Rightarrow> ocaml_sub_sat_vec i (sx_b sx) v1 v2)"
+
+definition ocaml_app_relop_vec_i_v :: "relop_vec_i \<Rightarrow> shape_vec_i \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option" where
+  "ocaml_app_relop_vec_i_v op svi v1 v2 =
+   (let i = integer_of_nat (vec_i_length svi) in
+    case op of
+      Eq_vec \<Rightarrow> ocaml_eq_vec_i i v1 v2
+    | Ne_vec \<Rightarrow> ocaml_ne_vec_i i v1 v2
+    | Lt_vec sx \<Rightarrow> ocaml_lt_vec_i i (sx_b sx) v1 v2
+    | Gt_vec sx \<Rightarrow> ocaml_gt_vec_i i (sx_b sx) v1 v2
+    | Le_vec sx \<Rightarrow> ocaml_le_vec_i i (sx_b sx) v1 v2
+    | Ge_vec sx \<Rightarrow> ocaml_ge_vec_i i (sx_b sx) v1 v2)"
+
+definition ocaml_app_relop_vec_f_v :: "relop_vec_f \<Rightarrow> shape_vec_f \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option" where
+  "ocaml_app_relop_vec_f_v op svf v1 v2 =
+   (let i = integer_of_nat (vec_f_length svf) in
+    case op of
+      Eq_vecf \<Rightarrow> ocaml_eq_vec_f i v1 v2
+    | Ne_vecf \<Rightarrow> ocaml_ne_vec_f i v1 v2
+    | Lt_vecf \<Rightarrow> ocaml_lt_vec_f i v1 v2
+    | Gt_vecf \<Rightarrow> ocaml_gt_vec_f i v1 v2
+    | Le_vecf \<Rightarrow> ocaml_le_vec_f i v1 v2
+    | Ge_vecf \<Rightarrow> ocaml_ge_vec_f i v1 v2)"
+
+definition ocaml_app_binop_vec_v :: "binop_vec \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option" where
+   "ocaml_app_binop_vec_v bop v1 v2 =
+      (case bop of
+         Binop_vec_v op \<Rightarrow> undefined
+       | Swizzle_i8_16 \<Rightarrow> ocaml_swizzle_vec v1 v2
+       | Binop_vec_i op svi \<Rightarrow> ocaml_app_binop_vec_i_v op svi v1 v2
+       | Binop_vec_f op svf \<Rightarrow> ocaml_app_binop_vec_f_v op svf v1 v2
+       | Minmaxop_i8_16 op \<Rightarrow> ocaml_app_minmax_vec_i_v op I8_16 v1 v2
+       | Minmaxop_i16_8 op \<Rightarrow> ocaml_app_minmax_vec_i_v op I16_8 v1 v2
+       | Minmaxop_i32_4 op \<Rightarrow> ocaml_app_minmax_vec_i_v op I32_4 v1 v2
+       | Satop_i8_16 op \<Rightarrow> ocaml_app_satop_vec_i_v op I8_16 v1 v2
+       | Satop_i16_8 op \<Rightarrow> ocaml_app_satop_vec_i_v op I16_8 v1 v2
+       | Mul_i16_8 \<Rightarrow> ocaml_mul_vec 2 v1 v2
+       | Mul_i32_4 \<Rightarrow> ocaml_mul_vec 4 v1 v2
+       | Mul_i64_2 \<Rightarrow> ocaml_mul_vec 8 v1 v2
+       | Avgr_u_i8_16 \<Rightarrow> ocaml_avgr_u_vec 1 v1 v2
+       | Avgr_u_i16_8 \<Rightarrow> ocaml_avgr_u_vec 2 v1 v2
+       | Q15mulr_sat_s_i16_8 \<Rightarrow> ocaml_q15_mulr_sat_s_vec v1 v2
+       | Relop_i8_16 op \<Rightarrow> ocaml_app_relop_vec_i_v op I8_16 v1 v2
+       | Relop_i16_8 op \<Rightarrow> ocaml_app_relop_vec_i_v op I16_8 v1 v2
+       | Relop_i32_4 op \<Rightarrow> ocaml_app_relop_vec_i_v op I32_4 v1 v2
+       | Relop_i64_2_eq \<Rightarrow> ocaml_app_relop_vec_i_v Eq_vec I64_2 v1 v2
+       | Relop_i64_2_ne \<Rightarrow> ocaml_app_relop_vec_i_v Ne_vec I64_2 v1 v2
+       | Relop_i64_2_lt_s \<Rightarrow> ocaml_app_relop_vec_i_v (Lt_vec S) I64_2 v1 v2
+       | Relop_i64_2_gt_s \<Rightarrow> ocaml_app_relop_vec_i_v (Gt_vec S) I64_2 v1 v2
+       | Relop_i64_2_le_s \<Rightarrow> ocaml_app_relop_vec_i_v (Le_vec S) I64_2 v1 v2
+       | Relop_i64_2_ge_s \<Rightarrow> ocaml_app_relop_vec_i_v (Ge_vec S) I64_2 v1 v2
+       | Relop_vec_f op svf \<Rightarrow> ocaml_app_relop_vec_f_v op svf v1 v2
+       | Narrow_i8_16_i16_8 sx \<Rightarrow> ocaml_narrow_vec 1 2 (sx_b sx) v1 v2
+       | Narrow_i16_8_i32_4 sx \<Rightarrow> ocaml_narrow_vec 2 4 (sx_b sx) v1 v2
+       | Dot_s_i32_4_i16_8 \<Rightarrow> ocaml_dot_s_vec 4 2 v1 v2
+       | Extmul_i16_8_i8_16 h sx \<Rightarrow> ocaml_extmul_vec 2 1 (half_vec_b h) (sx_b sx) v1 v2
+       | Extmul_i32_4_i16_8 h sx \<Rightarrow> ocaml_extmul_vec 4 2 (half_vec_b h) (sx_b sx) v1 v2
+       | Extmul_i64_2_i32_4 h sx \<Rightarrow> ocaml_extmul_vec 8 4 (half_vec_b h) (sx_b sx) v1 v2)"
+
+definition ocaml_app_ternop_vec_v :: "ternop_vec \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128" where
+  "ocaml_app_ternop_vec_v op v1 v2 v3 =
+     (case op of
+        Bitselect_vec \<Rightarrow> ocaml_bitselect_vec v1 v2 v3)"
+
+definition ocaml_app_test_vec_v :: "testop_vec \<Rightarrow> v128 \<Rightarrow> bool" where
+  "ocaml_app_test_vec_v op v1 =
+     (case op of
+        Any_true_vec \<Rightarrow> ocaml_any_true_vec v1
+      | All_true_vec svi \<Rightarrow> ocaml_all_true_vec (integer_of_nat (vec_i_length svi)) v1
+      | Bitmask_vec svi \<Rightarrow> ocaml_bitmask_vec (integer_of_nat (vec_i_length svi)) v1)"
+
+definition ocaml_app_shift_vec_v :: "shiftop_vec \<Rightarrow> v128 \<Rightarrow> i32 \<Rightarrow> v128" where
+  "ocaml_app_shift_vec_v op v i =
+     (case op of
+        Shl_vec svi \<Rightarrow> ocaml_shl_vec (integer_of_nat (vec_i_length svi)) v i
+      | Shr_vec svi sx \<Rightarrow> ocaml_shr_vec (integer_of_nat (vec_i_length svi)) (sx_b sx) v i)"
+
+
+(* 1.1 vector ops *)
+axiomatization where
+  app_unop_vec_v_is[code]: "app_unop_vec_v \<equiv> ocaml_app_unop_vec_v" and
+  app_binop_vec_v_is[code]: "app_binop_vec_v \<equiv> ocaml_app_binop_vec_v" and
+  app_shuffle_vec_v_is[code]: "app_shuffle_vec_v \<equiv> ocaml_shuffle_vec" and
+  app_ternop_vec_v_is[code]: "app_ternop_vec_v \<equiv> ocaml_app_ternop_vec_v" and
+  app_test_vec_v_is[code]: "app_test_vec_v \<equiv> ocaml_app_test_vec_v" and
+  app_shift_vec_v_is[code]: "app_shift_vec_v \<equiv> ocaml_app_shift_vec_v"
+
 (* arithmetic *)
 code_printing
 (* INT32 *)

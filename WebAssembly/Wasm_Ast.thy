@@ -218,7 +218,7 @@ datatype
 datatype
   cvtop = Convert | Reinterpret
 
-(* vector ops *)
+(* 1.1: vector ops *)
 
 datatype half_vec = High_vec | Low_vec
 
@@ -271,7 +271,7 @@ datatype
   binop_vec_f =
     Add_vecf
   | Sub_vecf
-  | Mulf_vecf
+  | Mul_vecf
   | Div_vecf
   | Min_vecf
   | Max_vecf
@@ -288,41 +288,41 @@ datatype
   relop_vec_i = Eq_vec | Ne_vec | Lt_vec sx | Gt_vec sx | Le_vec sx | Ge_vec sx
 
 datatype
-  relop_vec_f = Eq_vec | Ne_vec | Lt_vec | Gt_vec | Le_vec | Ge_vec
+  relop_vec_f = Eq_vecf | Ne_vecf | Lt_vecf | Gt_vecf | Le_vecf | Ge_vecf
 
 datatype
   binop_vec =
     Binop_vec_v binop_vec_v
-    | Swizzle_i8_16
-    | Binop_vec_i binop_vec_i shape_vec_i
-    | Binop_vec_f binop_vec_f shape_vec_f
-    | Minmaxop_i8_16 minmaxop_vec_i
-    | Minmaxop_i16_8 minmaxop_vec_i
-    | Minmaxop_i32_4 minmaxop_vec_i
-    | Satop_i8_16 satop_vec_i
-    | Satop_i16_8 satop_vec_i
-    | Mul_i16_8
-    | Mul_i32_4
-    | Mul_i64_2
-    | Avgr_u_i8_16
-    | Avgr_u_i16_8
-    | Q15mulr_sat_s_i16_8
-    | Relop_i8_16 relop_vec_i
-    | Relop_i16_8 relop_vec_i
-    | Relop_i32_4 relop_vec_i
-    | Relop_i64_2_eq
-    | Relop_i64_2_ne
-    | Relop_i64_2_lt_s
-    | Relop_i64_2_gt_s
-    | Relop_i64_2_le_s
-    | Relop_i64_2_ge_s
-    | Relop_vec_f relop_vec_f shape_vec_f
-    | Narrow_i8_16_i16_8 sx
-    | Narrow_i16_8_i32_4 sx
-    | Dot_s_i32_4_i16_8
-    | Extmul_i16_8_i8_16 half_vec sx
-    | Extmul_i32_4_i16_8 half_vec sx
-    | Extmul_i64_2_i32_4 half_vec sx
+  | Swizzle_i8_16
+  | Binop_vec_i binop_vec_i shape_vec_i
+  | Binop_vec_f binop_vec_f shape_vec_f
+  | Minmaxop_i8_16 minmaxop_vec_i
+  | Minmaxop_i16_8 minmaxop_vec_i
+  | Minmaxop_i32_4 minmaxop_vec_i
+  | Satop_i8_16 satop_vec_i
+  | Satop_i16_8 satop_vec_i
+  | Mul_i16_8
+  | Mul_i32_4
+  | Mul_i64_2
+  | Avgr_u_i8_16
+  | Avgr_u_i16_8
+  | Q15mulr_sat_s_i16_8
+  | Relop_i8_16 relop_vec_i
+  | Relop_i16_8 relop_vec_i
+  | Relop_i32_4 relop_vec_i
+  | Relop_i64_2_eq
+  | Relop_i64_2_ne
+  | Relop_i64_2_lt_s
+  | Relop_i64_2_gt_s
+  | Relop_i64_2_le_s
+  | Relop_i64_2_ge_s
+  | Relop_vec_f relop_vec_f shape_vec_f
+  | Narrow_i8_16_i16_8 sx
+  | Narrow_i16_8_i32_4 sx
+  | Dot_s_i32_4_i16_8
+  | Extmul_i16_8_i8_16 half_vec sx
+  | Extmul_i32_4_i16_8 half_vec sx
+  | Extmul_i64_2_i32_4 half_vec sx
 
 datatype
   ternop_vec = Bitselect_vec

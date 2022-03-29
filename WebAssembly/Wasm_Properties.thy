@@ -472,7 +472,7 @@ proof -
   have "\<C> \<turnstile> [C\<^sub>n (app_extract_vec sv sx i v)] : ([] _> [T_num (vec_lane_t sv)])"
     using b_e_typing.const[of _ "V_num (app_extract_vec sv sx i v)"]
     unfolding typeof_def typeof_num_def app_extract_vec_def vec_lane_t_def
-    by (auto split: shape_vec.splits shape_vec_i.splits shape_vec_f.splits v_num.splits)
+    by (auto simp add: Let_def split: shape_vec.splits shape_vec_i.splits shape_vec_f.splits v_num.splits)
   thus ?thesis
     using e_typing_l_typing.intros(1)
           b_e_typing.weakening[of \<C> "[C\<^sub>n (app_extract_vec sv sx i v)]" "[]" "[T_num (vec_lane_t sv)]" ts]
