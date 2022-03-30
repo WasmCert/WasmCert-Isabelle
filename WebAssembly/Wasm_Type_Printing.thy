@@ -705,10 +705,10 @@ consts
 
   ocaml_any_true_vec :: "v128 \<Rightarrow> bool"
   ocaml_all_true_vec :: "integer \<Rightarrow> v128 \<Rightarrow> bool"
-  ocaml_bitmask_vec :: "integer \<Rightarrow> v128 \<Rightarrow> i32"
+  ocaml_bitmask_vec :: "integer \<Rightarrow> v128 \<Rightarrow> ocaml_i32"
 
-  ocaml_shl_vec :: "integer \<Rightarrow> v128 \<Rightarrow> i32 \<Rightarrow> v128"
-  ocaml_shr_vec :: "integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> i32 \<Rightarrow> v128"
+  ocaml_shl_vec :: "integer \<Rightarrow> v128 \<Rightarrow> ocaml_i32 \<Rightarrow> v128"
+  ocaml_shr_vec :: "integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> ocaml_i32 \<Rightarrow> v128"
 
 code_printing
   constant ocaml_extadd_pairwise \<rightharpoonup> (OCaml) "V128Wrapper.extadd'_pairwise"
@@ -946,13 +946,13 @@ definition ocaml_app_test_vec_v :: "testop_vec \<Rightarrow> v128 \<Rightarrow> 
      (case op of
         Any_true_vec \<Rightarrow> wasm_bool (ocaml_any_true_vec v1)
       | All_true_vec svi \<Rightarrow> wasm_bool (ocaml_all_true_vec (integer_of_nat (vec_i_length svi)) v1)
-      | Bitmask_vec svi \<Rightarrow> ocaml_bitmask_vec (integer_of_nat (vec_i_length svi)) v1)"
+      | Bitmask_vec svi \<Rightarrow> ocaml_int32_to_isabelle_int32 (ocaml_bitmask_vec (integer_of_nat (vec_i_length svi)) v1))"
 
 definition ocaml_app_shift_vec_v :: "shiftop_vec \<Rightarrow> v128 \<Rightarrow> i32 \<Rightarrow> v128" where
   "ocaml_app_shift_vec_v op v i =
      (case op of
-        Shl_vec svi \<Rightarrow> ocaml_shl_vec (integer_of_nat (vec_i_length svi)) v i
-      | Shr_vec svi sx \<Rightarrow> ocaml_shr_vec (integer_of_nat (vec_i_length svi)) (sx_b sx) v i)"
+        Shl_vec svi \<Rightarrow> ocaml_shl_vec (integer_of_nat (vec_i_length svi)) v (isabelle_int32_to_ocaml_int32 i)
+      | Shr_vec svi sx \<Rightarrow> ocaml_shr_vec (integer_of_nat (vec_i_length svi)) (sx_b sx) v (isabelle_int32_to_ocaml_int32 i))"
 
 
 (* 1.1 vector ops *)

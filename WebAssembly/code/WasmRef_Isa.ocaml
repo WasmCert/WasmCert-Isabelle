@@ -5567,7 +5567,8 @@ let rec ocaml_app_test_vec_v
         wasm_bool
           (V128Wrapper.all_true_vec (integer_of_nat (vec_i_length svi)) v1)
       | Bitmask_vec svi ->
-        V128Wrapper.bitmask_vec (integer_of_nat (vec_i_length svi)) v1);;
+        ocaml_int32_to_isabelle_int32
+          (V128Wrapper.bitmask_vec (integer_of_nat (vec_i_length svi)) v1));;
 
 let rec app_test_vec_v x = ocaml_app_test_vec_v x;;
 
@@ -5758,9 +5759,11 @@ let rec ocaml_app_shift_vec_v
   op v i =
     (match op
       with Shl_vec svi ->
-        V128Wrapper.shl_vec (integer_of_nat (vec_i_length svi)) v i
+        V128Wrapper.shl_vec (integer_of_nat (vec_i_length svi)) v
+          (isabelle_int32_to_ocaml_int32 i)
       | Shr_vec (svi, sx) ->
-        V128Wrapper.shr_vec (integer_of_nat (vec_i_length svi)) (sx_b sx) v i);;
+        V128Wrapper.shr_vec (integer_of_nat (vec_i_length svi)) (sx_b sx) v
+          (isabelle_int32_to_ocaml_int32 i));;
 
 let rec app_shift_vec_v x = ocaml_app_shift_vec_v x;;
 
