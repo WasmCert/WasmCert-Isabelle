@@ -765,7 +765,7 @@ code_printing
 
 | constant ocaml_swizzle_vec \<rightharpoonup> (OCaml) "V128Wrapper.swizzle'_vec"
 | constant ocaml_mul_vec \<rightharpoonup> (OCaml) "V128Wrapper.mul'_vec"
-| constant ocaml_avgr_u_vec \<rightharpoonup> (OCaml) "V128Wrapper.avgr'_u''_vec"
+| constant ocaml_avgr_u_vec \<rightharpoonup> (OCaml) "V128Wrapper.avgr'_u'_vec"
 | constant ocaml_q15_mulr_sat_s_vec \<rightharpoonup> (OCaml) "V128Wrapper.q15'_mulr'_sat'_s'_vec"
 | constant ocaml_narrow_vec \<rightharpoonup> (OCaml) "V128Wrapper.narrow'_vec"
 | constant ocaml_dot_s_vec \<rightharpoonup> (OCaml) "V128Wrapper.dot'_s'_vec"

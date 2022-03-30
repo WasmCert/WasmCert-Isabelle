@@ -5719,8 +5719,8 @@ let rec ocaml_app_binop_vec_v
       | Mul_i16_8 -> V128Wrapper.mul_vec (Z.of_int 2) v1 v2
       | Mul_i32_4 -> V128Wrapper.mul_vec (Z.of_int 4) v1 v2
       | Mul_i64_2 -> V128Wrapper.mul_vec (Z.of_int 8) v1 v2
-      | Avgr_u_i8_16 -> V128Wrapper.avgr_u'(Z.of_int 1)vec v1 v2
-      | Avgr_u_i16_8 -> V128Wrapper.avgr_u'(Z.of_int 2)vec v1 v2
+      | Avgr_u_i8_16 -> V128Wrapper.avgr_u_vec (Z.of_int 1) v1 v2
+      | Avgr_u_i16_8 -> V128Wrapper.avgr_u_vec (Z.of_int 2) v1 v2
       | Q15mulr_sat_s_i16_8 -> V128Wrapper.q15_mulr_sat_s_vec v1 v2
       | Relop_i8_16 op -> ocaml_app_relop_vec_i_v op I8_16 v1 v2
       | Relop_i16_8 op -> ocaml_app_relop_vec_i_v op I16_8 v1 v2
