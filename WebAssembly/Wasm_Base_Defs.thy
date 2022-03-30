@@ -751,14 +751,14 @@ definition load_store_t_bounds :: "a \<Rightarrow> tp_num option \<Rightarrow> t
 
 definition load_vec_t_bounds :: "loadop_vec \<Rightarrow> a \<Rightarrow> bool" where
   "load_vec_t_bounds lv a = (case lv of
-                              Load_packed_vec tp sx \<Rightarrow> 2^a < (tp_vec_length tp) * (tp_vec_num tp)
-                            | Load_splat svi \<Rightarrow> 2^a < (vec_i_length svi)
-                            | _ \<Rightarrow> 2^a < (t_vec_length T_v128))"
+                              Load_packed_vec tp sx \<Rightarrow> 2^a \<le> (tp_vec_length tp) * (tp_vec_num tp)
+                            | Load_splat svi \<Rightarrow> 2^a \<le> (vec_i_length svi)
+                            | _ \<Rightarrow> 2^a \<le> (t_vec_length T_v128))"
 
 definition store_vec_t_bounds :: "storeop_vec \<Rightarrow> a \<Rightarrow> bool" where
   "store_vec_t_bounds sv a = (case sv of
-                               Store_lane svi i \<Rightarrow> i < vec_i_num svi \<and> 2^a < (vec_i_length svi)
-                             | _ \<Rightarrow> 2^a < (t_vec_length T_v128))"
+                               Store_lane svi i \<Rightarrow> i < vec_i_num svi \<and> 2^a \<le> (vec_i_length svi)
+                             | _ \<Rightarrow> 2^a \<le> (t_vec_length T_v128))"
 
 definition cvt_i32 :: "(sat \<times> sx) option \<Rightarrow> v_num \<Rightarrow> i32 option" where
   "cvt_i32 sat_sx v = (case v of
