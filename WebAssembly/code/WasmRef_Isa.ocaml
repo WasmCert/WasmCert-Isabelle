@@ -1467,6 +1467,8 @@ module WasmRef_Isa : sig
     nat -> v array -> v list -> (unit -> (v list * res_step))
   val update_redex_step : redex -> v list -> e list -> redex
   val update_fc_step_m : frame_context_m -> v list -> e list -> frame_context_m
+  val ocaml_app_shuffle_vec_v :
+    nat list -> V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t
   val app_shuffle_vec_v :
     nat list -> V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t
   val app_shuffle_vec : nat list -> v_vec -> v_vec -> v_vec
@@ -6778,7 +6780,10 @@ let rec update_fc_step_m
   (Frame_context_m (rdx, lcs, nf, f1, f2)) v_s es_cont =
     Frame_context_m (update_redex_step rdx v_s es_cont, lcs, nf, f1, f2);;
 
-let rec app_shuffle_vec_v x = V128Wrapper.shuffle_vec x;;
+let rec ocaml_app_shuffle_vec_v
+  is v1 v2 = V128Wrapper.shuffle_vec (map integer_of_nat is) v1 v2;;
+
+let rec app_shuffle_vec_v x = ocaml_app_shuffle_vec_v x;;
 
 let rec app_shuffle_vec
   is v1 v2 =

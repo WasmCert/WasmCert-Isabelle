@@ -691,7 +691,7 @@ consts
   ocaml_dot_s_vec :: "integer \<Rightarrow> integer \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
   ocaml_extmul_vec :: "integer \<Rightarrow> integer \<Rightarrow> bool \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
 
-  ocaml_shuffle_vec :: "i list \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128"
+  ocaml_shuffle_vec :: "integer list \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128"
 
   ocaml_cvt_extend_vec :: "integer \<Rightarrow> integer \<Rightarrow> bool \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128"
   ocaml_cvt_trunc_sat_vec_i_f :: "integer \<Rightarrow> integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128"
@@ -936,6 +936,9 @@ definition ocaml_app_binop_vec_v :: "binop_vec \<Rightarrow> v128 \<Rightarrow> 
        | Extmul_i32_4_i16_8 h sx \<Rightarrow> ocaml_extmul_vec 4 2 (half_vec_b h) (sx_b sx) v1 v2
        | Extmul_i64_2_i32_4 h sx \<Rightarrow> ocaml_extmul_vec 8 4 (half_vec_b h) (sx_b sx) v1 v2)"
 
+definition ocaml_app_shuffle_vec_v :: "i list \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128" where
+  "ocaml_app_shuffle_vec_v is v1 v2 = ocaml_shuffle_vec (map integer_of_nat is) v1 v2"
+
 definition ocaml_app_ternop_vec_v :: "ternop_vec \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128" where
   "ocaml_app_ternop_vec_v op v1 v2 v3 =
      (case op of
@@ -959,7 +962,7 @@ definition ocaml_app_shift_vec_v :: "shiftop_vec \<Rightarrow> v128 \<Rightarrow
 axiomatization where
   app_unop_vec_v_is[code]: "app_unop_vec_v \<equiv> ocaml_app_unop_vec_v" and
   app_binop_vec_v_is[code]: "app_binop_vec_v \<equiv> ocaml_app_binop_vec_v" and
-  app_shuffle_vec_v_is[code]: "app_shuffle_vec_v \<equiv> ocaml_shuffle_vec" and
+  app_shuffle_vec_v_is[code]: "app_shuffle_vec_v \<equiv> ocaml_app_shuffle_vec_v" and
   app_ternop_vec_v_is[code]: "app_ternop_vec_v \<equiv> ocaml_app_ternop_vec_v" and
   app_test_vec_v_is[code]: "app_test_vec_v \<equiv> ocaml_app_test_vec_v" and
   app_shift_vec_v_is[code]: "app_shift_vec_v \<equiv> ocaml_app_shift_vec_v"
