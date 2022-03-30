@@ -135,7 +135,7 @@ consts
   app_binop_vec_v :: "binop_vec \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
   app_shuffle_vec_v :: "i list \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128"
   app_ternop_vec_v :: "ternop_vec \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128"
-  app_test_vec_v :: "testop_vec \<Rightarrow> v128 \<Rightarrow> bool"
+  app_test_vec_v :: "testop_vec \<Rightarrow> v128 \<Rightarrow> i32"
   app_shift_vec_v :: "shiftop_vec \<Rightarrow> v128 \<Rightarrow> i32 \<Rightarrow> v128"
 
 consts
@@ -602,7 +602,7 @@ definition app_ternop_vec :: "ternop_vec \<Rightarrow> v_vec \<Rightarrow> v_vec
   "app_ternop_vec op v1 v2 v3 = 
      (case (v1,v2,v3) of (ConstVec128 c1,ConstVec128 c2,ConstVec128 c3) \<Rightarrow> ConstVec128 (app_ternop_vec_v op c1 c2 c3))"
 
-definition app_test_vec :: "testop_vec \<Rightarrow> v_vec \<Rightarrow> bool" where
+definition app_test_vec :: "testop_vec \<Rightarrow> v_vec \<Rightarrow> i32" where
   "app_test_vec op v1 =
     (case v1 of ConstVec128 c \<Rightarrow> (app_test_vec_v op c))"
 

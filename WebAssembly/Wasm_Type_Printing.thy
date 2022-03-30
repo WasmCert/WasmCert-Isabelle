@@ -705,7 +705,7 @@ consts
 
   ocaml_any_true_vec :: "v128 \<Rightarrow> bool"
   ocaml_all_true_vec :: "integer \<Rightarrow> v128 \<Rightarrow> bool"
-  ocaml_bitmask_vec :: "integer \<Rightarrow> v128 \<Rightarrow> bool"
+  ocaml_bitmask_vec :: "integer \<Rightarrow> v128 \<Rightarrow> i32"
 
   ocaml_shl_vec :: "integer \<Rightarrow> v128 \<Rightarrow> i32 \<Rightarrow> v128"
   ocaml_shr_vec :: "integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> i32 \<Rightarrow> v128"
@@ -941,11 +941,11 @@ definition ocaml_app_ternop_vec_v :: "ternop_vec \<Rightarrow> v128 \<Rightarrow
      (case op of
         Bitselect_vec \<Rightarrow> ocaml_bitselect_vec v1 v2 v3)"
 
-definition ocaml_app_test_vec_v :: "testop_vec \<Rightarrow> v128 \<Rightarrow> bool" where
+definition ocaml_app_test_vec_v :: "testop_vec \<Rightarrow> v128 \<Rightarrow> i32" where
   "ocaml_app_test_vec_v op v1 =
      (case op of
-        Any_true_vec \<Rightarrow> ocaml_any_true_vec v1
-      | All_true_vec svi \<Rightarrow> ocaml_all_true_vec (integer_of_nat (vec_i_length svi)) v1
+        Any_true_vec \<Rightarrow> wasm_bool (ocaml_any_true_vec v1)
+      | All_true_vec svi \<Rightarrow> wasm_bool (ocaml_all_true_vec (integer_of_nat (vec_i_length svi)) v1)
       | Bitmask_vec svi \<Rightarrow> ocaml_bitmask_vec (integer_of_nat (vec_i_length svi)) v1)"
 
 definition ocaml_app_shift_vec_v :: "shiftop_vec \<Rightarrow> v128 \<Rightarrow> i32 \<Rightarrow> v128" where

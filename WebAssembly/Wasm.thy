@@ -178,7 +178,7 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
   \<comment> \<open>\<open>ternary vector ops\<close>\<close>
 | ternop_vec:"\<lparr>[$C\<^sub>v v1, $C\<^sub>v v2, $C\<^sub>v v3, $(Ternop_vec op)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>v (app_ternop_vec op v1 v2 v3)]\<rparr>"
   \<comment> \<open>\<open>test vector ops\<close>\<close>
-| test_vec:"\<lparr>[$C\<^sub>v v, $(Test_vec op)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>n (ConstInt32 (wasm_bool (app_test_vec op v)))]\<rparr>"
+| test_vec:"\<lparr>[$C\<^sub>v v, $(Test_vec op)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>n (ConstInt32 (app_test_vec op v))]\<rparr>"
   \<comment> \<open>\<open>shift vector ops\<close>\<close>
 | shift_vec:"\<lparr>[$C\<^sub>v v, $C\<^sub>n (ConstInt32 n), $(Shift_vec op)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>v (app_shift_vec op v n)]\<rparr>"
   \<comment> \<open>\<open>splat vector ops\<close>\<close>

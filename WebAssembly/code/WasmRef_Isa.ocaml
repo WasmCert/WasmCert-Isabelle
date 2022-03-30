@@ -1261,9 +1261,9 @@ module WasmRef_Isa : sig
     Bytes.t -> nat -> Bytes.t -> nat -> nat -> (unit -> unit)
   val load_uint8_list : Bytes.t -> nat -> nat -> (unit -> (uint8 list))
   val store_uint8_list : Bytes.t -> nat -> uint8 list -> (unit -> unit)
-  val ocaml_app_test_vec_v : testop_vec -> V128Wrapper.t -> bool
-  val app_test_vec_v : testop_vec -> V128Wrapper.t -> bool
-  val app_test_vec : testop_vec -> v_vec -> bool
+  val ocaml_app_test_vec_v : testop_vec -> V128Wrapper.t -> i32
+  val app_test_vec_v : testop_vec -> V128Wrapper.t -> i32
+  val app_test_vec : testop_vec -> v_vec -> i32
   val ocaml_app_unop_vec_v_v : unop_vec_v -> V128Wrapper.t -> V128Wrapper.t
   val ocaml_app_unop_vec_i_v :
     unop_vec_i -> shape_vec_i -> V128Wrapper.t -> V128Wrapper.t
@@ -5562,9 +5562,10 @@ let rec store_uint8_list
 
 let rec ocaml_app_test_vec_v
   op v1 =
-    (match op with Any_true_vec -> V128Wrapper.any_true_vec v1
+    (match op with Any_true_vec -> wasm_bool (V128Wrapper.any_true_vec v1)
       | All_true_vec svi ->
-        V128Wrapper.all_true_vec (integer_of_nat (vec_i_length svi)) v1
+        wasm_bool
+          (V128Wrapper.all_true_vec (integer_of_nat (vec_i_length svi)) v1)
       | Bitmask_vec svi ->
         V128Wrapper.bitmask_vec (integer_of_nat (vec_i_length svi)) v1);;
 
@@ -6902,8 +6903,7 @@ let rec app_v_s_test_vec
     (match v_s with [] -> (v_s, crash_invalid)
       | V_num _ :: _ -> (v_s, crash_invalid)
       | V_vec v1 :: v_sa ->
-        (V_num (ConstInt32 (wasm_bool (app_test_vec op v1))) :: v_sa,
-          Step_normal));;
+        (V_num (ConstInt32 (app_test_vec op v1)) :: v_sa, Step_normal));;
 
 let rec app_v_s_br_table
   ks k v_s =
