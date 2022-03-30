@@ -514,10 +514,6 @@ fun run_step_b_e_m :: "b_e \<Rightarrow> config_m \<Rightarrow> res_step_tuple_m
         let (v_s', res) = (app_v_s_binop_vec op v_s) in
         return ((Config_m d s (update_fc_step_m fc v_s' []) fcs), res)
 
-    | (Shuffle_i8_16 is) \<Rightarrow>
-        let (v_s', res) = (app_v_s_shuffle_vec is v_s) in
-        return ((Config_m d s (update_fc_step_m fc v_s' []) fcs), res)
-
     | (Ternop_vec op) \<Rightarrow>
         let (v_s', res) = (app_v_s_ternop_vec op v_s) in
         return ((Config_m d s (update_fc_step_m fc v_s' []) fcs), res)

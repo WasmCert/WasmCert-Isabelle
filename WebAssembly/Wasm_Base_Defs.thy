@@ -131,6 +131,8 @@ instantiation v128 :: wasm_base begin instance .. end
 
 (* 1.1 vector ops *)
 consts
+  binop_vec_wf :: "binop_vec \<Rightarrow> bool"
+
   app_unop_vec_v :: "unop_vec \<Rightarrow> v128 \<Rightarrow> v128"
   app_binop_vec_v :: "binop_vec \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
   app_shuffle_vec_v :: "i list \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128"

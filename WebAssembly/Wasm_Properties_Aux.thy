@@ -352,13 +352,6 @@ lemma b_e_type_binop_vec:
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
-lemma b_e_type_shuffle_vec:
-  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = Shuffle_i8_16 is"
-  shows "\<exists>ts''. ts = ts''@[T_vec T_v128, T_vec T_v128] \<and> ts' = ts''@[T_vec T_v128] \<and> length is = 16 \<and> list_all (\<lambda>i. i < 32) is"
-  using assms
-  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
-
 lemma b_e_type_ternop_vec:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Ternop_vec op"

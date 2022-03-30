@@ -897,7 +897,7 @@ module WasmRef_Isa : sig
     Testop of t_num * testop | Relop of t_num * relop |
     Cvtop of t_num * cvtop * t_num * (sat * sx) option |
     Unop_vec of V128Wrapper.unop_vec_t | Binop_vec of V128Wrapper.binop_vec_t |
-    Shuffle_i8_16 of nat list | Ternop_vec of V128Wrapper.ternop_vec_t |
+    Ternop_vec of V128Wrapper.ternop_vec_t |
     Test_vec of V128Wrapper.testop_vec_t |
     Shift_vec of V128Wrapper.shiftop_vec_t | Splat_vec of shape_vec |
     Extract_vec of shape_vec * sx * nat | Replace_vec of shape_vec * nat
@@ -1396,10 +1396,6 @@ module WasmRef_Isa : sig
     nat -> v array -> v list -> (unit -> (v list * res_step))
   val update_redex_step : redex -> v list -> e list -> redex
   val update_fc_step_m : frame_context_m -> v list -> e list -> frame_context_m
-  val app_shuffle_vec_v :
-    nat list -> V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t
-  val app_shuffle_vec : nat list -> v_vec -> v_vec -> v_vec
-  val app_v_s_shuffle_vec : nat list -> v list -> v list * res_step
   val app_replace_vec : shape_vec -> nat -> v_vec -> v_num -> v_vec
   val app_v_s_replace_vec : shape_vec -> nat -> v list -> v list * res_step
   val app_extract_vec : shape_vec -> sx -> nat -> v_vec -> v_num
@@ -3886,10 +3882,9 @@ type b_e = Unreachable | Nop | Drop | Select | Block of tf * b_e list |
   Testop of t_num * testop | Relop of t_num * relop |
   Cvtop of t_num * cvtop * t_num * (sat * sx) option |
   Unop_vec of V128Wrapper.unop_vec_t | Binop_vec of V128Wrapper.binop_vec_t |
-  Shuffle_i8_16 of nat list | Ternop_vec of V128Wrapper.ternop_vec_t |
-  Test_vec of V128Wrapper.testop_vec_t | Shift_vec of V128Wrapper.shiftop_vec_t
-  | Splat_vec of shape_vec | Extract_vec of shape_vec * sx * nat |
-  Replace_vec of shape_vec * nat;;
+  Ternop_vec of V128Wrapper.ternop_vec_t | Test_vec of V128Wrapper.testop_vec_t
+  | Shift_vec of V128Wrapper.shiftop_vec_t | Splat_vec of shape_vec |
+  Extract_vec of shape_vec * sx * nat | Replace_vec of shape_vec * nat;;
 
 type cl_m = Func_native of unit inst_m_ext * tf * t list * b_e list |
   Func_host of tf * host
@@ -4764,11 +4759,7 @@ and check_single
     | c, Unop_vec op, ts ->
         type_update ts [TSome (T_vec T_v128)] (Typea [T_vec T_v128])
     | c, Binop_vec op, ts ->
-        type_update ts [TSome (T_vec T_v128); TSome (T_vec T_v128)]
-          (Typea [T_vec T_v128])
-    | c, Shuffle_i8_16 is, ts ->
-        (if equal_nat (size_list is) (nat_of_integer (Z.of_int 16)) &&
-              list_all (fun i -> less_nat i (nat_of_integer (Z.of_int 32))) is
+        (if V128Wrapper.binop_vec_wf op
           then type_update ts [TSome (T_vec T_v128); TSome (T_vec T_v128)]
                  (Typea [T_vec T_v128])
           else Bot)
@@ -5042,9 +5033,9 @@ let rec const_expr_p
             | (_, Binop (_, _)) -> bot_pred | (_, Testop (_, _)) -> bot_pred
             | (_, Relop (_, _)) -> bot_pred
             | (_, Cvtop (_, _, _, _)) -> bot_pred | (_, Unop_vec _) -> bot_pred
-            | (_, Binop_vec _) -> bot_pred | (_, Shuffle_i8_16 _) -> bot_pred
-            | (_, Ternop_vec _) -> bot_pred | (_, Test_vec _) -> bot_pred
-            | (_, Shift_vec _) -> bot_pred | (_, Splat_vec _) -> bot_pred
+            | (_, Binop_vec _) -> bot_pred | (_, Ternop_vec _) -> bot_pred
+            | (_, Test_vec _) -> bot_pred | (_, Shift_vec _) -> bot_pred
+            | (_, Splat_vec _) -> bot_pred
             | (_, Extract_vec (_, _, _)) -> bot_pred
             | (_, Replace_vec (_, _)) -> bot_pred)))
       (bind (single (x, xa))
@@ -5072,9 +5063,9 @@ let rec const_expr_p
             | (_, Binop (_, _)) -> bot_pred | (_, Testop (_, _)) -> bot_pred
             | (_, Relop (_, _)) -> bot_pred
             | (_, Cvtop (_, _, _, _)) -> bot_pred | (_, Unop_vec _) -> bot_pred
-            | (_, Binop_vec _) -> bot_pred | (_, Shuffle_i8_16 _) -> bot_pred
-            | (_, Ternop_vec _) -> bot_pred | (_, Test_vec _) -> bot_pred
-            | (_, Shift_vec _) -> bot_pred | (_, Splat_vec _) -> bot_pred
+            | (_, Binop_vec _) -> bot_pred | (_, Ternop_vec _) -> bot_pred
+            | (_, Test_vec _) -> bot_pred | (_, Shift_vec _) -> bot_pred
+            | (_, Splat_vec _) -> bot_pred
             | (_, Extract_vec (_, _, _)) -> bot_pred
             | (_, Replace_vec (_, _)) -> bot_pred)));;
 
@@ -6476,21 +6467,6 @@ let rec update_fc_step_m
   (Frame_context_m (rdx, lcs, nf, f1, f2)) v_s es_cont =
     Frame_context_m (update_redex_step rdx v_s es_cont, lcs, nf, f1, f2);;
 
-let rec app_shuffle_vec_v is = V128Wrapper.shuffle_vec (map integer_of_nat is);;
-
-let rec app_shuffle_vec
-  is v1 v2 =
-    (let (ConstVec128 c1, ConstVec128 c2) = (v1, v2) in
-      ConstVec128 (app_shuffle_vec_v is c1 c2));;
-
-let rec app_v_s_shuffle_vec
-  is v_s =
-    (match v_s with [] -> (v_s, crash_invalid)
-      | V_num _ :: _ -> (v_s, crash_invalid) | [V_vec _] -> (v_s, crash_invalid)
-      | V_vec _ :: V_num _ :: _ -> (v_s, crash_invalid)
-      | V_vec v2 :: V_vec v1 :: v_sa ->
-        (V_vec (app_shuffle_vec is v1 v2) :: v_sa, Step_normal));;
-
 let rec app_replace_vec
   sv i vv vn =
     (let bs_v = bits_vec vv in
@@ -6923,10 +6899,6 @@ let rec run_step_b_e_m
           (let (v_sa, res) = app_v_s_binop_vec op v_s in
             (fun () ->
               (Config_m (d, s, update_fc_step_m fc v_sa [], fcs), res)))
-        | Shuffle_i8_16 is ->
-          (let (v_sa, res) = app_v_s_shuffle_vec is v_s in
-            (fun () ->
-              (Config_m (d, s, update_fc_step_m fc v_sa [], fcs), res)))
         | Ternop_vec op ->
           (let (v_sa, res) = app_v_s_ternop_vec op v_s in
             (fun () ->
@@ -7128,7 +7100,6 @@ let rec split_v_s_b_s_aux
     | v_s, Cvtop (vb, vc, vd, ve) :: va -> (v_s, Cvtop (vb, vc, vd, ve) :: va)
     | v_s, Unop_vec vb :: va -> (v_s, Unop_vec vb :: va)
     | v_s, Binop_vec vb :: va -> (v_s, Binop_vec vb :: va)
-    | v_s, Shuffle_i8_16 vb :: va -> (v_s, Shuffle_i8_16 vb :: va)
     | v_s, Ternop_vec vb :: va -> (v_s, Ternop_vec vb :: va)
     | v_s, Test_vec vb :: va -> (v_s, Test_vec vb :: va)
     | v_s, Shift_vec vb :: va -> (v_s, Shift_vec vb :: va)

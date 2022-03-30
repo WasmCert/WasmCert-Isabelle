@@ -10,8 +10,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | relop:"relop_t_num_agree op t   \<Longrightarrow> \<C> \<turnstile> [Relop t op] : ([T_num t,T_num t] _> [T_num T_i32])"
   \<comment> \<open>\<open>vector ops\<close>\<close>
 | unop_vec:"\<C> \<turnstile> [Unop_vec op]  : ([T_vec T_v128]   _> [T_vec T_v128])"
-| binop_vec:"\<C> \<turnstile> [Binop_vec op]  : ([T_vec T_v128, T_vec T_v128]   _> [T_vec T_v128])"
-| shuffle_vec:"\<lbrakk>length is = 16; list_all (\<lambda>i. i < 32) is\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Shuffle_i8_16 is]  : ([T_vec T_v128, T_vec T_v128]   _> [T_vec T_v128])"
+| binop_vec:"\<lbrakk>binop_vec_wf op\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Binop_vec op]  : ([T_vec T_v128, T_vec T_v128]   _> [T_vec T_v128])"
 | ternop_vec:"\<C> \<turnstile> [Ternop_vec op]  : ([T_vec T_v128, T_vec T_v128, T_vec T_v128]   _> [T_vec T_v128])"
 | test_vec:"\<C> \<turnstile> [Test_vec op]  : ([T_vec T_v128]   _> [T_num T_i32])"
 | shift_vec:"\<C> \<turnstile> [Shift_vec op]  : ([T_vec T_v128, T_num T_i32]   _> [T_vec T_v128])"
@@ -173,8 +172,6 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
   \<comment> \<open>\<open>binary vector ops\<close>\<close>
 | binop_vec_Some:"\<lbrakk>app_binop_vec op v1 v2 = Some v\<rbrakk> \<Longrightarrow> \<lparr>[$C\<^sub>v v1, $C\<^sub>v v2, $(Binop_vec op)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>v v]\<rparr>"
 | binop_vec_None:"\<lbrakk>app_binop_vec op v1 v2 = None\<rbrakk> \<Longrightarrow> \<lparr>[$C\<^sub>v v1, $C\<^sub>v v2, $(Binop_vec op)]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
-  \<comment> \<open>\<open>shuffle vector ops\<close>\<close>
-| shuffle_vec:"\<lparr>[$C\<^sub>v v1, $C\<^sub>v v2, $(Shuffle_i8_16 is)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>v (app_shuffle_vec is v1 v2)]\<rparr>"
   \<comment> \<open>\<open>ternary vector ops\<close>\<close>
 | ternop_vec:"\<lparr>[$C\<^sub>v v1, $C\<^sub>v v2, $C\<^sub>v v3, $(Ternop_vec op)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>v (app_ternop_vec op v1 v2 v3)]\<rparr>"
   \<comment> \<open>\<open>test vector ops\<close>\<close>

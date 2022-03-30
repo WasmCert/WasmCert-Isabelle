@@ -610,7 +610,8 @@ axiomatization where
 (* 1.1 vector ops *)
 code_printing
   type_constructor v128 \<rightharpoonup> (OCaml) "V128Wrapper.t"
-| constant zero_v128_inst.zero_v128  \<rightharpoonup> (OCaml) "V128Wrapper.zero"
+  | constant zero_v128_inst.zero_v128 \<rightharpoonup> (OCaml) "V128Wrapper.zero"
+  | constant binop_vec_wf \<rightharpoonup> (OCaml) "V128Wrapper.binop'_vec'_wf"
 
 consts
   v128_serialise_ocaml_char :: "v128 \<Rightarrow> ocaml_char list"
@@ -640,7 +641,6 @@ code_printing
 consts
   ocaml_app_unop_vec_v :: "unop_vec \<Rightarrow> v128 \<Rightarrow> v128"
   ocaml_app_binop_vec_v :: "binop_vec \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
-  ocaml_app_shuffle_vec_v :: "integer list \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128"
   ocaml_app_ternop_vec_v :: "ternop_vec \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128"
   ocaml_app_test_vec_v :: "testop_vec \<Rightarrow> v128 \<Rightarrow> ocaml_i32"
   ocaml_app_shift_vec_v :: "shiftop_vec \<Rightarrow> v128 \<Rightarrow> ocaml_i32 \<Rightarrow> v128"
@@ -648,7 +648,6 @@ consts
 code_printing
   constant ocaml_app_unop_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.unop'_vec"
 | constant ocaml_app_binop_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.binop'_vec"
-| constant ocaml_app_shuffle_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.shuffle'_vec"
 | constant ocaml_app_ternop_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.ternop'_vec"
 | constant ocaml_app_test_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.test'_vec"
 | constant ocaml_app_shift_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.shift'_vec"
@@ -657,7 +656,6 @@ code_printing
 axiomatization where
   app_unop_vec_v_is[code]: "app_unop_vec_v \<equiv> ocaml_app_unop_vec_v" and
   app_binop_vec_v_is[code]: "app_binop_vec_v \<equiv> ocaml_app_binop_vec_v" and
-  app_shuffle_vec_v_is[code]: "app_shuffle_vec_v is \<equiv> ocaml_app_shuffle_vec_v (map integer_of_nat is)" and
   app_ternop_vec_v_is[code]: "app_ternop_vec_v \<equiv> ocaml_app_ternop_vec_v" and
   app_test_vec_v_is[code]: "app_test_vec_v op1 v \<equiv> ocaml_int32_to_isabelle_int32 (ocaml_app_test_vec_v op1 v)" and
   app_shift_vec_v_is[code]: "app_shift_vec_v op2 v n \<equiv> ocaml_app_shift_vec_v op2 v (isabelle_int32_to_ocaml_int32 n)"

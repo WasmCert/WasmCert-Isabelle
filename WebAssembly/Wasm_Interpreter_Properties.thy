@@ -210,14 +210,6 @@ lemma app_v_s_binop_vec_is:
   apply fastforce
   done
 
-lemma app_v_s_shuffle_vec_is:
-  assumes "app_v_s_shuffle_vec is v_s = (v_s',res)"
-  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Shuffle_i8_16 is]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
-         (res = crash_invalid)"
-  using progress_L0_left[OF reduce.basic[OF reduce_simple.shuffle_vec]] assms
-  unfolding app_v_s_shuffle_vec_def
-  by (auto split: v.splits list.splits)
-
 lemma app_v_s_ternop_vec_is:
   assumes "app_v_s_ternop_vec op v_s = (v_s',res)"
   shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Ternop_vec op]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
@@ -1989,25 +1981,6 @@ proof -
       case b
       thus ?thesis
         using es_frame_contexts_to_config_trap_ctx[OF b(5)] Binop_vec fc_is 0
-        by simp blast
-    qed auto
-  next
-    case (Shuffle_i8_16 "is")
-    consider
-        (a) v_s' where
-              "s' = s"
-              "fcs' = fcs"
-              "fc' = (update_fc_step fc v_s' [])"
-              "res = Step_normal"
-              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Shuffle_i8_16 is]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
-      | (b) "(res = crash_invalid)"
-      using app_v_s_shuffle_vec_is assms Shuffle_i8_16 fc_is
-      by (fastforce split: prod.splits)
-    thus ?thesis
-    proof (cases)
-      case a
-      thus ?thesis
-        using es_frame_contexts_to_config_ctx2[OF a(5)] Shuffle_i8_16 fc_is 0
         by simp blast
     qed auto
   next

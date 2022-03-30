@@ -995,9 +995,6 @@ proof -
     case (Binop_vec op)
     then show ?thesis unfolding unfold_vars_assns by sep_auto
   next
-    case (Shuffle_i8_16 "is")
-    then show ?thesis unfolding unfold_vars_assns by sep_auto
-  next
     case (Ternop_vec op)
     then show ?thesis unfolding unfold_vars_assns by sep_auto
   next

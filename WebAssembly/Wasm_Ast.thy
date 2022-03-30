@@ -280,7 +280,6 @@ datatype \<comment> \<open>basic instructions\<close>
     | Cvtop t_num cvtop t_num "(sat \<times> sx) option"
     | Unop_vec unop_vec
     | Binop_vec binop_vec
-    | Shuffle_i8_16 "i list"
     | Ternop_vec ternop_vec
     | Test_vec testop_vec
     | Shift_vec shiftop_vec

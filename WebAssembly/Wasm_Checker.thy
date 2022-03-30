@@ -94,8 +94,7 @@ foldl_Cons: "foldl f a (x # xs) = foldl f (f a x) xs"
                                                    else Bot)"
   (* vector ops *)
 | check_unop_vec:"check_single \<C> (Unop_vec op) ts = (type_update ts [TSome (T_vec T_v128)] (Type [T_vec T_v128]))"
-| check_binop_vec:"check_single \<C> (Binop_vec op) ts = (type_update ts [TSome (T_vec T_v128), TSome (T_vec T_v128)] (Type [T_vec T_v128]))"
-| check_shuffle_vec:"check_single \<C> (Shuffle_i8_16 is) ts = (if length is = 16 \<and> list_all (\<lambda>i. i < 32) is
+| check_binop_vec:"check_single \<C> (Binop_vec op) ts = (if binop_vec_wf op
                                                                then type_update ts [TSome (T_vec T_v128), TSome (T_vec T_v128)] (Type [T_vec T_v128])
                                                                else Bot)"
 | check_ternop_vec:"check_single \<C> (Ternop_vec op) ts = (type_update ts [TSome (T_vec T_v128), TSome (T_vec T_v128), TSome (T_vec T_v128)] (Type [T_vec T_v128]))"
