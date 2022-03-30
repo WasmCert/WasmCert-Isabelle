@@ -256,7 +256,7 @@ lemma b_e_type_load_lane_vec:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Load_lane_vec svi i a off"
   shows "\<exists>ts'' sec n. ts = ts''@[T_num T_i32, T_vec T_v128] \<and> ts' = ts''@[T_vec T_v128] \<and> length (memory \<C>) \<ge> 1"
-        "i < vec_i_num svi \<and> 2^a < (vec_i_length svi)"
+        "i < vec_i_num svi \<and> 2^a \<le> (vec_i_length svi)"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 

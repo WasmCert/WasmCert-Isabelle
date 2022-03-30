@@ -61,7 +61,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
   \<comment> \<open>\<open>load_vec\<close>\<close>
 | load_vec:"\<lbrakk>length (memory \<C>) \<ge> 1; load_vec_t_bounds lvop a\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Load_vec lvop a off] : ([T_num T_i32] _> [T_vec T_v128])"
   \<comment> \<open>\<open>load_lane_vec\<close>\<close>
-| load_lane_vec:"\<lbrakk>length (memory \<C>) \<ge> 1; i < vec_i_num svi \<and> 2^a < (vec_i_length svi)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Load_lane_vec svi i a off] : ([T_num T_i32, T_vec T_v128] _> [T_vec T_v128])"
+| load_lane_vec:"\<lbrakk>length (memory \<C>) \<ge> 1; i < vec_i_num svi \<and> 2^a \<le> (vec_i_length svi)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Load_lane_vec svi i a off] : ([T_num T_i32, T_vec T_v128] _> [T_vec T_v128])"
   \<comment> \<open>\<open>store_vec\<close>\<close>
 | store_vec:"\<lbrakk>length (memory \<C>) \<ge> 1; store_vec_t_bounds svop a\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Store_vec svop a off] : ([T_num T_i32,T_vec T_v128] _> [])"
   \<comment> \<open>\<open>current_memory\<close>\<close>

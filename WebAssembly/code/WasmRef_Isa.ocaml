@@ -4875,7 +4875,7 @@ and check_single
     | c, Load_lane_vec (svi, i, a, off), ts ->
         (if less_eq_nat one_nata (size_list (memory c)) &&
               (less_nat i (vec_i_num svi) &&
-                less_nat (power power_nat (nat_of_integer (Z.of_int 2)) a)
+                less_eq_nat (power power_nat (nat_of_integer (Z.of_int 2)) a)
                   (vec_i_length svi))
           then type_update ts [TSome (T_num T_i32); TSome (T_vec T_v128)]
                  (Typea [T_vec T_v128])

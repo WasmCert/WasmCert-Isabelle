@@ -192,7 +192,7 @@ foldl_Cons: "foldl f a (x # xs) = foldl f (f a x) xs"
                                                              then type_update ts [TSome (T_num T_i32)] (Type [T_vec T_v128])
                                                              else Bot)"
   (* load_lane_vec *)
-| check_load_lane_vec:"check_single \<C> (Load_lane_vec svi i a off) ts = (if length (memory \<C>) \<ge> 1 \<and> (i < vec_i_num svi \<and> 2^a < (vec_i_length svi))
+| check_load_lane_vec:"check_single \<C> (Load_lane_vec svi i a off) ts = (if length (memory \<C>) \<ge> 1 \<and> (i < vec_i_num svi \<and> 2^a \<le> (vec_i_length svi))
                                                                          then type_update ts [TSome (T_num T_i32), TSome (T_vec T_v128)] (Type [T_vec T_v128])
                                                                          else Bot)"
   (* store_vec *)
