@@ -220,124 +220,11 @@ datatype
 
 (* 1.1: vector ops *)
 
-datatype half_vec = High_vec | Low_vec
-
 datatype shape_vec_i = I8_16 | I16_8 | I32_4 | I64_2
 
 datatype shape_vec_f = F32_4 | F64_2
 
 datatype shape_vec = Svi shape_vec_i | Svf shape_vec_f
-
-datatype unop_vec_v = Not_vec
-
-datatype unop_vec_i = Abs_vec | Neg_vec
-
-datatype unop_vec_f =
-    Abs_vecf
-  | Neg_vecf
-  | Sqrt_vecf
-  | Ceil_vecf
-  | Floor_vecf
-  | Trunc_vecf
-  | Nearest_vecf
-
-datatype cvtop_vec =
-    Extend_i16_8_i8_16 half_vec sx
-  | Extend_i32_4_i16_8 half_vec sx
-  | Extend_i64_8_i32_4 half_vec sx
-  | Trunc_sat_i32_4_f_32_4 sx
-  | Trunc_sat_i32_4_f_64_2_zero sx
-  | Convert_f32_4_i32_4 sx
-  | Demote_f32_4_f64_2_zero
-  | Convert_low_f64_2_i32_4 sx
-  | Promote_low_f64_2_f32_4
-
-datatype
-  unop_vec =
-    Unop_vec_v unop_vec_v
-  | Unop_vec_i unop_vec_i shape_vec_i
-  | Unop_vec_f unop_vec_f shape_vec_f
-  | Cvt_vec cvtop_vec
-  | Popcnt_i8_16
-  | Extadd_pairwise_i16_8_i8_16 sx
-  | Extadd_pairwise_i32_4_i16_8 sx
-
-datatype
-  binop_vec_v = And_vec | Andnot_vec | Or_vec | Xor_vec
-
-datatype
-  binop_vec_i = Add_vec | Sub_vec
-
-datatype
-  binop_vec_f =
-    Add_vecf
-  | Sub_vecf
-  | Mul_vecf
-  | Div_vecf
-  | Min_vecf
-  | Max_vecf
-  | Pmin_vecf
-  | Pmax_vecf
-
-datatype
-  minmaxop_vec_i = Min_vec sx | Max_vec sx
-
-datatype
-  satop_vec_i = Add_sat_vec sx | Sub_sat_vec sx
-
-datatype
-  relop_vec_i = Eq_vec | Ne_vec | Lt_vec sx | Gt_vec sx | Le_vec sx | Ge_vec sx
-
-datatype
-  relop_vec_f = Eq_vecf | Ne_vecf | Lt_vecf | Gt_vecf | Le_vecf | Ge_vecf
-
-datatype
-  binop_vec =
-    Binop_vec_v binop_vec_v
-  | Swizzle_i8_16
-  | Binop_vec_i binop_vec_i shape_vec_i
-  | Binop_vec_f binop_vec_f shape_vec_f
-  | Minmaxop_i8_16 minmaxop_vec_i
-  | Minmaxop_i16_8 minmaxop_vec_i
-  | Minmaxop_i32_4 minmaxop_vec_i
-  | Satop_i8_16 satop_vec_i
-  | Satop_i16_8 satop_vec_i
-  | Mul_i16_8
-  | Mul_i32_4
-  | Mul_i64_2
-  | Avgr_u_i8_16
-  | Avgr_u_i16_8
-  | Q15mulr_sat_s_i16_8
-  | Relop_i8_16 relop_vec_i
-  | Relop_i16_8 relop_vec_i
-  | Relop_i32_4 relop_vec_i
-  | Relop_i64_2_eq
-  | Relop_i64_2_ne
-  | Relop_i64_2_lt_s
-  | Relop_i64_2_gt_s
-  | Relop_i64_2_le_s
-  | Relop_i64_2_ge_s
-  | Relop_vec_f relop_vec_f shape_vec_f
-  | Narrow_i8_16_i16_8 sx
-  | Narrow_i16_8_i32_4 sx
-  | Dot_s_i32_4_i16_8
-  | Extmul_i16_8_i8_16 half_vec sx
-  | Extmul_i32_4_i16_8 half_vec sx
-  | Extmul_i64_2_i32_4 half_vec sx
-
-datatype
-  ternop_vec = Bitselect_vec
-
-datatype
-  testop_vec =
-    Any_true_vec
-  | All_true_vec shape_vec_i
-  | Bitmask_vec shape_vec_i
-
-datatype
-  shiftop_vec =
-    Shl_vec shape_vec_i
-  | Shr_vec shape_vec_i sx
 
 datatype
   loadop_vec =
@@ -351,6 +238,12 @@ datatype
   storeop_vec =
     Store_128
   | Store_lane shape_vec_i i
+
+typedecl unop_vec
+typedecl binop_vec
+typedecl ternop_vec
+typedecl testop_vec
+typedecl shiftop_vec
 
 datatype \<comment> \<open>basic instructions\<close>
   b_e =

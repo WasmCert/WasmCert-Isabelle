@@ -856,33 +856,6 @@ module WasmRef_Isa : sig
   val countable_unit : unit countable
   val typerep_unit : unit typerep
   val heap_unit : unit heap
-  type minmaxop_vec_i = Min_vec of sx | Max_vec of sx
-  type shape_vec_i = I8_16 | I16_8 | I32_4 | I64_2
-  type shape_vec_f = F32_4 | F64_2
-  type satop_vec_i = Add_sat_vec of sx | Sub_sat_vec of sx
-  type relop_vec_i = Eq_vec | Ne_vec | Lt_vec of sx | Gt_vec of sx |
-    Le_vec of sx | Ge_vec of sx
-  type relop_vec_f = Eq_vecf | Ne_vecf | Lt_vecf | Gt_vecf | Le_vecf | Ge_vecf
-  type binop_vec_v = And_vec | Andnot_vec | Or_vec | Xor_vec
-  type binop_vec_i = Add_vec | Sub_vec
-  type binop_vec_f = Add_vecf | Sub_vecf | Mul_vecf | Div_vecf | Min_vecf |
-    Max_vecf | Pmin_vecf | Pmax_vecf
-  type half_vec = High_vec | Low_vec
-  type binop_vec = Binop_vec_v of binop_vec_v | Swizzle_i8_16 |
-    Binop_vec_i of binop_vec_i * shape_vec_i |
-    Binop_vec_f of binop_vec_f * shape_vec_f | Minmaxop_i8_16 of minmaxop_vec_i
-    | Minmaxop_i16_8 of minmaxop_vec_i | Minmaxop_i32_4 of minmaxop_vec_i |
-    Satop_i8_16 of satop_vec_i | Satop_i16_8 of satop_vec_i | Mul_i16_8 |
-    Mul_i32_4 | Mul_i64_2 | Avgr_u_i8_16 | Avgr_u_i16_8 | Q15mulr_sat_s_i16_8 |
-    Relop_i8_16 of relop_vec_i | Relop_i16_8 of relop_vec_i |
-    Relop_i32_4 of relop_vec_i | Relop_i64_2_eq | Relop_i64_2_ne |
-    Relop_i64_2_lt_s | Relop_i64_2_gt_s | Relop_i64_2_le_s | Relop_i64_2_ge_s |
-    Relop_vec_f of relop_vec_f * shape_vec_f | Narrow_i8_16_i16_8 of sx |
-    Narrow_i16_8_i32_4 of sx | Dot_s_i32_4_i16_8 |
-    Extmul_i16_8_i8_16 of half_vec * sx | Extmul_i32_4_i16_8 of half_vec * sx |
-    Extmul_i64_2_i32_4 of half_vec * sx
-  val typerep_binop_veca : binop_vec itself -> typerepa
-  val typerep_binop_vec : binop_vec typerep
   val typerep_byte_arraya : Bytes.t itself -> typerepa
   val countable_byte_array : Bytes.t countable
   val typerep_byte_array : Bytes.t typerep
@@ -894,28 +867,13 @@ module WasmRef_Isa : sig
   val heap_global_ext : 'a heap -> 'a global_ext heap
   type 'a inst_m_ext =
     Inst_m_ext of tf array * nat array * nat array * nat array * nat array * 'a
+  type shape_vec_i = I8_16 | I16_8 | I32_4 | I64_2
   type storeop_vec = Store_128 | Store_lane of shape_vec_i * nat
-  type shiftop_vec = Shl_vec of shape_vec_i | Shr_vec of shape_vec_i * sx
-  type testop_vec = Any_true_vec | All_true_vec of shape_vec_i |
-    Bitmask_vec of shape_vec_i
-  type ternop_vec = Bitselect_vec
   type tp_vec = Tp_v8_8 | Tp_v16_4 | Tp_v32_2
   type loadop_vec = Load_128 | Load_packed_vec of tp_vec * sx | Load_32_zero |
     Load_64_zero | Load_splat of shape_vec_i
+  type shape_vec_f = F32_4 | F64_2
   type shape_vec = Svi of shape_vec_i | Svf of shape_vec_f
-  type unop_vec_v = Not_vec
-  type unop_vec_i = Abs_vec | Neg_vec
-  type unop_vec_f = Abs_vecf | Neg_vecf | Sqrt_vecf | Ceil_vecf | Floor_vecf |
-    Trunc_vecf | Nearest_vecf
-  type cvtop_vec = Extend_i16_8_i8_16 of half_vec * sx |
-    Extend_i32_4_i16_8 of half_vec * sx | Extend_i64_8_i32_4 of half_vec * sx |
-    Trunc_sat_i32_4_f_32_4 of sx | Trunc_sat_i32_4_f_64_2_zero of sx |
-    Convert_f32_4_i32_4 of sx | Demote_f32_4_f64_2_zero |
-    Convert_low_f64_2_i32_4 of sx | Promote_low_f64_2_f32_4
-  type unop_vec = Unop_vec_v of unop_vec_v |
-    Unop_vec_i of unop_vec_i * shape_vec_i |
-    Unop_vec_f of unop_vec_f * shape_vec_f | Cvt_vec of cvtop_vec | Popcnt_i8_16
-    | Extadd_pairwise_i16_8_i8_16 of sx | Extadd_pairwise_i32_4_i16_8 of sx
   type tp_num = Tp_i8 | Tp_i16 | Tp_i32
   type testop = Eqz
   type relop_i = Eq | Ne | Lt of sx | Gt of sx | Le of sx | Ge of sx
@@ -937,11 +895,12 @@ module WasmRef_Isa : sig
     Store_vec of storeop_vec * nat * nat | Current_memory | Grow_memory |
     EConst of v | Unop of t_num * unop | Binop of t_num * binop |
     Testop of t_num * testop | Relop of t_num * relop |
-    Cvtop of t_num * cvtop * t_num * (sat * sx) option | Unop_vec of unop_vec |
-    Binop_vec of binop_vec | Shuffle_i8_16 of nat list |
-    Ternop_vec of ternop_vec | Test_vec of testop_vec | Shift_vec of shiftop_vec
-    | Splat_vec of shape_vec | Extract_vec of shape_vec * sx * nat |
-    Replace_vec of shape_vec * nat
+    Cvtop of t_num * cvtop * t_num * (sat * sx) option |
+    Unop_vec of V128Wrapper.unop_vec_t | Binop_vec of V128Wrapper.binop_vec_t |
+    Shuffle_i8_16 of nat list | Ternop_vec of V128Wrapper.ternop_vec_t |
+    Test_vec of V128Wrapper.testop_vec_t |
+    Shift_vec of V128Wrapper.shiftop_vec_t | Splat_vec of shape_vec |
+    Extract_vec of shape_vec * sx * nat | Replace_vec of shape_vec * nat
   type cl_m = Func_native of unit inst_m_ext * tf * t list * b_e list |
     Func_host of tf * host
   and 'a s_m_ext =
@@ -1176,7 +1135,6 @@ module WasmRef_Isa : sig
   val eq_i_i : 'a equal -> 'a -> 'a -> unit pred
   val fold_map : ('a -> (unit -> 'b)) -> 'a list -> (unit -> ('b list))
   val list_all2 : ('a -> 'b -> bool) -> 'a list -> 'b list -> bool
-  val sx_b : sx -> bool
   val byte_of_nat : nat -> uint8
   val nat_of_byte : uint8 -> nat
   val uminus_word : 'a len -> 'a word -> 'a word
@@ -1256,54 +1214,25 @@ module WasmRef_Isa : sig
   val len_byte_array : Bytes.t -> (unit -> nat)
   val app_testop_i : 'a wasm_int -> testop -> 'a -> bool
   val app_testop : testop -> v_num -> v_num
-  val half_vec_b : half_vec -> bool
   val blit_byte_array :
     Bytes.t -> nat -> Bytes.t -> nat -> nat -> (unit -> unit)
   val load_uint8_list : Bytes.t -> nat -> nat -> (unit -> (uint8 list))
   val store_uint8_list : Bytes.t -> nat -> uint8 list -> (unit -> unit)
-  val ocaml_app_test_vec_v : testop_vec -> V128Wrapper.t -> i32
-  val app_test_vec_v : testop_vec -> V128Wrapper.t -> i32
-  val app_test_vec : testop_vec -> v_vec -> i32
-  val ocaml_app_unop_vec_v_v : unop_vec_v -> V128Wrapper.t -> V128Wrapper.t
-  val ocaml_app_unop_vec_i_v :
-    unop_vec_i -> shape_vec_i -> V128Wrapper.t -> V128Wrapper.t
-  val ocaml_app_unop_vec_f_v :
-    unop_vec_f -> shape_vec_f -> V128Wrapper.t -> V128Wrapper.t
-  val ocaml_app_cvt_vec_v : cvtop_vec -> V128Wrapper.t -> V128Wrapper.t
-  val ocaml_app_unop_vec_v : unop_vec -> V128Wrapper.t -> V128Wrapper.t
-  val app_unop_vec_v : unop_vec -> V128Wrapper.t -> V128Wrapper.t
-  val app_unop_vec : unop_vec -> v_vec -> v_vec
+  val app_test_vec_v : V128Wrapper.testop_vec_t -> V128Wrapper.t -> i32
+  val app_test_vec : V128Wrapper.testop_vec_t -> v_vec -> i32
+  val app_unop_vec_v : V128Wrapper.unop_vec_t -> V128Wrapper.t -> V128Wrapper.t
+  val app_unop_vec : V128Wrapper.unop_vec_t -> v_vec -> v_vec
   val crash_invalid : res_step
   val app_v_s_if :
     tf -> b_e list -> b_e list -> v list -> v list * (e list * res_step)
   val g_val_update : (v -> v) -> 'a global_ext -> 'a global_ext
-  val ocaml_app_minmax_vec_i_v :
-    minmaxop_vec_i ->
-      shape_vec_i -> V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t option
-  val ocaml_app_satop_vec_i_v :
-    satop_vec_i ->
-      shape_vec_i -> V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t option
-  val ocaml_app_relop_vec_i_v :
-    relop_vec_i ->
-      shape_vec_i -> V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t option
-  val ocaml_app_relop_vec_f_v :
-    relop_vec_f ->
-      shape_vec_f -> V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t option
-  val ocaml_app_binop_vec_i_v :
-    binop_vec_i ->
-      shape_vec_i -> V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t option
-  val ocaml_app_binop_vec_f_v :
-    binop_vec_f ->
-      shape_vec_f -> V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t option
-  val ocaml_app_binop_vec_v :
-    binop_vec -> V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t option
   val app_binop_vec_v :
-    binop_vec -> V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t option
-  val app_binop_vec : binop_vec -> v_vec -> v_vec -> v_vec option
-  val ocaml_app_shift_vec_v :
-    shiftop_vec -> V128Wrapper.t -> i32 -> V128Wrapper.t
-  val app_shift_vec_v : shiftop_vec -> V128Wrapper.t -> i32 -> V128Wrapper.t
-  val app_shift_vec : shiftop_vec -> v_vec -> i32 -> v_vec
+    V128Wrapper.binop_vec_t ->
+      V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t option
+  val app_binop_vec : V128Wrapper.binop_vec_t -> v_vec -> v_vec -> v_vec option
+  val app_shift_vec_v :
+    V128Wrapper.shiftop_vec_t -> V128Wrapper.t -> i32 -> V128Wrapper.t
+  val app_shift_vec : V128Wrapper.shiftop_vec_t -> v_vec -> i32 -> v_vec
   val v128_deserialise_isabelle_bytes : uint8 list -> V128Wrapper.t
   val deserialise_v128 : uint8 list -> V128Wrapper.t
   val app_splat_vec : shape_vec -> v_num -> v_vec
@@ -1467,8 +1396,6 @@ module WasmRef_Isa : sig
     nat -> v array -> v list -> (unit -> (v list * res_step))
   val update_redex_step : redex -> v list -> e list -> redex
   val update_fc_step_m : frame_context_m -> v list -> e list -> frame_context_m
-  val ocaml_app_shuffle_vec_v :
-    nat list -> V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t
   val app_shuffle_vec_v :
     nat list -> V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t
   val app_shuffle_vec : nat list -> v_vec -> v_vec -> v_vec
@@ -1479,20 +1406,20 @@ module WasmRef_Isa : sig
   val app_v_s_extract_vec :
     shape_vec -> sx -> nat -> v list -> v list * res_step
   val app_f_call_m : nat -> unit inst_m_ext -> (unit -> (e list * res_step))
-  val ocaml_app_ternop_vec_v :
-    ternop_vec ->
-      V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t
   val app_ternop_vec_v :
-    ternop_vec ->
+    V128Wrapper.ternop_vec_t ->
       V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t -> V128Wrapper.t
-  val app_ternop_vec : ternop_vec -> v_vec -> v_vec -> v_vec -> v_vec
-  val app_v_s_ternop_vec : ternop_vec -> v list -> v list * res_step
+  val app_ternop_vec :
+    V128Wrapper.ternop_vec_t -> v_vec -> v_vec -> v_vec -> v_vec
+  val app_v_s_ternop_vec :
+    V128Wrapper.ternop_vec_t -> v list -> v list * res_step
   val app_v_s_tee_local : nat -> v list -> v list * (e list * res_step)
   val app_v_s_splat_vec : shape_vec -> v list -> v list * res_step
-  val app_v_s_shift_vec : shiftop_vec -> v list -> v list * res_step
-  val app_v_s_binop_vec : binop_vec -> v list -> v list * res_step
-  val app_v_s_unop_vec : unop_vec -> v list -> v list * res_step
-  val app_v_s_test_vec : testop_vec -> v list -> v list * res_step
+  val app_v_s_shift_vec :
+    V128Wrapper.shiftop_vec_t -> v list -> v list * res_step
+  val app_v_s_binop_vec : V128Wrapper.binop_vec_t -> v list -> v list * res_step
+  val app_v_s_unop_vec : V128Wrapper.unop_vec_t -> v list -> v list * res_step
+  val app_v_s_test_vec : V128Wrapper.testop_vec_t -> v list -> v list * res_step
   val app_v_s_br_table :
     nat list -> nat -> v list -> v list * (e list * res_step)
   val crash_invariant : res_step
@@ -3886,46 +3813,6 @@ let typerep_unit = ({typerep = typerep_unita} : unit typerep);;
 let heap_unit =
   ({countable_heap = countable_unit; typerep_heap = typerep_unit} : unit heap);;
 
-type minmaxop_vec_i = Min_vec of sx | Max_vec of sx;;
-
-type shape_vec_i = I8_16 | I16_8 | I32_4 | I64_2;;
-
-type shape_vec_f = F32_4 | F64_2;;
-
-type satop_vec_i = Add_sat_vec of sx | Sub_sat_vec of sx;;
-
-type relop_vec_i = Eq_vec | Ne_vec | Lt_vec of sx | Gt_vec of sx | Le_vec of sx
-  | Ge_vec of sx;;
-
-type relop_vec_f = Eq_vecf | Ne_vecf | Lt_vecf | Gt_vecf | Le_vecf | Ge_vecf;;
-
-type binop_vec_v = And_vec | Andnot_vec | Or_vec | Xor_vec;;
-
-type binop_vec_i = Add_vec | Sub_vec;;
-
-type binop_vec_f = Add_vecf | Sub_vecf | Mul_vecf | Div_vecf | Min_vecf |
-  Max_vecf | Pmin_vecf | Pmax_vecf;;
-
-type half_vec = High_vec | Low_vec;;
-
-type binop_vec = Binop_vec_v of binop_vec_v | Swizzle_i8_16 |
-  Binop_vec_i of binop_vec_i * shape_vec_i |
-  Binop_vec_f of binop_vec_f * shape_vec_f | Minmaxop_i8_16 of minmaxop_vec_i |
-  Minmaxop_i16_8 of minmaxop_vec_i | Minmaxop_i32_4 of minmaxop_vec_i |
-  Satop_i8_16 of satop_vec_i | Satop_i16_8 of satop_vec_i | Mul_i16_8 |
-  Mul_i32_4 | Mul_i64_2 | Avgr_u_i8_16 | Avgr_u_i16_8 | Q15mulr_sat_s_i16_8 |
-  Relop_i8_16 of relop_vec_i | Relop_i16_8 of relop_vec_i |
-  Relop_i32_4 of relop_vec_i | Relop_i64_2_eq | Relop_i64_2_ne |
-  Relop_i64_2_lt_s | Relop_i64_2_gt_s | Relop_i64_2_le_s | Relop_i64_2_ge_s |
-  Relop_vec_f of relop_vec_f * shape_vec_f | Narrow_i8_16_i16_8 of sx |
-  Narrow_i16_8_i32_4 of sx | Dot_s_i32_4_i16_8 |
-  Extmul_i16_8_i8_16 of half_vec * sx | Extmul_i32_4_i16_8 of half_vec * sx |
-  Extmul_i64_2_i32_4 of half_vec * sx;;
-
-let rec typerep_binop_veca t = Typerep ("Wasm_Ast.binop_vec", []);;
-
-let typerep_binop_vec = ({typerep = typerep_binop_veca} : binop_vec typerep);;
-
 let rec typerep_byte_arraya t = Typerep ("Byte_Array.byte_array", []);;
 
 let countable_byte_array = (() : Bytes.t countable);;
@@ -3954,39 +3841,18 @@ let rec heap_global_ext _A =
 type 'a inst_m_ext =
   Inst_m_ext of tf array * nat array * nat array * nat array * nat array * 'a;;
 
+type shape_vec_i = I8_16 | I16_8 | I32_4 | I64_2;;
+
 type storeop_vec = Store_128 | Store_lane of shape_vec_i * nat;;
-
-type shiftop_vec = Shl_vec of shape_vec_i | Shr_vec of shape_vec_i * sx;;
-
-type testop_vec = Any_true_vec | All_true_vec of shape_vec_i |
-  Bitmask_vec of shape_vec_i;;
-
-type ternop_vec = Bitselect_vec;;
 
 type tp_vec = Tp_v8_8 | Tp_v16_4 | Tp_v32_2;;
 
 type loadop_vec = Load_128 | Load_packed_vec of tp_vec * sx | Load_32_zero |
   Load_64_zero | Load_splat of shape_vec_i;;
 
+type shape_vec_f = F32_4 | F64_2;;
+
 type shape_vec = Svi of shape_vec_i | Svf of shape_vec_f;;
-
-type unop_vec_v = Not_vec;;
-
-type unop_vec_i = Abs_vec | Neg_vec;;
-
-type unop_vec_f = Abs_vecf | Neg_vecf | Sqrt_vecf | Ceil_vecf | Floor_vecf |
-  Trunc_vecf | Nearest_vecf;;
-
-type cvtop_vec = Extend_i16_8_i8_16 of half_vec * sx |
-  Extend_i32_4_i16_8 of half_vec * sx | Extend_i64_8_i32_4 of half_vec * sx |
-  Trunc_sat_i32_4_f_32_4 of sx | Trunc_sat_i32_4_f_64_2_zero of sx |
-  Convert_f32_4_i32_4 of sx | Demote_f32_4_f64_2_zero |
-  Convert_low_f64_2_i32_4 of sx | Promote_low_f64_2_f32_4;;
-
-type unop_vec = Unop_vec_v of unop_vec_v |
-  Unop_vec_i of unop_vec_i * shape_vec_i |
-  Unop_vec_f of unop_vec_f * shape_vec_f | Cvt_vec of cvtop_vec | Popcnt_i8_16 |
-  Extadd_pairwise_i16_8_i8_16 of sx | Extadd_pairwise_i32_4_i16_8 of sx;;
 
 type tp_num = Tp_i8 | Tp_i16 | Tp_i32;;
 
@@ -4018,10 +3884,12 @@ type b_e = Unreachable | Nop | Drop | Select | Block of tf * b_e list |
   Store_vec of storeop_vec * nat * nat | Current_memory | Grow_memory |
   EConst of v | Unop of t_num * unop | Binop of t_num * binop |
   Testop of t_num * testop | Relop of t_num * relop |
-  Cvtop of t_num * cvtop * t_num * (sat * sx) option | Unop_vec of unop_vec |
-  Binop_vec of binop_vec | Shuffle_i8_16 of nat list | Ternop_vec of ternop_vec
-  | Test_vec of testop_vec | Shift_vec of shiftop_vec | Splat_vec of shape_vec |
-  Extract_vec of shape_vec * sx * nat | Replace_vec of shape_vec * nat;;
+  Cvtop of t_num * cvtop * t_num * (sat * sx) option |
+  Unop_vec of V128Wrapper.unop_vec_t | Binop_vec of V128Wrapper.binop_vec_t |
+  Shuffle_i8_16 of nat list | Ternop_vec of V128Wrapper.ternop_vec_t |
+  Test_vec of V128Wrapper.testop_vec_t | Shift_vec of V128Wrapper.shiftop_vec_t
+  | Splat_vec of shape_vec | Extract_vec of shape_vec * sx * nat |
+  Replace_vec of shape_vec * nat;;
 
 type cl_m = Func_native of unit inst_m_ext * tf * t list * b_e list |
   Func_host of tf * host
@@ -5052,8 +4920,6 @@ let rec list_all2
     | p, xs, [] -> null xs
     | p, [], ys -> null ys;;
 
-let rec sx_b sx = (match sx with S -> true | U -> false);;
-
 let rec byte_of_nat x = uint8_of_nat x;;
 
 let rec nat_of_byte x = nat_of_uint8 x;;
@@ -5539,8 +5405,6 @@ let rec app_testop
       | ConstFloat32 _ -> ConstInt32 zero_i32a
       | ConstFloat64 _ -> ConstInt32 zero_i32a);;
 
-let rec half_vec_b h = (match h with High_vec -> true | Low_vec -> false);;
-
 let rec blit_byte_array
   baa sn ba dn ln =
     (fun () -> 
@@ -5562,80 +5426,12 @@ let rec store_uint8_list
         (fun () ->
           (let _ = store_uint8 a n b () in store_uint8_list a (suc n) bs ()));;
 
-let rec ocaml_app_test_vec_v
-  op v1 =
-    (match op with Any_true_vec -> wasm_bool (V128Wrapper.any_true_vec v1)
-      | All_true_vec svi ->
-        wasm_bool
-          (V128Wrapper.all_true_vec (integer_of_nat (vec_i_length svi)) v1)
-      | Bitmask_vec svi ->
-        ocaml_int32_to_isabelle_int32
-          (V128Wrapper.bitmask_vec (integer_of_nat (vec_i_length svi)) v1));;
-
-let rec app_test_vec_v x = ocaml_app_test_vec_v x;;
+let rec app_test_vec_v
+  op1 v = ocaml_int32_to_isabelle_int32 (V128Wrapper.shiftop_vec op1 v);;
 
 let rec app_test_vec op v1 = (let ConstVec128 a = v1 in app_test_vec_v op a);;
 
-let rec ocaml_app_unop_vec_v_v
-  op v = (let Not_vec = op in V128Wrapper.not_vec_v v);;
-
-let rec ocaml_app_unop_vec_i_v
-  op svi v =
-    (let n = integer_of_nat (vec_i_length svi) in
-      (match op with Abs_vec -> V128Wrapper.abs_vec_i n v
-        | Neg_vec -> V128Wrapper.neg_vec_i n v));;
-
-let rec ocaml_app_unop_vec_f_v
-  op svf v =
-    (let n = integer_of_nat (vec_f_length svf) in
-      (match op with Abs_vecf -> V128Wrapper.abs_vec_f n v
-        | Neg_vecf -> V128Wrapper.neg_vec_f n v
-        | Sqrt_vecf -> V128Wrapper.sqrt_vec_f n v
-        | Ceil_vecf -> V128Wrapper.ceil_vec_f n v
-        | Floor_vecf -> V128Wrapper.floor_vec_f n v
-        | Trunc_vecf -> V128Wrapper.trunc_vec_f n v
-        | Nearest_vecf -> V128Wrapper.nearest_vec_f n v));;
-
-let rec ocaml_app_cvt_vec_v
-  op v =
-    (match op
-      with Extend_i16_8_i8_16 (h, sx) ->
-        V128Wrapper.cvt_extend_vec (Z.of_int 2) (Z.of_int 1) (half_vec_b h)
-          (sx_b sx) v
-      | Extend_i32_4_i16_8 (h, sx) ->
-        V128Wrapper.cvt_extend_vec (Z.of_int 4) (Z.of_int 2) (half_vec_b h)
-          (sx_b sx) v
-      | Extend_i64_8_i32_4 (h, sx) ->
-        V128Wrapper.cvt_extend_vec (Z.of_int 8) (Z.of_int 4) (half_vec_b h)
-          (sx_b sx) v
-      | Trunc_sat_i32_4_f_32_4 sx ->
-        V128Wrapper.cvt_trunc_sat_vec_i_f (Z.of_int 4) (Z.of_int 4) (sx_b sx) v
-      | Trunc_sat_i32_4_f_64_2_zero sx ->
-        V128Wrapper.cvt_trunc_sat_zero_vec_i_f (Z.of_int 4) (Z.of_int 8)
-          (sx_b sx) v
-      | Convert_f32_4_i32_4 sx ->
-        V128Wrapper.cvt_convert_vec_f_i (Z.of_int 4) (Z.of_int 4) (sx_b sx) v
-      | Demote_f32_4_f64_2_zero ->
-        V128Wrapper.cvt_demote_vec_f_f (Z.of_int 4) (Z.of_int 8) v
-      | Convert_low_f64_2_i32_4 sx ->
-        V128Wrapper.cvt_convert_low_vec_f_i (Z.of_int 8) (Z.of_int 4) (sx_b sx)
-          v
-      | Promote_low_f64_2_f32_4 ->
-        V128Wrapper.cvt_promote_low_vec_f_f (Z.of_int 8) (Z.of_int 4) v);;
-
-let rec ocaml_app_unop_vec_v
-  uop v =
-    (match uop with Unop_vec_v op -> ocaml_app_unop_vec_v_v op v
-      | Unop_vec_i (op, sv) -> ocaml_app_unop_vec_i_v op sv v
-      | Unop_vec_f (op, sv) -> ocaml_app_unop_vec_f_v op sv v
-      | Cvt_vec op -> ocaml_app_cvt_vec_v op v
-      | Popcnt_i8_16 -> V128Wrapper.popcnt_vec (Z.of_int 1) v
-      | Extadd_pairwise_i16_8_i8_16 sx ->
-        V128Wrapper.extadd_pairwise (Z.of_int 2) (sx_b sx) v
-      | Extadd_pairwise_i32_4_i16_8 sx ->
-        V128Wrapper.extadd_pairwise (Z.of_int 4) (sx_b sx) v);;
-
-let rec app_unop_vec_v x = ocaml_app_unop_vec_v x;;
+let rec app_unop_vec_v x = V128Wrapper.unop_vec x;;
 
 let rec app_unop_vec
   uop v1 = (let ConstVec128 c = v1 in ConstVec128 (app_unop_vec_v uop c));;
@@ -5659,116 +5455,15 @@ let rec g_val_update
   g_vala (Global_ext (g_mut, g_val, more)) =
     Global_ext (g_mut, g_vala g_val, more);;
 
-let rec ocaml_app_minmax_vec_i_v
-  op svi v1 v2 =
-    (let i = integer_of_nat (vec_i_length svi) in
-      (match op with Min_vec sx -> V128Wrapper.min_vec i (sx_b sx) v1 v2
-        | Max_vec sx -> V128Wrapper.max_vec i (sx_b sx) v1 v2));;
-
-let rec ocaml_app_satop_vec_i_v
-  op svi v1 v2 =
-    (let i = integer_of_nat (vec_i_length svi) in
-      (match op with Add_sat_vec sx -> V128Wrapper.add_sat_vec i (sx_b sx) v1 v2
-        | Sub_sat_vec sx -> V128Wrapper.sub_sat_vec i (sx_b sx) v1 v2));;
-
-let rec ocaml_app_relop_vec_i_v
-  op svi v1 v2 =
-    (let i = integer_of_nat (vec_i_length svi) in
-      (match op with Eq_vec -> V128Wrapper.eq_vec_i i v1 v2
-        | Ne_vec -> V128Wrapper.ne_vec_i i v1 v2
-        | Lt_vec sx -> V128Wrapper.lt_vec_i i (sx_b sx) v1 v2
-        | Gt_vec sx -> V128Wrapper.gt_vec_i i (sx_b sx) v1 v2
-        | Le_vec sx -> V128Wrapper.le_vec_i i (sx_b sx) v1 v2
-        | Ge_vec sx -> V128Wrapper.ge_vec_i i (sx_b sx) v1 v2));;
-
-let rec ocaml_app_relop_vec_f_v
-  op svf v1 v2 =
-    (let i = integer_of_nat (vec_f_length svf) in
-      (match op with Eq_vecf -> V128Wrapper.eq_vec_f i v1 v2
-        | Ne_vecf -> V128Wrapper.ne_vec_f i v1 v2
-        | Lt_vecf -> V128Wrapper.lt_vec_f i v1 v2
-        | Gt_vecf -> V128Wrapper.gt_vec_f i v1 v2
-        | Le_vecf -> V128Wrapper.le_vec_f i v1 v2
-        | Ge_vecf -> V128Wrapper.ge_vec_f i v1 v2));;
-
-let rec ocaml_app_binop_vec_i_v
-  op svi v1 v2 =
-    (let i = integer_of_nat (vec_i_length svi) in
-      (match op with Add_vec -> V128Wrapper.add_vec_i i v1 v2
-        | Sub_vec -> V128Wrapper.sub_vec_i i v1 v2));;
-
-let rec ocaml_app_binop_vec_f_v
-  op svf v1 v2 =
-    (let i = integer_of_nat (vec_f_length svf) in
-      (match op with Add_vecf -> V128Wrapper.add_vec_f i v1 v2
-        | Sub_vecf -> V128Wrapper.sub_vec_f i v1 v2
-        | Mul_vecf -> V128Wrapper.mul_vec_f i v1 v2
-        | Div_vecf -> V128Wrapper.div_vec_f i v1 v2
-        | Min_vecf -> V128Wrapper.min_vec_f i v1 v2
-        | Max_vecf -> V128Wrapper.max_vec_f i v1 v2
-        | Pmin_vecf -> V128Wrapper.pmin_vec_f i v1 v2
-        | Pmax_vecf -> V128Wrapper.pmax_vec_f i v1 v2));;
-
-let rec ocaml_app_binop_vec_v
-  bop v1 v2 =
-    (match bop with Swizzle_i8_16 -> V128Wrapper.swizzle_vec v1 v2
-      | Binop_vec_i (op, svi) -> ocaml_app_binop_vec_i_v op svi v1 v2
-      | Binop_vec_f (op, svf) -> ocaml_app_binop_vec_f_v op svf v1 v2
-      | Minmaxop_i8_16 op -> ocaml_app_minmax_vec_i_v op I8_16 v1 v2
-      | Minmaxop_i16_8 op -> ocaml_app_minmax_vec_i_v op I16_8 v1 v2
-      | Minmaxop_i32_4 op -> ocaml_app_minmax_vec_i_v op I32_4 v1 v2
-      | Satop_i8_16 op -> ocaml_app_satop_vec_i_v op I8_16 v1 v2
-      | Satop_i16_8 op -> ocaml_app_satop_vec_i_v op I16_8 v1 v2
-      | Mul_i16_8 -> V128Wrapper.mul_vec (Z.of_int 2) v1 v2
-      | Mul_i32_4 -> V128Wrapper.mul_vec (Z.of_int 4) v1 v2
-      | Mul_i64_2 -> V128Wrapper.mul_vec (Z.of_int 8) v1 v2
-      | Avgr_u_i8_16 -> V128Wrapper.avgr_u_vec (Z.of_int 1) v1 v2
-      | Avgr_u_i16_8 -> V128Wrapper.avgr_u_vec (Z.of_int 2) v1 v2
-      | Q15mulr_sat_s_i16_8 -> V128Wrapper.q15_mulr_sat_s_vec v1 v2
-      | Relop_i8_16 op -> ocaml_app_relop_vec_i_v op I8_16 v1 v2
-      | Relop_i16_8 op -> ocaml_app_relop_vec_i_v op I16_8 v1 v2
-      | Relop_i32_4 op -> ocaml_app_relop_vec_i_v op I32_4 v1 v2
-      | Relop_i64_2_eq -> ocaml_app_relop_vec_i_v Eq_vec I64_2 v1 v2
-      | Relop_i64_2_ne -> ocaml_app_relop_vec_i_v Ne_vec I64_2 v1 v2
-      | Relop_i64_2_lt_s -> ocaml_app_relop_vec_i_v (Lt_vec S) I64_2 v1 v2
-      | Relop_i64_2_gt_s -> ocaml_app_relop_vec_i_v (Gt_vec S) I64_2 v1 v2
-      | Relop_i64_2_le_s -> ocaml_app_relop_vec_i_v (Le_vec S) I64_2 v1 v2
-      | Relop_i64_2_ge_s -> ocaml_app_relop_vec_i_v (Ge_vec S) I64_2 v1 v2
-      | Relop_vec_f (op, svf) -> ocaml_app_relop_vec_f_v op svf v1 v2
-      | Narrow_i8_16_i16_8 sx ->
-        V128Wrapper.narrow_vec (Z.of_int 1) (Z.of_int 2) (sx_b sx) v1 v2
-      | Narrow_i16_8_i32_4 sx ->
-        V128Wrapper.narrow_vec (Z.of_int 2) (Z.of_int 4) (sx_b sx) v1 v2
-      | Dot_s_i32_4_i16_8 ->
-        V128Wrapper.dot_s_vec (Z.of_int 4) (Z.of_int 2) v1 v2
-      | Extmul_i16_8_i8_16 (h, sx) ->
-        V128Wrapper.extmul_vec (Z.of_int 2) (Z.of_int 1) (half_vec_b h)
-          (sx_b sx) v1 v2
-      | Extmul_i32_4_i16_8 (h, sx) ->
-        V128Wrapper.extmul_vec (Z.of_int 4) (Z.of_int 2) (half_vec_b h)
-          (sx_b sx) v1 v2
-      | Extmul_i64_2_i32_4 (h, sx) ->
-        V128Wrapper.extmul_vec (Z.of_int 8) (Z.of_int 4) (half_vec_b h)
-          (sx_b sx) v1 v2);;
-
-let rec app_binop_vec_v x = ocaml_app_binop_vec_v x;;
+let rec app_binop_vec_v x = V128Wrapper.binop_vec x;;
 
 let rec app_binop_vec
   bop v1 v2 =
     (let (ConstVec128 c1, ConstVec128 c2) = (v1, v2) in
       map_option (fun a -> ConstVec128 a) (app_binop_vec_v bop c1 c2));;
 
-let rec ocaml_app_shift_vec_v
-  op v i =
-    (match op
-      with Shl_vec svi ->
-        V128Wrapper.shl_vec (integer_of_nat (vec_i_length svi)) v
-          (isabelle_int32_to_ocaml_int32 i)
-      | Shr_vec (svi, sx) ->
-        V128Wrapper.shr_vec (integer_of_nat (vec_i_length svi)) (sx_b sx) v
-          (isabelle_int32_to_ocaml_int32 i));;
-
-let rec app_shift_vec_v x = ocaml_app_shift_vec_v x;;
+let rec app_shift_vec_v
+  op2 v n = V128Wrapper.shiftop_vec op2 v (isabelle_int32_to_ocaml_int32 n);;
 
 let rec app_shift_vec
   sop v cn =
@@ -6781,10 +6476,7 @@ let rec update_fc_step_m
   (Frame_context_m (rdx, lcs, nf, f1, f2)) v_s es_cont =
     Frame_context_m (update_redex_step rdx v_s es_cont, lcs, nf, f1, f2);;
 
-let rec ocaml_app_shuffle_vec_v
-  is v1 v2 = V128Wrapper.shuffle_vec (map integer_of_nat is) v1 v2;;
-
-let rec app_shuffle_vec_v x = ocaml_app_shuffle_vec_v x;;
+let rec app_shuffle_vec_v is = V128Wrapper.ternop_vec (map integer_of_nat is);;
 
 let rec app_shuffle_vec
   is v1 v2 =
@@ -6847,10 +6539,7 @@ let rec app_f_call_m
       (let i_cl = array_nth heap_nat (funcsa inst_m) k () in
         ([Invoke i_cl], Step_normal)));;
 
-let rec ocaml_app_ternop_vec_v
-  op v1 v2 v3 = (let Bitselect_vec = op in V128Wrapper.bitselect_vec v1 v2 v3);;
-
-let rec app_ternop_vec_v x = ocaml_app_ternop_vec_v x;;
+let rec app_ternop_vec_v x = V128Wrapper.testop_vec x;;
 
 let rec app_ternop_vec
   op v1 v2 v3 =
@@ -6897,8 +6586,7 @@ let rec app_v_s_binop_vec
       | V_num _ :: _ -> (v_s, crash_invalid) | [V_vec _] -> (v_s, crash_invalid)
       | V_vec _ :: V_num _ :: _ -> (v_s, crash_invalid)
       | V_vec v2 :: V_vec v1 :: v_sa ->
-        (match app_binop_vec op v1 v2
-          with None -> (v_sa, Res_trap (name typerep_binop_vec op))
+        (match app_binop_vec op v1 v2 with None -> (v_sa, Res_trap "binop_vec")
           | Some a -> (V_vec a :: v_sa, Step_normal)));;
 
 let rec app_v_s_unop_vec

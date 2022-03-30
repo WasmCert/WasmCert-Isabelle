@@ -205,12 +205,6 @@ lift_definition deserialise_i64 :: "bytes \<Rightarrow> i64" is "word_rcat_rev\<
 lift_definition wasm_bool :: "bool \<Rightarrow> i32" is "(\<lambda>b. if b then 1 else 0)" .
 lift_definition  int32_minus_one :: i32 is "max_word" .
 
-definition sx_b :: "sx \<Rightarrow> bool" where
-  "sx_b sx = (case sx of S \<Rightarrow> True | U \<Rightarrow> False)"
-
-definition half_vec_b :: "half_vec \<Rightarrow> bool" where
-  "half_vec_b h = (case h of High_vec \<Rightarrow> True | Low_vec \<Rightarrow> False)"
-
   (* memory *)
 definition mem_size :: "mem \<Rightarrow> nat" where
   "mem_size m = (mem_length m) div Ki64"

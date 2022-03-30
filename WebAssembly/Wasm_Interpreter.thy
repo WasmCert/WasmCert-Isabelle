@@ -96,7 +96,7 @@ definition app_v_s_binop_vec :: "binop_vec \<Rightarrow> v_stack \<Rightarrow> (
        (V_vec v2)#(V_vec v1)#v_s' \<Rightarrow>
          expect (app_binop_vec op v1 v2)
                 (\<lambda>v. ((V_vec v)#v_s', Step_normal))
-                (v_s', Res_trap (name op))
+                (v_s', Res_trap (STR ''binop_vec''))
      | _ \<Rightarrow> (v_s, crash_invalid))"
 
 definition app_v_s_shuffle_vec :: "i list \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
