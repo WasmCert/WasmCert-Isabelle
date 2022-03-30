@@ -580,7 +580,7 @@ definition app_relop :: "relop \<Rightarrow> v_num \<Rightarrow> v_num \<Rightar
 
 definition insert_lane_vec_bs :: "nat \<Rightarrow> i \<Rightarrow> bytes \<Rightarrow> bytes \<Rightarrow> bytes" where
   "insert_lane_vec_bs len_lane i bs_lane bs_vec =
-     ((take (i * len_lane) bs_vec) @ bs_lane @ (drop ((i+1) * len_lane) bs_vec))"
+     ((take (i * len_lane) bs_vec) @ (take len_lane bs_lane) @ (drop ((i+1) * len_lane) bs_vec))"
 
 definition app_unop_vec :: "unop_vec \<Rightarrow> v_vec \<Rightarrow> v_vec" where
   "app_unop_vec uop v1 =

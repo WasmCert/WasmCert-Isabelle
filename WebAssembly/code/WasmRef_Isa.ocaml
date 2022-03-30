@@ -6178,7 +6178,8 @@ let rec load_bytes_m_v
 let rec insert_lane_vec_bs
   len_lane i bs_lane bs_vec =
     take (times_nata i len_lane) bs_vec @
-      bs_lane @ drop (times_nata (plus_nat i one_nata) len_lane) bs_vec;;
+      take len_lane bs_lane @
+        drop (times_nata (plus_nat i one_nata) len_lane) bs_vec;;
 
 let rec insert_lane_vec
   svi i bs v =
