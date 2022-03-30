@@ -258,6 +258,7 @@ datatype
   | Unop_vec_i unop_vec_i shape_vec_i
   | Unop_vec_f unop_vec_f shape_vec_f
   | Cvt_vec cvtop_vec
+  | Popcnt_i8_16
   | Extadd_pairwise_i16_8_i8_16 sx
   | Extadd_pairwise_i32_4_i16_8 sx
 

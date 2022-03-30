@@ -914,8 +914,8 @@ module WasmRef_Isa : sig
     Convert_low_f64_2_i32_4 of sx | Promote_low_f64_2_f32_4
   type unop_vec = Unop_vec_v of unop_vec_v |
     Unop_vec_i of unop_vec_i * shape_vec_i |
-    Unop_vec_f of unop_vec_f * shape_vec_f | Cvt_vec of cvtop_vec |
-    Extadd_pairwise_i16_8_i8_16 of sx | Extadd_pairwise_i32_4_i16_8 of sx
+    Unop_vec_f of unop_vec_f * shape_vec_f | Cvt_vec of cvtop_vec | Popcnt_i8_16
+    | Extadd_pairwise_i16_8_i8_16 of sx | Extadd_pairwise_i32_4_i16_8 of sx
   type tp_num = Tp_i8 | Tp_i16 | Tp_i32
   type testop = Eqz
   type relop_i = Eq | Ne | Lt of sx | Gt of sx | Le of sx | Ge of sx
@@ -3985,7 +3985,7 @@ type cvtop_vec = Extend_i16_8_i8_16 of half_vec * sx |
 
 type unop_vec = Unop_vec_v of unop_vec_v |
   Unop_vec_i of unop_vec_i * shape_vec_i |
-  Unop_vec_f of unop_vec_f * shape_vec_f | Cvt_vec of cvtop_vec |
+  Unop_vec_f of unop_vec_f * shape_vec_f | Cvt_vec of cvtop_vec | Popcnt_i8_16 |
   Extadd_pairwise_i16_8_i8_16 of sx | Extadd_pairwise_i32_4_i16_8 of sx;;
 
 type tp_num = Tp_i8 | Tp_i16 | Tp_i32;;
@@ -5629,6 +5629,7 @@ let rec ocaml_app_unop_vec_v
       | Unop_vec_i (op, sv) -> ocaml_app_unop_vec_i_v op sv v
       | Unop_vec_f (op, sv) -> ocaml_app_unop_vec_f_v op sv v
       | Cvt_vec op -> ocaml_app_cvt_vec_v op v
+      | Popcnt_i8_16 -> V128Wrapper.popcnt_vec (Z.of_int 1) v
       | Extadd_pairwise_i16_8_i8_16 sx ->
         V128Wrapper.extadd_pairwise (Z.of_int 2) (sx_b sx) v
       | Extadd_pairwise_i32_4_i16_8 sx ->

@@ -631,6 +631,7 @@ axiomatization where
   deserialise_v128_is[code]: "deserialise_v128 \<equiv> v128_deserialise_isabelle_bytes"
 
 consts
+  ocaml_popcnt_vec :: "integer \<Rightarrow> v128 \<Rightarrow> v128"
   ocaml_extadd_pairwise :: "integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> v128"
 
   ocaml_not_vec_v  :: "v128 \<Rightarrow> v128"
@@ -711,7 +712,8 @@ consts
   ocaml_shr_vec :: "integer \<Rightarrow> bool \<Rightarrow> v128 \<Rightarrow> ocaml_i32 \<Rightarrow> v128"
 
 code_printing
-  constant ocaml_extadd_pairwise \<rightharpoonup> (OCaml) "V128Wrapper.extadd'_pairwise"
+  constant ocaml_popcnt_vec \<rightharpoonup> (OCaml) "V128Wrapper.popcnt'_vec"
+| constant ocaml_extadd_pairwise \<rightharpoonup> (OCaml) "V128Wrapper.extadd'_pairwise"
 
 | constant ocaml_not_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.not'_vec'_v"
 
@@ -834,6 +836,7 @@ definition ocaml_app_unop_vec_v :: "unop_vec \<Rightarrow> v128 \<Rightarrow> v1
       | Unop_vec_i op sv \<Rightarrow> ocaml_app_unop_vec_i_v op sv v
       | Unop_vec_f op sv \<Rightarrow> ocaml_app_unop_vec_f_v op sv v
       | Cvt_vec op \<Rightarrow> ocaml_app_cvt_vec_v op v
+      | Popcnt_i8_16 \<Rightarrow> ocaml_popcnt_vec 1 v
       | Extadd_pairwise_i16_8_i8_16 sx \<Rightarrow> ocaml_extadd_pairwise 2 (sx_b sx) v
       | Extadd_pairwise_i32_4_i16_8 sx \<Rightarrow> ocaml_extadd_pairwise 4 (sx_b sx) v)"
 
