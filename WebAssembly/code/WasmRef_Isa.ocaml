@@ -5427,7 +5427,7 @@ let rec store_uint8_list
           (let _ = store_uint8 a n b () in store_uint8_list a (suc n) bs ()));;
 
 let rec app_test_vec_v
-  op1 v = ocaml_int32_to_isabelle_int32 (V128Wrapper.shiftop_vec op1 v);;
+  op1 v = ocaml_int32_to_isabelle_int32 (V128Wrapper.test_vec op1 v);;
 
 let rec app_test_vec op v1 = (let ConstVec128 a = v1 in app_test_vec_v op a);;
 
@@ -5463,7 +5463,7 @@ let rec app_binop_vec
       map_option (fun a -> ConstVec128 a) (app_binop_vec_v bop c1 c2));;
 
 let rec app_shift_vec_v
-  op2 v n = V128Wrapper.shiftop_vec op2 v (isabelle_int32_to_ocaml_int32 n);;
+  op2 v n = V128Wrapper.shift_vec op2 v (isabelle_int32_to_ocaml_int32 n);;
 
 let rec app_shift_vec
   sop v cn =
@@ -6476,7 +6476,7 @@ let rec update_fc_step_m
   (Frame_context_m (rdx, lcs, nf, f1, f2)) v_s es_cont =
     Frame_context_m (update_redex_step rdx v_s es_cont, lcs, nf, f1, f2);;
 
-let rec app_shuffle_vec_v is = V128Wrapper.ternop_vec (map integer_of_nat is);;
+let rec app_shuffle_vec_v is = V128Wrapper.shuffle_vec (map integer_of_nat is);;
 
 let rec app_shuffle_vec
   is v1 v2 =
@@ -6539,7 +6539,7 @@ let rec app_f_call_m
       (let i_cl = array_nth heap_nat (funcsa inst_m) k () in
         ([Invoke i_cl], Step_normal)));;
 
-let rec app_ternop_vec_v x = V128Wrapper.testop_vec x;;
+let rec app_ternop_vec_v x = V128Wrapper.ternop_vec x;;
 
 let rec app_ternop_vec
   op v1 v2 v3 =

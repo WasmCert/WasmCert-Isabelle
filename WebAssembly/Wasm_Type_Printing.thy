@@ -648,10 +648,10 @@ consts
 code_printing
   constant ocaml_app_unop_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.unop'_vec"
 | constant ocaml_app_binop_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.binop'_vec"
-| constant ocaml_app_shuffle_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.ternop'_vec"
-| constant ocaml_app_ternop_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.testop'_vec"
-| constant ocaml_app_test_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.shiftop'_vec"
-| constant ocaml_app_shift_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.shiftop'_vec"
+| constant ocaml_app_shuffle_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.shuffle'_vec"
+| constant ocaml_app_ternop_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.ternop'_vec"
+| constant ocaml_app_test_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.test'_vec"
+| constant ocaml_app_shift_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.shift'_vec"
 
 (* 1.1 vector ops *)
 axiomatization where
