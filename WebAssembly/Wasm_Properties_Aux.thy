@@ -256,7 +256,7 @@ lemma b_e_type_load_lane_vec:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Load_lane_vec svi i a off"
   shows "\<exists>ts'' sec n. ts = ts''@[T_num T_i32, T_vec T_v128] \<and> ts' = ts''@[T_vec T_v128] \<and> length (memory \<C>) \<ge> 1"
-        "i < vec_i_num svi \<and> 2^a < (vec_i_length svi)"
+        "i < vec_i_num svi \<and> 2^a \<le> (vec_i_length svi)"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
@@ -349,13 +349,6 @@ lemma b_e_type_binop_vec:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Binop_vec op"
   shows "\<exists>ts''. ts = ts''@[T_vec T_v128, T_vec T_v128] \<and> ts' = ts''@[T_vec T_v128]"
-  using assms
-  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
-
-lemma b_e_type_shuffle_vec:
-  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = Shuffle_i8_16 is"
-  shows "\<exists>ts''. ts = ts''@[T_vec T_v128, T_vec T_v128] \<and> ts' = ts''@[T_vec T_v128] \<and> length is = 16 \<and> list_all (\<lambda>i. i < 32) is"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 

@@ -323,10 +323,10 @@ proof -
     by (metis append1_eq_conv b_e_type_value to_e_list_1 ts''_def(1,3,4))
 qed
 
-lemma types_preserved_binop_shuffle_vec:
+lemma types_preserved_binop_vec:
   assumes "\<lparr>[$C\<^sub>v v1, $C\<^sub>v v2, $e]\<rparr> \<leadsto> \<lparr>[$C\<^sub>v v']\<rparr>"
           "s\<bullet>\<C> \<turnstile> [$C\<^sub>v v1, $C\<^sub>v v2, $e] : (ts _> ts')"
-          "e = Binop_vec op \<or> e = Shuffle_i8_16 is"
+          "e = Binop_vec op"
   shows "s\<bullet>\<C> \<turnstile> [$C\<^sub>v v'] : (ts _> ts')"
 proof -
   have "\<C> \<turnstile> [C\<^sub>v v1, C\<^sub>v v2, e] : (ts _> ts')"
@@ -336,7 +336,6 @@ proof -
                                         "ts_id@[T_vec T_v128, T_vec T_v128] = ts''" "ts' = ts_id @ [T_vec T_v128]"
     using b_e_type_comp[where ?e = e and ?es = "[C\<^sub>v v1, C\<^sub>v v2]"] assms(3)
           b_e_type_binop_vec[of \<C> e _ ts']
-          b_e_type_shuffle_vec[of \<C> e _ ts']
     by fastforce
   have "\<C> \<turnstile> [C\<^sub>v v'] : ([] _> [T_vec T_v128])"
     using b_e_typing.const
@@ -472,7 +471,7 @@ proof -
   have "\<C> \<turnstile> [C\<^sub>n (app_extract_vec sv sx i v)] : ([] _> [T_num (vec_lane_t sv)])"
     using b_e_typing.const[of _ "V_num (app_extract_vec sv sx i v)"]
     unfolding typeof_def typeof_num_def app_extract_vec_def vec_lane_t_def
-    by (auto split: shape_vec.splits shape_vec_i.splits shape_vec_f.splits v_num.splits)
+    by (auto simp add: Let_def split: shape_vec.splits shape_vec_i.splits shape_vec_f.splits v_num.splits)
   thus ?thesis
     using e_typing_l_typing.intros(1)
           b_e_typing.weakening[of \<C> "[C\<^sub>n (app_extract_vec sv sx i v)]" "[]" "[T_num (vec_lane_t sv)]" ts]
@@ -1252,17 +1251,12 @@ next
 next
   case (binop_vec_Some op v1 v2 v)
  then show ?thesis
-    using assms types_preserved_binop_shuffle_vec
+    using assms types_preserved_binop_vec
     by simp
 next
   case (binop_vec_None op v1 v2)
   then show ?thesis
     by (simp add: e_typing_l_typing.intros(4))
-next
-  case (shuffle_vec v1 v2 "is")
- then show ?thesis
-    using assms types_preserved_binop_shuffle_vec
-    by simp
 next
   case (ternop_vec v1 v2 v3 op)
  then show ?thesis
@@ -2557,14 +2551,6 @@ lemma progress_binop_vec:
   unfolding typeof_def
   by (fastforce split: v.splits)
 
-lemma progress_shuffle_vec:
-  assumes "s\<bullet>\<C> \<turnstile> $C*vs : ([] _> [T_vec t, T_vec t])"
-          "e = Shuffle_i8_16 is"
-  shows "\<exists>a s' f' es'. \<lparr>s;f;($C*vs)@([$e])\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
-  using const_of_typed_const_2[OF assms(1)] assms(2) reduce_simple.shuffle_vec reduce.intros(1)
-  unfolding typeof_def
-  by (fastforce split: v.splits)
-
 lemma progress_ternop_vec:
   assumes "s\<bullet>\<C> \<turnstile> $C*vs : ([] _> [T_vec t, T_vec t, T_vec t])"
           "e = Ternop_vec op"
@@ -2660,11 +2646,6 @@ next
   case (binop_vec \<C> op)
   thus ?case
     using progress_binop_vec
-    by fastforce
-next
-  case (shuffle_vec "is" \<C>)
-  thus ?case
-    using progress_shuffle_vec
     by fastforce
 next
   case (ternop_vec \<C> op)

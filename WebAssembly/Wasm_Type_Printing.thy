@@ -607,6 +607,59 @@ axiomatization where
   deserialise_f32_is[code]: "deserialise_f32 \<equiv> f32_deserialise_isabelle_bytes" and
   deserialise_f64_is[code]: "deserialise_f64 \<equiv> f64_deserialise_isabelle_bytes"
 
+(* 1.1 vector ops *)
+code_printing
+  type_constructor v128 \<rightharpoonup> (OCaml) "V128Wrapper.t"
+  | constant zero_v128_inst.zero_v128 \<rightharpoonup> (OCaml) "V128Wrapper.zero"
+  | constant binop_vec_wf \<rightharpoonup> (OCaml) "V128Wrapper.binop'_vec'_wf"
+
+consts
+  v128_serialise_ocaml_char :: "v128 \<Rightarrow> ocaml_char list"
+  v128_deserialise_ocaml_char :: "ocaml_char list \<Rightarrow> v128"
+
+code_printing
+  constant v128_serialise_ocaml_char \<rightharpoonup> (OCaml) "ImplWrapper.serialise'_v128"
+| constant v128_deserialise_ocaml_char  \<rightharpoonup> (OCaml) "ImplWrapper.deserialise'_v128"
+
+definition v128_serialise_isabelle_bytes :: "v128 \<Rightarrow> bytes" where
+  "v128_serialise_isabelle_bytes v = List.map ocaml_char_to_isabelle_byte (v128_serialise_ocaml_char v)"
+
+definition v128_deserialise_isabelle_bytes :: "bytes \<Rightarrow> v128" where
+  "v128_deserialise_isabelle_bytes bs = v128_deserialise_ocaml_char (List.map isabelle_byte_to_ocaml_char bs)"
+
+axiomatization where
+  serialise_v128_is[code]: "serialise_v128 \<equiv> v128_serialise_isabelle_bytes" and
+  deserialise_v128_is[code]: "deserialise_v128 \<equiv> v128_deserialise_isabelle_bytes"
+
+code_printing
+  type_constructor unop_vec \<rightharpoonup> (OCaml) "V128Wrapper.unop'_vec'_t"
+| type_constructor binop_vec \<rightharpoonup> (OCaml) "V128Wrapper.binop'_vec'_t"
+| type_constructor ternop_vec \<rightharpoonup> (OCaml) "V128Wrapper.ternop'_vec'_t"
+| type_constructor testop_vec \<rightharpoonup> (OCaml) "V128Wrapper.testop'_vec'_t"
+| type_constructor shiftop_vec \<rightharpoonup> (OCaml) "V128Wrapper.shiftop'_vec'_t"
+
+consts
+  ocaml_app_unop_vec_v :: "unop_vec \<Rightarrow> v128 \<Rightarrow> v128"
+  ocaml_app_binop_vec_v :: "binop_vec \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  ocaml_app_ternop_vec_v :: "ternop_vec \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128"
+  ocaml_app_test_vec_v :: "testop_vec \<Rightarrow> v128 \<Rightarrow> ocaml_i32"
+  ocaml_app_shift_vec_v :: "shiftop_vec \<Rightarrow> v128 \<Rightarrow> ocaml_i32 \<Rightarrow> v128"
+
+code_printing
+  constant ocaml_app_unop_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.unop'_vec"
+| constant ocaml_app_binop_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.binop'_vec"
+| constant ocaml_app_ternop_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.ternop'_vec"
+| constant ocaml_app_test_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.test'_vec"
+| constant ocaml_app_shift_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.shift'_vec"
+
+(* 1.1 vector ops *)
+axiomatization where
+  app_unop_vec_v_is[code]: "app_unop_vec_v \<equiv> ocaml_app_unop_vec_v" and
+  app_binop_vec_v_is[code]: "app_binop_vec_v \<equiv> ocaml_app_binop_vec_v" and
+  app_ternop_vec_v_is[code]: "app_ternop_vec_v \<equiv> ocaml_app_ternop_vec_v" and
+  app_test_vec_v_is[code]: "app_test_vec_v op1 v \<equiv> ocaml_int32_to_isabelle_int32 (ocaml_app_test_vec_v op1 v)" and
+  app_shift_vec_v_is[code]: "app_shift_vec_v op2 v n \<equiv> ocaml_app_shift_vec_v op2 v (isabelle_int32_to_ocaml_int32 n)"
+
 (* arithmetic *)
 code_printing
 (* INT32 *)

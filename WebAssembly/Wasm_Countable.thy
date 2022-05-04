@@ -92,15 +92,6 @@ instance relop :: countable
 instance cvtop :: countable
   by countable_datatype
 
-instance unop_vec_v :: countable
-  by countable_datatype
-
-instance unop_vec_i :: countable
-  by countable_datatype
-
-instance unop_vec_f :: countable
-  by countable_datatype
-
 instance shape_vec_i :: countable
   by countable_datatype
 
@@ -110,47 +101,27 @@ instance shape_vec_f :: countable
 instance shape_vec :: countable
   by countable_datatype
 
-instance half_vec :: countable
-  by countable_datatype
-
-instance cvtop_vec :: countable
-  by countable_datatype
+axiomatization where
+  unop_vec_countable: "OFCLASS(unop_vec, countable_class)" and
+  binop_vec_countable: "OFCLASS(binop_vec, countable_class)" and
+  ternop_vec_countable: "OFCLASS(ternop_vec, countable_class)" and
+  testop_vec_countable: "OFCLASS(testop_vec, countable_class)" and
+  shiftop_vec_countable: "OFCLASS(shiftop_vec, countable_class)"
 
 instance unop_vec :: countable
-  by countable_datatype
-
-instance binop_vec_v :: countable
-  by countable_datatype
-
-instance binop_vec_i :: countable
-  by countable_datatype
-
-instance binop_vec_f :: countable
-  by countable_datatype
-
-instance minmaxop_vec_i :: countable
-  by countable_datatype
-
-instance satop_vec_i :: countable
-  by countable_datatype
-
-instance relop_vec_i :: countable
-  by countable_datatype
-
-instance relop_vec_f :: countable
-  by countable_datatype
+  by (rule unop_vec_countable)
 
 instance binop_vec :: countable
-  by countable_datatype
+  by (rule binop_vec_countable)
 
 instance ternop_vec :: countable
-  by countable_datatype
+  by (rule ternop_vec_countable)
 
 instance testop_vec :: countable
-  by countable_datatype
+  by (rule testop_vec_countable)
 
 instance shiftop_vec :: countable
-  by countable_datatype
+  by (rule shiftop_vec_countable)
 
 instance loadop_vec :: countable
   by countable_datatype

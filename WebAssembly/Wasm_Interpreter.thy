@@ -96,13 +96,7 @@ definition app_v_s_binop_vec :: "binop_vec \<Rightarrow> v_stack \<Rightarrow> (
        (V_vec v2)#(V_vec v1)#v_s' \<Rightarrow>
          expect (app_binop_vec op v1 v2)
                 (\<lambda>v. ((V_vec v)#v_s', Step_normal))
-                (v_s', Res_trap (name op))
-     | _ \<Rightarrow> (v_s, crash_invalid))"
-
-definition app_v_s_shuffle_vec :: "i list \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
-  "app_v_s_shuffle_vec is v_s =
-     (case v_s of
-       (V_vec v2)#(V_vec v1)#v_s' \<Rightarrow> ((V_vec (app_shuffle_vec is v1 v2))#v_s', Step_normal)
+                (v_s', Res_trap (STR ''binop_vec''))
      | _ \<Rightarrow> (v_s, crash_invalid))"
 
 definition app_v_s_ternop_vec :: "ternop_vec \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
@@ -114,7 +108,7 @@ definition app_v_s_ternop_vec :: "ternop_vec \<Rightarrow> v_stack \<Rightarrow>
 definition app_v_s_test_vec :: "testop_vec \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
   "app_v_s_test_vec op v_s =
      (case v_s of
-       (V_vec v1)#v_s' \<Rightarrow> ((V_num (ConstInt32 (wasm_bool (app_test_vec op v1))))#v_s', Step_normal)
+       (V_vec v1)#v_s' \<Rightarrow> ((V_num (ConstInt32  (app_test_vec op v1)))#v_s', Step_normal)
      | _ \<Rightarrow> (v_s, crash_invalid))"
 
 definition app_v_s_shift_vec :: "shiftop_vec \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
@@ -561,10 +555,6 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
 
     | (Binop_vec op) \<Rightarrow>
         let (v_s', res) = (app_v_s_binop_vec op v_s) in
-        ((Config d s (update_fc_step fc v_s' []) fcs), res)
-
-    | (Shuffle_i8_16 is) \<Rightarrow>
-        let (v_s', res) = (app_v_s_shuffle_vec is v_s) in
         ((Config d s (update_fc_step fc v_s' []) fcs), res)
 
     | (Ternop_vec op) \<Rightarrow>
