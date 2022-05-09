@@ -1,4 +1,4 @@
-theory Wasm_Type_Printing imports Wasm_Native_Word_Entry begin
+theory Wasm_Type_Printing imports Wasm_Native_Word_Entry "../libs/Misc_Generic_Lemmas" begin
 (* Maps types to Andreas' Ocaml implementation - a thin wrapper over Ocaml ints/floats for the most part. *)
 
 code_printing
@@ -81,13 +81,23 @@ lemma[code]: "int_clz (i32_impl_abs x) = i32_impl_abs (Abs_uint32' (Word.of_nat 
 lemma[code]: "int_ctz (i32_impl_abs x) = i32_impl_abs (Abs_uint32' (Word.of_nat (word_ctz (Rep_uint32' x))))"
   by (simp add: i32_impl_abs_def Abs_uint32'.rep_eq I32.int_ctz_def int_ctz_i32.abs_eq)
 
-(* TODO: avoid rep round-trip *)
 lemma "int_popcnt (i32_impl_abs x) = i32_impl_abs (Abs_uint32' (Word.of_nat (pop_count (Rep_uint32' x))))"
   by (simp add: i32_impl_abs_def Abs_uint32'.rep_eq I32.int_popcnt_def int_popcnt_i32.abs_eq)
 
-(* TODO: prove *)
 lemma[code]: "int_popcnt (i32_impl_abs x) = i32_impl_abs (uint32_of_nat (fold_atLeastAtMost_nat (\<lambda>n acc. if bit x n then acc+1 else acc) 0 31 0))"
-  sorry
+proof -
+  have a:"\<And>x. comp_fun_commute (\<lambda>n acc. if bit x n then acc+1 else acc)"
+    unfolding comp_fun_commute_def
+    by auto
+  have b:"Finite_Set.fold (\<lambda>n acc. if bit x n then acc+1 else acc) 0 {0..31} = fold (\<lambda>n acc. if bit x n then acc+1 else acc) [0..<32] 0"
+      using comp_fun_commute.fold_set_fold_remdups[OF a, of x 0 "[0..<32]"]
+      by (simp add: atLeastAtMost_upt)
+  have "pop_count (Rep_uint32' x) = (fold_atLeastAtMost_nat (\<lambda>n acc. if bit x n then acc+1 else acc) 0 31 0)"
+    using length_filter_fold[of _ "[0..<32]" 0]
+    by (simp add: bit_uint32.rep_eq[symmetric] b rev_filter[symmetric] pop_count_def to_bl_unfold fold_atLeastAtMost_nat[OF a])
+  thus ?thesis
+    by (simp add: uint32_of_int.rep_eq uint32_of_nat_def i32_impl_abs_def Abs_uint32'.rep_eq I32.int_popcnt_def int_popcnt_i32.abs_eq)
+qed
 
 lemma[code]: "int_add (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (x + y)"
   by (simp add: i32_impl_abs_def I32.int_add_def int_add_i32.abs_eq plus_uint32.rep_eq)
@@ -247,13 +257,23 @@ lemma[code]: "int_clz (i64_impl_abs x) = i64_impl_abs (Abs_uint64' (Word.of_nat 
 lemma[code]: "int_ctz (i64_impl_abs x) = i64_impl_abs (Abs_uint64' (Word.of_nat (word_ctz (Rep_uint64' x))))"
   by (simp add: i64_impl_abs_def Abs_uint64'.rep_eq I64.int_ctz_def int_ctz_i64.abs_eq)
 
-(* TODO: avoid rep round-trip *)
 lemma "int_popcnt (i64_impl_abs x) = i64_impl_abs (Abs_uint64' (Word.of_nat (pop_count (Rep_uint64' x))))"
   by (simp add: i64_impl_abs_def Abs_uint64'.rep_eq I64.int_popcnt_def int_popcnt_i64.abs_eq)
 
-(* TODO: prove *)
 lemma[code]: "int_popcnt (i64_impl_abs x) = i64_impl_abs (uint64_of_nat (fold_atLeastAtMost_nat (\<lambda>n acc. if bit x n then acc+1 else acc) 0 63 0))"
-  sorry
+proof -
+  have a:"\<And>x. comp_fun_commute (\<lambda>n acc. if bit x n then acc+1 else acc)"
+    unfolding comp_fun_commute_def
+    by auto
+  have b:"Finite_Set.fold (\<lambda>n acc. if bit x n then acc+1 else acc) 0 {0..63} = fold (\<lambda>n acc. if bit x n then acc+1 else acc) [0..<64] 0"
+      using comp_fun_commute.fold_set_fold_remdups[OF a, of x 0 "[0..<64]"]
+      by (simp add: atLeastAtMost_upt)
+  have "pop_count (Rep_uint64' x) = (fold_atLeastAtMost_nat (\<lambda>n acc. if bit x n then acc+1 else acc) 0 63 0)"
+    using length_filter_fold[of _ "[0..<64]" 0]
+    by (simp add: bit_uint64.rep_eq[symmetric] b rev_filter[symmetric] pop_count_def to_bl_unfold fold_atLeastAtMost_nat[OF a])
+  thus ?thesis
+    by (simp add: uint64_of_int.rep_eq uint64_of_nat_def i64_impl_abs_def Abs_uint64'.rep_eq I64.int_popcnt_def int_popcnt_i64.abs_eq)
+qed
 
 lemma[code]: "int_add (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (x + y)"
   by (simp add: i64_impl_abs_def I64.int_add_def int_add_i64.abs_eq plus_uint64.rep_eq)
