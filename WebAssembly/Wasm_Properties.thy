@@ -221,7 +221,7 @@ proof -
   have "arity_1_result e = typeof_num v'"
     using assms(1,3) calculation(2)
     apply (cases rule: reduce_simple.cases)
-             apply (simp_all add: arity_1_result_def wasm_deserialise_num_type t_num_cvt typeof_num_app_testop typeof_num_app_unop)
+             apply (simp_all add: wasm_reinterpret_def arity_1_result_def wasm_deserialise_num_type t_num_cvt typeof_num_app_testop typeof_num_app_unop)
     done
   hence "\<C> \<turnstile> [C\<^sub>n v'] : ([] _> [T_num (arity_1_result e)])"
     using b_e_typing.const

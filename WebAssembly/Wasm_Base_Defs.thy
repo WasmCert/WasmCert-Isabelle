@@ -830,6 +830,9 @@ definition cvt :: "t_num \<Rightarrow> (sat \<times> sx) option \<Rightarrow> v_
                      | T_f32 \<Rightarrow> (case (cvt_f32 sat_sx v) of Some c \<Rightarrow> Some (ConstFloat32 c) | None \<Rightarrow> None)
                      | T_f64 \<Rightarrow> (case (cvt_f64 sat_sx v) of Some c \<Rightarrow> Some (ConstFloat64 c) | None \<Rightarrow> None))"
 
+definition wasm_reinterpret :: "t_num \<Rightarrow> v_num \<Rightarrow> v_num" where
+  "wasm_reinterpret t v = (wasm_deserialise_num (bits_num v) t)"
+
 lemma is_int_t_exists:
   assumes "is_int_t_num t"
   shows "t = T_i32 \<or> t = T_i64"

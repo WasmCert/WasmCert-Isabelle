@@ -79,7 +79,7 @@ definition app_v_s_cvtop :: "cvtop \<Rightarrow> t_num \<Rightarrow> t_num \<Rig
                      (\<lambda>v. ((V_num v)#v_s', Step_normal))
                      (v_s', Res_trap (name cvtop))
           | Reinterpret \<Rightarrow> if tp_sx = None then
-                             ((V_num (wasm_deserialise_num (bits_num v1) t2))#v_s', Step_normal)
+                             ((V_num (wasm_reinterpret t2 v1))#v_s', Step_normal)
                            else (v_s, crash_invalid))
         else (v_s, crash_invalid))
      | _ \<Rightarrow> (v_s, crash_invalid))"

@@ -166,7 +166,7 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
 | convert_Some:"\<lbrakk>(typeof_num v) = t1; cvt t2 sat_sx v = (Some v')\<rbrakk> \<Longrightarrow> \<lparr>[$(C\<^sub>n v), $(Cvtop t2 Convert t1 sat_sx)]\<rparr> \<leadsto> \<lparr>[$(C\<^sub>n v')]\<rparr>"
 | convert_None:"\<lbrakk>(typeof_num v) = t1; cvt t2 sat_sx v = None\<rbrakk> \<Longrightarrow> \<lparr>[$(C\<^sub>n v), $(Cvtop t2 Convert t1 sat_sx)]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
   \<comment> \<open>\<open>reinterpret\<close>\<close>
-| reinterpret:"(typeof_num v) = t1 \<Longrightarrow> \<lparr>[$(C\<^sub>n v), $(Cvtop t2 Reinterpret t1 None)]\<rparr> \<leadsto> \<lparr>[$(C\<^sub>n (wasm_deserialise_num (bits_num v) t2))]\<rparr>"
+| reinterpret:"(typeof_num v) = t1 \<Longrightarrow> \<lparr>[$(C\<^sub>n v), $(Cvtop t2 Reinterpret t1 None)]\<rparr> \<leadsto> \<lparr>[$(C\<^sub>n (wasm_reinterpret t2 v))]\<rparr>"
   \<comment> \<open>\<open>unary vector ops\<close>\<close>
 | unop_vec:"\<lparr>[$C\<^sub>v v, $(Unop_vec op)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>v (app_unop_vec op v)]\<rparr>"
   \<comment> \<open>\<open>binary vector ops\<close>\<close>
