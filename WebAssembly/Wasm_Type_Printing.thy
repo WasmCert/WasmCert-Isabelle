@@ -82,8 +82,12 @@ lemma[code]: "int_ctz (i32_impl_abs x) = i32_impl_abs (Abs_uint32' (Word.of_nat 
   by (simp add: i32_impl_abs_def Abs_uint32'.rep_eq I32.int_ctz_def int_ctz_i32.abs_eq)
 
 (* TODO: avoid rep round-trip *)
-lemma[code]: "int_popcnt (i32_impl_abs x) = i32_impl_abs (Abs_uint32' (Word.of_nat (pop_count (Rep_uint32' x))))"
+lemma "int_popcnt (i32_impl_abs x) = i32_impl_abs (Abs_uint32' (Word.of_nat (pop_count (Rep_uint32' x))))"
   by (simp add: i32_impl_abs_def Abs_uint32'.rep_eq I32.int_popcnt_def int_popcnt_i32.abs_eq)
+
+(* TODO: prove *)
+lemma[code]: "int_popcnt (i32_impl_abs x) = i32_impl_abs (uint32_of_nat (fold_atLeastAtMost_nat (\<lambda>n acc. if bit x n then acc+1 else acc) 0 31 0))"
+  sorry
 
 lemma[code]: "int_add (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (x + y)"
   by (simp add: i32_impl_abs_def I32.int_add_def int_add_i32.abs_eq plus_uint32.rep_eq)
@@ -244,8 +248,12 @@ lemma[code]: "int_ctz (i64_impl_abs x) = i64_impl_abs (Abs_uint64' (Word.of_nat 
   by (simp add: i64_impl_abs_def Abs_uint64'.rep_eq I64.int_ctz_def int_ctz_i64.abs_eq)
 
 (* TODO: avoid rep round-trip *)
-lemma[code]: "int_popcnt (i64_impl_abs x) = i64_impl_abs (Abs_uint64' (Word.of_nat (pop_count (Rep_uint64' x))))"
+lemma "int_popcnt (i64_impl_abs x) = i64_impl_abs (Abs_uint64' (Word.of_nat (pop_count (Rep_uint64' x))))"
   by (simp add: i64_impl_abs_def Abs_uint64'.rep_eq I64.int_popcnt_def int_popcnt_i64.abs_eq)
+
+(* TODO: prove *)
+lemma[code]: "int_popcnt (i64_impl_abs x) = i64_impl_abs (uint64_of_nat (fold_atLeastAtMost_nat (\<lambda>n acc. if bit x n then acc+1 else acc) 0 63 0))"
+  sorry
 
 lemma[code]: "int_add (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (x + y)"
   by (simp add: i64_impl_abs_def I64.int_add_def int_add_i64.abs_eq plus_uint64.rep_eq)

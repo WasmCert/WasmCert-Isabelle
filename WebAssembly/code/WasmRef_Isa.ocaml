@@ -614,28 +614,12 @@ module WasmRef_Isa : sig
   val integer_of_uint32 : int32 -> Z.t
   val nat_of_uint32 : int32 -> nat
   val nat_of_int_i32 : i32 -> nat
-  val gen_length : nat -> 'a list -> nat
-  val size_list : 'a list -> nat
-  val map : ('a -> 'b) -> 'a list -> 'b list
-  val upt : nat -> nat -> nat list
-  val fold : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
-  val rev : 'a list -> 'a list
-  val to_bl : 'a len -> 'a word -> bool list
-  val filter : ('a -> bool) -> 'a list -> 'a list
-  val id : 'a -> 'a
-  val pop_count : 'a len -> 'a word -> nat
-  val comp : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
-  val foldr : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
-  val horner_sum : 'b comm_semiring_0 -> ('a -> 'b) -> 'b -> 'a list -> 'b
-  val of_bool : 'a zero_neq_one -> bool -> 'a
-  val set_bits_word : 'a len -> (nat -> bool) -> 'a word
-  val rep_uint32 : int32 -> num1 bit0 bit0 bit0 bit0 bit0 word
-  val abs_uint32 : num1 bit0 bit0 bit0 bit0 bit0 word -> int32
+  val fold_atLeastAtMost_nat : (nat -> 'a -> 'a) -> nat -> nat -> 'a -> 'a
   val int_of_nat : nat -> int
-  val of_nat : 'a len -> nat -> 'a word
-  val int_popcnt_i32 : i32 -> i32
   val uint32_of_int : int -> int32
+  val comp : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
   val uint32_of_nat : nat -> int32
+  val int_popcnt_i32 : i32 -> i32
   val int_of_nat_i32 : nat -> i32
   val int_shr_u_i32 : i32 -> i32 -> i32
   val int_shr_s_i32 : i32 -> i32 -> i32
@@ -691,6 +675,15 @@ module WasmRef_Isa : sig
   val semiring_bit_shifts_uint32 : int32 semiring_bit_shifts
   val int_rem_u_i32 : i32 -> i32 -> i32 option
   val signed_modulo_word : 'a len -> 'a word -> 'a word -> 'a word
+  val id : 'a -> 'a
+  val foldr : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
+  val horner_sum : 'b comm_semiring_0 -> ('a -> 'b) -> 'b -> 'a list -> 'b
+  val of_bool : 'a zero_neq_one -> bool -> 'a
+  val map : ('a -> 'b) -> 'a list -> 'b list
+  val upt : nat -> nat -> nat list
+  val set_bits_word : 'a len -> (nat -> bool) -> 'a word
+  val rep_uint32 : int32 -> num1 bit0 bit0 bit0 bit0 bit0 word
+  val abs_uint32 : num1 bit0 bit0 bit0 bit0 bit0 word -> int32
   val int_rem_s_i32 : i32 -> i32 -> i32 option
   val int_div_u_i32 : i32 -> i32 -> i32 option
   val int_div_s_i32 : i32 -> i32 -> i32 option
@@ -714,8 +707,14 @@ module WasmRef_Isa : sig
   val int_shl_i32 : i32 -> i32 -> i32
   val int_mul_i32 : i32 -> i32 -> i32
   val int_eqz_i32 : i32 -> bool
+  val gen_length : nat -> 'a list -> nat
+  val size_list : 'a list -> nat
+  val fold : ('a -> 'b -> 'b) -> 'a list -> 'b -> 'b
+  val rev : 'a list -> 'a list
+  val to_bl : 'a len -> 'a word -> bool list
   val takeWhile : ('a -> bool) -> 'a list -> 'a list
   val word_ctz : 'a len -> 'a word -> nat
+  val of_nat : 'a len -> nat -> 'a word
   val int_ctz_i32 : i32 -> i32
   val word_clz : 'a len -> 'a word -> nat
   val int_clz_i32 : i32 -> i32
@@ -784,11 +783,9 @@ module WasmRef_Isa : sig
   val integer_of_uint64 : int64 -> Z.t
   val nat_of_uint64 : int64 -> nat
   val nat_of_int_i64 : i64 -> nat
-  val rep_uint64 : int64 -> num1 bit0 bit0 bit0 bit0 bit0 bit0 word
-  val abs_uint64 : num1 bit0 bit0 bit0 bit0 bit0 bit0 word -> int64
-  val int_popcnt_i64 : i64 -> i64
   val uint64_of_int : int -> int64
   val uint64_of_nat : nat -> int64
+  val int_popcnt_i64 : i64 -> i64
   val int_of_nat_i64 : nat -> i64
   val int_shr_u_i64 : i64 -> i64 -> i64
   val int_shr_s_i64 : i64 -> i64 -> i64
@@ -799,6 +796,8 @@ module WasmRef_Isa : sig
   val uint64_divmod : int64 -> int64 -> int64 * int64
   val uint64_mod : int64 -> int64 -> int64
   val int_rem_u_i64 : i64 -> i64 -> i64 option
+  val rep_uint64 : int64 -> num1 bit0 bit0 bit0 bit0 bit0 bit0 word
+  val abs_uint64 : num1 bit0 bit0 bit0 bit0 bit0 bit0 word -> int64
   val int_rem_s_i64 : i64 -> i64 -> i64 option
   val uint64_div : int64 -> int64 -> int64
   val int_div_u_i64 : i64 -> i64 -> i64 option
@@ -2956,84 +2955,26 @@ let rec nat_of_uint32 x = nat_of_integer (integer_of_uint32 x);;
 
 let rec nat_of_int_i32 (I32_impl_abs x) = nat_of_uint32 x;;
 
-let rec gen_length n x1 = match n, x1 with n, x :: xs -> gen_length (suc n) xs
-                     | n, [] -> n;;
-
-let rec size_list x = gen_length zero_nat x;;
-
-let rec map f x1 = match f, x1 with f, [] -> []
-              | f, x21 :: x22 -> f x21 :: map f x22;;
-
-let rec upt i j = (if less_nat i j then i :: upt (suc i) j else []);;
-
-let rec fold f x1 s = match f, x1, s with f, x :: xs, s -> fold f xs (f x s)
-               | f, [], s -> s;;
-
-let rec rev xs = fold (fun a b -> a :: b) xs [];;
-
-let rec to_bl _A
-  w = map (bit_word _A w) (rev (upt zero_nat (len_of _A.len0_len Type)));;
-
-let rec filter
-  p x1 = match p, x1 with p, [] -> []
-    | p, x :: xs -> (if p x then x :: filter p xs else filter p xs);;
-
-let rec id x = (fun xa -> xa) x;;
-
-let rec pop_count _A w = size_list (filter id (to_bl _A w));;
-
-let rec comp f g = (fun x -> f (g x));;
-
-let rec foldr f x1 = match f, x1 with f, [] -> id
-                | f, x :: xs -> comp (f x) (foldr f xs);;
-
-let rec horner_sum _B
-  f a xs =
-    foldr (fun x b ->
-            plus _B.semiring_0_comm_semiring_0.comm_monoid_add_semiring_0.monoid_add_comm_monoid_add.semigroup_add_monoid_add.plus_semigroup_add
-              (f x)
-              (times
-                _B.semiring_0_comm_semiring_0.mult_zero_semiring_0.times_mult_zero
-                a b))
-      xs (zero _B.semiring_0_comm_semiring_0.mult_zero_semiring_0.zero_mult_zero);;
-
-let rec of_bool _A = function true -> one _A.one_zero_neq_one
-                     | false -> zero _A.zero_zero_neq_one;;
-
-let rec set_bits_word _A
-  p = horner_sum (comm_semiring_0_word _A) (of_bool (zero_neq_one_word _A))
-        (of_int _A (Int_of_integer (Z.of_int 2)))
-        (map p (upt zero_nat (len_of _A.len0_len Type)));;
-
-let rec rep_uint32
-  x = set_bits_word
-        (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-        (bit_uint32 x);;
-
-let rec abs_uint32
-  x = uint32
-        (integer_of_int
-          (the_int
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-            x));;
+let rec fold_atLeastAtMost_nat
+  f a b acc =
+    (if less_nat b a then acc
+      else fold_atLeastAtMost_nat f (plus_nat a one_nata) b (f a acc));;
 
 let rec int_of_nat n = Int_of_integer (integer_of_nat n);;
 
-let rec of_nat _A
-  n = Word (take_bit_int (len_of _A.len0_len Type) (int_of_nat n));;
+let rec uint32_of_int i = uint32 (integer_of_int i);;
+
+let rec comp f g = (fun x -> f (g x));;
+
+let rec uint32_of_nat x = comp uint32_of_int int_of_nat x;;
 
 let rec int_popcnt_i32
   (I32_impl_abs x) =
     I32_impl_abs
-      (abs_uint32
-        (of_nat (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-          (pop_count
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-            (rep_uint32 x))));;
-
-let rec uint32_of_int i = uint32 (integer_of_int i);;
-
-let rec uint32_of_nat x = comp uint32_of_int int_of_nat x;;
+      (uint32_of_nat
+        (fold_atLeastAtMost_nat
+          (fun n acc -> (if bit_uint32 x n then plus_nat acc one_nata else acc))
+          zero_nat (nat_of_integer (Z.of_int 31)) zero_nat));;
 
 let rec int_of_nat_i32 n = I32_impl_abs (uint32_of_nat n);;
 
@@ -3271,6 +3212,46 @@ let rec signed_modulo_word _A
          let result = modulo_inta (abs_int xa) (abs_int ya) in
           of_int _A (if negative then uminus_inta result else result));;
 
+let rec id x = (fun xa -> xa) x;;
+
+let rec foldr f x1 = match f, x1 with f, [] -> id
+                | f, x :: xs -> comp (f x) (foldr f xs);;
+
+let rec horner_sum _B
+  f a xs =
+    foldr (fun x b ->
+            plus _B.semiring_0_comm_semiring_0.comm_monoid_add_semiring_0.monoid_add_comm_monoid_add.semigroup_add_monoid_add.plus_semigroup_add
+              (f x)
+              (times
+                _B.semiring_0_comm_semiring_0.mult_zero_semiring_0.times_mult_zero
+                a b))
+      xs (zero _B.semiring_0_comm_semiring_0.mult_zero_semiring_0.zero_mult_zero);;
+
+let rec of_bool _A = function true -> one _A.one_zero_neq_one
+                     | false -> zero _A.zero_zero_neq_one;;
+
+let rec map f x1 = match f, x1 with f, [] -> []
+              | f, x21 :: x22 -> f x21 :: map f x22;;
+
+let rec upt i j = (if less_nat i j then i :: upt (suc i) j else []);;
+
+let rec set_bits_word _A
+  p = horner_sum (comm_semiring_0_word _A) (of_bool (zero_neq_one_word _A))
+        (of_int _A (Int_of_integer (Z.of_int 2)))
+        (map p (upt zero_nat (len_of _A.len0_len Type)));;
+
+let rec rep_uint32
+  x = set_bits_word
+        (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+        (bit_uint32 x);;
+
+let rec abs_uint32
+  x = uint32
+        (integer_of_int
+          (the_int
+            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+            x));;
+
 let rec int_rem_s_i32
   (I32_impl_abs x) (I32_impl_abs y) =
     (if (Int32.compare y Int32.zero = 0) then None
@@ -3376,10 +3357,26 @@ let rec int_mul_i32
 
 let rec int_eqz_i32 (I32_impl_abs x) = (Int32.compare x Int32.zero = 0);;
 
+let rec gen_length n x1 = match n, x1 with n, x :: xs -> gen_length (suc n) xs
+                     | n, [] -> n;;
+
+let rec size_list x = gen_length zero_nat x;;
+
+let rec fold f x1 s = match f, x1, s with f, x :: xs, s -> fold f xs (f x s)
+               | f, [], s -> s;;
+
+let rec rev xs = fold (fun a b -> a :: b) xs [];;
+
+let rec to_bl _A
+  w = map (bit_word _A w) (rev (upt zero_nat (len_of _A.len0_len Type)));;
+
 let rec takeWhile p x1 = match p, x1 with p, [] -> []
                     | p, x :: xs -> (if p x then x :: takeWhile p xs else []);;
 
 let rec word_ctz _A w = size_list (takeWhile not (rev (to_bl _A w)));;
+
+let rec of_nat _A
+  n = Word (take_bit_int (len_of _A.len0_len Type) (int_of_nat n));;
 
 let rec int_ctz_i32
   (I32_impl_abs x) =
@@ -3513,35 +3510,17 @@ let rec nat_of_uint64 x = nat_of_integer (integer_of_uint64 x);;
 
 let rec nat_of_int_i64 (I64_impl_abs x) = nat_of_uint64 x;;
 
-let rec rep_uint64
-  x = set_bits_word
-        (len_bit0
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        (bit_uint64 x);;
+let rec uint64_of_int i = uint64 (integer_of_int i);;
 
-let rec abs_uint64
-  x = uint64
-        (integer_of_int
-          (the_int
-            (len_bit0
-              (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-            x));;
+let rec uint64_of_nat x = comp uint64_of_int int_of_nat x;;
 
 let rec int_popcnt_i64
   (I64_impl_abs x) =
     I64_impl_abs
-      (abs_uint64
-        (of_nat
-          (len_bit0
-            (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-          (pop_count
-            (len_bit0
-              (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-            (rep_uint64 x))));;
-
-let rec uint64_of_int i = uint64 (integer_of_int i);;
-
-let rec uint64_of_nat x = comp uint64_of_int int_of_nat x;;
+      (uint64_of_nat
+        (fold_atLeastAtMost_nat
+          (fun n acc -> (if bit_uint64 x n then plus_nat acc one_nata else acc))
+          zero_nat (nat_of_integer (Z.of_int 63)) zero_nat));;
 
 let rec int_of_nat_i64 n = I64_impl_abs (uint64_of_nat n);;
 
@@ -3589,6 +3568,20 @@ let rec int_rem_u_i64
   (I64_impl_abs x) (I64_impl_abs y) =
     (if (Int64.compare y Int64.zero = 0) then None
       else Some (I64_impl_abs (uint64_mod x y)));;
+
+let rec rep_uint64
+  x = set_bits_word
+        (len_bit0
+          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
+        (bit_uint64 x);;
+
+let rec abs_uint64
+  x = uint64
+        (integer_of_int
+          (the_int
+            (len_bit0
+              (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
+            x));;
 
 let rec int_rem_s_i64
   (I64_impl_abs x) (I64_impl_abs y) =
