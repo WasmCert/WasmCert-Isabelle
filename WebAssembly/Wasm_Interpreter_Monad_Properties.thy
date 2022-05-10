@@ -196,13 +196,12 @@ lemma pure_dup:
 
 lemma funcs_nth_type_triple:"<funcs_m_assn i_s cls cls_m> 
     Array.nth cls_m i  
-    <\<lambda>r. \<up>(cl_m_type r = cl_type (cls!i)) * funcs_m_assn i_s cls cls_m>" 
+    <\<lambda>r. \<up>(cl_m_agree i_s (cls!i) r) * funcs_m_assn i_s cls cls_m>" 
   unfolding funcs_m_assn_def list_assn_conv_idx
   apply(sep_auto heap del:nth_rule)
   apply(extract_pre_pure)
   apply(sep_auto)
-  using cl_m_agree_type unfolding list_all2_conv_all_nth
-  by metis  
+  using list_all2_nthD2 by auto
 
 definition "fc_m_assn_pure fc fc_m \<equiv> (
   case fc of Frame_context redex lcs nf f \<Rightarrow> 
@@ -230,45 +229,6 @@ lemma extract_pre_cfg_m_assn[extract_pure_rules]:
   apply (sep_auto split:config.splits config_m.splits)
   subgoal by (metis mod_starE extract_pre_fc_m_assn)
   by (metis mod_starE extract_pre_list_assn_lengthD) 
-
-lemma array_fold_map_triple:
-  assumes "length l = length l'"
-          "((length l)+1) = length Ps"
-          "\<And>i. \<lbrakk>i < length l\<rbrakk> \<Longrightarrow> <Ps!i> f (l!i) <\<lambda>x. \<up>(x = l'!i) * Ps!(i+1)>"
-  shows "<Ps!0> Heap_Monad.fold_map f l <\<lambda>res. \<up>(res = l') * Ps!(length l) >"
-  using assms
-proof(induct l arbitrary: l' Ps)
-case Nil
-  thus ?case
-    by sep_auto
-next
-  case (Cons x xl)
-  obtain y yl where l'_is:"l' = y#yl" "length xl = length yl"
-    using Cons(2)
-    by (metis length_Suc_conv)
-  have 1:"length xl + 1 = length (tl Ps)"
-         "Ps \<noteq> []"
-    using Cons(3)
-    by auto
-  have "(\<And>i. i < length xl \<Longrightarrow>
-          <tl Ps ! i> f (xl ! i)
-          <\<lambda>x. \<up> (x = yl ! i) *
-               tl Ps ! (i + 1)>)"
-    using Cons(4) Misc.nth_tl[OF 1(2)] l'_is(1)
-    by simp (metis Suc_mono nth_Cons_Suc)
-  hence "<Ps ! 1> Heap_Monad.fold_map f xl
-  <\<lambda>res. \<up> (res = yl) * Ps ! (length xl + 1)>"
-    using Cons(1)[OF l'_is(2) 1(1)] Misc.nth_tl[OF 1(2)]
-    by simp
-  moreover
-  have " <Ps ! 0> f x <\<lambda>x. \<up>(x = l'!0) * Ps!1>"
-    using Cons(4)[of 0]
-    by simp
-  ultimately
-  show ?case
-    using l'_is(1)
-    by sep_auto
-qed
 
 
 (* hoare triples for run_step_b_e_m *)
@@ -407,9 +367,11 @@ lemma call_indirect_triple:
         apply(sep_auto_all)
          apply(knock_down j)
         apply(sep_auto_all)
-         apply(simp_all add:app_s_f_v_s_call_indirect_def Let_def split:list.splits)
+         apply(simp_all add:app_s_f_v_s_call_indirect_def Let_def split:list.splits)     
      apply(auto simp add:stypes_def tab_cl_ind_def)
+  using cl_m_agree_type apply(auto)
   done
+
 
 (* memory stuff *)
 
@@ -1153,9 +1115,9 @@ proof -
         [split] = v.splits option.splits 
         cl.splits cl_m.splits tf.splits nat.splits
 
-       apply(sep_auto simp:cl_m_agree_j_def locs_m_assn_def s_m_assn_def 
+       apply(sep_auto simp:cl_m_agree_def cl_m_agree_j_def locs_m_assn_def s_m_assn_def 
           funcs_m_assn_def fc_m_assn_def)
-      apply(sep_auto heap:host_apply_impl_m_triple simp:cl_m_agree_j_def)
+      apply(sep_auto heap:host_apply_impl_m_triple simp: cl_m_agree_def cl_m_agree_j_def)
       done
   next
     case Trap
@@ -1256,8 +1218,8 @@ lemma run_v_m_triple:
   assumes "inst_at i_s (f_inst f, f_inst2) j" 
   shows "< s_m_assn i_s s s_m * inst_store_assn i_s * locs_m_assn (f_locs f) f_locs1 > 
   run_v_m n d (s_m, f_locs1, f_inst2, b_es) 
-  <\<lambda>(s_m', res_m). let (s', res) = run_v n d (s, f, b_es) in \<up>(res_m = res) 
-  * s_m_assn i_s s' s_m' * inst_store_assn i_s >\<^sub>t"
+  <\<lambda>(s_m', res_m). let (s', res) = run_v n d (s, f, b_es) in 
+  \<up>(res_m = res) * s_m_assn i_s s' s_m' * inst_store_assn i_s >\<^sub>t"
 proof - 
   have 1:"s_m_assn i_s s s_m * inst_store_assn i_s * locs_m_assn (f_locs f) f_locs1
       \<Longrightarrow>\<^sub>A cfg_m_assn i_s 

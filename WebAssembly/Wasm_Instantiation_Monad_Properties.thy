@@ -109,7 +109,8 @@ lemma alloc_funcs_m_triple:
     apply(solve_entails)
    apply(sep_auto)
   apply(sep_auto simp:list_assn_pure)
-  by(simp add: list_all2_map1 list_all2_conv_all_nth cl_m_agree_j_def inst_at_def split:prod.splits)
+  by(simp add: list_all2_map1 list_all2_conv_all_nth cl_m_agree_def cl_m_agree_j_def inst_at_def 
+      split:prod.splits)
 
 
 lemma alloc_tabs_m_triple: 
@@ -217,19 +218,22 @@ lemma cl_m_agree_extend:
   shows "length is = length i_ms   \<Longrightarrow> cl_m_agree (is@is', i_ms@i_ms') cl cl_m"
         "length is' = length i_ms' \<Longrightarrow> cl_m_agree (is'@is, i_ms'@i_ms) cl cl_m"
 proof -
-  obtain j where j_def:"cl_m_agree_j (is, i_ms) j cl cl_m" using assms(1) by auto
+  obtain j where j_def:"cl_m_agree_j (is, i_ms) j cl cl_m" 
+    using assms(1) cl_m_agree_def by auto
   
   have "length is = length i_ms \<Longrightarrow> cl_m_agree_j (is@is', i_ms@i_ms') j cl cl_m"
     using assms(1) j_def unfolding cl_m_agree_j_def 
     by (simp add: inst_at_def split:cl.splits cl_m.splits) 
   then show 
-    "length is = length i_ms \<Longrightarrow> cl_m_agree (is@is', i_ms@i_ms') cl cl_m" by auto
+    "length is = length i_ms \<Longrightarrow> cl_m_agree (is@is', i_ms@i_ms') cl cl_m" 
+    unfolding cl_m_agree_def by auto
 
   have "length is' = length i_ms' \<Longrightarrow> cl_m_agree_j (is'@is, i_ms'@i_ms) (j+length is') cl cl_m" 
     using assms(1) j_def unfolding cl_m_agree_j_def 
     by (simp add: inst_at_def split:cl.splits cl_m.splits add:nth_append) 
   then show 
-    "length is' = length i_ms' \<Longrightarrow> cl_m_agree (is'@is, i_ms'@i_ms) cl cl_m" by auto
+    "length is' = length i_ms' \<Longrightarrow> cl_m_agree (is'@is, i_ms'@i_ms) cl cl_m" 
+    unfolding cl_m_agree_def by auto
 qed
 
 

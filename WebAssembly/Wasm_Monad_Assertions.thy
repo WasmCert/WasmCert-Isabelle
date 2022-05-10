@@ -80,7 +80,7 @@ definition cl_m_agree_j :: "inst_store \<Rightarrow> nat \<Rightarrow> cl \<Righ
   | cl_m.Func_host tf_m host_m \<Rightarrow> tf = tf_m \<and> host = host_m)
 )"
 
-abbreviation "cl_m_agree i_s cl cl_m \<equiv> \<exists>j. cl_m_agree_j i_s j cl cl_m"
+definition "cl_m_agree i_s cl cl_m \<equiv> \<exists>j. cl_m_agree_j i_s j cl cl_m"
 
 definition funcs_m_assn :: "inst_store \<Rightarrow> cl list \<Rightarrow> cl_m array \<Rightarrow> assn" where
   "funcs_m_assn i_s fs fs_m = (\<exists>\<^sub>A fs_i. fs_m \<mapsto>\<^sub>a fs_i *\<up>(list_all2 (cl_m_agree i_s)  fs fs_i))"
@@ -130,7 +130,7 @@ definition cfg_m_assn :: "inst_store \<Rightarrow> config \<Rightarrow> config_m
 
 
 lemma cl_m_agree_type: "cl_m_agree i_s cl cl_m \<Longrightarrow> cl_type cl = cl_m_type cl_m"
-  unfolding cl_m_agree_j_def cl_type_def cl_m_type_def
+  unfolding cl_m_agree_def cl_m_agree_j_def cl_type_def cl_m_type_def
   by (auto, simp split:cl.splits cl_m.splits)
 
 
