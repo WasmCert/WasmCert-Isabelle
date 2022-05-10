@@ -354,6 +354,34 @@ lemma call_triple:
   apply(sep_auto)
   done
 
+lemma tb_tf_triple:
+  assumes "inst_at i_s (inst, f_inst2) j"
+  shows
+  "<inst_store_assn i_s> 
+  tb_tf_m f_inst2 tb
+  <\<lambda>r. \<up>(r = tb_tf inst tb) * inst_store_assn i_s>"
+proof (cases tb)
+  case (Tbf tf_i)
+  thus ?thesis
+    using assms
+    unfolding tb_tf_m_def tb_tf_def inst_store_assn_def inst_at_def
+    supply [split] = prod.splits option.splits tb.splits
+    apply sep_auto
+    unfolding list_assn_conv_idx
+    apply (extract_list_idx j)
+    unfolding inst_m_assn_def
+    apply sep_auto
+    apply (reinsert_list_idx j)
+    apply sep_auto
+    done
+next
+  case (Tbv t_opt)
+  thus ?thesis
+    using assms
+    unfolding tb_tf_m_def tb_tf_def inst_store_assn_def inst_at_def
+    supply [split] = prod.splits option.splits tb.splits
+    by sep_auto
+qed
 
 (* todo: tidy up for consistency *)
 lemma call_indirect_triple:
@@ -942,10 +970,10 @@ proof -
       by (sep_auto split:frame_context_m.splits frame_context.splits list.split)
   next
     case (Block tf b_ebs)
-    then show ?thesis unfolding unfold_vars_assns by(sep_auto split:tf.splits)
+    then show ?thesis unfolding unfold_vars_assns by(sep_auto heap:tb_tf_triple split:tf.splits)
   next
     case (Loop tfs b_els)
-    then show ?thesis unfolding unfold_vars_assns by(sep_auto split:tf.splits)
+    then show ?thesis unfolding unfold_vars_assns by(sep_auto heap:tb_tf_triple split:tf.splits)
   next
     case (Br k)
     then show ?thesis unfolding unfold_vars_assns by(sep_auto split:label_context.splits)
@@ -1019,6 +1047,7 @@ qed
 
 abbreviation "s_m_vs_pair_assn i_s \<equiv> \<lambda>(s, vs) (s_m, vs_m). s_m_assn i_s s s_m * \<up>(vs=vs_m)"
 
+(* TODO: something like this should be an axiom *)
 lemma host_apply_impl_m_triple:
  "< s_m_assn i_s s s_m>
  host_apply_impl_m s_m tf h vs

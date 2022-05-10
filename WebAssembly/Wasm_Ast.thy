@@ -152,6 +152,9 @@ free_constructors case_tg_ext for tg_ext
 datatype \<comment> \<open>function types\<close>
   tf = Tf "t list" "t list" ("_ '_> _" 60)
 
+datatype \<comment> \<open>block types\<close>
+  tb = Tbf i | Tbv "t option"
+
 (* TYPING *)
 record t_context =
   types_t :: "tf list"
@@ -251,9 +254,9 @@ datatype \<comment> \<open>basic instructions\<close>
     | Nop
     | Drop
     | Select
-    | Block tf "b_e list"
-    | Loop tf "b_e list"
-    | If tf "b_e list" "b_e list"
+    | Block tb "b_e list"
+    | Loop tb "b_e list"
+    | If tb "b_e list" "b_e list"
     | Br i
     | Br_if i
     | Br_table "i list" i

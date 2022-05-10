@@ -12,6 +12,9 @@ instance t :: countable
 instance tf :: countable
   by countable_datatype
 
+instance tb :: countable
+  by countable_datatype
+
 instance inst_ext :: (countable) countable
 proof(rule countable_classI[of "\<lambda>i. to_nat (types i, inst.funcs i, inst.tabs i, inst.mems i, inst.globs i, inst.more i)"])
 qed auto

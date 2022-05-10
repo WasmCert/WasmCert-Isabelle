@@ -93,6 +93,12 @@ definition config_m_to_config :: "heap \<Rightarrow> config_m \<Rightarrow> conf
      (Config_m d s_m fc_m fcs_m) \<Rightarrow>
         Config d (s_m_to_s h s_m) (frame_context_m_to_frame_context h fc_m) (map (frame_context_m_to_frame_context h) fcs_m)"
 
+definition tb_tf_m :: "inst_m \<Rightarrow> tb \<Rightarrow> tf Heap" where
+  "tb_tf_m tfa tb = (case tb of
+                       Tbf i \<Rightarrow> Array.nth (inst_m.types tfa) i
+                     | Tbv (Some t) \<Rightarrow> return ([] _> [t])
+                     | Tbv None \<Rightarrow> return ([] _> []))"
+
 fun list_blit_array :: "'a::heap list \<Rightarrow> 'a array \<Rightarrow> nat \<Rightarrow> unit Heap" where
   "list_blit_array src_list dst dst_pos =
    (case src_list of
@@ -552,32 +558,36 @@ fun run_step_b_e_m :: "b_e \<Rightarrow> config_m \<Rightarrow> res_step_tuple_m
         let (v_s', res) = (app_v_s_select v_s) in
         return ((Config_m d s (update_fc_step_m fc v_s' []) fcs), res)
 
-    | (Block (t1s _> t2s) b_ebs) \<Rightarrow>
+    | (Block tb b_ebs) \<Rightarrow>
         if es \<noteq> [] then return (Config_m d s fc fcs, crash_invariant)
-        else
-          let n = length t1s in
-          let m = length t2s in
+        else do {
+          tf \<leftarrow> tb_tf_m f_inst2 tb;
+          case tf of (t1s _> t2s) \<Rightarrow> do {
+          let n = length t1s;
+          let m = length t2s;
           if (length v_s \<ge> n) then
             let (v_bs, v_s') = split_n v_s n in
             let lc = Label_context v_s' b_es m [] in 
             let fc' = Frame_context_m (Redex v_bs [] b_ebs) (lc#lcs) nf f_locs1 f_inst2 in
             return (Config_m d s fc' fcs, Step_normal)
-          else return (Config_m d s fc fcs, crash_invalid)
+          else return (Config_m d s fc fcs, crash_invalid) }}
 
-    | (Loop (t1s _> t2s) b_els) \<Rightarrow>
+    | (Loop tb b_els) \<Rightarrow>
         if es \<noteq> [] then return (Config_m d s fc fcs, crash_invariant)
-        else
-          let n = length t1s in
-          let m = length t2s in
+        else do {
+          tf \<leftarrow> tb_tf_m f_inst2 tb;
+          case tf of (t1s _> t2s) \<Rightarrow> do {
+          let n = length t1s;
+          let m = length t2s;
           if (length v_s \<ge> n) then
             let (v_bs, v_s') = split_n v_s n in
-            let lc = Label_context v_s' b_es n [(Loop (t1s _> t2s) b_els)] in 
+            let lc = Label_context v_s' b_es n [(Loop tb b_els)] in 
             let fc' = Frame_context_m (Redex v_bs [] b_els) (lc#lcs) nf f_locs1 f_inst2 in
             return (Config_m d s fc' fcs, Step_normal)
-          else return (Config_m d s fc fcs, crash_invalid)
+          else return (Config_m d s fc fcs, crash_invalid) }}
 
-    | (If tf es1 es2) \<Rightarrow>
-        let (v_s', es_cont, res) = (app_v_s_if tf es1 es2 v_s) in
+    | (If tb es1 es2) \<Rightarrow>
+        let (v_s', es_cont, res) = (app_v_s_if tb es1 es2 v_s) in
         return (Config_m d s (update_fc_step_m fc v_s' es_cont) fcs, res)
 
     | (Br k) \<Rightarrow>
@@ -686,7 +696,8 @@ fun run_step_e_m :: "e \<Rightarrow> config_m \<Rightarrow> res_step_tuple_m Hea
                       let fc' = Frame_context_m (Redex v_s' es b_es) lcs nf f_locs1 f_inst2 in
                       let zs = n_zeros ts in do {
                       ff_locs1 \<leftarrow> Array.of_list ((rev v_fs)@zs);
-                      let fcf = Frame_context_m (Redex [] [] [Block ([] _> t2s) es_f]) [] m ff_locs1 i' in
+                      let lc = Label_context [] [] m [];
+                      let fcf = Frame_context_m (Redex [] [] es_f) [lc] m ff_locs1 i' in
                       return (Config_m d' s fcf (fc'#fcs), Step_normal) }
                     else
                       return (Config_m d s fc fcs, crash_invalid))
