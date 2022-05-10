@@ -137,8 +137,7 @@ record m = \<comment> \<open>module\<close>
   m_exports :: "module_export list"
 
 inductive module_typing :: "m \<Rightarrow> extern_t list \<Rightarrow> extern_t list \<Rightarrow> bool" where
-"\<lbrakk>list_all (\<lambda>tf. case tf of (tn _> tm) \<Rightarrow> length tm \<le> 1) tfs; \<comment> \<open>\<open>MVP restriction\<close>\<close>
-  list_all2 (module_func_typing \<C>) fs fts;
+"\<lbrakk>list_all2 (module_func_typing \<C>) fs fts;
   list_all (module_tab_typing) ts;
   list_all (module_mem_typing) ms;
   list_all2 (module_glob_typing \<C>') gs gts;

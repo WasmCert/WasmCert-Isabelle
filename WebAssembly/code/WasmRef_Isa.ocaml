@@ -7456,29 +7456,27 @@ let rec module_type_checker
              (tfs, ifts @ fts, igs @ gts, its @ ts, ims @ ms, [], [], None, ())
            in
          let ca = T_context_ext ([], [], igs, [], [], [], [], None, ()) in
-          (if list_all (fun (Tf (_, tm)) -> less_eq_nat (size_list tm) one_nata)
-                tfs &&
-                (list_all (module_func_type_checker c) fs &&
+          (if list_all (module_func_type_checker c) fs &&
+                (list_all
+                   (fun t ->
+                     limit_typing t
+                       (power power_nat (nat_of_integer (Z.of_int 2))
+                         (nat_of_integer (Z.of_int 32))))
+                   ts &&
                   (list_all
                      (fun t ->
                        limit_typing t
                          (power power_nat (nat_of_integer (Z.of_int 2))
-                           (nat_of_integer (Z.of_int 32))))
-                     ts &&
-                    (list_all
-                       (fun t ->
-                         limit_typing t
-                           (power power_nat (nat_of_integer (Z.of_int 2))
-                             (nat_of_integer (Z.of_int 16))))
-                       ms &&
-                      (list_all (module_glob_type_checker ca) gs &&
-                        (list_all (module_elem_type_checker c) els &&
-                          (list_all (module_data_type_checker c) ds &&
-                            (pred_option (module_start_typing c) i_opt &&
-                              (distinct equal_literal (map e_name exps) &&
-                                (less_eq_nat (size_list (its @ ts)) one_nata &&
-                                  less_eq_nat (size_list (ims @ ms))
-                                    one_nata)))))))))
+                           (nat_of_integer (Z.of_int 16))))
+                     ms &&
+                    (list_all (module_glob_type_checker ca) gs &&
+                      (list_all (module_elem_type_checker c) els &&
+                        (list_all (module_data_type_checker c) ds &&
+                          (pred_option (module_start_typing c) i_opt &&
+                            (distinct equal_literal (map e_name exps) &&
+                              (less_eq_nat (size_list (its @ ts)) one_nata &&
+                                less_eq_nat (size_list (ims @ ms))
+                                  one_nata))))))))
             then (match
                    those (map (fun exp -> module_export_typer c (e_desc exp))
                            exps)
