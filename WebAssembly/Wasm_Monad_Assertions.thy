@@ -65,15 +65,7 @@ definition "inst_at \<equiv> \<lambda>(is, i_ms) (i, i_m) j. j < min (length is)
 
 abbreviation "contains_inst i_s i \<equiv> \<exists> j. inst_at i_s i j"
 
-definition "inst_store_subset \<equiv> \<lambda>(is1, i_ms1) (is2, i_ms2). 
-  set (zip is1 i_ms1) \<subseteq> set (zip is2 i_ms2)"
 
-lemma inst_store_extend_preserve_contains:
-  assumes "inst_at i_s' i j" "inst_store_subset i_s' i_s" 
-  shows "contains_inst i_s i"
-  using assms unfolding inst_store_subset_def inst_at_def
-  apply(simp split:prod.splits) 
-  by (metis in_set_zip prod.sel(1) prod.sel(2) subset_code(1))
 
 definition cl_m_agree_j :: "inst_store \<Rightarrow> nat \<Rightarrow> cl \<Rightarrow> cl_m \<Rightarrow> bool" where 
   "cl_m_agree_j i_s j cl cl_m = (case cl of 
@@ -126,12 +118,12 @@ definition fc_m_assn :: "inst_store \<Rightarrow> frame_context \<Rightarrow> fr
 
 definition "fcs_m_assn i_s fcs fcs_m \<equiv> list_assn (fc_m_assn i_s) fcs fcs_m"
 
-definition cfg_m_assn :: "inst_store \<Rightarrow> inst_store \<Rightarrow> config \<Rightarrow> config_m \<Rightarrow> assn" where
-  "cfg_m_assn i_s i_s' cfg cfg_m = (
+definition cfg_m_assn :: "inst_store \<Rightarrow> config \<Rightarrow> config_m \<Rightarrow> assn" where
+  "cfg_m_assn i_s cfg cfg_m = (
   case cfg of Config d s fc fcs \<Rightarrow>
   case cfg_m of Config_m d_m s_m fc_m fcs_m \<Rightarrow> 
-  \<up>(d=d_m \<and> inst_store_subset i_s' i_s) 
-  * s_m_assn i_s' s s_m * fc_m_assn i_s fc fc_m * fcs_m_assn i_s fcs fcs_m
+  \<up>(d=d_m) 
+  * s_m_assn i_s s s_m * fc_m_assn i_s fc fc_m * fcs_m_assn i_s fcs fcs_m
   * inst_store_assn i_s
 )"     
 

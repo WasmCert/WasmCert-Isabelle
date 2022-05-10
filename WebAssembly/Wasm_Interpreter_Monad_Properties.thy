@@ -225,7 +225,7 @@ definition "cfg_m_assn_pure cfg cfg_m = (
 )"     
 
 lemma extract_pre_cfg_m_assn[extract_pure_rules]: 
-  "h \<Turnstile> cfg_m_assn i_s i_s' cfg cfg_m \<Longrightarrow> cfg_m_assn_pure cfg cfg_m"
+  "h \<Turnstile> cfg_m_assn i_s cfg cfg_m \<Longrightarrow> cfg_m_assn_pure cfg cfg_m"
   unfolding cfg_m_assn_def cfg_m_assn_pure_def fcs_m_assn_def
   apply (sep_auto split:config.splits config_m.splits)
   subgoal by (metis mod_starE extract_pre_fc_m_assn)
@@ -851,15 +851,15 @@ lemma init_tab_triple:
 (* run_step_b_e *)
 
 abbreviation cfg_m_pair_assn where 
-  "cfg_m_pair_assn i_s i_s' p p_m \<equiv> 
+  "cfg_m_pair_assn i_s p p_m \<equiv> 
   let (cfg, res) = p in 
   let (cfg_m, res_m) = p_m in 
-  cfg_m_assn i_s i_s' cfg cfg_m * \<up>(res = res_m)"
+  cfg_m_assn i_s  cfg cfg_m * \<up>(res = res_m)"
   
 lemma run_step_b_e_m_triple:
-    "<cfg_m_assn i_s i_s' cfg cfg_m> 
+    "<cfg_m_assn i_s cfg cfg_m> 
     run_step_b_e_m b_e cfg_m 
-    <\<lambda>r. cfg_m_pair_assn i_s i_s' (run_step_b_e b_e cfg) r>\<^sub>t"
+    <\<lambda>r. cfg_m_pair_assn i_s (run_step_b_e b_e cfg) r>\<^sub>t"
 proof - 
   obtain d s fc fcs where config:"cfg = Config d s fc fcs"
     by(erule config.exhaust)
@@ -1086,9 +1086,9 @@ lemma app_s_f_init_tab_m_triple:
   done
 
 lemma run_step_e_m_triple:
-    "<cfg_m_assn i_s i_s' cfg cfg_m> 
+    "<cfg_m_assn i_s cfg cfg_m> 
     run_step_e_m e cfg_m 
-    <\<lambda>r. cfg_m_pair_assn i_s i_s' (run_step_e e cfg) r>\<^sub>t"
+    <\<lambda>r. cfg_m_pair_assn i_s (run_step_e e cfg) r>\<^sub>t"
 proof -
   obtain d s fc fcs where config:"cfg = Config d s fc fcs"
     by(erule config.exhaust)
@@ -1124,12 +1124,8 @@ proof -
         [split] = v.splits option.splits 
         cl.splits cl_m.splits tf.splits nat.splits
 
-       apply(sep_auto simp:cl_m_agree_j_def locs_m_assn_def s_m_assn_def funcs_m_assn_def fc_m_assn_def)
-        apply(match premises in  J:"inst_store_subset i_s' _" and I:"inst_at i_s' _ _" 
-          \<Rightarrow> \<open>insert someI_ex[OF inst_store_extend_preserve_contains[OF I J]]\<close>)
-        apply(simp)
-      apply(sep_auto simp:s_m_assn_def funcs_m_assn_def cl_m_agree_j_def locs_m_assn_def)
-
+       apply(sep_auto simp:cl_m_agree_j_def locs_m_assn_def s_m_assn_def 
+          funcs_m_assn_def fc_m_assn_def)
       apply(sep_auto heap:host_apply_impl_m_triple simp:cl_m_agree_j_def)
       done
   next
@@ -1156,19 +1152,19 @@ qed
 (* run_iter *)
 
 lemma update_fc_return_preserve_assn:
-  "cfg_m_assn i_s i_s' (Config d s fc (fc'#fcs)) (Config_m d_m s_m fc_m (fc'_m#fcs_m)) 
-  \<Longrightarrow>\<^sub>A cfg_m_assn i_s i_s' (Config (Suc d) s (update_fc_return fc' v_s) fcs)
+  "cfg_m_assn i_s (Config d s fc (fc'#fcs)) (Config_m d_m s_m fc_m (fc'_m#fcs_m)) 
+  \<Longrightarrow>\<^sub>A cfg_m_assn i_s (Config (Suc d) s (update_fc_return fc' v_s) fcs)
     (Config_m (Suc d_m) s_m (update_fc_return_m fc'_m v_s) fcs_m) * true"
   unfolding cfg_m_assn_def 
   apply (sep_auto)
   unfolding fc_m_assn_def
   by (sep_auto split:frame_context.splits frame_context_m.splits)
 
-lemma update_redex_lc_preserve_assn:"cfg_m_assn i_s i_s'
+lemma update_redex_lc_preserve_assn:"cfg_m_assn i_s
        (Config d s (Frame_context redex lcs nf f) fcs)
        (Config_m d_m s_m (Frame_context_m redex_m 
         lcs_m nf_m f_locs1 f_inst2) fcs_m)
-  \<Longrightarrow>\<^sub>A cfg_m_assn i_s i_s'
+  \<Longrightarrow>\<^sub>A cfg_m_assn i_s 
        (Config d s (Frame_context (g1 redex lcs) (g2 redex lcs) nf f) fcs)
        (Config_m d_m s_m (Frame_context_m (g1 redex_m lcs) 
         (g2 redex_m lcs_m) nf_m f_locs1 f_inst2) fcs_m) "
@@ -1176,9 +1172,9 @@ lemma update_redex_lc_preserve_assn:"cfg_m_assn i_s i_s'
   by (sep_auto)
 
 lemma run_iter_m_triple:
-    "<cfg_m_assn i_s i_s' cfg cfg_m> 
+    "<cfg_m_assn i_s cfg cfg_m> 
     run_iter_m n cfg_m 
-    <\<lambda>r. cfg_m_pair_assn i_s i_s' (run_iter n cfg) r>\<^sub>t"
+    <\<lambda>r. cfg_m_pair_assn i_s (run_iter n cfg) r>\<^sub>t"
 proof(induct n arbitrary: i_s cfg cfg_m)
   case 0
   show ?case unfolding 0 by sep_auto
@@ -1228,14 +1224,14 @@ qed
 
 
 lemma run_v_m_triple: 
-  assumes "inst_at i_s (f_inst f, f_inst2) j" "inst_store_subset i_s' i_s"
-  shows "< s_m_assn i_s' s s_m * inst_store_assn i_s * locs_m_assn (f_locs f) f_locs1 > 
+  assumes "inst_at i_s (f_inst f, f_inst2) j" 
+  shows "< s_m_assn i_s s s_m * inst_store_assn i_s * locs_m_assn (f_locs f) f_locs1 > 
   run_v_m n d (s_m, f_locs1, f_inst2, b_es) 
   <\<lambda>(s_m', res_m). let (s', res) = run_v n d (s, f, b_es) in \<up>(res_m = res) 
-  * s_m_assn i_s' s' s_m' * inst_store_assn i_s >\<^sub>t"
+  * s_m_assn i_s s' s_m' * inst_store_assn i_s >\<^sub>t"
 proof - 
-  have 1:"s_m_assn i_s' s s_m * inst_store_assn i_s * locs_m_assn (f_locs f) f_locs1
-      \<Longrightarrow>\<^sub>A cfg_m_assn i_s i_s'
+  have 1:"s_m_assn i_s s s_m * inst_store_assn i_s * locs_m_assn (f_locs f) f_locs1
+      \<Longrightarrow>\<^sub>A cfg_m_assn i_s 
       (Config d s (Frame_context (Redex [] [] b_es) [] 0 f) [])
       (Config_m d s_m (Frame_context_m (Redex [] [] b_es) [] 0 f_locs1 f_inst2) [])"
     using assms
@@ -1250,18 +1246,18 @@ qed
 
 
 lemma run_instantiate_m_triple:
-  assumes "inst_at i_s (i, i_m) j" "inst_store_subset i_s' i_s"
-  shows "< s_m_assn i_s' s s_m * inst_store_assn i_s> 
+  assumes "inst_at i_s (i, i_m) j" 
+  shows "< s_m_assn i_s s s_m * inst_store_assn i_s> 
   run_instantiate_m n d (s_m, i_m, es)
   <\<lambda>(s_m', res_m). let (s', res) = run_instantiate n d (s, i, es) in \<up>(res_m = res) 
-  * s_m_assn i_s' s' s_m' * inst_store_assn i_s >\<^sub>t"
+  * s_m_assn i_s s' s_m' * inst_store_assn i_s >\<^sub>t"
 proof - 
   note 1 = cfg_m_assn_def fc_m_assn_def fcs_m_assn_def  locs_m_assn_def
 
   {
     fix locs
-    have "locs \<mapsto>\<^sub>a [] * s_m_assn i_s' s s_m * inst_store_assn i_s
-      \<Longrightarrow>\<^sub>A cfg_m_assn i_s i_s' 
+    have "locs \<mapsto>\<^sub>a [] * s_m_assn i_s s s_m * inst_store_assn i_s
+      \<Longrightarrow>\<^sub>A cfg_m_assn i_s 
           (Config d s (Frame_context (Redex [] es []) [] 0 \<lparr>f_locs = [], f_inst=i\<rparr>) [])
           (Config_m d s_m (Frame_context_m (Redex [] es []) [] 0 locs i_m) [])"
       unfolding 1 using assms by sep_auto

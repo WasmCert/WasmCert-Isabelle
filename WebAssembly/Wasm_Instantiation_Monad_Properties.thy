@@ -673,7 +673,7 @@ proof -
       apply(vcg decon:fold_map_decon
         [where R="\<lambda>x. \<exists>y. module_glob_typing _ x y" and 
           Q="\<lambda>g r.\<up>(interp_get_v s _ (g_init g) = r) * true"])
-       apply(sep_auto heap:1 simp:inst_store_subset_def module_glob_typing.simps)
+       apply(sep_auto heap:1 simp:module_glob_typing.simps)
       apply(solve_entails)
 
      apply(sep_auto simp:list_assn_star list_assn_pure list_all2_eq_map_conv)
@@ -684,7 +684,7 @@ proof -
         [where R="\<lambda>x. module_elem_typing _ x" and 
           Q="\<lambda>e r.\<up>(interp_get_i32 _ _ (e_off e) = r) * true"])
        apply(sep_auto simp: interp_get_i32_m_def interp_get_i32_def
-          module_elem_typing.simps inst_at_def inst_store_subset_def
+          module_elem_typing.simps inst_at_def 
           heap: interp_get_v_m_triple[where j=0])
       apply(solve_entails)
 
@@ -693,7 +693,7 @@ proof -
         [where R="\<lambda>x. module_data_typing _ x" and 
           Q="\<lambda>d r.\<up>(interp_get_i32 _ _ (d_off d) = r) * true"])
        apply(sep_auto simp: interp_get_i32_m_def interp_get_i32_def
-          module_data_typing.simps inst_at_def inst_store_subset_def
+          module_data_typing.simps inst_at_def 
           heap: interp_get_v_m_triple[where j=0])
       apply(solve_entails)
 
@@ -717,7 +717,6 @@ lemma interp_instantiate_init_m_triple:
   supply [simp del] = interp_instantiate_m.simps interp_instantiate.simps
     run_instantiate_m.simps run_instantiate.simps
   apply(sep_auto heap:interp_instantiate_m_triple run_instantiate_m_triple
-      simp:inst_store_subset_def
       split:res_inst_m.splits res_inst.splits prod.splits res.splits)
   done
 end
