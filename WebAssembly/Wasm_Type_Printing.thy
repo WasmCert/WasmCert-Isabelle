@@ -70,6 +70,7 @@ lemma[code]: "int32_minus_one = i32_impl_abs (-1 :: uint32)"
 lemma[code]: "deserialise_i32 bs = i32_impl_abs (Abs_uint32' (word_rcat_rev (map Rep_uint8' bs)))"
   by transfer fastforce
 
+(* TODO: avoid rep round-trip *)
 lemma[code]: "serialise_i32 (i32_impl_abs x) = map Abs_uint8' (word_rsplit_rev (Rep_uint32' x))"
   by (simp add: serialise_i32_def i32_impl_abs_def I32.rep_abs Abs_uint8'.abs_eq)
 

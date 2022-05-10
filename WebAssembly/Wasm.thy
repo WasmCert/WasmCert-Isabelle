@@ -27,11 +27,11 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | drop:"\<C> \<turnstile> [Drop] : ([t] _> [])"
 | select:"\<C> \<turnstile> [Select] : ([t,t,T_num T_i32] _> [t])"
   \<comment> \<open>\<open>block\<close>\<close>
-| block:"\<lbrakk>tf = (tn _> tm); \<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr> \<turnstile> es : (tn _> tm)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Block tf es] : (tn _> tm)"
+| block:"\<lbrakk>tb_tf_t \<C> tb = Some (tn _> tm); \<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr> \<turnstile> es : (tn _> tm)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Block tb es] : (tn _> tm)"
   \<comment> \<open>\<open>loop\<close>\<close>
-| loop:"\<lbrakk>tf = (tn _> tm); \<C>\<lparr>label := ([tn] @ (label \<C>))\<rparr> \<turnstile> es : (tn _> tm)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Loop tf es] : (tn _> tm)"
+| loop:"\<lbrakk>tb_tf_t \<C> tb = Some (tn _> tm); \<C>\<lparr>label := ([tn] @ (label \<C>))\<rparr> \<turnstile> es : (tn _> tm)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Loop tb es] : (tn _> tm)"
   \<comment> \<open>\<open>if then else\<close>\<close>
-| if_wasm:"\<lbrakk>tf = (tn _> tm); \<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr> \<turnstile> es1 : (tn _> tm); \<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr> \<turnstile> es2 : (tn _> tm)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [If tf es1 es2] : (tn @ [T_num T_i32] _> tm)"
+| if_wasm:"\<lbrakk>tb_tf_t \<C> tb = Some (tn _> tm); \<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr> \<turnstile> es1 : (tn _> tm); \<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr> \<turnstile> es2 : (tn _> tm)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [If tb es1 es2] : (tn @ [T_num T_i32] _> tm)"
   \<comment> \<open>\<open>br\<close>\<close>
 | br:"\<lbrakk>i < length(label \<C>); (label \<C>)!i = ts\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Br i] : (t1s @ ts _> t2s)"
   \<comment> \<open>\<open>br_if\<close>\<close>
@@ -193,13 +193,9 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
   \<comment> \<open>\<open>select\<close>\<close>
 | select_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$(C v1), $(C v2), $C\<^sub>n (ConstInt32 n), ($ Select)]\<rparr> \<leadsto> \<lparr>[$(C v2)]\<rparr>"
 | select_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$(C v1), $(C v2), $C\<^sub>n (ConstInt32 n), ($ Select)]\<rparr> \<leadsto> \<lparr>[$(C v1)]\<rparr>"
-  \<comment> \<open>\<open>block\<close>\<close>
-| block:"\<lbrakk>length vs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>($C* vs) @ [$(Block (t1s _> t2s) es)]\<rparr> \<leadsto> \<lparr>[Label m [] (($C* vs) @ ($* es))]\<rparr>"
-  \<comment> \<open>\<open>loop\<close>\<close>
-| loop:"\<lbrakk>length vs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>($C* vs) @ [$(Loop (t1s _> t2s) es)]\<rparr> \<leadsto> \<lparr>[Label n [$(Loop (t1s _> t2s) es)] (($C* vs) @ ($* es))]\<rparr>"
   \<comment> \<open>\<open>if\<close>\<close>
-| if_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$C\<^sub>n (ConstInt32 n), $(If tf e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tf e2s)]\<rparr>"
-| if_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$C\<^sub>n (ConstInt32 n), $(If tf e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tf e1s)]\<rparr>"
+| if_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$C\<^sub>n (ConstInt32 n), $(If tb e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tb e2s)]\<rparr>"
+| if_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$C\<^sub>n (ConstInt32 n), $(If tb e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tb e1s)]\<rparr>"
   \<comment> \<open>\<open>label\<close>\<close>
 | label_const:"\<lparr>[Label n es ($C* vs)]\<rparr> \<leadsto> \<lparr>($C* vs)\<rparr>"
 | label_trap:"\<lparr>[Label n es [Trap]]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
@@ -230,7 +226,7 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
 | call_indirect_Some:"\<lbrakk>(f_inst f) = i; stab s i (nat_of_int c) = Some i_cl; stypes i j = tf; cl_type (funcs s!i_cl) = tf\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke i_cl]\<rparr>"
 | call_indirect_None:"\<lbrakk>(f_inst f) = i; (stab s i (nat_of_int c) = Some i_cl \<and> stypes i j \<noteq> cl_type (funcs s!i_cl)) \<or> stab s i (nat_of_int c) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>invoke\<close>\<close>
-| invoke_native:"\<lbrakk>(funcs s!i_cl) = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs) \<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;[Frame m \<lparr> f_locs = vcs@zs, f_inst = j \<rparr> [$(Block ([] _> t2s) es)]]\<rparr>"
+| invoke_native:"\<lbrakk>(funcs s!i_cl) = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs) \<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;[Frame m \<lparr> f_locs = vcs@zs, f_inst = j \<rparr> [(Label m [] ($*es))]]\<rparr>"
 | invoke_host_Some:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs (Some (s', vcs'))\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f;($C* vcs')\<rparr>"
 | invoke_host_None:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>get_local\<close>\<close>
@@ -268,6 +264,10 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
 | grow_memory:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 c), $(Grow_memory)]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[$C\<^sub>n (ConstInt32 (int_of_nat n))]\<rparr>"
   \<comment> \<open>\<open>grow_memory fail\<close>\<close>
 | grow_memory_fail:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 c),$(Grow_memory)]\<rparr> \<leadsto> \<lparr>s;f;[$C\<^sub>n (ConstInt32 int32_minus_one)]\<rparr>"
+  \<comment> \<open>\<open>block\<close>\<close>
+| block:"\<lbrakk>length vs = n; tb_tf (f_inst f) tb = (t1s _> t2s); length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>s;f;($C* vs) @ [$(Block tb es)]\<rparr> \<leadsto> \<lparr>s;f;[Label m [] (($C* vs) @ ($* es))]\<rparr>"
+  \<comment> \<open>\<open>loop\<close>\<close>
+| loop:"\<lbrakk>length vs = n; tb_tf (f_inst f) tb = (t1s _> t2s); length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>s;f;($C* vs) @ [$(Loop tb es)]\<rparr> \<leadsto> \<lparr>s;f;[Label n [$(Loop tb es)] (($C* vs) @ ($* es))]\<rparr>"
   (* The bad ones *)
   \<comment> \<open>\<open>inductive label reduction\<close>\<close>
 | label:"\<lbrakk>\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>; Lfilled k lholed es les; Lfilled k lholed es' les'\<rbrakk> \<Longrightarrow> \<lparr>s;f;les\<rparr> \<leadsto> \<lparr>s';f';les'\<rparr>"

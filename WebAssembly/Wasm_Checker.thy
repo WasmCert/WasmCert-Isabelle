@@ -121,18 +121,26 @@ foldl_Cons: "foldl f a (x # xs) = foldl f (f a x) xs"
 | check_drop:"check_single \<C> (Drop) ts = type_update ts [TAny] (Type [])"
 | check_select:"check_single \<C> (Select) ts = type_update_select ts"
   (* block *)                                 
-| check_block:"check_single \<C> (Block (tn _> tm) es) ts = (if (b_e_type_checker (\<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr>) es (tn _> tm))
-                                                            then type_update ts (to_ct_list tn) (Type tm)
-                                                            else Bot)"
+| check_block:"check_single \<C> (Block tb es) ts = (case tb_tf_t \<C> tb of
+                                                    Some (tn _> tm) \<Rightarrow>
+                                                      (if (b_e_type_checker (\<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr>) es (tn _> tm))
+                                                        then type_update ts (to_ct_list tn) (Type tm)
+                                                        else Bot)
+                                                  | None \<Rightarrow> Bot)"
   (* loop *)
-| check_loop:"check_single \<C> (Loop (tn _> tm) es) ts = (if (b_e_type_checker (\<C>\<lparr>label := ([tn] @ (label \<C>))\<rparr>) es (tn _> tm))
-                                                          then type_update ts (to_ct_list tn) (Type tm)
-                                                          else Bot)"
+| check_loop:"check_single \<C> (Loop tb es) ts = (case tb_tf_t \<C> tb of
+                                                  Some (tn _> tm) \<Rightarrow>
+                                                    (if (b_e_type_checker (\<C>\<lparr>label := ([tn] @ (label \<C>))\<rparr>) es (tn _> tm))
+                                                      then type_update ts (to_ct_list tn) (Type tm)
+                                                      else Bot)
+                                                | None \<Rightarrow> Bot)"
   (* if *)
-| check_if:"check_single \<C> (If (tn _> tm) es1 es2) ts = (if (b_e_type_checker (\<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr>) es1 (tn _> tm)
+| check_if:"check_single \<C> (If tb es1 es2) ts = (case tb_tf_t \<C> tb of
+                                                   Some (tn _> tm) \<Rightarrow> (if (b_e_type_checker (\<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr>) es1 (tn _> tm)
                                                               \<and> b_e_type_checker (\<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr>) es2 (tn _> tm))
                                                             then type_update ts (to_ct_list (tn@[T_num T_i32])) (Type tm)
-                                                            else Bot)"
+                                                            else Bot)
+                                                 | None => Bot)"
   (* br *)
 | check_br:"check_single \<C> (Br i) ts = (if i < length (label \<C>)
                                          then type_update ts (to_ct_list ((label \<C>)!i)) (TopType [])

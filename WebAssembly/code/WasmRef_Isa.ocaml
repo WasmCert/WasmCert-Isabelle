@@ -882,8 +882,9 @@ module WasmRef_Isa : sig
   type unop_f = Neg | Abs | Ceil | Floor | Trunc | Nearest | Sqrt
   type unop = Unop_i of unop_i | Unop_f of unop_f | Extend_s of tp_num
   type sat = Sat | Nonsat
-  type b_e = Unreachable | Nop | Drop | Select | Block of tf * b_e list |
-    Loop of tf * b_e list | If of tf * b_e list * b_e list | Br of nat |
+  type tb = Tbf of nat | Tbv of t option
+  type b_e = Unreachable | Nop | Drop | Select | Block of tb * b_e list |
+    Loop of tb * b_e list | If of tb * b_e list * b_e list | Br of nat |
     Br_if of nat | Br_table of nat list * nat | Return | Call of nat |
     Call_indirect of nat | Get_local of nat | Set_local of nat |
     Tee_local of nat | Get_global of nat | Set_global of nat |
@@ -1127,6 +1128,7 @@ module WasmRef_Isa : sig
   val label : 'a t_context_ext -> (t list) list
   val vec_f_num : shape_vec_f -> nat
   val vec_num : shape_vec -> nat
+  val tb_tf_t : unit t_context_ext -> tb -> tf option
   val same_lab_h : nat list -> (t list) list -> t list -> (t list) option
   val same_lab : nat list -> (t list) list -> (t list) option
   val is_mut : unit tg_ext -> bool
@@ -1225,7 +1227,7 @@ module WasmRef_Isa : sig
   val app_unop_vec : V128Wrapper.unop_vec_t -> v_vec -> v_vec
   val crash_invalid : res_step
   val app_v_s_if :
-    tf -> b_e list -> b_e list -> v list -> v list * (e list * res_step)
+    tb -> b_e list -> b_e list -> v list -> v list * (e list * res_step)
   val g_val_update : (v -> v) -> 'a global_ext -> 'a global_ext
   val app_binop_vec_v :
     V128Wrapper.binop_vec_t ->
@@ -1420,6 +1422,7 @@ module WasmRef_Isa : sig
   val crash_invariant : res_step
   val app_v_s_testop : testop -> v list -> v list * res_step
   val app_v_s_select : v list -> v list * res_step
+  val tb_tf_m : unit inst_m_ext -> tb -> (unit -> tf)
   val app_v_s_relop : relop -> v list -> v list * res_step
   val wasm_reinterpret : t_num -> v_num -> v_num
   val app_v_s_cvtop :
@@ -3856,8 +3859,10 @@ type unop = Unop_i of unop_i | Unop_f of unop_f | Extend_s of tp_num;;
 
 type sat = Sat | Nonsat;;
 
-type b_e = Unreachable | Nop | Drop | Select | Block of tf * b_e list |
-  Loop of tf * b_e list | If of tf * b_e list * b_e list | Br of nat |
+type tb = Tbf of nat | Tbv of t option;;
+
+type b_e = Unreachable | Nop | Drop | Select | Block of tb * b_e list |
+  Loop of tb * b_e list | If of tb * b_e list * b_e list | Br of nat |
   Br_if of nat | Br_table of nat list * nat | Return | Call of nat |
   Call_indirect of nat | Get_local of nat | Set_local of nat | Tee_local of nat
   | Get_global of nat | Set_global of nat |
@@ -4706,6 +4711,14 @@ let rec vec_f_num
 let rec vec_num
   sv = (match sv with Svi a -> vec_i_num a | Svf a -> vec_f_num a);;
 
+let rec tb_tf_t
+  c tb =
+    (match tb
+      with Tbf i ->
+        (let tfs = types_t c in
+          (if less_nat i (size_list tfs) then Some (nth tfs i) else None))
+      | Tbv None -> Some (Tf ([], [])) | Tbv (Some t) -> Some (Tf ([], [t])));;
+
 let rec same_lab_h
   x0 uu ts = match x0, uu, ts with [], uu, ts -> Some ts
     | i :: is, lab_c, ts ->
@@ -4790,21 +4803,27 @@ and check_single
     | c, Nop, ts -> ts
     | c, Drop, ts -> type_update ts [TAny] (Typea [])
     | c, Select, ts -> type_update_select ts
-    | c, Block (Tf (tn, tm), es), ts ->
-        (if b_e_type_checker (label_update (fun _ -> [tm] @ label c) c) es
-              (Tf (tn, tm))
-          then type_update ts (to_ct_list tn) (Typea tm) else Bot)
-    | c, Loop (Tf (tn, tm), es), ts ->
-        (if b_e_type_checker (label_update (fun _ -> [tn] @ label c) c) es
-              (Tf (tn, tm))
-          then type_update ts (to_ct_list tn) (Typea tm) else Bot)
-    | c, If (Tf (tn, tm), es1, es2), ts ->
-        (if b_e_type_checker (label_update (fun _ -> [tm] @ label c) c) es1
-              (Tf (tn, tm)) &&
-              b_e_type_checker (label_update (fun _ -> [tm] @ label c) c) es2
-                (Tf (tn, tm))
-          then type_update ts (to_ct_list (tn @ [T_num T_i32])) (Typea tm)
-          else Bot)
+    | c, Block (tb, es), ts ->
+        (match tb_tf_t c tb with None -> Bot
+          | Some (Tf (tn, tm)) ->
+            (if b_e_type_checker (label_update (fun _ -> [tm] @ label c) c) es
+                  (Tf (tn, tm))
+              then type_update ts (to_ct_list tn) (Typea tm) else Bot))
+    | c, Loop (tb, es), ts ->
+        (match tb_tf_t c tb with None -> Bot
+          | Some (Tf (tn, tm)) ->
+            (if b_e_type_checker (label_update (fun _ -> [tn] @ label c) c) es
+                  (Tf (tn, tm))
+              then type_update ts (to_ct_list tn) (Typea tm) else Bot))
+    | c, If (tb, es1, es2), ts ->
+        (match tb_tf_t c tb with None -> Bot
+          | Some (Tf (tn, tm)) ->
+            (if b_e_type_checker (label_update (fun _ -> [tm] @ label c) c) es1
+                  (Tf (tn, tm)) &&
+                  b_e_type_checker (label_update (fun _ -> [tm] @ label c) c)
+                    es2 (Tf (tn, tm))
+              then type_update ts (to_ct_list (tn @ [T_num T_i32])) (Typea tm)
+              else Bot))
     | c, Br i, ts ->
         (if less_nat i (size_list (label c))
           then type_update ts (to_ct_list (nth (label c) i)) (TopType [])
@@ -5423,12 +5442,12 @@ let crash_invalid : res_step
   = Res_crash (Error_invalid "type system violation");;
 
 let rec app_v_s_if
-  tf es1 es2 v_s =
+  tb es1 es2 v_s =
     (match v_s with [] -> (v_s, ([], crash_invalid))
       | V_num (ConstInt32 c) :: v_sa ->
         (if int_eq_i32 c zero_i32a
-          then (v_sa, ([Basic (Block (tf, es2))], Step_normal))
-          else (v_sa, ([Basic (Block (tf, es1))], Step_normal)))
+          then (v_sa, ([Basic (Block (tb, es2))], Step_normal))
+          else (v_sa, ([Basic (Block (tb, es1))], Step_normal)))
       | V_num (ConstInt64 _) :: _ -> (v_s, ([], crash_invalid))
       | V_num (ConstFloat32 _) :: _ -> (v_s, ([], crash_invalid))
       | V_num (ConstFloat64 _) :: _ -> (v_s, ([], crash_invalid))
@@ -6601,6 +6620,12 @@ let rec app_v_s_select
           | V_num (ConstFloat64 _) :: _ -> (v_s, crash_invalid)
           | V_vec _ :: _ -> (v_s, crash_invalid));;
 
+let rec tb_tf_m
+  tfa tb =
+    (match tb with Tbf a -> array_nth heap_tf (types tfa) a
+      | Tbv None -> (fun () -> (Tf ([], [])))
+      | Tbv (Some t) -> (fun () -> (Tf ([], [t]))));;
+
 let rec app_v_s_relop
   relop v_s =
     (match v_s with [] -> (v_s, crash_invalid)
@@ -6706,45 +6731,53 @@ let rec run_step_b_e_m
           (let (v_sa, res) = app_v_s_select v_s in
             (fun () ->
               (Config_m (d, s, update_fc_step_m fc v_sa [], fcs), res)))
-        | Block (Tf (t1s, t2s), b_ebs) ->
+        | Block (tb, b_ebs) ->
           (if not (null es)
             then (fun () -> (Config_m (d, s, fc, fcs), crash_invariant))
-            else (let n = size_list t1s in
-                  let m = size_list t2s in
-                   (if less_eq_nat n (size_list v_s)
-                     then (let (v_bs, v_sa) = split_n v_s n in
-                           let lc = Label_context (v_sa, b_es, m, []) in
-                           let fca =
-                             Frame_context_m
-                               (Redex (v_bs, [], b_ebs), lc :: lcs, nf, f_locs1,
-                                 f_inst2)
-                             in
-                            (fun () ->
-                              (Config_m (d, s, fca, fcs), Step_normal)))
-                     else (fun () ->
-                            (Config_m (d, s, fc, fcs), crash_invalid)))))
-        | Loop (Tf (t1s, t2s), b_els) ->
+            else (fun () ->
+                   (let a = tb_tf_m f_inst2 tb () in
+                     (let Tf (t1s, t2s) = a in
+                      let n = size_list t1s in
+                      let m = size_list t2s in
+                       (if less_eq_nat n (size_list v_s)
+                         then (let (v_bs, v_sa) = split_n v_s n in
+                               let lc = Label_context (v_sa, b_es, m, []) in
+                               let fca =
+                                 Frame_context_m
+                                   (Redex (v_bs, [], b_ebs), lc :: lcs, nf,
+                                     f_locs1, f_inst2)
+                                 in
+                                (fun () ->
+                                  (Config_m (d, s, fca, fcs), Step_normal)))
+                         else (fun () ->
+                                (Config_m (d, s, fc, fcs), crash_invalid))))
+                       ())))
+        | Loop (tb, b_els) ->
           (if not (null es)
             then (fun () -> (Config_m (d, s, fc, fcs), crash_invariant))
-            else (let n = size_list t1s in
-                  let _ = size_list t2s in
-                   (if less_eq_nat n (size_list v_s)
-                     then (let (v_bs, v_sa) = split_n v_s n in
-                           let lc =
-                             Label_context
-                               (v_sa, b_es, n, [Loop (Tf (t1s, t2s), b_els)])
-                             in
-                           let fca =
-                             Frame_context_m
-                               (Redex (v_bs, [], b_els), lc :: lcs, nf, f_locs1,
-                                 f_inst2)
-                             in
-                            (fun () ->
-                              (Config_m (d, s, fca, fcs), Step_normal)))
-                     else (fun () ->
-                            (Config_m (d, s, fc, fcs), crash_invalid)))))
-        | If (tf, es1, es2) ->
-          (let (v_sa, (es_cont, res)) = app_v_s_if tf es1 es2 v_s in
+            else (fun () ->
+                   (let a = tb_tf_m f_inst2 tb () in
+                     (let Tf (t1s, t2s) = a in
+                      let n = size_list t1s in
+                      let _ = size_list t2s in
+                       (if less_eq_nat n (size_list v_s)
+                         then (let (v_bs, v_sa) = split_n v_s n in
+                               let lc =
+                                 Label_context
+                                   (v_sa, b_es, n, [Loop (tb, b_els)])
+                                 in
+                               let fca =
+                                 Frame_context_m
+                                   (Redex (v_bs, [], b_els), lc :: lcs, nf,
+                                     f_locs1, f_inst2)
+                                 in
+                                (fun () ->
+                                  (Config_m (d, s, fca, fcs), Step_normal)))
+                         else (fun () ->
+                                (Config_m (d, s, fc, fcs), crash_invalid))))
+                       ())))
+        | If (tb, es1, es2) ->
+          (let (v_sa, (es_cont, res)) = app_v_s_if tb es1 es2 v_s in
             (fun () ->
               (Config_m (d, s, update_fc_step_m fc v_sa es_cont, fcs), res)))
         | Br k ->
@@ -7027,10 +7060,8 @@ let rec run_step_e_m
  (rev v_fs @ zs)))
                                       ()) ())
                                       (fun ff_locs1 ->
-(let fcf =
-   Frame_context_m
-     (Redex ([], [], [Block (Tf ([], t2s), es_f)]), [], m, ff_locs1, i)
-   in
+(let lc = Label_context ([], [], m, []) in
+ let fcf = Frame_context_m (Redex ([], [], es_f), [lc], m, ff_locs1, i) in
   (fun () ->
     (Config_m (minus_nat d one_nata, s, fcf, fca :: fcs), Step_normal)))))
                              else (fun () ->

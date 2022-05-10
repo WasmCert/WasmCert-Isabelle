@@ -461,26 +461,26 @@ lemma b_e_type_set_global:
 
 lemma b_e_type_block:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = Block tf es"
-  shows "\<exists>ts'' tfn tfm. tf = (tfn _> tfm) \<and> (ts = ts''@tfn) \<and> (ts' = ts''@tfm) \<and>
-                        (\<C>\<lparr>label :=  [tfm] @ label \<C>\<rparr> \<turnstile> es : tf)"
+          "e = Block tb es"
+  shows "\<exists>ts'' tfn tfm. (tb_tf_t \<C> tb) = Some (tfn _> tfm) \<and> (ts = ts''@tfn) \<and> (ts' = ts''@tfm) \<and>
+                        (\<C>\<lparr>label :=  [tfm] @ label \<C>\<rparr> \<turnstile> es : (tfn _> tfm))"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
 lemma b_e_type_loop:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = Loop tf es"
-  shows "\<exists>ts'' tfn tfm. tf = (tfn _> tfm) \<and> (ts = ts''@tfn) \<and> (ts' = ts''@tfm) \<and>
-                        (\<C>\<lparr>label :=  [tfn] @ label \<C>\<rparr> \<turnstile> es : tf)"
+          "e = Loop tb es"
+  shows "\<exists>ts'' tfn tfm. (tb_tf_t \<C> tb) = Some (tfn _> tfm) \<and> (ts = ts''@tfn) \<and> (ts' = ts''@tfm) \<and>
+                        (\<C>\<lparr>label :=  [tfn] @ label \<C>\<rparr> \<turnstile> es : (tfn _> tfm))"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
 lemma b_e_type_if:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = If tf es1 es2"
-  shows "\<exists>ts'' tfn tfm. tf = (tfn _> tfm) \<and> (ts = ts''@tfn @ [T_num T_i32]) \<and> (ts' = ts''@tfm) \<and>
-                        (\<C>\<lparr>label := [tfm] @ label \<C>\<rparr> \<turnstile> es1 : tf) \<and>
-                        (\<C>\<lparr>label := [tfm] @ label \<C>\<rparr> \<turnstile> es2 : tf)"
+          "e = If tb es1 es2"
+  shows "\<exists>ts'' tfn tfm. (tb_tf_t \<C> tb) = Some (tfn _> tfm) \<and> (ts = ts''@tfn @ [T_num T_i32]) \<and> (ts' = ts''@tfm) \<and>
+                        (\<C>\<lparr>label := [tfm] @ label \<C>\<rparr> \<turnstile> es1 : (tfn _> tfm)) \<and>
+                        (\<C>\<lparr>label := [tfm] @ label \<C>\<rparr> \<turnstile> es2 : (tfn _> tfm))"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
@@ -1812,6 +1812,14 @@ lemma store_mem_exists:
 lemma store_tab_exists:
   assumes "inst_typing s i \<C>"
   shows "length (table \<C>) = length (inst.tabs i)"
+  using assms list_all2_lengthD
+  unfolding inst_typing.simps
+  by fastforce
+
+
+lemma store_types_exists:
+  assumes "inst_typing s i \<C>"
+  shows "types_t \<C> = inst.types i"
   using assms list_all2_lengthD
   unfolding inst_typing.simps
   by fastforce
