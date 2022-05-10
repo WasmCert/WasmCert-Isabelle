@@ -1,4 +1,4 @@
-theory Wasm_Type_Printing imports Wasm_Native_Word_Entry begin
+theory Wasm_Type_Printing imports Wasm_Native_Word_Entry "../libs/Misc_Generic_Lemmas" begin
 (* Maps types to Andreas' Ocaml implementation - a thin wrapper over Ocaml ints/floats for the most part. *)
 
 code_printing
@@ -70,6 +70,7 @@ lemma[code]: "int32_minus_one = i32_impl_abs (-1 :: uint32)"
 lemma[code]: "deserialise_i32 bs = i32_impl_abs (Abs_uint32' (word_rcat_rev (map Rep_uint8' bs)))"
   by transfer fastforce
 
+(* TODO: avoid rep round-trip *)
 lemma[code]: "serialise_i32 (i32_impl_abs x) = map Abs_uint8' (word_rsplit_rev (Rep_uint32' x))"
   by (simp add: serialise_i32_def i32_impl_abs_def I32.rep_abs Abs_uint8'.abs_eq)
 
@@ -81,9 +82,23 @@ lemma[code]: "int_clz (i32_impl_abs x) = i32_impl_abs (Abs_uint32' (Word.of_nat 
 lemma[code]: "int_ctz (i32_impl_abs x) = i32_impl_abs (Abs_uint32' (Word.of_nat (word_ctz (Rep_uint32' x))))"
   by (simp add: i32_impl_abs_def Abs_uint32'.rep_eq I32.int_ctz_def int_ctz_i32.abs_eq)
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "int_popcnt (i32_impl_abs x) = i32_impl_abs (Abs_uint32' (Word.of_nat (pop_count (Rep_uint32' x))))"
+lemma "int_popcnt (i32_impl_abs x) = i32_impl_abs (Abs_uint32' (Word.of_nat (pop_count (Rep_uint32' x))))"
   by (simp add: i32_impl_abs_def Abs_uint32'.rep_eq I32.int_popcnt_def int_popcnt_i32.abs_eq)
+
+lemma[code]: "int_popcnt (i32_impl_abs x) = i32_impl_abs (uint32_of_nat (fold_atLeastAtMost_nat (\<lambda>n acc. if bit x n then acc+1 else acc) 0 31 0))"
+proof -
+  have a:"\<And>x. comp_fun_commute (\<lambda>n acc. if bit x n then acc+1 else acc)"
+    unfolding comp_fun_commute_def
+    by auto
+  have b:"Finite_Set.fold (\<lambda>n acc. if bit x n then acc+1 else acc) 0 {0..31} = fold (\<lambda>n acc. if bit x n then acc+1 else acc) [0..<32] 0"
+      using comp_fun_commute.fold_set_fold_remdups[OF a, of x 0 "[0..<32]"]
+      by (simp add: atLeastAtMost_upt)
+  have "pop_count (Rep_uint32' x) = (fold_atLeastAtMost_nat (\<lambda>n acc. if bit x n then acc+1 else acc) 0 31 0)"
+    using length_filter_fold[of _ "[0..<32]" 0]
+    by (simp add: bit_uint32.rep_eq[symmetric] b rev_filter[symmetric] pop_count_def to_bl_unfold fold_atLeastAtMost_nat[OF a])
+  thus ?thesis
+    by (simp add: uint32_of_int.rep_eq uint32_of_nat_def i32_impl_abs_def Abs_uint32'.rep_eq I32.int_popcnt_def int_popcnt_i32.abs_eq)
+qed
 
 lemma[code]: "int_add (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (x + y)"
   by (simp add: i32_impl_abs_def I32.int_add_def int_add_i32.abs_eq plus_uint32.rep_eq)
@@ -196,30 +211,26 @@ lemma[code]: "int_eq (i32_impl_abs x) (i32_impl_abs y) = (x = y)"
 lemma[code]: "int_lt_u (i32_impl_abs x) (i32_impl_abs y) = (x < y)"
   by (simp add: i32_impl_abs_def I32.int_lt_u_def int_lt_u_i32.abs_eq less_uint32.rep_eq)
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "int_lt_s (i32_impl_abs x) (i32_impl_abs y) = ((Rep_uint32' x) <s (Rep_uint32' y))"
-  by (simp add: i32_impl_abs_def I32.int_lt_s_def int_lt_s_i32.abs_eq)
+lemma[code]: "int_lt_s (i32_impl_abs x) (i32_impl_abs y) = ((msb y \<longrightarrow> msb x) \<and> (msb x \<and> \<not> msb y \<or> x < y))"
+  by (simp add: i32_impl_abs_def I32.int_lt_s_def int_lt_s_i32.abs_eq word_sless_msb_less less_uint32.rep_eq msb_uint32.rep_eq)
 
 lemma[code]: "int_gt_u (i32_impl_abs x) (i32_impl_abs y) = (x > y)"
   by (simp add: i32_impl_abs_def I32.int_gt_u_def int_gt_u_i32.abs_eq less_uint32.rep_eq)
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "int_gt_s (i32_impl_abs x) (i32_impl_abs y) = (signed.greater (Rep_uint32' x) (Rep_uint32' y))"
-  by (simp add: i32_impl_abs_def I32.int_gt_s_def int_gt_s_i32.abs_eq)
+lemma[code]: "int_gt_s (i32_impl_abs x) (i32_impl_abs y) = ((msb x \<longrightarrow> msb y) \<and> (msb y \<and> \<not> msb x \<or> y < x))"
+  by (simp add: i32_impl_abs_def I32.int_gt_s_def int_gt_s_i32.abs_eq less_uint32.rep_eq msb_uint32.rep_eq word_sless_msb_less)
 
 lemma[code]: "int_le_u (i32_impl_abs x) (i32_impl_abs y) = (x \<le> y)"
   by (simp add: i32_impl_abs_def I32.int_le_u_def int_le_u_i32.abs_eq less_eq_uint32.rep_eq)
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "int_le_s (i32_impl_abs x) (i32_impl_abs y) = ((Rep_uint32' x) \<le>s (Rep_uint32' y))"
-  by (simp add: i32_impl_abs_def I32.int_le_s_def int_le_s_i32.abs_eq)
+lemma[code]: "int_le_s (i32_impl_abs x) (i32_impl_abs y) = ((msb y \<longrightarrow> msb x) \<and> (msb x \<and> \<not> msb y \<or> x \<le> y))"
+  by (simp add: i32_impl_abs_def I32.int_le_s_def int_le_s_i32.abs_eq less_eq_uint32.rep_eq msb_uint32.rep_eq word_sle_msb_le)
 
 lemma[code]: "int_ge_u (i32_impl_abs x) (i32_impl_abs y) = (x \<ge> y)"
   by (simp add: i32_impl_abs_def I32.int_ge_u_def int_ge_u_i32.abs_eq less_eq_uint32.rep_eq)
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "int_ge_s (i32_impl_abs x) (i32_impl_abs y) = (signed.greater_eq (Rep_uint32' x) (Rep_uint32' y))"
-  by (simp add: i32_impl_abs_def I32.int_ge_s_def int_ge_s_i32.abs_eq)
+lemma[code]: "int_ge_s (i32_impl_abs x) (i32_impl_abs y) =  ((msb x \<longrightarrow> msb y) \<and> (msb y \<and> \<not> msb x \<or> y \<le> x))"
+  by (simp add: i32_impl_abs_def I32.int_ge_s_def int_ge_s_i32.abs_eq less_eq_uint32.rep_eq msb_uint32.rep_eq word_sle_msb_le)
 
 (* i64 *)
 
@@ -247,9 +258,23 @@ lemma[code]: "int_clz (i64_impl_abs x) = i64_impl_abs (Abs_uint64' (Word.of_nat 
 lemma[code]: "int_ctz (i64_impl_abs x) = i64_impl_abs (Abs_uint64' (Word.of_nat (word_ctz (Rep_uint64' x))))"
   by (simp add: i64_impl_abs_def Abs_uint64'.rep_eq I64.int_ctz_def int_ctz_i64.abs_eq)
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "int_popcnt (i64_impl_abs x) = i64_impl_abs (Abs_uint64' (Word.of_nat (pop_count (Rep_uint64' x))))"
+lemma "int_popcnt (i64_impl_abs x) = i64_impl_abs (Abs_uint64' (Word.of_nat (pop_count (Rep_uint64' x))))"
   by (simp add: i64_impl_abs_def Abs_uint64'.rep_eq I64.int_popcnt_def int_popcnt_i64.abs_eq)
+
+lemma[code]: "int_popcnt (i64_impl_abs x) = i64_impl_abs (uint64_of_nat (fold_atLeastAtMost_nat (\<lambda>n acc. if bit x n then acc+1 else acc) 0 63 0))"
+proof -
+  have a:"\<And>x. comp_fun_commute (\<lambda>n acc. if bit x n then acc+1 else acc)"
+    unfolding comp_fun_commute_def
+    by auto
+  have b:"Finite_Set.fold (\<lambda>n acc. if bit x n then acc+1 else acc) 0 {0..63} = fold (\<lambda>n acc. if bit x n then acc+1 else acc) [0..<64] 0"
+      using comp_fun_commute.fold_set_fold_remdups[OF a, of x 0 "[0..<64]"]
+      by (simp add: atLeastAtMost_upt)
+  have "pop_count (Rep_uint64' x) = (fold_atLeastAtMost_nat (\<lambda>n acc. if bit x n then acc+1 else acc) 0 63 0)"
+    using length_filter_fold[of _ "[0..<64]" 0]
+    by (simp add: bit_uint64.rep_eq[symmetric] b rev_filter[symmetric] pop_count_def to_bl_unfold fold_atLeastAtMost_nat[OF a])
+  thus ?thesis
+    by (simp add: uint64_of_int.rep_eq uint64_of_nat_def i64_impl_abs_def Abs_uint64'.rep_eq I64.int_popcnt_def int_popcnt_i64.abs_eq)
+qed
 
 lemma[code]: "int_add (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (x + y)"
   by (simp add: i64_impl_abs_def I64.int_add_def int_add_i64.abs_eq plus_uint64.rep_eq)
@@ -362,31 +387,26 @@ lemma[code]: "int_eq (i64_impl_abs x) (i64_impl_abs y) = (x = y)"
 lemma[code]: "int_lt_u (i64_impl_abs x) (i64_impl_abs y) = (x < y)"
   by (simp add: i64_impl_abs_def I64.int_lt_u_def int_lt_u_i64.abs_eq less_uint64.rep_eq)
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "int_lt_s (i64_impl_abs x) (i64_impl_abs y) = ((Rep_uint64' x) <s (Rep_uint64' y))"
-  by (simp add: i64_impl_abs_def I64.int_lt_s_def int_lt_s_i64.abs_eq)
+lemma[code]: "int_lt_s (i64_impl_abs x) (i64_impl_abs y) = ((msb y \<longrightarrow> msb x) \<and> (msb x \<and> \<not> msb y \<or> x < y))"
+  by (simp add: i64_impl_abs_def I64.int_lt_s_def int_lt_s_i64.abs_eq less_uint64.rep_eq msb_uint64.rep_eq word_sless_msb_less)
 
 lemma[code]: "int_gt_u (i64_impl_abs x) (i64_impl_abs y) = (x > y)"
   by (simp add: i64_impl_abs_def I64.int_gt_u_def int_gt_u_i64.abs_eq less_uint64.rep_eq)
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "int_gt_s (i64_impl_abs x) (i64_impl_abs y) = (signed.greater (Rep_uint64' x) (Rep_uint64' y))"
-  by (simp add: i64_impl_abs_def I64.int_gt_s_def int_gt_s_i64.abs_eq)
+lemma[code]: "int_gt_s (i64_impl_abs x) (i64_impl_abs y) = ((msb x \<longrightarrow> msb y) \<and> (msb y \<and> \<not> msb x \<or> y < x))"
+  by (simp add: i64_impl_abs_def I64.int_gt_s_def int_gt_s_i64.abs_eq less_uint64.rep_eq msb_uint64.rep_eq word_sless_msb_less)
 
 lemma[code]: "int_le_u (i64_impl_abs x) (i64_impl_abs y) = (x \<le> y)"
   by (simp add: i64_impl_abs_def I64.int_le_u_def int_le_u_i64.abs_eq less_eq_uint64.rep_eq)
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "int_le_s (i64_impl_abs x) (i64_impl_abs y) = ((Rep_uint64' x) \<le>s (Rep_uint64' y))"
-  by (simp add: i64_impl_abs_def I64.int_le_s_def int_le_s_i64.abs_eq)
+lemma[code]: "int_le_s (i64_impl_abs x) (i64_impl_abs y) = ((msb y \<longrightarrow> msb x) \<and> (msb x \<and> \<not> msb y \<or> x \<le> y))"
+  by (simp add: i64_impl_abs_def I64.int_le_s_def int_le_s_i64.abs_eq less_eq_uint64.rep_eq msb_uint64.rep_eq word_sle_msb_le)
 
 lemma[code]: "int_ge_u (i64_impl_abs x) (i64_impl_abs y) = (x \<ge> y)"
   by (simp add: i64_impl_abs_def I64.int_ge_u_def int_ge_u_i64.abs_eq less_eq_uint64.rep_eq)
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "int_ge_s (i64_impl_abs x) (i64_impl_abs y) = (signed.greater_eq (Rep_uint64' x) (Rep_uint64' y))"
-  by (simp add: i64_impl_abs_def I64.int_ge_s_def int_ge_s_i64.abs_eq)
-
+lemma[code]: "int_ge_s (i64_impl_abs x) (i64_impl_abs y) = ((msb x \<longrightarrow> msb y) \<and> (msb y \<and> \<not> msb x \<or> y \<le> x))"
+  by (simp add: i64_impl_abs_def I64.int_ge_s_def int_ge_s_i64.abs_eq less_eq_uint64.rep_eq msb_uint64.rep_eq word_sle_msb_le)
 
 (* Sometimes to implement conversions we need to indirect through OCaml int types *)
 typedecl ocaml_i32
@@ -418,13 +438,13 @@ definition ocaml_int32_to_isabelle_int32 :: "ocaml_i32 \<Rightarrow> i32" where
   "ocaml_int32_to_isabelle_int32 n \<equiv> i32_impl_abs (Uint32 (ocaml_i32_to_integer n))"
 
 definition isabelle_int32_to_ocaml_int32 :: "i32 \<Rightarrow> ocaml_i32" where
-  "isabelle_int32_to_ocaml_int32 n \<equiv> integer_to_ocaml_i32 (integer_of_nat (wasm_int_ops_i32_inst.nat_of_int_i32 n))"
+  "isabelle_int32_to_ocaml_int32 n \<equiv> integer_to_ocaml_i32 (integer_of_uint32 (i32_impl_rep n))"
 
 definition ocaml_int64_to_isabelle_int64 :: "ocaml_i64 \<Rightarrow> i64" where
   "ocaml_int64_to_isabelle_int64 n \<equiv> i64_impl_abs (Uint64 (ocaml_i64_to_integer n))"
 
 definition isabelle_int64_to_ocaml_int64 :: "i64 \<Rightarrow> ocaml_i64" where
-  "isabelle_int64_to_ocaml_int64 n \<equiv> integer_to_ocaml_i64 (integer_of_nat (wasm_int_ops_i64_inst.nat_of_int_i64 n))"
+  "isabelle_int64_to_ocaml_int64 n \<equiv> integer_to_ocaml_i64 (integer_of_uint64 (i64_impl_rep n))"
 
 definition ocaml_char_to_isabelle_byte :: "ocaml_char \<Rightarrow> byte" where
   "ocaml_char_to_isabelle_byte n \<equiv> Uint8 (ocaml_char_to_integer n)"
@@ -442,6 +462,7 @@ axiomatization
   f64_convert_s_ocaml_i32 :: "ocaml_i32 \<Rightarrow> f64" and
   f64_convert_u_ocaml_i64 :: "ocaml_i64 \<Rightarrow> f64" and
   f64_convert_s_ocaml_i64 :: "ocaml_i64 \<Rightarrow> f64" and
+
   ocaml_i32_trunc_u_f32 :: "f32 \<Rightarrow> ocaml_i32 option" and
   ocaml_i32_trunc_s_f32 :: "f32 \<Rightarrow> ocaml_i32 option" and
   ocaml_i32_trunc_u_f64 :: "f64 \<Rightarrow> ocaml_i32 option" and
@@ -458,10 +479,16 @@ axiomatization
   ocaml_i64_trunc_sat_s_f32 :: "f32 \<Rightarrow> ocaml_i64" and
   ocaml_i64_trunc_sat_u_f64 :: "f64 \<Rightarrow> ocaml_i64" and
   ocaml_i64_trunc_sat_s_f64 :: "f64 \<Rightarrow> ocaml_i64" and
+
   f32_serialise_ocaml_char :: "f32 \<Rightarrow> ocaml_char list" and
   f64_serialise_ocaml_char :: "f64 \<Rightarrow> ocaml_char list" and
   f32_deserialise_ocaml_char :: "ocaml_char list \<Rightarrow> f32" and
-  f64_deserialise_ocaml_char :: "ocaml_char list \<Rightarrow> f64"
+  f64_deserialise_ocaml_char :: "ocaml_char list \<Rightarrow> f64" and
+
+  ocaml_i32_reinterpret_f32 :: "f32 \<Rightarrow> ocaml_i32" and
+  ocaml_i64_reinterpret_f64 :: "f64 \<Rightarrow> ocaml_i64" and
+  ocaml_f32_reinterpret_i32 :: "ocaml_i32 \<Rightarrow> f32" and
+  ocaml_f64_reinterpret_i64 :: "ocaml_i64 \<Rightarrow> f64"
 
 code_printing
   constant f32_convert_u_ocaml_i32 \<rightharpoonup> (OCaml) "F32Wrapper'_convert.convert'_u'_i32"
@@ -472,6 +499,7 @@ code_printing
 | constant f64_convert_s_ocaml_i32 \<rightharpoonup> (OCaml) "F64Wrapper'_convert.convert'_s'_i32"
 | constant f64_convert_u_ocaml_i64 \<rightharpoonup> (OCaml) "F64Wrapper'_convert.convert'_u'_i64"
 | constant f64_convert_s_ocaml_i64 \<rightharpoonup> (OCaml) "F64Wrapper'_convert.convert'_s'_i64"
+
 | constant ocaml_i32_trunc_u_f32 \<rightharpoonup> (OCaml) "I32Wrapper'_convert.trunc'_u'_f32"
 | constant ocaml_i32_trunc_s_f32 \<rightharpoonup> (OCaml) "I32Wrapper'_convert.trunc'_s'_f32"
 | constant ocaml_i32_trunc_u_f64 \<rightharpoonup> (OCaml) "I32Wrapper'_convert.trunc'_u'_f64"
@@ -488,10 +516,16 @@ code_printing
 | constant ocaml_i64_trunc_sat_s_f32 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.trunc'_sat'_s'_f32"
 | constant ocaml_i64_trunc_sat_u_f64 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.trunc'_sat'_u'_f64"
 | constant ocaml_i64_trunc_sat_s_f64 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.trunc'_sat'_s'_f64"
+
 | constant f32_serialise_ocaml_char \<rightharpoonup> (OCaml) "ImplWrapper.serialise'_f32"
 | constant f64_serialise_ocaml_char \<rightharpoonup> (OCaml) "ImplWrapper.serialise'_f64"
 | constant f32_deserialise_ocaml_char \<rightharpoonup> (OCaml) "ImplWrapper.deserialise'_f32"
 | constant f64_deserialise_ocaml_char \<rightharpoonup> (OCaml) "ImplWrapper.deserialise'_f64"
+
+| constant ocaml_i32_reinterpret_f32 \<rightharpoonup> (OCaml) "I32Wrapper'_convert.reinterpret'_of'_f32"
+| constant ocaml_i64_reinterpret_f64 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.reinterpret'_of'_f64"
+| constant ocaml_f32_reinterpret_i32 \<rightharpoonup> (OCaml) "I32Wrapper'_convert.reinterpret'_to'_f32"
+| constant ocaml_f64_reinterpret_i64 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.reinterpret'_to'_f64"
 
 definition f32_convert_u_isabelle_i32 :: "i32 \<Rightarrow> f32" where
   "f32_convert_u_isabelle_i32 i = f32_convert_u_ocaml_i32 (isabelle_int32_to_ocaml_int32 i)"
@@ -586,6 +620,7 @@ axiomatization where
   f64_convert_si32_is[code]: "f64_convert_si32 \<equiv> f64_convert_s_isabelle_i32" and
   f64_convert_ui64_is[code]: "f64_convert_ui64 \<equiv> f64_convert_u_isabelle_i64" and
   f64_convert_si64_is[code]: "f64_convert_si64 \<equiv> f64_convert_s_isabelle_i64" and
+
   ui32_trunc_f32_is[code]: "ui32_trunc_f32 \<equiv> isabelle_i32_trunc_u_f32" and
   si32_trunc_f32_is[code]: "si32_trunc_f32 \<equiv> isabelle_i32_trunc_s_f32" and
   ui32_trunc_f64_is[code]: "ui32_trunc_f64 \<equiv> isabelle_i32_trunc_u_f64" and
@@ -602,10 +637,28 @@ axiomatization where
   si64_trunc_sat_f32_is[code]: "si64_trunc_sat_f32 \<equiv> isabelle_i64_trunc_sat_s_f32" and
   ui64_trunc_sat_f64_is[code]: "ui64_trunc_sat_f64 \<equiv> isabelle_i64_trunc_sat_u_f64" and
   si64_trunc_sat_f64_is[code]: "si64_trunc_sat_f64 \<equiv> isabelle_i64_trunc_sat_s_f64" and
+
   serialise_f32_is[code]: "serialise_f32 \<equiv> f32_serialise_isabelle_bytes" and
   serialise_f64_is[code]: "serialise_f64 \<equiv> f64_serialise_isabelle_bytes" and
   deserialise_f32_is[code]: "deserialise_f32 \<equiv> f32_deserialise_isabelle_bytes" and
-  deserialise_f64_is[code]: "deserialise_f64 \<equiv> f64_deserialise_isabelle_bytes"
+  deserialise_f64_is[code]: "deserialise_f64 \<equiv> f64_deserialise_isabelle_bytes" and
+
+  ocaml_i32_reinterpret_f32_is: "ocaml_int32_to_isabelle_int32 (ocaml_i32_reinterpret_f32 f32) \<equiv> deserialise_i32 (serialise_f32 f32)" and
+  ocaml_f32_reinterpret_i32_is: "(ocaml_f32_reinterpret_i32 (isabelle_int32_to_ocaml_int32 i32)) \<equiv> deserialise_f32 (serialise_i32 i32)" and
+  ocaml_i64_reinterpret_f64_is: "ocaml_int64_to_isabelle_int64 (ocaml_i64_reinterpret_f64 f64) \<equiv> deserialise_i64 (serialise_f64 f64)" and
+  ocaml_f64_reinterpret_i64_is: "(ocaml_f64_reinterpret_i64 (isabelle_int64_to_ocaml_int64 i64)) \<equiv> deserialise_f64 (serialise_i64 i64)"
+
+lemma wasm_reinterpret_is[code]:
+  "wasm_reinterpret t v =
+     (case (t,v) of
+       (T_f32, ConstInt32 c) \<Rightarrow> ConstFloat32 (ocaml_f32_reinterpret_i32 (isabelle_int32_to_ocaml_int32 c))
+     | (T_f64, ConstInt64 c) \<Rightarrow> ConstFloat64 (ocaml_f64_reinterpret_i64 (isabelle_int64_to_ocaml_int64 c))
+     | (T_i32, ConstFloat32 c) \<Rightarrow> ConstInt32 (ocaml_int32_to_isabelle_int32 (ocaml_i32_reinterpret_f32 c))
+     | (T_i64, ConstFloat64 c) \<Rightarrow> ConstInt64 (ocaml_int64_to_isabelle_int64 (ocaml_i64_reinterpret_f64 c))
+     | _ \<Rightarrow> (wasm_deserialise_num (bits_num v) t))"
+  apply (cases t; cases v)
+  apply (simp_all add: wasm_deserialise_num_def bits_num_def wasm_reinterpret_def ocaml_i32_reinterpret_f32_is ocaml_f32_reinterpret_i32_is ocaml_i64_reinterpret_f64_is ocaml_f64_reinterpret_i64_is)
+  done
 
 (* 1.1 vector ops *)
 code_printing

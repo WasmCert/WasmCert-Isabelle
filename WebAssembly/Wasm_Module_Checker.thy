@@ -225,8 +225,7 @@ fun module_type_checker :: "m \<Rightarrow> (extern_t list \<times> extern_t lis
        let gts = gather_m_g_types gs in
        let \<C> = \<lparr>types_t=tfs, func_t=ifts@fts, global=igs@gts, table=its@ts, memory=ims@ms, local=[], label=[], return=None\<rparr> in
        let \<C>' = \<lparr>types_t=[], func_t=[], global=igs, table=[], memory=[], local=[], label=[], return=None\<rparr> in
-       if (list_all (\<lambda>tf. case tf of (tn _> tm) \<Rightarrow> length tm \<le> 1) tfs \<and> \<comment> \<open>\<open>MVP restriction\<close>\<close>
-           list_all (module_func_type_checker \<C>) fs \<and>
+       if (list_all (module_func_type_checker \<C>) fs \<and>
            list_all (module_tab_type_checker) ts \<and>
            list_all (module_mem_type_checker) ms \<and>
            list_all (module_glob_type_checker \<C>') gs \<and>
@@ -261,7 +260,6 @@ proof -
     using module_type_checker.cases
     by blast
   obtain \<C> \<C>' fts gts ifts its ims igs where module_typing_is:
-    "list_all (\<lambda>tf. case tf of (tn _> tm) \<Rightarrow> length tm \<le> 1) tfs"
     "list_all2 (module_func_typing \<C>) fs fts"
     "list_all (module_tab_typing) ts"
     "list_all (module_mem_typing) ms"
@@ -287,20 +285,20 @@ proof -
     done
 
   have "gather_m_f_types tfs fs = Some fts"
-    using module_typing_is(2,18) module_func_typing_imp_gather_m_f_types
+    using module_typing_is(1,17) module_func_typing_imp_gather_m_f_types
     by fastforce
   moreover
   have "gather_m_g_types gs = gts"
-    using module_typing_is(5)
+    using module_typing_is(4)
     unfolding list_all2_conv_all_nth module_glob_typing.simps
     by (metis length_map module_glob.select_convs(1) nth_equalityI nth_map)
   moreover
   have "module_imports_typer tfs imps = Some impts"
-    using module_typing_is(9)
-    by (simp add: list_all2_module_imports_typer module_typing_is(18))
+    using module_typing_is(8)
+    by (simp add: list_all2_module_imports_typer module_typing_is(17))
   moreover
   have "module_exports_typer \<C> exps = Some expts"
-    using module_typing_is(10)
+    using module_typing_is(9)
     by (simp add: list_all2_module_exports_typer)
   moreover
   have "list_all (module_func_type_checker \<C>) fs"
@@ -311,7 +309,7 @@ proof -
        "list_all (module_data_type_checker \<C>) ds"
        "pred_option (module_start_type_checker \<C>) i_opt"
        "module_exports_distinct exps"
-    using module_typing_is(2-8,15)
+    using module_typing_is(1-7,14)
           module_func_typing_equiv_module_func_type_checker
           module_glob_typing_equiv_module_glob_type_checker
           module_elem_typing_equiv_module_elem_type_checker
@@ -351,7 +349,6 @@ proof -
     "gts = gather_m_g_types gs"
     "\<C> = \<lparr>types_t=tfs, func_t=ifts@fts, global=igs@gts, table=its@ts, memory=ims@ms, local=[], label=[], return=None\<rparr>"
     "\<C>' = \<lparr>types_t=[], func_t=[], global=igs, table=[], memory=[], local=[], label=[], return=None\<rparr>"
-    "list_all (\<lambda>tf. case tf of (tn _> tm) \<Rightarrow> length tm \<le> 1) tfs"
     "list_all (module_func_type_checker \<C>) fs"
     "list_all (module_tab_type_checker) ts"
     "list_all (module_mem_type_checker) ms"
@@ -367,7 +364,7 @@ proof -
     by (simp add: Let_def split: option.splits if_splits)
   have "list_all2 (module_func_typing \<C>) fs fts"
     using gather_m_f_types_imp_module_func_typing
-          module_type_checker_is(1,8,11)
+          module_type_checker_is
     by fastforce
   moreover
   have "list_all (module_tab_typing) ts"
@@ -389,7 +386,7 @@ proof -
   moreover
   have "list_all2 (\<lambda>exp. module_export_typing \<C> (E_desc exp)) exps expts"
     using list_all2_module_exports_typer[symmetric]
-          module_type_checker_is(21,8)
+          module_type_checker_is(20)
     by fastforce
   ultimately
   show ?thesis
@@ -403,13 +400,4 @@ theorem module_typing_equiv_module_type_checker:
         module_type_checker_imp_module_typing
   by blast
 
-(*
-lemma[code]: "pred_option P None = True"
-  by auto
-lemmas[code] = option.pred_inject(2)
-
-
-export_code module_type_checker in OCaml
-module_name Example file_prefix "example.ml"
-*)
 end

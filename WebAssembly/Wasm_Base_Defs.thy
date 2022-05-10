@@ -658,6 +658,19 @@ definition store_serialise_vec :: "storeop_vec \<Rightarrow> v128 \<Rightarrow> 
 definition cl_type :: "cl \<Rightarrow> tf" where
   "cl_type cl = (case cl of Func_native _ tf _ _ \<Rightarrow> tf | Func_host tf _ \<Rightarrow> tf)"
 
+definition tb_tf :: "inst \<Rightarrow> tb \<Rightarrow> tf" where
+  "tb_tf inst tb = (case tb of
+                      Tbf i \<Rightarrow> (inst.types inst)!i
+                    | Tbv (Some t) \<Rightarrow> ([] _> [t])
+                    | Tbv None \<Rightarrow> ([] _> []))"
+
+definition tb_tf_t :: "t_context \<Rightarrow> tb \<Rightarrow> tf option" where
+  "tb_tf_t \<C> tb = (case tb of
+                      Tbf i \<Rightarrow> let tfs = (types_t \<C>) in
+                               if i < length tfs then Some (tfs!i) else None
+                    | Tbv (Some t) \<Rightarrow> Some ([] _> [t])
+                    | Tbv None \<Rightarrow> Some ([] _> []))"
+
 definition rglob_is_mut :: "global \<Rightarrow> bool" where
   "rglob_is_mut g = (g_mut g = T_mut)"
 
@@ -829,6 +842,9 @@ definition cvt :: "t_num \<Rightarrow> (sat \<times> sx) option \<Rightarrow> v_
                      | T_i64 \<Rightarrow> (case (cvt_i64 sat_sx v) of Some c \<Rightarrow> Some (ConstInt64 c) | None \<Rightarrow> None)
                      | T_f32 \<Rightarrow> (case (cvt_f32 sat_sx v) of Some c \<Rightarrow> Some (ConstFloat32 c) | None \<Rightarrow> None)
                      | T_f64 \<Rightarrow> (case (cvt_f64 sat_sx v) of Some c \<Rightarrow> Some (ConstFloat64 c) | None \<Rightarrow> None))"
+
+definition wasm_reinterpret :: "t_num \<Rightarrow> v_num \<Rightarrow> v_num" where
+  "wasm_reinterpret t v = (wasm_deserialise_num (bits_num v) t)"
 
 lemma is_int_t_exists:
   assumes "is_int_t_num t"

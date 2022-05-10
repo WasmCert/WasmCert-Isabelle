@@ -571,51 +571,20 @@ proof -
         by fastforce
     qed simp
   next
-    case (22 \<C> tn'' tm'' es ts)
-    hence "type_update ts (to_ct_list tn'') (Type tm'') = tm'"
-      by auto
-    moreover
-    have "(b_e_type_checker (\<C>\<lparr>label := ([tm''] @ (label \<C>))\<rparr>) es (tn'' _> tm''))"
-      using 22
-      by (simp, meson)
-    hence "\<C> \<turnstile> [Block (tn'' _> tm'') es] : (tn'' _> tm'')"
-      using b_e_typing.intros(20)[OF _ 22(1)]
-      by blast
-    ultimately
+    case (22 \<C> tb es ts)
     show ?case
-      using b_e_check_single_type_not_bot_sound[OF _ 22(4,5,3)]
-      by blast
+      using 22 b_e_typing.intros(20)[OF _ 22(1)] b_e_check_single_type_not_bot_sound[OF _ 22(4,5,3)]
+      by (simp split: tf.splits if_splits checker_type.splits option.splits)
   next
-    case (23 \<C> tn'' tm'' es ts)
-    hence "type_update ts (to_ct_list tn'') (Type tm'') = tm'"
-      by auto
-    moreover
-    have "(b_e_type_checker (\<C>\<lparr>label := ([tn''] @ (label \<C>))\<rparr>) es (tn'' _> tm''))"
-      using 23
-      by (simp, meson)
-    hence "\<C> \<turnstile> [Loop (tn'' _> tm'') es] : (tn'' _> tm'')"
-      using b_e_typing.intros(21)[OF _ 23(1)]
-      by blast
-    ultimately
+    case (23 \<C> tb es ts)
     show ?case
-      using b_e_check_single_type_not_bot_sound[OF _ 23(4,5,3)]
-      by blast
+      using 23 b_e_typing.intros(21)[OF _ 23(1)] b_e_check_single_type_not_bot_sound[OF _ 23(4,5,3)]
+      by (simp split: tf.splits if_splits checker_type.splits option.splits)
   next
-    case (24 \<C> tn'' tm'' es1 es2 ts)
-    hence "type_update ts (to_ct_list (tn''@[T_num T_i32])) (Type tm'') = tm'"
-      by auto
-    moreover
-    have "(b_e_type_checker (\<C>\<lparr>label := ([tm''] @ (label \<C>))\<rparr>) es1 (tn'' _> tm''))"
-         "(b_e_type_checker (\<C>\<lparr>label := ([tm''] @ (label \<C>))\<rparr>) es2 (tn'' _> tm''))"
-      using 24
-      by (simp, meson)+
-    hence "\<C> \<turnstile> [If (tn'' _> tm'') es1 es2] : (tn''@[T_num T_i32] _> tm'')"
-      using b_e_typing.intros(22)[OF _ 24(1,2)]
-      by blast
-    ultimately
+    case (24 \<C> tb es1 es2 ts)
     show ?case
-      using b_e_check_single_type_not_bot_sound[OF _ 24(5,6,4)]
-      by blast
+      using 24 b_e_typing.intros(22)[OF _ 24(1,2)] b_e_check_single_type_not_bot_sound[OF _ 24(5,6,4)]
+      by (simp split: tf.splits if_splits checker_type.splits option.splits)
   next
     case (25 \<C> i ts)
     hence "type_update ts (to_ct_list ((label \<C>)!i)) (TopType []) = tm'"

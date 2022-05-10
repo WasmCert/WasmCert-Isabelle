@@ -79,7 +79,7 @@ definition app_v_s_cvtop :: "cvtop \<Rightarrow> t_num \<Rightarrow> t_num \<Rig
                      (\<lambda>v. ((V_num v)#v_s', Step_normal))
                      (v_s', Res_trap (name cvtop))
           | Reinterpret \<Rightarrow> if tp_sx = None then
-                             ((V_num (wasm_deserialise_num (bits_num v1) t2))#v_s', Step_normal)
+                             ((V_num (wasm_reinterpret t2 v1))#v_s', Step_normal)
                            else (v_s, crash_invalid))
         else (v_s, crash_invalid))
      | _ \<Rightarrow> (v_s, crash_invalid))"
@@ -164,11 +164,11 @@ definition app_v_s_tee_local :: "nat \<Rightarrow> v_stack \<Rightarrow> (v_stac
        v1#v_s' \<Rightarrow> (v1#v1#v_s', [$Set_local k], Step_normal)
      | _ \<Rightarrow> (v_s, [], crash_invalid))"
 
-definition app_v_s_if :: "tf \<Rightarrow> b_e list \<Rightarrow> b_e list \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
-  "app_v_s_if tf es1 es2 v_s =
+definition app_v_s_if :: "tb \<Rightarrow> b_e list \<Rightarrow> b_e list \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
+  "app_v_s_if tb es1 es2 v_s =
      (case v_s of
        (V_num (ConstInt32 c))#v_s' \<Rightarrow>
-         (if int_eq c 0 then (v_s', [$(Block tf es2)], Step_normal) else (v_s', [$(Block tf es1)], Step_normal))
+         (if int_eq c 0 then (v_s', [$(Block tb es2)], Step_normal) else (v_s', [$(Block tb es1)], Step_normal))
      | _ \<Rightarrow> (v_s, [], crash_invalid))"
 
 definition app_v_s_br_if :: "nat \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
@@ -595,32 +595,34 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
         let (v_s', res) = (app_v_s_select v_s) in
         ((Config d s (update_fc_step fc v_s' []) fcs), res)
 
-    | (Block (t1s _> t2s) b_ebs) \<Rightarrow>
+    | (Block tb b_ebs) \<Rightarrow>
         if es \<noteq> [] then (Config d s fc fcs, crash_invariant)
         else
-          let n = length t1s in
-          let m = length t2s in
-          if (length v_s \<ge> n) then
-            let (v_bs, v_s') = split_n v_s n in
-            let lc = Label_context v_s' b_es m [] in 
-            let fc' = Frame_context (Redex v_bs [] b_ebs) (lc#lcs) nf f in
-            (Config d s fc' fcs, Step_normal)
-          else (Config d s fc fcs, crash_invalid)
+          (case tb_tf (f_inst f) tb of (t1s _> t2s) \<Rightarrow>
+           let n = length t1s in
+           let m = length t2s in
+           if (length v_s \<ge> n) then
+             let (v_bs, v_s') = split_n v_s n in
+             let lc = Label_context v_s' b_es m [] in 
+             let fc' = Frame_context (Redex v_bs [] b_ebs) (lc#lcs) nf f in
+             (Config d s fc' fcs, Step_normal)
+           else (Config d s fc fcs, crash_invalid))
 
-    | (Loop (t1s _> t2s) b_els) \<Rightarrow>
+    | (Loop tb b_els) \<Rightarrow>
         if es \<noteq> [] then (Config d s fc fcs, crash_invariant)
         else
-          let n = length t1s in
-          let m = length t2s in
-          if (length v_s \<ge> n) then
-            let (v_bs, v_s') = split_n v_s n in
-            let lc = Label_context v_s' b_es n [(Loop (t1s _> t2s) b_els)] in 
-            let fc' = Frame_context (Redex v_bs [] b_els) (lc#lcs) nf f in
-            (Config d s fc' fcs, Step_normal)
-          else (Config d s fc fcs, crash_invalid)
+          (case tb_tf (f_inst f) tb of (t1s _> t2s) \<Rightarrow>
+           let n = length t1s in
+           let m = length t2s in
+           if (length v_s \<ge> n) then
+             let (v_bs, v_s') = split_n v_s n in
+             let lc = Label_context v_s' b_es n [(Loop tb b_els)] in 
+             let fc' = Frame_context (Redex v_bs [] b_els) (lc#lcs) nf f in
+             (Config d s fc' fcs, Step_normal)
+           else (Config d s fc fcs, crash_invalid))
 
-    | (If tf es1 es2) \<Rightarrow>
-        let (v_s', es_cont, res) = (app_v_s_if tf es1 es2 v_s) in
+    | (If tb es1 es2) \<Rightarrow>
+        let (v_s', es_cont, res) = (app_v_s_if tb es1 es2 v_s) in
         (Config d s (update_fc_step fc v_s' es_cont) fcs, res)
 
     | (Br k) \<Rightarrow>
@@ -726,7 +728,8 @@ fun run_step_e :: "e \<Rightarrow> config \<Rightarrow> res_step_tuple" where
                       let fc' = Frame_context (Redex v_s' es b_es) lcs nf f in
                       let zs = n_zeros ts in
                       let ff = \<lparr> f_locs = ((rev v_fs)@zs), f_inst = i'\<rparr> in
-                      let fcf = Frame_context (Redex [] [] [Block ([] _> t2s) es_f]) [] m ff in
+                      let lc = Label_context [] [] m [] in 
+                      let fcf = Frame_context (Redex [] [] es_f) [lc] m ff in
                       (Config d' s fcf (fc'#fcs), Step_normal)
                     else
                       (Config d s fc fcs, crash_invalid))

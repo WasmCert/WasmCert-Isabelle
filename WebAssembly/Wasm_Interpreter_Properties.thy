@@ -1211,12 +1211,12 @@ proof -
         by simp blast
     qed auto
   next
-    case (Block tf es_b)
+    case (Block tb es_b)
     show ?thesis
     proof (cases "res = Step_normal")
       case True
       then obtain v_bs v_s' lc_b t1s t2s where fc'_is:
-              "tf = (t1s _> t2s)"
+              "tb_tf (f_inst f) tb = (t1s _> t2s)"
               "es = []"
               "length v_s \<ge> length t1s"
               "(v_bs, v_s') = split_n v_s (length t1s)"
@@ -1226,11 +1226,11 @@ proof -
               "fc' = (Frame_context (Redex v_bs [] es_b) (lc_b#lcs) nf f)"
         using assms Block fc_is
         by (simp add: Let_def split: tf.splits prod.splits if_splits)
-      have fc_red1:"(\<lparr>s;f;(es_redex_to_es [$Block (t1s _> t2s) es_b] rdx)\<rparr> \<leadsto> \<lparr>s;f;es_label_context_to_es (es_redex_to_es [] (Redex v_bs [] es_b)) lc_b\<rparr>)"
-        using progress_L0[OF reduce.basic[OF reduce_simple.block], of "rev v_bs" _ t1s t2s _ s f "rev v_s'"  es_b "$*b_es"]
+      have fc_red1:"(\<lparr>s;f;(es_redex_to_es [$Block tb es_b] rdx)\<rparr> \<leadsto> \<lparr>s;f;es_label_context_to_es (es_redex_to_es [] (Redex v_bs [] es_b)) lc_b\<rparr>)"
+        using progress_L0[OF reduce.block, of "rev v_bs"]
               fc'_is(1,2,3,4,5) split_n_conv_app fc_is
         by simp (metis append_assoc map_append rev_append split_n_length)
-      hence fc_red2:"\<And>f. \<lparr>s;f;[es_frame_context_to_e ([$Block (t1s _> t2s) es_b]) fc]\<rparr> \<leadsto> \<lparr>s;f;[es_frame_context_to_e ([]) fc']\<rparr>"
+      hence fc_red2:"\<And>f. \<lparr>s;f;[es_frame_context_to_e ([$Block tb es_b]) fc]\<rparr> \<leadsto> \<lparr>s;f;[es_frame_context_to_e ([]) fc']\<rparr>"
         using fc_is fc'_is(7,8)
         by (simp add: es_label_contexts_to_es_LN local)
       obtain f''' esfc''' where f'''_is:
@@ -1258,26 +1258,26 @@ proof -
         by (fastforce simp add: Let_def split: prod.splits tf.splits if_splits)
     qed
   next
-    case (Loop tf es_b)
+    case (Loop tb es_b)
     show ?thesis
     proof (cases "res = Step_normal")
       case True
       then obtain v_bs v_s' lc_b t1s t2s where fc'_is:
-              "tf = (t1s _> t2s)"
+              "tb_tf (f_inst f) tb = (t1s _> t2s)"
               "es = []"
               "length v_s \<ge> length t1s"
               "(v_bs, v_s') = split_n v_s (length t1s)"
-              "lc_b = (Label_context v_s' b_es (length t1s) [(Loop (t1s _> t2s) es_b)])"
+              "lc_b = (Label_context v_s' b_es (length t1s) [(Loop tb es_b)])"
               "s' = s"
               "fcs' = fcs"
               "fc' = (Frame_context (Redex v_bs [] es_b) (lc_b#lcs) nf f)"
         using assms Loop fc_is
         by (simp add: Let_def split: tf.splits prod.splits if_splits)
-      have fc_red1:"(\<lparr>s;f;(es_redex_to_es [$Loop (t1s _> t2s) es_b] rdx)\<rparr> \<leadsto> \<lparr>s;f;es_label_context_to_es (es_redex_to_es [] (Redex v_bs [] es_b)) lc_b\<rparr>)"
-        using progress_L0[OF reduce.basic[OF reduce_simple.loop], of "rev v_bs" _ t1s t2s _ s f "rev v_s'"  es_b "$*b_es"]
+      have fc_red1:"(\<lparr>s;f;(es_redex_to_es [$Loop tb es_b] rdx)\<rparr> \<leadsto> \<lparr>s;f;es_label_context_to_es (es_redex_to_es [] (Redex v_bs [] es_b)) lc_b\<rparr>)"
+        using progress_L0[OF reduce.loop, of "rev v_bs"]
               fc'_is(1,2,3,4,5) split_n_conv_app fc_is
         by simp (metis append_assoc map_append rev_append split_n_length)
-      hence fc_red2:"\<And>f. \<lparr>s;f;[es_frame_context_to_e ([$Loop (t1s _> t2s) es_b]) fc]\<rparr> \<leadsto> \<lparr>s;f;[es_frame_context_to_e ([]) fc']\<rparr>"
+      hence fc_red2:"\<And>f. \<lparr>s;f;[es_frame_context_to_e ([$Loop tb es_b]) fc]\<rparr> \<leadsto> \<lparr>s;f;[es_frame_context_to_e ([]) fc']\<rparr>"
         using fc_is fc'_is(7,8)
         by (simp add: es_label_contexts_to_es_LN local)
       then obtain f''' esfc''' where f'''_is:
@@ -1305,14 +1305,14 @@ proof -
         by (fastforce simp add: Let_def split: prod.splits tf.splits if_splits)
     qed
   next
-    case (If tf esif1 esif2)
+    case (If tb esif1 esif2)
     consider
         (a) v_s' es_cont where
               "s' = s"
               "fcs' = fcs"
               "fc' = (update_fc_step fc v_s' es_cont)"
               "res = Step_normal"
-              "(\<lparr>s;f;(v_stack_to_es v_s)@[$If tf esif1 esif2]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@es_cont\<rparr>)"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$If tb esif1 esif2]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@es_cont\<rparr>)"
       | (b) "(res = crash_invalid)"
       using app_v_s_if_is assms If Cons fc_is
       by (fastforce split: prod.splits)
@@ -2145,7 +2145,7 @@ proof -
           "tf = (t1s _> t2s)"
           "(v_fs, v_s') = split_n v_s (length t1s)"
           "fcs' = (Frame_context (Redex v_s' es b_es) lcs nf f)#fcs"
-          "fc' = (Frame_context (Redex [] [] [Block ([] _> t2s) es_f]) [] (length t2s) \<lparr> f_locs = ((rev v_fs)@(n_zeros ts_f)), f_inst = i'\<rparr>)"
+          "fc' = (Frame_context (Redex [] [] es_f) [(Label_context [] [] (length t2s) [])] (length t2s) \<lparr> f_locs = ((rev v_fs)@(n_zeros ts_f)), f_inst = i'\<rparr>)"
           "length v_s \<ge> length t1s"
           "res = Step_normal"
             using assms Invoke Func_native fc_is False
