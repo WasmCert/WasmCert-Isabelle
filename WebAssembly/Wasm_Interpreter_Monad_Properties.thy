@@ -244,9 +244,9 @@ lemma mem_size_triple:
   unfolding app_s_f_v_s_mem_size_m_def inst_m_assn_def mems_m_assn_def list_assn_conv_idx 
     inst_store_assn_def inst_at_def
   apply (sep_auto split:prod.splits)
-   apply (knock_down j)
+   apply (extract_reinsert_list_idx j)
   apply(sep_auto)
-  apply(knock_down "inst.mems (f_inst f) ! 0")
+  apply(extract_reinsert_list_idx "inst.mems (f_inst f) ! 0")
    apply (sep_auto)
   apply (auto simp add: app_s_f_v_s_mem_size_def smem_ind_def mem_size_def 
         mem_length_def mem_rep_length_def split: option.split list.split)  
@@ -269,7 +269,7 @@ lemma get_global_triple:
   unfolding globs_m_assn_def inst_m_assn_def app_s_f_v_s_get_global_m_def app_s_f_v_s_get_global_def
     sglob_ind_def list_assn_conv_idx inst_store_assn_def inst_at_def
   apply (sep_auto split:prod.splits)
-   apply (knock_down j)
+   apply (extract_reinsert_list_idx j)
   apply (sep_auto)
   done
 
@@ -296,7 +296,7 @@ lemma set_global_triple:
     inst_store_assn_def inst_at_def
   apply (sep_auto simp: app_s_f_v_s_set_global_def update_glob_def sglob_ind_def Let_def
       split: prod.split)
-   apply (knock_down j)
+   apply (extract_reinsert_list_idx j)
   apply(sep_auto)
   done
 
@@ -310,7 +310,7 @@ lemma call_triple:
   unfolding inst_m_assn_def app_f_call_m_def app_f_call_def sfunc_ind_def list_assn_conv_idx
     inst_store_assn_def inst_at_def
   apply(sep_auto split:prod.splits)
-   apply(knock_down j)
+   apply(extract_reinsert_list_idx j)
   apply(sep_auto)
   done
 
@@ -357,15 +357,15 @@ lemma call_indirect_triple:
   apply(sep_auto split:prod.splits)
   unfolding inst_m_assn_def tabs_m_assn_def list_assn_conv_idx 
    apply(sep_auto_all)
-       apply(knock_down j)
+       apply(extract_reinsert_list_idx j)
       apply sep_auto_all
-      apply(knock_down "inst.tabs (f_inst f) ! 0")
+      apply(extract_reinsert_list_idx "inst.tabs (f_inst f) ! 0")
       apply(sep_auto_all)
-      apply(knock_down "inst.tabs (f_inst f) ! 0")
+      apply(extract_reinsert_list_idx "inst.tabs (f_inst f) ! 0")
        apply(sep_auto_all)
          apply(sep_auto heap: funcs_nth_type_triple)
         apply(sep_auto_all)
-         apply(knock_down j)
+         apply(extract_reinsert_list_idx j)
         apply(sep_auto_all)
          apply(simp_all add:app_s_f_v_s_call_indirect_def Let_def split:list.splits)     
      apply(auto simp add:stypes_def tab_cl_ind_def)
@@ -403,7 +403,7 @@ proof -
       inst_m_assn_def mems_m_assn_def
       list_assn_conv_idx inst_store_assn_def inst_at_def
     apply(sep_auto split: v.splits v_num.splits prod.splits)
-        apply(knock_down "j")
+        apply(extract_reinsert_list_idx "j")
        apply(sep_auto)
         apply(extract_list_idx "inst.mems (f_inst f) ! 0") 
         (* not reinserting immediately -- the extracted mem_m_assn keeps being necessary *)
@@ -568,9 +568,9 @@ proof -
     apply(sep_auto split:v.splits prod.splits)
      apply(sep_auto split:option.splits)
     apply(sep_auto split:v.splits v_num.splits)
-        apply(knock_down j)
+        apply(extract_reinsert_list_idx j)
        apply(sep_auto split:option.splits)
-               apply(sep_auto?, knock_down "inst.mems (f_inst f) ! 0",
+               apply(sep_auto?, extract_reinsert_list_idx "inst.mems (f_inst f) ! 0",
         sep_auto simp:expand split:splits)+ (*takes a moment*)   
       apply(sep_auto split:splits)+
     done
@@ -629,9 +629,9 @@ lemma load_vec_triple:
     inst_store_assn_def inst_m_assn_def inst_at_def list_assn_conv_idx mems_m_assn_def
   supply [sep_heap_rules] = load_vec_m_v_triple
   apply(sep_auto split:v_num.splits v.splits prod.splits )
-       apply(knock_down j)
+       apply(extract_reinsert_list_idx j)
       apply(sep_auto)
-       apply(knock_down "inst.mems (f_inst f) ! 0")
+       apply(extract_reinsert_list_idx "inst.mems (f_inst f) ! 0")
       apply(sep_auto simp:smem_ind_def split:list.splits)
      apply(sep_auto)+
   done
@@ -656,9 +656,9 @@ proof -
     supply [sep_heap_rules] = load_bytes_triple
     apply(sep_auto split:option.splits prod.splits)
     apply(sep_auto split:v.splits v_vec.splits v_num.splits)
-    apply(knock_down j)
+    apply(extract_reinsert_list_idx j)
     apply(sep_auto)
-    apply(sep_auto?, knock_down "inst.mems (f_inst f) ! 0",
+    apply(sep_auto?, extract_reinsert_list_idx "inst.mems (f_inst f) ! 0",
           sep_auto simp:expand split:splits)+ (*takes a moment*)   
     apply(sep_auto split:splits)+
   done
@@ -762,7 +762,7 @@ proof -
     apply(sep_auto split:list.splits)
      apply(sep_auto split:option.splits prod.splits simp:app_s_f_v_s_store_packed_def)
     apply(sep_auto split:v.splits v_num.splits prod.splits)
-         apply(knock_down j)
+         apply(extract_reinsert_list_idx j)
          apply(sep_auto)
           apply(extract_list_idx "inst.mems (f_inst f) ! 0")
           apply(sep_auto heap:store_triple)
@@ -772,7 +772,7 @@ proof -
          apply(rule listI_assn_reinsert_upd, frame_inference, simp, simp, sep_auto)
 
           apply(sep_auto split:v.splits v_num.splits prod.splits)+
-           apply (knock_down j)
+           apply (extract_reinsert_list_idx j)
           apply (sep_auto)
           apply(extract_list_idx "inst.mems (f_inst f) ! 0")
           apply(sep_auto heap:store_packed_triple)
@@ -803,9 +803,9 @@ lemma store_vec_triple:
   unfolding app_s_f_v_s_store_vec_m_def app_s_f_v_s_store_vec_def
     inst_store_assn_def inst_m_assn_def inst_at_def list_assn_conv_idx mems_m_assn_def
   apply(sep_auto split:v_num.splits v.splits v_vec.splits prod.splits)
-       apply(knock_down j)
+       apply(extract_reinsert_list_idx j)
       apply(sep_auto)
-       apply(knock_down "inst.mems (f_inst f) ! 0")
+       apply(extract_reinsert_list_idx "inst.mems (f_inst f) ! 0")
       apply(sep_auto)
         apply(extract_list_idx "inst.mems (f_inst f) ! 0")
         apply(sep_auto heap:store_uint8_list_triple)
@@ -1043,7 +1043,7 @@ lemma app_s_f_init_mem_m_triple:
   unfolding mems_m_assn_def app_s_f_init_mem_m_def list_assn_conv_idx inst_m_assn_def
     inst_store_assn_def inst_at_def
   apply(sep_auto split:prod.splits)
-   apply(knock_down j)
+   apply(extract_reinsert_list_idx j)
   apply(sep_auto)
    apply(extract_list_idx "inst.mems (f_inst f) ! 0")
    apply(sep_auto heap: init_mem_triple)
@@ -1065,7 +1065,7 @@ lemma app_s_f_init_tab_m_triple:
   unfolding tabs_m_assn_def app_s_f_init_tab_m_def list_assn_conv_idx inst_m_assn_def
     inst_store_assn_def inst_at_def
   apply(sep_auto split:prod.splits)
-   apply(knock_down j)
+   apply(extract_reinsert_list_idx j)
   apply(sep_auto)
    apply(extract_list_idx "inst.tabs (f_inst f) ! 0")
    apply(sep_auto heap:init_tab_triple)

@@ -531,7 +531,7 @@ lemma element_in_bounds_m_triple:
     inst_at_def inst_store_assn_def inst_m_assn_def list_assn_conv_idx 
   apply(sep_auto split:prod.splits)
   apply(vcg decon:list_all2_m_decon[where Q'="\<lambda>r. _ * \<up>(r = _)"])
-     apply(knock_down j)
+     apply(extract_reinsert_list_idx j)
     apply(sep_auto)
  (*hack to convert it to the form I like *)
      apply(subst (asm) (2) prod_pack)
@@ -557,7 +557,7 @@ lemma data_in_bounds_m_triple:
     inst_at_def inst_store_assn_def inst_m_assn_def list_assn_conv_idx 
   apply(sep_auto split:prod.splits)
   apply(vcg decon:list_all2_m_decon[where Q'="\<lambda>r. _ * \<up>(r = _)"])
-     apply(knock_down j)
+     apply(extract_reinsert_list_idx j)
     apply(sep_auto)
  (*hack to convert it to the form I like *)
      apply(subst (asm) (2) prod_pack)
@@ -582,7 +582,7 @@ lemma get_start_m_triple:
   using assms 
   unfolding get_start_m_def inst_at_def inst_store_assn_def inst_m_assn_def list_assn_conv_idx 
   apply(sep_auto split:prod.splits)
-   apply(knock_down j)
+   apply(extract_reinsert_list_idx j)
   apply(sep_auto)
   done
 
@@ -601,7 +601,7 @@ lemma get_init_tab_m_triple:
   unfolding get_init_tab_m_def inst_at_def inst_store_assn_def inst_m_assn_def list_assn_conv_idx
   apply(sep_auto split:prod.splits)
    apply(vcg decon:fold_map_decon'[where Q="\<lambda>x r. \<up>((inst.funcs i)!x = r)"])
-    apply(knock_down j)
+    apply(extract_reinsert_list_idx j)
     apply(sep_auto)
    apply(solve_entails)
   apply(sep_auto simp:list_assn_pure list_all2_eq_map_conv)

@@ -11,7 +11,7 @@ method reinsert_list_idx for i :: nat =
   (simp;fail),
   (simp;fail)
 
-method knock_down for i :: nat = 
+method extract_reinsert_list_idx for i :: nat = 
  extract_pre_pure?, extract_list_idx i, sep_auto, extract_pre_pure?, reinsert_list_idx i
 
 lemmas is_complex_goal = asm_rl[of "< _ > _ < _ >"] asm_rl[of "_ \<Longrightarrow>\<^sub>A _"]
