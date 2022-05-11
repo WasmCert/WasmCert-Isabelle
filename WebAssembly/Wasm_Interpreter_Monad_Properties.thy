@@ -234,20 +234,15 @@ lemma extract_pre_cfg_m_assn[extract_pure_rules]:
 (* hoare triples for run_step_b_e_m *)
 
 lemma mem_size_triple:
-  assumes "inst_at i_s (f_inst f, f_inst2) j" 
-  shows 
-  "< mems_m_assn ms ms_m * inst_store_assn i_s > 
+  "< mems_m_assn ms ms_m * inst_m_assn (f_inst f) f_inst2 > 
     app_s_f_v_s_mem_size_m ms_m f_inst2 v_s 
   <\<lambda>r. \<up>(r = app_s_f_v_s_mem_size ms f v_s) *
-   mems_m_assn ms ms_m * inst_store_assn i_s>"
-  using assms
+   mems_m_assn ms ms_m * inst_m_assn (f_inst f) f_inst2 >"
   unfolding app_s_f_v_s_mem_size_m_def inst_m_assn_def mems_m_assn_def list_assn_conv_idx 
     inst_store_assn_def inst_at_def
   apply (sep_auto split:prod.splits)
-   apply (extract_reinsert_list_idx j)
-  apply(sep_auto)
-  apply(extract_reinsert_list_idx "inst.mems (f_inst f) ! 0")
-   apply (sep_auto)
+   apply(extract_reinsert_list_idx "inst.mems (f_inst f) ! 0")
+  apply (sep_auto)
   apply (auto simp add: app_s_f_v_s_mem_size_def smem_ind_def mem_size_def 
         mem_length_def mem_rep_length_def split: option.split list.split)  
   done
@@ -260,84 +255,58 @@ lemma get_local_triple:
   by sep_auto
 
 lemma get_global_triple:
-  assumes "inst_at i_s (f_inst f, f_inst2) j"
-  shows "<globs_m_assn gs gs_m * inst_store_assn i_s>
+  "<globs_m_assn gs gs_m * inst_m_assn (f_inst f) f_inst2>
   app_s_f_v_s_get_global_m k gs_m f_inst2 v_s
   <\<lambda>r.\<up>(r = app_s_f_v_s_get_global k gs f v_s)
-  * globs_m_assn gs gs_m * inst_store_assn i_s>"
-  using assms
+  * globs_m_assn gs gs_m * inst_m_assn (f_inst f) f_inst2>"
   unfolding globs_m_assn_def inst_m_assn_def app_s_f_v_s_get_global_m_def app_s_f_v_s_get_global_def
     sglob_ind_def list_assn_conv_idx inst_store_assn_def inst_at_def
   apply (sep_auto split:prod.splits)
-   apply (extract_reinsert_list_idx j)
-  apply (sep_auto)
   done
 
 lemma set_local_triple: 
-  assumes "inst_at i_s (f_inst f, f_inst2) j"
-  shows "<locs_m_assn (f_locs f) f_locs1 * inst_store_assn i_s> 
+  "<locs_m_assn (f_locs f) f_locs1 > 
   app_f_v_s_set_local_m k f_locs1 v_s
   <\<lambda>r. let (f', v_s', res) = (app_f_v_s_set_local k f v_s) in 
-  \<up>(r = (v_s', res) \<and> inst_at i_s (f_inst f', f_inst2) j) 
-  * locs_m_assn (f_locs f') f_locs1 * inst_store_assn i_s>"
-  using assms
+  \<up>(r = (v_s', res) \<and> f_inst f' = f_inst f) * locs_m_assn (f_locs f') f_locs1 >"
   unfolding locs_m_assn_def app_f_v_s_set_local_m_def app_f_v_s_set_local_def
   by(sep_auto split:prod.splits)
 
 lemma set_global_triple: 
-  assumes "inst_at i_s (f_inst f, f_inst2) j"
-  shows "<globs_m_assn gs gs_m * inst_store_assn i_s> 
+  "<globs_m_assn gs gs_m * inst_m_assn (f_inst f) f_inst2> 
   app_s_f_v_s_set_global_m k gs_m f_inst2 v_s
   <\<lambda>r. let (gs', v_s', res) = (app_s_f_v_s_set_global k gs f v_s) in 
   \<up>(r = (v_s', res)) 
-  * globs_m_assn gs' gs_m * inst_store_assn i_s>"
-  using assms
+  * globs_m_assn gs' gs_m * inst_m_assn (f_inst f) f_inst2>"
   unfolding app_s_f_v_s_set_global_m_def inst_m_assn_def globs_m_assn_def list_assn_conv_idx
     inst_store_assn_def inst_at_def
   apply (sep_auto simp: app_s_f_v_s_set_global_def update_glob_def sglob_ind_def Let_def
       split: prod.split)
-   apply (extract_reinsert_list_idx j)
-  apply(sep_auto)
   done
 
 lemma call_triple: 
-  assumes "inst_at i_s (f_inst f, f_inst2) j"
-  shows
- "<inst_store_assn i_s> 
+ "<inst_m_assn (f_inst f) f_inst2> 
   app_f_call_m k f_inst2 
-  <\<lambda>r. \<up>(r = app_f_call k f) * inst_store_assn i_s>"
-  using assms
+  <\<lambda>r. \<up>(r = app_f_call k f) * inst_m_assn (f_inst f) f_inst2>"
   unfolding inst_m_assn_def app_f_call_m_def app_f_call_def sfunc_ind_def list_assn_conv_idx
     inst_store_assn_def inst_at_def
   apply(sep_auto split:prod.splits)
-   apply(extract_reinsert_list_idx j)
-  apply(sep_auto)
   done
 
 lemma tb_tf_triple:
-  assumes "inst_at i_s (inst, f_inst2) j"
-  shows
-  "<inst_store_assn i_s> 
+  "<inst_m_assn inst f_inst2> 
   tb_tf_m f_inst2 tb
-  <\<lambda>r. \<up>(r = tb_tf inst tb) * inst_store_assn i_s>"
+  <\<lambda>r. \<up>(r = tb_tf inst tb) * inst_m_assn inst f_inst2>"
 proof (cases tb)
   case (Tbf tf_i)
   thus ?thesis
-    using assms
-    unfolding tb_tf_m_def tb_tf_def inst_store_assn_def inst_at_def
+    unfolding tb_tf_m_def tb_tf_def inst_store_assn_def inst_at_def inst_m_assn_def
     supply [split] = prod.splits option.splits tb.splits
-    apply sep_auto
-    unfolding list_assn_conv_idx
-    apply (extract_list_idx j)
-    unfolding inst_m_assn_def
-    apply sep_auto
-    apply (reinsert_list_idx j)
     apply sep_auto
     done
 next
   case (Tbv t_opt)
   thus ?thesis
-    using assms
     unfolding tb_tf_m_def tb_tf_def inst_store_assn_def inst_at_def
     supply [split] = prod.splits option.splits tb.splits
     by sep_auto
@@ -383,12 +352,10 @@ lemma [sep_heap_rules]:
   by(sep_auto split:prod.splits simp:Abs_mem_rep_inverse)
 
 lemma mem_grow_triple:
-  assumes "inst_at i_s (f_inst f, f_inst2) j" 
-  shows 
-  "< mems_m_assn ms ms_m * inst_store_assn i_s > 
+  "< mems_m_assn ms ms_m * inst_m_assn (f_inst f) f_inst2> 
     app_s_f_v_s_mem_grow_m ms_m f_inst2 v_s 
   <\<lambda>r. let (ms', v_s', res) = app_s_f_v_s_mem_grow ms f v_s in
-   \<up>(r = (v_s', res)) * mems_m_assn ms' ms_m * inst_store_assn i_s>\<^sub>t"
+   \<up>(r = (v_s', res)) * mems_m_assn ms' ms_m * inst_m_assn (f_inst f) f_inst2>\<^sub>t"
 proof - 
   note expand = smem_ind_def mem_grow_def Let_def mem_size_def mem_length_def
         mem_rep_length_def mem_max_def
@@ -398,24 +365,21 @@ proof -
   (* the "sep_auto simp:expand split:splits" list eliminate subgoals 
     by finding contradictions in their assumptions *)
   show ?thesis
-    using assms 
     unfolding app_s_f_v_s_mem_grow_m_def app_s_f_v_s_mem_grow_def 
       inst_m_assn_def mems_m_assn_def
       list_assn_conv_idx inst_store_assn_def inst_at_def
     apply(sep_auto split: v.splits v_num.splits prod.splits)
-        apply(extract_reinsert_list_idx "j")
-       apply(sep_auto)
-        apply(extract_list_idx "inst.mems (f_inst f) ! 0") 
+       apply(extract_pre_pure, extract_list_idx "inst.mems (f_inst f) ! 0") 
         (* not reinserting immediately -- the extracted mem_m_assn keeps being necessary *)
         apply(sep_auto) 
-       apply(sep_auto simp:expand split:splits) 
-          apply(rule listI_assn_reinsert_upd, frame_inference, simp, simp)
+        apply(sep_auto simp:expand split:splits) 
+           apply(extract_pre_pure, rule listI_assn_reinsert_upd, frame_inference, simp, simp)
           apply(sep_auto simp:mem_append_def zero_byte_def)
          apply(sep_auto simp:expand_with_assn split:splits)
         apply(sep_auto)
          apply(sep_auto simp:expand_with_assn split:splits) 
         apply(sep_auto simp:expand_with_assn split:splits) 
-       apply(rule listI_assn_reinsert', frame_inference, simp, simp)
+       apply(extract_pre_pure, rule listI_assn_reinsert', frame_inference, simp, simp)
        apply(sep_auto)
       apply(sep_auto_all)
     done
@@ -548,18 +512,16 @@ lemma load_packed_triple:
   done
 
 lemma load_maybe_packed_triple:
-  assumes "inst_at i_s (f_inst f, f_inst2) j"
-  shows "<mems_m_assn ms ms_m * inst_store_assn i_s>
+  "<mems_m_assn ms ms_m * inst_m_assn (f_inst f) f_inst2>
   app_s_f_v_s_load_maybe_packed_m t tp_sx off ms_m f_inst2 v_s
   <\<lambda>r.\<up>(r = app_s_f_v_s_load_maybe_packed t tp_sx off ms f v_s)
-  * mems_m_assn ms ms_m * inst_store_assn i_s>\<^sub>t"
+  * mems_m_assn ms ms_m * inst_m_assn (f_inst f) f_inst2>\<^sub>t"
 proof -
   note expand = smem_ind_def Let_def mem_size_def mem_length_def
         mem_rep_length_def mem_max_def
   note splits = option.splits list.splits if_splits prod.splits
 
   show ?thesis
-    using assms 
     unfolding app_s_f_v_s_load_maybe_packed_m_def app_s_f_v_s_load_maybe_packed_def 
       app_s_f_v_s_load_packed_def app_s_f_v_s_load_def
       inst_m_assn_def mems_m_assn_def
@@ -567,12 +529,10 @@ proof -
     supply [sep_heap_rules] = load_triple load_packed_triple
     apply(sep_auto split:v.splits prod.splits)
      apply(sep_auto split:option.splits)
-    apply(sep_auto split:v.splits v_num.splits)
-        apply(extract_reinsert_list_idx j)
-       apply(sep_auto split:option.splits)
-               apply(sep_auto?, extract_reinsert_list_idx "inst.mems (f_inst f) ! 0",
+    apply(sep_auto)
+    apply(sep_auto split:v.splits v_num.splits option.splits)
+               apply(sep_auto?, (extract_reinsert_list_idx "inst.mems (f_inst f) ! 0")?,
         sep_auto simp:expand split:splits)+ (*takes a moment*)   
-      apply(sep_auto split:splits)+
     done
 qed
 
@@ -619,36 +579,30 @@ lemma load_vec_m_v_triple:
   by (sep_auto split:loadop_vec.splits heap:load_bytes_triple load_packed_vec_m_v_triple)
 
 lemma load_vec_triple:
-  assumes "inst_at i_s (f_inst f, f_inst2) j"
-  shows "<mems_m_assn ms ms_m * inst_store_assn i_s>
+  shows "<mems_m_assn ms ms_m * inst_m_assn (f_inst f) f_inst2>
   app_s_f_v_s_load_vec_m lv off ms_m f_inst2 v_s
   <\<lambda>r.\<up>(r = app_s_f_v_s_load_vec lv off ms f v_s)
-  * mems_m_assn ms ms_m * inst_store_assn i_s>\<^sub>t"
-  using assms
+  * mems_m_assn ms ms_m * inst_m_assn (f_inst f) f_inst2>\<^sub>t"
   unfolding app_s_f_v_s_load_vec_m_def app_s_f_v_s_load_vec_def
     inst_store_assn_def inst_m_assn_def inst_at_def list_assn_conv_idx mems_m_assn_def
   supply [sep_heap_rules] = load_vec_m_v_triple
   apply(sep_auto split:v_num.splits v.splits prod.splits )
-       apply(extract_reinsert_list_idx j)
-      apply(sep_auto)
        apply(extract_reinsert_list_idx "inst.mems (f_inst f) ! 0")
       apply(sep_auto simp:smem_ind_def split:list.splits)
      apply(sep_auto)+
   done
 
 lemma load_lane_vec_triple:
-  assumes "inst_at i_s (f_inst f, f_inst2) j"
-  shows "<mems_m_assn ms ms_m * inst_store_assn i_s>
+  "<mems_m_assn ms ms_m * inst_m_assn (f_inst f) f_inst2>
   app_s_f_v_s_load_lane_vec_m svi i_n off ms_m f_inst2 v_s
   <\<lambda>r.\<up>(r = app_s_f_v_s_load_lane_vec svi i_n off ms f v_s)
-  * mems_m_assn ms ms_m * inst_store_assn i_s>\<^sub>t"
+  * mems_m_assn ms ms_m * inst_m_assn (f_inst f) f_inst2>\<^sub>t"
 proof -
   note expand = smem_ind_def Let_def mem_size_def mem_length_def
         mem_rep_length_def mem_max_def
   note splits = option.splits list.splits if_splits prod.splits
 
   show ?thesis
-  using assms
   unfolding app_s_f_v_s_load_lane_vec_m_def app_s_f_v_s_load_lane_vec_def
       app_s_f_v_s_load_packed_def app_s_f_v_s_load_def
       inst_m_assn_def mems_m_assn_def
@@ -656,8 +610,6 @@ proof -
     supply [sep_heap_rules] = load_bytes_triple
     apply(sep_auto split:option.splits prod.splits)
     apply(sep_auto split:v.splits v_vec.splits v_num.splits)
-    apply(extract_reinsert_list_idx j)
-    apply(sep_auto)
     apply(sep_auto?, extract_reinsert_list_idx "inst.mems (f_inst f) ! 0",
           sep_auto simp:expand split:splits)+ (*takes a moment*)   
     apply(sep_auto split:splits)+
@@ -740,18 +692,16 @@ lemma store_packed_triple:
       serialise_deserialise_i64 serialise_f64_len)
 
 lemma store_maybe_packed_triple:
-  assumes "inst_at i_s (f_inst f, f_inst2) j"
-  shows "<mems_m_assn ms ms_m * inst_store_assn i_s>
+  shows "<mems_m_assn ms ms_m * inst_m_assn (f_inst f) f_inst2>
   app_s_f_v_s_store_maybe_packed_m t tp_sx off ms_m f_inst2 v_s
   <\<lambda>r. let (ms', v_s', res) = app_s_f_v_s_store_maybe_packed t tp_sx off ms f v_s in 
-  \<up>(r = (v_s', res)) * mems_m_assn ms' ms_m * inst_store_assn i_s>\<^sub>t"
+  \<up>(r = (v_s', res)) * mems_m_assn ms' ms_m * inst_m_assn (f_inst f) f_inst2>\<^sub>t"
 proof -
   note expand = smem_ind_def mem_grow_def Let_def mem_size_def mem_length_def
         mem_rep_length_def mem_max_def
   note splits = option.splits list.splits if_splits prod.splits
 
   show ?thesis
-    using assms
     unfolding 
       app_s_f_v_s_store_maybe_packed_m_def app_s_f_v_s_store_maybe_packed_def
       app_s_f_v_s_store_def app_s_f_v_s_store_packed_def
@@ -762,24 +712,20 @@ proof -
     apply(sep_auto split:list.splits)
      apply(sep_auto split:option.splits prod.splits simp:app_s_f_v_s_store_packed_def)
     apply(sep_auto split:v.splits v_num.splits prod.splits)
-         apply(extract_reinsert_list_idx j)
-         apply(sep_auto)
-          apply(extract_list_idx "inst.mems (f_inst f) ! 0")
+          apply(extract_pre_pure, extract_list_idx "inst.mems (f_inst f) ! 0")
           apply(sep_auto heap:store_triple)
          apply(sep_auto simp:expand split:splits)
-          apply(rule listI_assn_reinsert, frame_inference, simp, simp, sep_auto)
+          apply(extract_pre_pure, rule listI_assn_reinsert, frame_inference, simp, simp, sep_auto)
          apply(sep_auto simp:expand split:splits)
-         apply(rule listI_assn_reinsert_upd, frame_inference, simp, simp, sep_auto)
+         apply(extract_pre_pure, rule listI_assn_reinsert_upd, frame_inference, simp, simp, sep_auto)
 
           apply(sep_auto split:v.splits v_num.splits prod.splits)+
-           apply (extract_reinsert_list_idx j)
-          apply (sep_auto)
-          apply(extract_list_idx "inst.mems (f_inst f) ! 0")
+          apply(extract_pre_pure, extract_list_idx "inst.mems (f_inst f) ! 0")
           apply(sep_auto heap:store_packed_triple)
          apply(sep_auto simp:expand split:splits)
-          apply(rule listI_assn_reinsert, frame_inference, simp, simp, sep_auto)
+          apply(extract_pre_pure, rule listI_assn_reinsert, frame_inference, simp, simp, sep_auto)
          apply(sep_auto simp:expand split:splits)
-         apply(rule listI_assn_reinsert_upd, frame_inference, simp, simp, sep_auto)
+         apply(extract_pre_pure, rule listI_assn_reinsert_upd, frame_inference, simp, simp, sep_auto)
           apply(sep_auto split:v.splits v_num.splits prod.splits)+
     done
 qed
@@ -793,18 +739,14 @@ lemma store_uint8_list_triple: "<mem_m_assn m m_m>
   by (sep_auto split:prod.splits list.splits simp:Abs_mem_rep_inverse)
 
 lemma store_vec_triple:
-  assumes "inst_at i_s (f_inst f, f_inst2) j"
-  shows "<mems_m_assn ms ms_m * inst_store_assn i_s>
+  shows "<mems_m_assn ms ms_m * inst_m_assn (f_inst f) f_inst2>
   app_s_f_v_s_store_vec_m sv off ms_m f_inst2 v_s
   <\<lambda>r. let (ms', v_s', res) = app_s_f_v_s_store_vec sv off ms f v_s in 
   \<up>(r = (v_s', res))
-  * mems_m_assn ms' ms_m * inst_store_assn i_s>\<^sub>t"
-  using assms
+  * mems_m_assn ms' ms_m * inst_m_assn (f_inst f) f_inst2>\<^sub>t"
   unfolding app_s_f_v_s_store_vec_m_def app_s_f_v_s_store_vec_def
     inst_store_assn_def inst_m_assn_def inst_at_def list_assn_conv_idx mems_m_assn_def
   apply(sep_auto split:v_num.splits v.splits v_vec.splits prod.splits)
-       apply(extract_reinsert_list_idx j)
-      apply(sep_auto)
        apply(extract_reinsert_list_idx "inst.mems (f_inst f) ! 0")
       apply(sep_auto)
         apply(extract_list_idx "inst.mems (f_inst f) ! 0")
@@ -870,58 +812,107 @@ proof -
   note unfold_vars = config frame redex unfold_vars_m
   note unfold_vars_assns = unfold_vars cfg_m_assn_def fc_m_assn_def
 
+  obtain j where j_def:"cfg_m_assn i_s cfg cfg_m \<Longrightarrow>\<^sub>A 
+    \<up>(inst_at i_s ((f_inst f), f_inst2) j) * cfg_m_assn i_s cfg cfg_m"
+    unfolding unfold_vars_assns by sep_auto
+
+  note extract_j = cons_pre_rulet[OF ent_imp_entt[OF j_def]]
+
+  note unfold_for_j = 
+    unfold_vars_assns s_m_assn_def inst_at_def inst_store_assn_def list_assn_conv_idx
+
   show ?thesis
   proof (cases b_e)
     case (Get_global k)
-    then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
-      by (sep_auto heap:get_global_triple)
+    then show ?thesis 
+      apply(rule_tac extract_j)
+      unfolding unfold_for_j
+      apply(sep_auto split:prod.splits)
+      apply(extract_reinsert_list_idx j heap:get_global_triple)
+      by (sep_auto)
   next
     case (Set_global k)
-    then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
-      by (sep_auto heap:set_global_triple split:prod.splits)
+    then show ?thesis 
+      apply(rule_tac extract_j)
+      unfolding unfold_for_j
+      apply(sep_auto split:prod.splits)
+      apply(extract_reinsert_list_idx j heap:set_global_triple)
+      by (sep_auto)
   next
     case (Load t tp_sx a off)
-    then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
-      by (sep_auto heap:load_maybe_packed_triple split:prod.splits)
+    then show ?thesis 
+      apply(rule_tac extract_j)
+      unfolding unfold_for_j
+      apply(sep_auto split:prod.splits)
+      apply(extract_reinsert_list_idx j heap:load_maybe_packed_triple)
+      by (sep_auto)
   next
     case (Store t tp a off)
-    then show ?thesis unfolding unfold_vars_assns s_m_assn_def
-      by (sep_auto heap:store_maybe_packed_triple split:prod.splits)
+    then show ?thesis 
+      apply(rule_tac extract_j)
+      unfolding unfold_for_j
+      apply(sep_auto split:prod.splits)
+      apply(extract_reinsert_list_idx j heap:store_maybe_packed_triple)
+      by (sep_auto)
   next
     case (Load_vec lv a off)
-    then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
-      by (sep_auto heap:load_vec_triple split:prod.splits)
+    then show ?thesis
+      apply(rule_tac extract_j)
+      unfolding unfold_for_j
+      apply(sep_auto split:prod.splits)
+      apply(extract_reinsert_list_idx j heap:load_vec_triple)
+      by (sep_auto)
   next
     case (Load_lane_vec svi i a off)
-    then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
-      by (sep_auto heap:load_lane_vec_triple split:prod.splits)
+    then show ?thesis 
+      apply(rule_tac extract_j)
+      unfolding unfold_for_j
+      apply(sep_auto split:prod.splits)
+      apply(extract_reinsert_list_idx j heap:load_lane_vec_triple)
+      by (sep_auto)
   next
     case (Store_vec sv a off)
-    then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
-      by (sep_auto heap:store_vec_triple split:prod.splits)
+    then show ?thesis 
+      apply(rule_tac extract_j)
+      unfolding unfold_for_j
+      apply(sep_auto split:prod.splits)
+      apply(extract_reinsert_list_idx j heap:store_vec_triple)
+      by (sep_auto)
   next
     case Grow_memory
-    then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
-      by (sep_auto heap:mem_grow_triple split:prod.splits)
+    then show ?thesis 
+      apply(rule_tac extract_j)
+      unfolding unfold_for_j
+      apply(sep_auto split:prod.splits)
+      apply(extract_reinsert_list_idx j heap:mem_grow_triple)
+      by (sep_auto)
   next
     case Current_memory
-    then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
-      by (sep_auto heap:mem_size_triple split:prod.splits)
+    then show ?thesis 
+      apply(rule_tac extract_j)
+      unfolding unfold_for_j
+      apply(sep_auto split:prod.splits)
+      apply(extract_reinsert_list_idx j heap:mem_size_triple)
+      by (sep_auto)
   next
     case (Get_local k)
     then show ?thesis 
       unfolding unfold_vars_assns by (sep_auto heap:get_local_triple)
   next
     case (Set_local k)
-    then show ?thesis unfolding unfold_vars_assns
-      by (sep_auto heap: set_local_triple split:prod.splits)
+    then show ?thesis 
+      unfolding unfold_vars_assns by (sep_auto heap:set_local_triple split:prod.splits)
   next
     case (Tee_local k)
     then show ?thesis unfolding unfold_vars_assns by sep_auto
   next
     case (Call k)
-    then show ?thesis unfolding unfold_vars_assns 
-      by (sep_auto heap:call_triple split:prod.splits)
+    then show ?thesis 
+      apply(rule_tac extract_j)
+      unfolding unfold_for_j
+      apply(sep_auto split:prod.splits)
+      apply(extract_reinsert_list_idx j heap:call_triple)
+      by (sep_auto)
   next
     case (Call_indirect k)
     then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
@@ -932,10 +923,22 @@ proof -
       by (sep_auto split:frame_context_m.splits frame_context.splits list.split)
   next
     case (Block tf b_ebs)
-    then show ?thesis unfolding unfold_vars_assns by(sep_auto heap:tb_tf_triple split:tf.splits)
+    then show ?thesis
+      apply(rule_tac extract_j)
+      unfolding unfold_for_j
+      apply(sep_auto split:prod.splits)
+      apply(extract_reinsert_list_idx j heap:tb_tf_triple)
+       apply(sep_auto split:tf.splits)+
+      done
   next
     case (Loop tfs b_els)
-    then show ?thesis unfolding unfold_vars_assns by(sep_auto heap:tb_tf_triple split:tf.splits)
+    then show ?thesis
+      apply(rule_tac extract_j)
+      unfolding unfold_for_j
+      apply(sep_auto split:prod.splits)
+      apply(extract_reinsert_list_idx j heap:tb_tf_triple)
+       apply(sep_auto split:tf.splits)+
+      done
   next
     case (Br k)
     then show ?thesis unfolding unfold_vars_assns by(sep_auto split:label_context.splits)
@@ -1033,47 +1036,37 @@ lemma funcs_nth_triple_s:
   by (sep_auto heap:funcs_nth_triple heap del:nth_rule simp:list_all2_conv_all_nth)
 
 lemma app_s_f_init_mem_m_triple: 
-  assumes "inst_at i_s (f_inst f, f_inst2) j"
-  shows
- "< mems_m_assn ms ms_m * inst_store_assn i_s> 
+ "< mems_m_assn ms ms_m * inst_m_assn (f_inst f) f_inst2> 
   app_s_f_init_mem_m n bs ms_m f_inst2
   <\<lambda>r. let (ms', res) = app_s_f_init_mem n bs ms f in
-  \<up>(r = res) *  mems_m_assn ms' ms_m * inst_store_assn i_s>"
-  using assms
+  \<up>(r = res) *  mems_m_assn ms' ms_m * inst_m_assn (f_inst f) f_inst2>"
   unfolding mems_m_assn_def app_s_f_init_mem_m_def list_assn_conv_idx inst_m_assn_def
     inst_store_assn_def inst_at_def
   apply(sep_auto split:prod.splits)
-   apply(extract_reinsert_list_idx j)
-  apply(sep_auto)
-   apply(extract_list_idx "inst.mems (f_inst f) ! 0")
+   apply(extract_pre_pure, extract_list_idx "inst.mems (f_inst f) ! 0")
    apply(sep_auto heap: init_mem_triple)
   apply(sep_auto simp:app_s_f_init_mem_def smem_ind_def 
       split:prod.splits option.splits list.splits)
-    apply(rule listI_assn_reinsert, frame_inference, simp, simp, sep_auto)
+    apply(extract_pre_pure, rule listI_assn_reinsert, frame_inference, simp, simp, sep_auto)
   apply(sep_auto)
-  apply(rule listI_assn_reinsert_upd, frame_inference, simp, simp, sep_auto)
+  apply(extract_pre_pure, rule listI_assn_reinsert_upd, frame_inference, simp, simp, sep_auto)
   done
 
 lemma app_s_f_init_tab_m_triple: 
-  assumes "inst_at i_s (f_inst f, f_inst2) j"
-  shows
- "< tabs_m_assn ts ts_m * inst_store_assn i_s> 
+ "< tabs_m_assn ts ts_m * inst_m_assn (f_inst f) f_inst2> 
   app_s_f_init_tab_m n icls ts_m f_inst2
   <\<lambda>r. let (ts', res) = app_s_f_init_tab n icls ts f in
-  \<up>(r = res) *  tabs_m_assn ts' ts_m * inst_store_assn i_s>"
-  using assms
+  \<up>(r = res) *  tabs_m_assn ts' ts_m * inst_m_assn (f_inst f) f_inst2>"
   unfolding tabs_m_assn_def app_s_f_init_tab_m_def list_assn_conv_idx inst_m_assn_def
     inst_store_assn_def inst_at_def
   apply(sep_auto split:prod.splits)
-   apply(extract_reinsert_list_idx j)
-  apply(sep_auto)
-   apply(extract_list_idx "inst.tabs (f_inst f) ! 0")
+   apply(extract_pre_pure, extract_list_idx "inst.tabs (f_inst f) ! 0")
    apply(sep_auto heap:init_tab_triple)
   apply(sep_auto simp:app_s_f_init_tab_def store_tab_def stab_ind_def 
       split:prod.splits option.splits list.splits)
-   apply(rule listI_assn_reinsert_upd, frame_inference, simp, simp, sep_auto)
+   apply(extract_pre_pure, rule listI_assn_reinsert_upd, frame_inference, simp, simp, sep_auto)
   apply(sep_auto)
-  apply(rule listI_assn_reinsert, frame_inference, simp, simp, sep_auto)
+  apply(extract_pre_pure, rule listI_assn_reinsert, frame_inference, simp, simp, sep_auto)
   done
 
 lemma run_step_e_m_triple:
@@ -1097,6 +1090,14 @@ proof -
   note unfold_vars_m = config_m frame_m redex_m
   note unfold_vars = config frame redex unfold_vars_m
   note unfold_vars_assns = unfold_vars cfg_m_assn_def fc_m_assn_def
+
+  obtain j where j_def:"cfg_m_assn i_s cfg cfg_m \<Longrightarrow>\<^sub>A 
+    \<up>(inst_at i_s ((f_inst f), f_inst2) j) * cfg_m_assn i_s cfg cfg_m"
+    unfolding unfold_vars_assns by sep_auto
+
+  note extract_j = cons_pre_rulet[OF ent_imp_entt[OF j_def]]
+  note unfold_for_j = 
+    unfold_vars_assns s_m_assn_def inst_at_def inst_store_assn_def list_assn_conv_idx
 
   show ?thesis 
   proof (cases e)
@@ -1130,12 +1131,20 @@ proof -
     then show ?thesis unfolding unfold_vars by sep_auto
   next
     case (Init_mem x61 x62)
-    then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
-      by (sep_auto heap:app_s_f_init_mem_m_triple split:prod.splits)
+    then show ?thesis
+      apply(rule_tac extract_j)
+      unfolding unfold_for_j
+      apply(sep_auto split:prod.splits)
+      apply(extract_reinsert_list_idx j heap:app_s_f_init_mem_m_triple)
+      by (sep_auto)
   next
     case (Init_tab x71 x72)
-    then show ?thesis unfolding unfold_vars_assns s_m_assn_def 
-      by (sep_auto heap:app_s_f_init_tab_m_triple split:prod.splits)
+    then show ?thesis
+      apply(rule_tac extract_j)
+      unfolding unfold_for_j
+      apply(sep_auto split:prod.splits)
+      apply(extract_reinsert_list_idx j heap:app_s_f_init_tab_m_triple)
+      by (sep_auto)
   qed
 qed 
 

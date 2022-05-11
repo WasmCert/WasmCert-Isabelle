@@ -11,8 +11,21 @@ method reinsert_list_idx for i :: nat =
   (simp;fail),
   (simp;fail)
 
-method extract_reinsert_list_idx for i :: nat = 
- extract_pre_pure?, extract_list_idx i, sep_auto, extract_pre_pure?, reinsert_list_idx i
+method extract_reinsert_list_idx for i :: nat uses heap = 
+ extract_pre_pure?, extract_list_idx i, sep_auto heap:heap, extract_pre_pure?, reinsert_list_idx i
+
+lemma list_assn_basic_heap_rule: 
+  assumes "<P_i> c <Q>"
+    "P_i = P (xs!i) (ys!i) * F" "\<And>r. Q r \<Longrightarrow>\<^sub>A  P_i * R r" "i < length xs"
+  shows "<list_assn P xs ys * F> c <\<lambda>r. list_assn P xs ys * F * R r>"
+  unfolding list_assn_conv_idx
+  apply(insert assms(2, 4))
+  apply(extract_list_idx i)
+  apply(sep_auto heap:assms(1))
+  apply(rule ent_trans[OF fr_refl[OF assms(3)]])
+  apply(reinsert_list_idx i)
+  apply(sep_auto)
+  done
 
 lemmas is_complex_goal = asm_rl[of "< _ > _ < _ >"] asm_rl[of "_ \<Longrightarrow>\<^sub>A _"]
 

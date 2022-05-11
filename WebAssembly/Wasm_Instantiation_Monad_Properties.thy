@@ -428,12 +428,11 @@ qed
 lemma const_exprs_run_v_m_triple:
   assumes "const_exprs \<C> b_es"
           "\<C> \<turnstile> b_es : ([] _> [t])"
-          "inst_at i_s (inst, f_inst2) j"  
-  shows "< s_m_assn i_s' s s_m * inst_store_assn i_s * locs_m_assn locs f_locs1>
+  shows "< s_m_assn i_s s s_m * inst_m_assn inst f_inst2 * locs_m_assn locs f_locs1>
         run_v_m 2 0 (s_m, f_locs1, f_inst2, b_es)
         <\<lambda>(s_m', res_m). let (s', res) = 
         run_v 2 0 (s, \<lparr> f_locs = locs, f_inst = inst\<rparr>, b_es)
-        in \<up>(s_m' = s_m \<and> res_m = res) * s_m_assn i_s' s' s_m' * inst_store_assn i_s >\<^sub>t"
+        in \<up>(s_m' = s_m \<and> res_m = res) * s_m_assn i_s s' s_m' * inst_m_assn inst f_inst2 >\<^sub>t"
 proof -
 
   consider (1) v where "b_es = [C v] \<and> typeof v = t"
@@ -447,7 +446,7 @@ proof -
       by (sep_auto simp: Suc_1[symmetric])
   next
     case 2
-    note 3 = get_global_triple[where f="\<lparr>f_locs = locs, f_inst = inst\<rparr>", simplified, OF assms(3)]
+    note 3 = get_global_triple[where f="\<lparr>f_locs = locs, f_inst = inst\<rparr>", simplified]
 
     show ?thesis
       using assms 2
@@ -462,18 +461,11 @@ qed
 lemma interp_get_v_m_triple:
   assumes  
     "const_exprs \<C> b_es" "\<C> \<turnstile> b_es : ([] _> [t])" 
-    "inst_at i_s (inst, inst_m) j" 
-  shows "< s_m_assn i_s' s s_m * inst_store_assn i_s  > 
+  shows "< s_m_assn i_s s s_m * inst_m_assn inst inst_m  > 
   interp_get_v_m s_m inst_m b_es
   <\<lambda>r.\<up>(r = interp_get_v s inst b_es) 
-  * s_m_assn i_s' s s_m * inst_store_assn i_s >\<^sub>t"
+  * s_m_assn i_s s s_m * inst_m_assn inst inst_m >\<^sub>t"
 proof -
-  obtain iss i_ms where i_s:"i_s = (iss, i_ms)" by fastforce 
-
-  have 1:"s_m_assn i_s' s s_m * inst_store_assn i_s  * inst_m_assn inst inst_m
-    \<Longrightarrow>\<^sub>A s_m_assn i_s' s s_m * inst_store_assn (inst#iss, inst_m#i_ms)"
-    unfolding i_s inst_store_assn_def by sep_auto
-
   note 4 = const_exprs_run_v_m_triple
     [simplified locs_m_assn_def,
       OF assms]
@@ -482,9 +474,8 @@ proof -
   show ?thesis          
     unfolding interp_get_v_m_def interp_get_v_def
     supply [simp del] = run_v_m.simps run_v.simps
-  (*  apply(rule cons_pre_rule[OF 1])*)
     apply(sep_auto heap:4)
-    apply(sep_auto split:res.splits prod.splits simp:inst_store_assn_def i_s 7)
+    apply(sep_auto split:res.splits prod.splits simp:inst_store_assn_def  7)
     done 
 qed
 
@@ -496,15 +487,12 @@ lemma inst_store_assn_cons:
 lemma interp_get_v_m_triple':
   assumes  
     "const_exprs \<C> b_es" "\<C> \<turnstile> b_es : ([] _> [t])" 
-  shows "< s_m_assn i_s' s s_m * inst_store_assn i_s * inst_m_assn inst inst_m > 
+  shows "< s_m_assn i_s s s_m *  inst_m_assn inst inst_m > 
   interp_get_v_m s_m inst_m b_es
   <\<lambda>r.\<up>(r = interp_get_v s inst b_es) 
-  * s_m_assn i_s' s s_m * inst_store_assn i_s * inst_m_assn inst inst_m >\<^sub>t"
-  apply(cases i_s)
-  apply(sep_auto decon: cons_rule[OF _ _ interp_get_v_m_triple
-        [where i_s="(_#_,_#_)", OF assms]])
-    apply(sep_auto simp:inst_store_assn_cons inst_at_def)+
-  done
+  * s_m_assn i_s s s_m * inst_m_assn inst inst_m >\<^sub>t"
+  by(sep_auto heap:interp_get_v_m_triple[OF assms])
+ 
 
 
 lemma prod_pack:"(x = (y, z)) = (y = fst x \<and> z = snd x) " by auto
@@ -687,18 +675,18 @@ proof -
       apply(vcg decon:fold_map_decon
         [where R="\<lambda>x. module_elem_typing _ x" and 
           Q="\<lambda>e r.\<up>(interp_get_i32 _ _ (e_off e) = r) * true"])
-       apply(sep_auto simp: interp_get_i32_m_def interp_get_i32_def
+       apply(sep_auto simp:inst_store_assn_def interp_get_i32_m_def interp_get_i32_def
           module_elem_typing.simps inst_at_def 
-          heap: interp_get_v_m_triple[where j=0])
+          heap: interp_get_v_m_triple)
       apply(solve_entails)
 
      apply(sep_auto simp:list_assn_star list_assn_pure list_all2_eq_map_conv)
       apply(vcg decon:fold_map_decon
         [where R="\<lambda>x. module_data_typing _ x" and 
           Q="\<lambda>d r.\<up>(interp_get_i32 _ _ (d_off d) = r) * true"])
-       apply(sep_auto simp: interp_get_i32_m_def interp_get_i32_def
+       apply(sep_auto simp:inst_store_assn_def interp_get_i32_m_def interp_get_i32_def
           module_data_typing.simps inst_at_def 
-          heap: interp_get_v_m_triple[where j=0])
+          heap: interp_get_v_m_triple)
       apply(solve_entails)
 
      apply(sep_auto simp:inst_at_def heap:element_in_bounds_m_triple[where j=0])
