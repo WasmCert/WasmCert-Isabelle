@@ -343,14 +343,14 @@ next
     by sep_auto
 qed
 
-(* todo: tidy up for consistency *)
+(* todo: rewrite proofs of other troublesome triples to use sep_auto_all *)
 lemma call_indirect_triple:
   assumes "inst_at i_s (f_inst f, f_inst2) j"
   shows 
-  "<tabs_m_assn ts ts_m * funcs_m_assn i_s' fs fs_m * inst_store_assn i_s> 
+  "<tabs_m_assn ts ts_m * funcs_m_assn i_s fs fs_m * inst_store_assn i_s> 
   app_s_f_v_s_call_indirect_m k ts_m fs_m f_inst2 v_s
   <\<lambda>r. \<up>(r = app_s_f_v_s_call_indirect k ts fs f v_s) 
-* tabs_m_assn ts ts_m * funcs_m_assn i_s' fs fs_m * inst_store_assn i_s>"
+* tabs_m_assn ts ts_m * funcs_m_assn i_s fs fs_m * inst_store_assn i_s>"
   using assms
   unfolding app_s_f_v_s_call_indirect_m_def inst_store_assn_def inst_at_def
   supply [split] = v.splits v_num.splits option.splits
