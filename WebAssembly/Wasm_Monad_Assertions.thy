@@ -68,19 +68,20 @@ definition "inst_m_assn i i_m \<equiv>
   * inst_m.mems  i_m \<mapsto>\<^sub>a inst.mems  i 
   * inst_m.globs i_m \<mapsto>\<^sub>a inst.globs i"
 
-type_synonym inst_pile = "(inst list \<times> inst_m list)"
+type_synonym inst_assocs = "(inst list \<times> inst_m list)"
 
-definition inst_pile_assn :: "inst_pile \<Rightarrow> assn" where
-  "inst_pile_assn \<equiv> \<lambda>(is, i_ms). list_assn inst_m_assn is i_ms"
+definition inst_assocs_assn :: "inst_assocs \<Rightarrow> assn" where
+  "inst_assocs_assn \<equiv> \<lambda>(is, i_ms). list_assn inst_m_assn is i_ms"
 
-definition "inst_at \<equiv> \<lambda>(is, i_ms) (i, i_m) j. j < min (length is) (length i_ms) 
+definition inst_at :: "inst_assocs \<Rightarrow> (inst \<times> inst_m) \<Rightarrow> nat \<Rightarrow> bool " where 
+  "inst_at \<equiv> \<lambda>(is, i_ms) (i, i_m) j. j < min (length is) (length i_ms) 
   \<and> is!j = i \<and> i_ms!j = i_m"
 
 abbreviation "contains_inst i_s i \<equiv> \<exists> j. inst_at i_s i j"
 
 
 
-definition cl_m_agree_j :: "inst_pile \<Rightarrow> nat \<Rightarrow> cl \<Rightarrow> cl_m \<Rightarrow> bool" where 
+definition cl_m_agree_j :: "inst_assocs \<Rightarrow> nat \<Rightarrow> cl \<Rightarrow> cl_m \<Rightarrow> bool" where 
   "cl_m_agree_j i_s j cl cl_m = (case cl of 
   cl.Func_native i tf ts b_es \<Rightarrow> 
     (case cl_m of 
@@ -95,7 +96,7 @@ definition cl_m_agree_j :: "inst_pile \<Rightarrow> nat \<Rightarrow> cl \<Right
 
 definition "cl_m_agree i_s cl cl_m \<equiv> \<exists>j. cl_m_agree_j i_s j cl cl_m"
 
-definition funcs_m_assn :: "inst_pile \<Rightarrow> cl list \<Rightarrow> cl_m array \<Rightarrow> assn" where
+definition funcs_m_assn :: "inst_assocs \<Rightarrow> cl list \<Rightarrow> cl_m array \<Rightarrow> assn" where
   "funcs_m_assn i_s fs fs_m = (\<exists>\<^sub>A fs_i. fs_m \<mapsto>\<^sub>a fs_i *\<up>(list_all2 (cl_m_agree i_s)  fs fs_i))"
 
 definition tabinst_m_assn :: "tabinst \<Rightarrow> tabinst_m \<Rightarrow> assn" where 
@@ -111,7 +112,7 @@ definition tabs_m_assn :: "tabinst list \<Rightarrow> tabinst_m array \<Rightarr
 
 definition "globs_m_assn gs gs_m \<equiv> gs_m \<mapsto>\<^sub>a gs"
 
-definition s_m_assn :: "inst_pile \<Rightarrow> s \<Rightarrow> s_m \<Rightarrow> assn" where 
+definition s_m_assn :: "inst_assocs \<Rightarrow> s \<Rightarrow> s_m \<Rightarrow> assn" where 
   "s_m_assn i_s s s_m = 
   funcs_m_assn i_s (s.funcs s) (s_m.funcs s_m)
 * tabs_m_assn  (s.tabs s)  (s_m.tabs s_m)
@@ -121,7 +122,7 @@ definition s_m_assn :: "inst_pile \<Rightarrow> s \<Rightarrow> s_m \<Rightarrow
 definition locs_m_assn :: "v list \<Rightarrow> v array \<Rightarrow> assn" where 
   "locs_m_assn locs locs_m = locs_m \<mapsto>\<^sub>a locs"
 
-definition fc_m_assn :: "inst_pile \<Rightarrow> frame_context \<Rightarrow> frame_context_m \<Rightarrow> assn" where 
+definition fc_m_assn :: "inst_assocs \<Rightarrow> frame_context \<Rightarrow> frame_context_m \<Rightarrow> assn" where 
   "fc_m_assn i_s fc fc_m = (
   case fc of Frame_context redex lcs nf f \<Rightarrow> 
   case fc_m of Frame_context_m redex_m lcs_m nf_m f_locs1 f_inst2 \<Rightarrow>
@@ -131,13 +132,13 @@ definition fc_m_assn :: "inst_pile \<Rightarrow> frame_context \<Rightarrow> fra
 
 definition "fcs_m_assn i_s fcs fcs_m \<equiv> list_assn (fc_m_assn i_s) fcs fcs_m"
 
-definition cfg_m_assn :: "inst_pile \<Rightarrow> config \<Rightarrow> config_m \<Rightarrow> assn" where
+definition cfg_m_assn :: "inst_assocs \<Rightarrow> config \<Rightarrow> config_m \<Rightarrow> assn" where
   "cfg_m_assn i_s cfg cfg_m = (
   case cfg of Config d s fc fcs \<Rightarrow>
   case cfg_m of Config_m d_m s_m fc_m fcs_m \<Rightarrow> 
   \<up>(d=d_m) 
   * s_m_assn i_s s s_m * fc_m_assn i_s fc fc_m * fcs_m_assn i_s fcs fcs_m
-  * inst_pile_assn i_s
+  * inst_assocs_assn i_s
 )"     
 
 
