@@ -11,8 +11,21 @@ method reinsert_list_idx for i :: nat =
   (simp;fail),
   (simp;fail)
 
-method knock_down for i :: nat = 
- extract_pre_pure?, extract_list_idx i, sep_auto, extract_pre_pure?, reinsert_list_idx i
+method extract_reinsert_list_idx for i :: nat uses heap = 
+ extract_pre_pure?, extract_list_idx i, sep_auto heap:heap, extract_pre_pure?, reinsert_list_idx i
+
+lemma list_assn_basic_heap_rule: 
+  assumes "<P_i> c <Q>"
+    "P_i = P (xs!i) (ys!i) * F" "\<And>r. Q r \<Longrightarrow>\<^sub>A  P_i * R r" "i < length xs"
+  shows "<list_assn P xs ys * F> c <\<lambda>r. list_assn P xs ys * F * R r>"
+  unfolding list_assn_conv_idx
+  apply(insert assms(2, 4))
+  apply(extract_list_idx i)
+  apply(sep_auto heap:assms(1))
+  apply(rule ent_trans[OF fr_refl[OF assms(3)]])
+  apply(reinsert_list_idx i)
+  apply(sep_auto)
+  done
 
 lemmas is_complex_goal = asm_rl[of "< _ > _ < _ >"] asm_rl[of "_ \<Longrightarrow>\<^sub>A _"]
 
@@ -55,27 +68,20 @@ definition "inst_m_assn i i_m \<equiv>
   * inst_m.mems  i_m \<mapsto>\<^sub>a inst.mems  i 
   * inst_m.globs i_m \<mapsto>\<^sub>a inst.globs i"
 
-type_synonym inst_store = "(inst list \<times> inst_m list)"
+type_synonym inst_assocs = "(inst list \<times> inst_m list)"
 
-definition inst_store_assn :: "inst_store \<Rightarrow> assn" where
-  "inst_store_assn \<equiv> \<lambda>(is, i_ms). list_assn inst_m_assn is i_ms"
+definition inst_assocs_assn :: "inst_assocs \<Rightarrow> assn" where
+  "inst_assocs_assn \<equiv> \<lambda>(is, i_ms). list_assn inst_m_assn is i_ms"
 
-definition "inst_at \<equiv> \<lambda>(is, i_ms) (i, i_m) j. j < min (length is) (length i_ms) 
+definition inst_at :: "inst_assocs \<Rightarrow> (inst \<times> inst_m) \<Rightarrow> nat \<Rightarrow> bool " where 
+  "inst_at \<equiv> \<lambda>(is, i_ms) (i, i_m) j. j < min (length is) (length i_ms) 
   \<and> is!j = i \<and> i_ms!j = i_m"
 
 abbreviation "contains_inst i_s i \<equiv> \<exists> j. inst_at i_s i j"
 
-definition "inst_store_subset \<equiv> \<lambda>(is1, i_ms1) (is2, i_ms2). 
-  set (zip is1 i_ms1) \<subseteq> set (zip is2 i_ms2)"
 
-lemma inst_store_extend_preserve_contains:
-  assumes "inst_at i_s' i j" "inst_store_subset i_s' i_s" 
-  shows "contains_inst i_s i"
-  using assms unfolding inst_store_subset_def inst_at_def
-  apply(simp split:prod.splits) 
-  by (metis in_set_zip prod.sel(1) prod.sel(2) subset_code(1))
 
-definition cl_m_agree_j :: "inst_store \<Rightarrow> nat \<Rightarrow> cl \<Rightarrow> cl_m \<Rightarrow> bool" where 
+definition cl_m_agree_j :: "inst_assocs \<Rightarrow> nat \<Rightarrow> cl \<Rightarrow> cl_m \<Rightarrow> bool" where 
   "cl_m_agree_j i_s j cl cl_m = (case cl of 
   cl.Func_native i tf ts b_es \<Rightarrow> 
     (case cl_m of 
@@ -88,9 +94,9 @@ definition cl_m_agree_j :: "inst_store \<Rightarrow> nat \<Rightarrow> cl \<Righ
   | cl_m.Func_host tf_m host_m \<Rightarrow> tf = tf_m \<and> host = host_m)
 )"
 
-abbreviation "cl_m_agree i_s cl cl_m \<equiv> \<exists>j. cl_m_agree_j i_s j cl cl_m"
+definition "cl_m_agree i_s cl cl_m \<equiv> \<exists>j. cl_m_agree_j i_s j cl cl_m"
 
-definition funcs_m_assn :: "inst_store \<Rightarrow> cl list \<Rightarrow> cl_m array \<Rightarrow> assn" where
+definition funcs_m_assn :: "inst_assocs \<Rightarrow> cl list \<Rightarrow> cl_m array \<Rightarrow> assn" where
   "funcs_m_assn i_s fs fs_m = (\<exists>\<^sub>A fs_i. fs_m \<mapsto>\<^sub>a fs_i *\<up>(list_all2 (cl_m_agree i_s)  fs fs_i))"
 
 definition tabinst_m_assn :: "tabinst \<Rightarrow> tabinst_m \<Rightarrow> assn" where 
@@ -106,7 +112,7 @@ definition tabs_m_assn :: "tabinst list \<Rightarrow> tabinst_m array \<Rightarr
 
 definition "globs_m_assn gs gs_m \<equiv> gs_m \<mapsto>\<^sub>a gs"
 
-definition s_m_assn :: "inst_store \<Rightarrow> s \<Rightarrow> s_m \<Rightarrow> assn" where 
+definition s_m_assn :: "inst_assocs \<Rightarrow> s \<Rightarrow> s_m \<Rightarrow> assn" where 
   "s_m_assn i_s s s_m = 
   funcs_m_assn i_s (s.funcs s) (s_m.funcs s_m)
 * tabs_m_assn  (s.tabs s)  (s_m.tabs s_m)
@@ -116,7 +122,7 @@ definition s_m_assn :: "inst_store \<Rightarrow> s \<Rightarrow> s_m \<Rightarro
 definition locs_m_assn :: "v list \<Rightarrow> v array \<Rightarrow> assn" where 
   "locs_m_assn locs locs_m = locs_m \<mapsto>\<^sub>a locs"
 
-definition fc_m_assn :: "inst_store \<Rightarrow> frame_context \<Rightarrow> frame_context_m \<Rightarrow> assn" where 
+definition fc_m_assn :: "inst_assocs \<Rightarrow> frame_context \<Rightarrow> frame_context_m \<Rightarrow> assn" where 
   "fc_m_assn i_s fc fc_m = (
   case fc of Frame_context redex lcs nf f \<Rightarrow> 
   case fc_m of Frame_context_m redex_m lcs_m nf_m f_locs1 f_inst2 \<Rightarrow>
@@ -126,19 +132,19 @@ definition fc_m_assn :: "inst_store \<Rightarrow> frame_context \<Rightarrow> fr
 
 definition "fcs_m_assn i_s fcs fcs_m \<equiv> list_assn (fc_m_assn i_s) fcs fcs_m"
 
-definition cfg_m_assn :: "inst_store \<Rightarrow> inst_store \<Rightarrow> config \<Rightarrow> config_m \<Rightarrow> assn" where
-  "cfg_m_assn i_s i_s' cfg cfg_m = (
+definition cfg_m_assn :: "inst_assocs \<Rightarrow> config \<Rightarrow> config_m \<Rightarrow> assn" where
+  "cfg_m_assn i_s cfg cfg_m = (
   case cfg of Config d s fc fcs \<Rightarrow>
   case cfg_m of Config_m d_m s_m fc_m fcs_m \<Rightarrow> 
-  \<up>(d=d_m \<and> inst_store_subset i_s' i_s) 
-  * s_m_assn i_s' s s_m * fc_m_assn i_s fc fc_m * fcs_m_assn i_s fcs fcs_m
-  * inst_store_assn i_s
+  \<up>(d=d_m) 
+  * s_m_assn i_s s s_m * fc_m_assn i_s fc fc_m * fcs_m_assn i_s fcs fcs_m
+  * inst_assocs_assn i_s
 )"     
 
 
 
 lemma cl_m_agree_type: "cl_m_agree i_s cl cl_m \<Longrightarrow> cl_type cl = cl_m_type cl_m"
-  unfolding cl_m_agree_j_def cl_type_def cl_m_type_def
+  unfolding cl_m_agree_def cl_m_agree_j_def cl_type_def cl_m_type_def
   by (auto, simp split:cl.splits cl_m.splits)
 
 
