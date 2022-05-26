@@ -1,6 +1,6 @@
 theory Wasm_Instantiation_Monad_Properties 
   imports "../libs/Misc_Generic_Lemmas" "../libs/List_Assn" 
-    Wasm_Instantiation_Monad Wasm_Monad_Assertions Wasm_Instantiation_Properties     
+    Wasm_Instantiation_Monad Wasm_Monad_Aux Wasm_Instantiation_Properties     
     Wasm_Interpreter_Monad_Properties
     
 begin

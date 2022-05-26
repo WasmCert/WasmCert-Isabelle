@@ -1,6 +1,6 @@
 theory Wasm_Interpreter_Monad_Properties 
   imports "../libs/Misc_Generic_Lemmas" "../libs/List_Assn" 
-    Wasm_Interpreter_Monad Wasm_Monad_Assertions begin
+    Wasm_Interpreter_Monad Wasm_Monad_Aux begin
 
 lemma load_fX_from_uiX_bs_helper:
   assumes "n*8 = LENGTH('a::len)"
@@ -1001,17 +1001,6 @@ proof -
   qed
 qed
 
-(* run_step_e_m *)
-
-abbreviation "s_m_vs_pair_assn i_s \<equiv> \<lambda>(s, vs) (s_m, vs_m). s_m_assn i_s s s_m * \<up>(vs=vs_m)"
-
-(* TODO: something like this should be an axiom *)
-lemma host_apply_impl_m_triple:
- "< s_m_assn i_s s s_m>
- host_apply_impl_m s_m tf h vs
- <\<lambda>r_opt. expect_assn (\<lambda>r r_m. s_m_vs_pair_assn i_s r r_m) (s_m_assn i_s s s_m)
-  (host_apply_impl s tf h vs) r_opt >"
-  sorry
 
 lemma funcs_nth_triple:
   assumes "list_all2 (cl_m_agree i_s) fs fs_i" 
