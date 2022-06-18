@@ -1,50 +1,7 @@
-theory Wasm_Interpreter_Monad imports Wasm_Native_Word_Entry Wasm_Countable Wasm_Interpreter "HOL-Imperative_HOL.Array" "../libs/Byte_Array" begin
+theory Wasm_Interpreter_Monad imports Wasm_Interpreter_Monad_Config 
+  Wasm_Native_Word_Entry   begin
 
-instance uint8 :: heap ..
-instance tf :: heap ..
-instance v :: heap ..
-instance global_ext :: (heap) heap ..
 
-type_synonym mem_m = "(byte_array) \<times> nat option"
-
-record inst_m = \<comment> \<open>instances\<close>
-  types :: "tf array"
-  funcs :: "i array"
-  tabs :: "i array"
-  mems :: "i array"
-  globs :: "i array"
-
-instance inst_m_ext :: (countable) countable
-proof(rule countable_classI[of "\<lambda>i. to_nat (inst_m.types i, inst_m.funcs i, inst_m.tabs i, inst_m.mems i, inst_m.globs i, inst_m.more i)"])
-qed auto
-
-datatype cl_m = \<comment> \<open>function closures\<close>
-  Func_native inst_m (cl_m_type:tf) "t list" "b_e list"
-| Func_host (cl_m_type:tf) host
-
-instance cl_m :: countable
-  by (countable_datatype)
-
-instance cl_m :: heap ..
-
-type_synonym tabinst_m = "(i option) array \<times> nat option"
-
-record s_m = \<comment> \<open>store\<close>
-  funcs :: "cl_m array"
-  tabs :: "tabinst_m array"
-  mems :: "mem_m array"
-  globs :: "global array"
-
-instance s_m_ext :: (countable) countable
-proof(rule countable_classI[of "\<lambda>i. to_nat (s_m.funcs i, s_m.tabs i, s_m.mems i, s_m.globs i, s_m.more i)"])
-qed auto
-
-instance s_m_ext :: (heap) heap ..
-
-(* 0: redex, 1: label contexts, 2: frame arity, 3: frame *)
-datatype frame_context_m = Frame_context_m redex "label_context list" (frame_arity:nat) (f_locs_m:"v array") (f_inst_m:"inst_m")
-
-datatype config_m = Config_m depth s_m frame_context_m "frame_context_m list"
 
 definition mem_m_to_m :: "heap \<Rightarrow> mem_m \<Rightarrow> mem" where
 "mem_m_to_m h mem_m \<equiv>
@@ -482,11 +439,16 @@ type_synonym res_step_tuple_m = "config_m \<times> res_step"
 
 type_synonym res_tuple_m = "config_m \<times> res"
 
+abbreviation "s_m_vs_pair_assn i_s \<equiv> \<lambda>(s, vs) (s_m, vs_m). s_m_assn i_s s s_m * \<up>(vs=vs_m)"
+
 axiomatization 
   host_apply_impl_m:: "s_m \<Rightarrow> tf \<Rightarrow> host \<Rightarrow> v list \<Rightarrow> ((s_m \<times> v list) option) Heap"
-(*TODO:*)
- (*where host_apply_impl_m_correct:"(host_apply_impl_m s tf h vs = Some m') \<Longrightarrow> (\<exists>hs. host_apply s tf h vs hs (Some m'))"
-*)
+  where host_apply_impl_m_triple:
+   "< s_m_assn i_s s s_m>
+   host_apply_impl_m s_m tf h vs
+   <\<lambda>r_opt. expect_assn (\<lambda>r r_m. s_m_vs_pair_assn i_s r r_m) (s_m_assn i_s s s_m)
+  (host_apply_impl s tf h vs) r_opt >"
+
 
 fun run_step_b_e_m :: "b_e \<Rightarrow> config_m \<Rightarrow> res_step_tuple_m Heap" where
   "run_step_b_e_m b_e (Config_m d s fc fcs) =
