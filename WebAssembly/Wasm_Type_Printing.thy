@@ -200,62 +200,44 @@ proof -
     by (simp add: I32.int_shr_s_def int_shr_s_i32.abs_eq)
 qed
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "int_rotl (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (Abs_uint32' (word_rotl (nat_of_uint32 y) (Rep_uint32' x)))"
+lemma "int_rotl (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (Abs_uint32' (word_rotl (nat_of_uint32 y) (Rep_uint32' x)))"
   by (simp add: i32_impl_abs_def Abs_uint32'.rep_eq I32.int_rotl_def int_rotl_i32.abs_eq nat_of_uint32_def)
 
-(* TODO: tidy this lemma and use to solve rotl and rotr perf *)
-lemma "int_rotl (i32_impl_abs x) (i32_impl_abs y) =
-  i32_impl_abs (let n = nat_of_uint32 (uint32_mod y 32) in
+lemma "int_rotr (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (Abs_uint32' (word_rotr (nat_of_uint32 y) (Rep_uint32' x)))"
+  by (simp add: i32_impl_abs_def Abs_uint32'.rep_eq I32.int_rotr_def int_rotr_i32.abs_eq nat_of_uint32_def)
+
+lemma[code]:
+"int_rotl (i32_impl_abs x) (i32_impl_abs y) =
+  i32_impl_abs (let n = nat_of_uint32 (y mod 32) in
    (drop_bit (32-n) x) OR push_bit n (take_bit (32-n) x))"
+
+"int_rotr (i32_impl_abs x) (i32_impl_abs y) =
+  i32_impl_abs (let n = nat_of_uint32 (y mod 32) in
+    (drop_bit n x) OR (push_bit (32-n) (take_bit n x)))"
 proof -
-  have 2:"unat (Rep_uint32 (uint32_mod y 32)) = (unat (Rep_uint32 y) mod 32)"
-  proof -
-    have 1:"(32::uint32) \<noteq> 0"
-      by transfer simp
-    have "unat (Rep_uint32 (y mod 32)) = (unat (Rep_uint32 y) mod 32)"
-      by transfer (simp add: unat_mod)
-    thus ?thesis
-      by (simp only: 1 mod_uint32_code split: if_splits)
-  qed
-  have a:"Transfer.Rel (rel_fun pcr_word cr_i32) Word.Word I32.lift0"
-    by (auto simp add: I32.rep_abs Transfer.Rel_def rel_fun_def cr_i32_def pcr_word_def cr_word_def)
-  have b: "Transfer.Rel (rel_fun pcr_word (=)) (Word.rep\<circ>(Word.Word::int \<Rightarrow> 32 word)) (Word.rep::32 word => int)"
-    by (auto simp add: I32.rep_abs Transfer.Rel_def rel_fun_def cr_i32_def pcr_word_def cr_word_def)
-  have 11:"\<And>y x. (take_bit
-                (32)
-                ((Word.rep::32 word => int) (word_of_int x))) = (take_bit
-                (32) x)"
-    using Word.the_int.rep_eq[of "_::32 word", symmetric]
+  have x:"\<And>y::int. (take_bit 32 (take_bit 32 y mod 32)) = take_bit 32 y mod 32"
+    unfolding take_bit_eq_mod
     by simp
-  hence 1:"\<And>y x. (take_bit
-                (32 -
-                 nat (take_bit 32 y) mod 32)
-                ((Word.rep::32 word => int) (word_of_int x))) = (take_bit
-                (32 -
-                 nat (take_bit 32 y) mod 32) x)"
-    using take_bit_tightened[OF 11]
-    by simp
-    show ?thesis
-  apply (simp add: 2 word_rotl_def concat_bit_def Let_def i32_impl_abs_def Abs_uint32'.rep_eq I32.int_rotl_def int_rotl_i32.abs_eq nat_of_uint32_def)
+  have y:"\<And>y::int. (nat (take_bit 32 y) mod 32) = nat ((take_bit 32 y) mod 32)"
+    unfolding take_bit_eq_mod
+    by (simp add: nat_mod_distrib)
+  show "int_rotl (i32_impl_abs x) (i32_impl_abs y) =
+          i32_impl_abs (let n = nat_of_uint32 (y mod 32) in
+           (drop_bit (32-n) x) OR push_bit n (take_bit (32-n) x))"
     apply transfer
-     defer
-     apply (rule a)
-    apply (simp add: take_bit_drop_bit)
-    using Word.the_int.rep_eq[of "_::32 word",symmetric]
-    apply simp
+    unfolding I32.int_rotl_def
     apply transfer
-      defer
-      apply (rule b)
-     apply (rule b)
-    apply simp
-    apply (simp add: 1)
+    apply (simp add: Let_def x y concat_bit_def take_bit_drop_bit)
+    done
+  show "int_rotr (i32_impl_abs x) (i32_impl_abs y) =
+          i32_impl_abs (let n = nat_of_uint32 (y mod 32) in
+            (drop_bit n x) OR (push_bit (32-n) (take_bit n x)))"
+    apply transfer
+    unfolding I32.int_rotr_def
+    apply transfer
+    apply (simp add: Let_def x y concat_bit_def take_bit_drop_bit)
     done
 qed
-
-(* TODO: avoid rep round-trip *)
-lemma[code]: "int_rotr (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (Abs_uint32' (word_rotr (nat_of_uint32 y) (Rep_uint32' x)))"
-  by (simp add: i32_impl_abs_def Abs_uint32'.rep_eq I32.int_rotr_def int_rotr_i32.abs_eq nat_of_uint32_def)
 
 lemma[code]: "int_eqz (i32_impl_abs x) = (x = 0)"
   apply (simp add: i32_impl_abs_def I32.int_eqz_def int_eqz_i32.abs_eq)
@@ -436,13 +418,44 @@ proof -
     by (simp add: I64.int_shr_s_def int_shr_s_i64.abs_eq)
 qed
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "int_rotl (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (Abs_uint64' (word_rotl (nat_of_uint64 y) (Rep_uint64' x)))"
+lemma "int_rotl (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (Abs_uint64' (word_rotl (nat_of_uint64 y) (Rep_uint64' x)))"
   by (simp add: i64_impl_abs_def Abs_uint64'.rep_eq I64.int_rotl_def int_rotl_i64.abs_eq nat_of_uint64_def)
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "int_rotr (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (Abs_uint64' (word_rotr (nat_of_uint64 y) (Rep_uint64' x)))"
+lemma "int_rotr (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (Abs_uint64' (word_rotr (nat_of_uint64 y) (Rep_uint64' x)))"
   by (simp add: i64_impl_abs_def Abs_uint64'.rep_eq I64.int_rotr_def int_rotr_i64.abs_eq nat_of_uint64_def)
+
+lemma[code]:
+"int_rotl (i64_impl_abs x) (i64_impl_abs y) =
+  i64_impl_abs (let n = nat_of_uint64 (y mod 64) in
+   (drop_bit (64-n) x) OR push_bit n (take_bit (64-n) x))"
+
+"int_rotr (i64_impl_abs x) (i64_impl_abs y) =
+  i64_impl_abs (let n = nat_of_uint64 (y mod 64) in
+    (drop_bit n x) OR (push_bit (64-n) (take_bit n x)))"
+proof -
+  have x:"\<And>y::int. (take_bit 64 (take_bit 64 y mod 64)) = take_bit 64 y mod 64"
+    unfolding take_bit_eq_mod
+    by simp
+  have y:"\<And>y::int. (nat (take_bit 64 y) mod 64) = nat ((take_bit 64 y) mod 64)"
+    unfolding take_bit_eq_mod
+    by (simp add: nat_mod_distrib)
+  show "int_rotl (i64_impl_abs x) (i64_impl_abs y) =
+          i64_impl_abs (let n = nat_of_uint64 (y mod 64) in
+           (drop_bit (64-n) x) OR push_bit n (take_bit (64-n) x))"
+    apply transfer
+    unfolding I64.int_rotl_def
+    apply transfer
+    apply (simp add: Let_def x y concat_bit_def take_bit_drop_bit)
+    done
+  show "int_rotr (i64_impl_abs x) (i64_impl_abs y) =
+          i64_impl_abs (let n = nat_of_uint64 (y mod 64) in
+            (drop_bit n x) OR (push_bit (64-n) (take_bit n x)))"
+    apply transfer
+    unfolding I64.int_rotr_def
+    apply transfer
+    apply (simp add: Let_def x y concat_bit_def take_bit_drop_bit)
+    done
+qed
 
 lemma[code]: "int_eqz (i64_impl_abs x) = (x = 0)"
   apply (simp add: i64_impl_abs_def I64.int_eqz_def int_eqz_i64.abs_eq)

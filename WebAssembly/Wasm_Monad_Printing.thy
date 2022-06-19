@@ -8,6 +8,30 @@ code_identifier constant  Array.nth \<rightharpoonup> (OCaml) "WasmRef_Isa.array
 declare [[code drop: blit]]
 lemmas[code] = blit.simps
 
+(* more efficient bitmask generation *)
+declare [[code drop: "mask::nat\<Rightarrow>uint32"]]
+declare [[code drop: "mask::nat\<Rightarrow>uint64"]]
+
+lemma[code]: "((mask n) :: uint32) = shiftr (-1) (32 - n)"
+proof -
+  show ?thesis
+    apply transfer
+    apply transfer
+    apply (simp add: drop_bit_take_bit)
+    apply (metis bin_mask_conv_pow2 bintr_Min diff_add_inverse min_pm1)
+    done
+qed
+
+lemma[code]: "((mask n) :: uint64) = shiftr (-1) (64 - n)"
+proof -
+  show ?thesis
+    apply transfer
+    apply transfer
+    apply (simp add: drop_bit_take_bit)
+    apply (metis bin_mask_conv_pow2 bintr_Min diff_add_inverse min_pm1)
+    done
+qed
+
 fun run_fuzz :: "fuel \<Rightarrow> depth \<Rightarrow> s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (v list) option \<Rightarrow> (s_m \<times> res) Heap" where
   "run_fuzz n d s m v_imps opt_vs = do {
    i_res \<leftarrow> interp_instantiate_init_m s m v_imps;
