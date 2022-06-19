@@ -37,18 +37,15 @@ lemma[code]:
   unfolding i64_impl_rep_def i64_impl_abs_def
   by (simp add: I64.rep_abs Rep_uint64_inverse)
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "wasm_wrap (i64_impl_abs x) = i32_impl_abs (Abs_uint32' (Word.ucast (Rep_uint64' x)))"
-  by (simp add: wasm_wrap_def i32_impl_abs_def Abs_uint32'.rep_eq i64_impl_abs.rep_eq)
+lemma[code]: "wasm_wrap (i64_impl_abs x) = i32_impl_abs (Uint32 (integer_of_uint64 x))"
+  by (metis Rep_i32_inverse Rep_i64_inverse Uint32.rep_eq i32_impl_abs.rep_eq i64_impl_abs.rep_eq int_of_uint64.rep_eq int_of_uint64_code ucast_eq wasm_wrap.abs_eq)
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "wasm_extend_u (i32_impl_abs x) = i64_impl_abs (Abs_uint64' (Word.ucast (Rep_uint32' x)))"
-  by (simp add: wasm_extend_u_def i32_impl_abs_def I32.rep_abs  Abs_uint64'.abs_eq i64_impl_abs.abs_eq)
+lemma[code]: "wasm_extend_u (i32_impl_abs x) = i64_impl_abs (Uint64 (integer_of_uint32 x))"
+  by (metis Rep_i64_inverse Word.of_int_uint comp_apply i32_impl_abs.rep_eq i64_impl_abs.abs_eq int_of_uint32.rep_eq integer_of_uint32_def uint64_of_int.abs_eq uint64_of_int_code wasm_extend_u.rep_eq)
 
 (* TODO: avoid rep round-trip *)
 lemma[code]: "wasm_extend_s (i32_impl_abs x) = i64_impl_abs (Abs_uint64' (Word.scast (Rep_uint32' x)))"
   by (simp add: wasm_extend_s_def i32_impl_abs_def I32.rep_abs Abs_uint64'.abs_eq i64_impl_abs.abs_eq)
-
 
 (* i32 *)
 
@@ -126,11 +123,22 @@ lemma[code]: "int_rem_u (i32_impl_abs x) (i32_impl_abs y) = (if y = 0 then None 
   apply (metis Rep_uint32_inject mod_uint32_code modulo_uint32.rep_eq zero_uint32.rep_eq)
   done
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "int_rem_s (i32_impl_abs x) (i32_impl_abs y) = (if y = 0 then None else Some (i32_impl_abs (Abs_uint32' ((Rep_uint32' x) smod (Rep_uint32' y)))))"
+lemma "int_rem_s (i32_impl_abs x) (i32_impl_abs y) = (if y = 0 then None else Some (i32_impl_abs (Abs_uint32' ((Rep_uint32' x) smod (Rep_uint32' y)))))"
   apply (simp_all add: i32_impl_abs_def I32.int_rem_s_def int_rem_s_i32.abs_eq split: if_splits)
   apply (metis Abs_uint32'.rep_eq Rep_uint32_inverse zero_uint32.abs_eq)
   done
+
+lemma[code]: "int_rem_s (i32_impl_abs x) (i32_impl_abs y) = (if y = 0 then None else Some (i32_impl_abs (x - (uint32_sdiv x y) * y)))"
+proof -
+  have "Rep_uint32 y \<noteq> 0 \<Longrightarrow> y \<noteq> 0 \<Longrightarrow>
+    I32.lift0 (Rep_uint32 x - Rep_uint32 x sdiv Rep_uint32 y * Rep_uint32 y) =
+    I32.lift0 (Rep_uint32 (x - Abs_uint32 (Rep_uint32 x sdiv Rep_uint32 y) * y))"
+    by (metis Abs_uint32'.rep_eq Rep_uint32_inverse minus_uint32.rep_eq times_uint32.abs_eq)
+  thus ?thesis
+    apply (simp add:smod_word_alt_def Rep_uint32_inverse zero_uint32.rep_eq uint32_sdiv_def i32_impl_abs_def I32.int_rem_s_def int_rem_s_i32.abs_eq split: if_splits)
+    apply (metis Rep_uint32_inverse zero_uint32.abs_eq)
+    done
+qed
 
 lemma[code]: "int_and (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (and x y)"
   by (simp add: i32_impl_abs_def I32.int_and_def int_and_i32.abs_eq and_uint32.rep_eq)
@@ -195,6 +203,55 @@ qed
 (* TODO: avoid rep round-trip *)
 lemma[code]: "int_rotl (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (Abs_uint32' (word_rotl (nat_of_uint32 y) (Rep_uint32' x)))"
   by (simp add: i32_impl_abs_def Abs_uint32'.rep_eq I32.int_rotl_def int_rotl_i32.abs_eq nat_of_uint32_def)
+
+(* TODO: tidy this lemma and use to solve rotl and rotr perf *)
+lemma "int_rotl (i32_impl_abs x) (i32_impl_abs y) =
+  i32_impl_abs (let n = nat_of_uint32 (uint32_mod y 32) in
+   (drop_bit (32-n) x) OR push_bit n (take_bit (32-n) x))"
+proof -
+  have 2:"unat (Rep_uint32 (uint32_mod y 32)) = (unat (Rep_uint32 y) mod 32)"
+  proof -
+    have 1:"(32::uint32) \<noteq> 0"
+      by transfer simp
+    have "unat (Rep_uint32 (y mod 32)) = (unat (Rep_uint32 y) mod 32)"
+      by transfer (simp add: unat_mod)
+    thus ?thesis
+      by (simp only: 1 mod_uint32_code split: if_splits)
+  qed
+  have a:"Transfer.Rel (rel_fun pcr_word cr_i32) Word.Word I32.lift0"
+    by (auto simp add: I32.rep_abs Transfer.Rel_def rel_fun_def cr_i32_def pcr_word_def cr_word_def)
+  have b: "Transfer.Rel (rel_fun pcr_word (=)) (Word.rep\<circ>(Word.Word::int \<Rightarrow> 32 word)) (Word.rep::32 word => int)"
+    by (auto simp add: I32.rep_abs Transfer.Rel_def rel_fun_def cr_i32_def pcr_word_def cr_word_def)
+  have 11:"\<And>y x. (take_bit
+                (32)
+                ((Word.rep::32 word => int) (word_of_int x))) = (take_bit
+                (32) x)"
+    using Word.the_int.rep_eq[of "_::32 word", symmetric]
+    by simp
+  hence 1:"\<And>y x. (take_bit
+                (32 -
+                 nat (take_bit 32 y) mod 32)
+                ((Word.rep::32 word => int) (word_of_int x))) = (take_bit
+                (32 -
+                 nat (take_bit 32 y) mod 32) x)"
+    using take_bit_tightened[OF 11]
+    by simp
+    show ?thesis
+  apply (simp add: 2 word_rotl_def concat_bit_def Let_def i32_impl_abs_def Abs_uint32'.rep_eq I32.int_rotl_def int_rotl_i32.abs_eq nat_of_uint32_def)
+    apply transfer
+     defer
+     apply (rule a)
+    apply (simp add: take_bit_drop_bit)
+    using Word.the_int.rep_eq[of "_::32 word",symmetric]
+    apply simp
+    apply transfer
+      defer
+      apply (rule b)
+     apply (rule b)
+    apply simp
+    apply (simp add: 1)
+    done
+qed
 
 (* TODO: avoid rep round-trip *)
 lemma[code]: "int_rotr (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (Abs_uint32' (word_rotr (nat_of_uint32 y) (Rep_uint32' x)))"
@@ -302,11 +359,22 @@ lemma[code]: "int_rem_u (i64_impl_abs x) (i64_impl_abs y) = (if y = 0 then None 
   apply (metis Rep_uint64_inject mod_uint64_code modulo_uint64.rep_eq zero_uint64.rep_eq)
   done
 
-(* TODO: avoid rep round-trip *)
-lemma[code]: "int_rem_s (i64_impl_abs x) (i64_impl_abs y) = (if y = 0 then None else Some (i64_impl_abs (Abs_uint64' ((Rep_uint64' x) smod (Rep_uint64' y)))))"
+lemma "int_rem_s (i64_impl_abs x) (i64_impl_abs y) = (if y = 0 then None else Some (i64_impl_abs (Abs_uint64' ((Rep_uint64' x) smod (Rep_uint64' y)))))"
   apply (simp_all add: i64_impl_abs_def I64.int_rem_s_def int_rem_s_i64.abs_eq split: if_splits)
   apply (metis Abs_uint64'.rep_eq Rep_uint64_inverse zero_uint64.abs_eq)
   done
+
+lemma[code]: "int_rem_s (i64_impl_abs x) (i64_impl_abs y) = (if y = 0 then None else Some (i64_impl_abs (x - (uint64_sdiv x y) * y)))"
+proof -
+  have "Rep_uint64 y \<noteq> 0 \<Longrightarrow> y \<noteq> 0 \<Longrightarrow>
+    I64.lift0 (Rep_uint64 x - Rep_uint64 x sdiv Rep_uint64 y * Rep_uint64 y) =
+    I64.lift0 (Rep_uint64 (x - Abs_uint64 (Rep_uint64 x sdiv Rep_uint64 y) * y))"
+    by (metis Abs_uint64'.rep_eq Rep_uint64_inverse minus_uint64.rep_eq times_uint64.abs_eq)
+  thus ?thesis
+    apply (simp add:smod_word_alt_def Rep_uint64_inverse zero_uint64.rep_eq uint64_sdiv_def i64_impl_abs_def I64.int_rem_s_def int_rem_s_i64.abs_eq split: if_splits)
+    apply (metis Rep_uint64_inverse zero_uint64.abs_eq)
+    done
+qed
 
 lemma[code]: "int_and (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (and x y)"
   by (simp add: i64_impl_abs_def I64.int_and_def int_and_i64.abs_eq and_uint64.rep_eq)
