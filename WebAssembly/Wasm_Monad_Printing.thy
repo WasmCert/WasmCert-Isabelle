@@ -48,6 +48,11 @@ fun run_fuzz :: "fuel \<Rightarrow> depth \<Rightarrow> s_m \<Rightarrow> m \<Ri
   | (s', RI_crash_m res) \<Rightarrow> return (s', RCrash res)
   | (s', RI_trap_m msg) \<Rightarrow> return (s', RTrap msg) }"
 
+fun run_fuzz_entry :: "fuel \<Rightarrow> m \<Rightarrow> (v list) option \<Rightarrow> (s_m \<times> res) Heap" where
+  "run_fuzz_entry n m vs_opt = do {
+     s_m \<leftarrow> make_empty_store_m;
+     run_fuzz n 300 s_m m [] vs_opt }"
+
 export_code open nat_of_byte byte_of_nat
                  ocaml_int32_to_isabelle_int32
                  isabelle_int32_to_ocaml_int32
@@ -57,7 +62,7 @@ export_code open nat_of_byte byte_of_nat
                  isabelle_byte_to_ocaml_char
                  zero_byte negone_byte m_imports
                  make_empty_store_m module_type_checker interp_instantiate_init_m typing run_m run_invoke_m
-                 run_fuzz
+                 run_fuzz run_fuzz_entry
   in OCaml_imp module_name WasmRef_Isa file_prefix WasmRef_Isa_m
 
 end
