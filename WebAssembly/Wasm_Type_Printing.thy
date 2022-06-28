@@ -1,6 +1,8 @@
 theory Wasm_Type_Printing imports Wasm_Native_Word_Entry "../libs/Misc_Generic_Lemmas" begin
 (* Maps types to Andreas' Ocaml implementation - a thin wrapper over Ocaml ints/floats for the most part. *)
 
+unbundle bit_operations_syntax
+
 code_printing
 (*  type_constructor i32 \<rightharpoonup> (OCaml) "I32Wrapper.t" *)
 (*| type_constructor i64 \<rightharpoonup> (OCaml) "I64Wrapper.t" *)
@@ -41,7 +43,7 @@ lemma[code]: "wasm_wrap (i64_impl_abs x) = i32_impl_abs (Uint32 (integer_of_uint
   by (metis Rep_i32_inverse Rep_i64_inverse Uint32.rep_eq i32_impl_abs.rep_eq i64_impl_abs.rep_eq int_of_uint64.rep_eq int_of_uint64_code ucast_eq wasm_wrap.abs_eq)
 
 lemma[code]: "wasm_extend_u (i32_impl_abs x) = i64_impl_abs (Uint64 (integer_of_uint32 x))"
-  by (metis Rep_i64_inverse Word.of_int_uint comp_apply i32_impl_abs.rep_eq i64_impl_abs.abs_eq int_of_uint32.rep_eq integer_of_uint32_def uint64_of_int.abs_eq uint64_of_int_code wasm_extend_u.rep_eq)
+  by (metis Rep_i64_inject Uint64.rep_eq i32_impl_abs.rep_eq i64_impl_abs.rep_eq integer_of_uint32.rep_eq of_int_uint_ucast wasm_extend_u.rep_eq)
 
 (* TODO: avoid rep round-trip *)
 lemma[code]: "wasm_extend_s (i32_impl_abs x) = i64_impl_abs (Abs_uint64' (Word.scast (Rep_uint32' x)))"
@@ -84,17 +86,19 @@ lemma "int_popcnt (i32_impl_abs x) = i32_impl_abs (Abs_uint32' (Word.of_nat (pop
 
 lemma[code]: "int_popcnt (i32_impl_abs x) = i32_impl_abs (uint32_of_nat (fold_atLeastAtMost_nat (\<lambda>n acc. if bit x n then acc+1 else acc) 0 31 0))"
 proof -
-  have a:"\<And>x. comp_fun_commute (\<lambda>n acc. if bit x n then acc+1 else acc)"
+  have a: "\<And>x. comp_fun_commute (\<lambda>n acc. if bit x n then acc+1 else acc)"
     unfolding comp_fun_commute_def
     by auto
+  then interpret comp_fun_commute "(\<lambda>n acc. if bit xx n then acc+1 else acc)" for xx :: uint32 .
+
   have b:"Finite_Set.fold (\<lambda>n acc. if bit x n then acc+1 else acc) 0 {0..31} = fold (\<lambda>n acc. if bit x n then acc+1 else acc) [0..<32] 0"
-      using comp_fun_commute.fold_set_fold_remdups[OF a, of x 0 "[0..<32]"]
-      by (simp add: atLeastAtMost_upt)
+    using fold_set_fold_remdups[of x 0 "[0..<32]"]
+    by (simp add: atLeastAtMost_upt)
   have "pop_count (Rep_uint32' x) = (fold_atLeastAtMost_nat (\<lambda>n acc. if bit x n then acc+1 else acc) 0 31 0)"
     using length_filter_fold[of _ "[0..<32]" 0]
     by (simp add: bit_uint32.rep_eq[symmetric] b rev_filter[symmetric] pop_count_def to_bl_unfold fold_atLeastAtMost_nat[OF a])
   thus ?thesis
-    by (simp add: uint32_of_int.rep_eq uint32_of_nat_def i32_impl_abs_def Abs_uint32'.rep_eq I32.int_popcnt_def int_popcnt_i32.abs_eq)
+    by (simp add: uint32.word_of_word  uint32_of_nat_def i32_impl_abs_def I32.int_popcnt_def int_popcnt_i32.abs_eq)
 qed
 
 lemma[code]: "int_add (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (x + y)"
@@ -114,9 +118,8 @@ lemma[code]: "int_div_u (i32_impl_abs x) (i32_impl_abs y) = (if y = 0 then None 
 lemma[code]: "int_div_s (i32_impl_abs x) (i32_impl_abs y) = (if y = 0 \<or> (x = -2147483648 \<and> y = -1) then None else Some (i32_impl_abs (uint32_sdiv x y)))"
   apply (cases "y = 0 \<or> (x = -2147483648 \<and> y = -1)")
   apply (simp_all add: i32_impl_abs_def uint32_sdiv_code I32.int_div_s_def int_div_s_i32.abs_eq)
-  apply (metis Rep_uint32_neg_numeral one_uint32.rep_eq uminus_uint32.rep_eq zero_uint32.rep_eq)
-  apply (metis Rep_uint32_inject Rep_uint32_neg_numeral one_uint32.rep_eq uminus_uint32.rep_eq zero_uint32.rep_eq)
-  done
+  using one_uint32.rep_eq uint32.word_of_numeral uminus_uint32.rep_eq zero_uint32.rep_eq apply presburger
+  by (metis one_uint32.rep_eq uint32.word_of_eqI uint32.word_of_numeral uminus_uint32.rep_eq zero_uint32.rep_eq)
 
 lemma[code]: "int_rem_u (i32_impl_abs x) (i32_impl_abs y) = (if y = 0 then None else Some (i32_impl_abs (uint32_mod x y)))"
   apply (simp add: i32_impl_abs_def I32.int_rem_u_def int_rem_u_i32.abs_eq split: if_splits)
@@ -154,16 +157,17 @@ proof -
   have 1:"\<not>(integer_of_uint32 y mod 32 < 0 \<or> 32 \<le> integer_of_uint32 y mod 32)"
     by (meson unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
   have 2:"(Rep_uint32 (x << (nat_of_integer (integer_of_uint32 y mod 32)))) =
-            ((Rep_uint32 x) << (unat (Rep_uint32 y) mod 32))"
-    unfolding integer_of_uint32_def nat_of_integer_def
-    apply transfer
+            ((Rep_uint32 x) << (unat (Rep_uint32 y) mod 32))" 
+    unfolding integer_of_uint32_def nat_of_integer_def shiftl_def
+    apply transfer'
     apply transfer
     apply (simp add: take_bit_eq_mod nat_mod_distrib)
     done
   thus ?thesis
     using 1
     unfolding i32_impl_abs_def uint32_shiftl_def
-    by (simp add: shiftl_eq_push_bit I32.int_shl_def int_shl_i32.abs_eq)
+    by (simp add: I32.int_shl_def int_shl_i32.abs_eq shiftl_def) 
+    
 qed
 
 lemma[code]: "int_shr_u (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (uint32_shiftr x ((integer_of_uint32 y) mod 32))"
@@ -172,28 +176,29 @@ proof -
     by (meson unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
   have 2:"(Rep_uint32 (shiftr x (nat_of_integer ((integer_of_uint32 y) mod 32)))) =
             (shiftr (Rep_uint32 x) ((unat (Rep_uint32 y)) mod 32))"
-    unfolding integer_of_uint32_def nat_of_integer_def
-    apply transfer
+    unfolding integer_of_uint32_def nat_of_integer_def shiftr_def
+    apply transfer'
     apply transfer
     apply (simp add: take_bit_eq_mod nat_mod_distrib)
     done
   thus ?thesis
     using 1
     unfolding i32_impl_abs_def uint32_shiftr_def
-    by (simp add: shiftr_eq_drop_bit I32.int_shr_u_def int_shr_u_i32.abs_eq)
+    by (simp add: shiftr_def I32.int_shr_u_def int_shr_u_i32.abs_eq)
 qed
 
 lemma[code]: "int_shr_s (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (uint32_sshiftr x ((integer_of_uint32 y) mod 32))"
 proof -
   have 1:"\<not>(integer_of_uint32 y mod 32 < 0 \<or> 32 \<le> integer_of_uint32 y mod 32)"
     by (meson unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
-  have 2:"(Rep_uint32 (sshiftr_uint32 x (nat_of_integer ((integer_of_uint32 y) mod 32)))) =
+  have 2:"(Rep_uint32 (signed_drop_bit_uint32 (nat_of_integer ((integer_of_uint32 y) mod 32)) x)) =
             (sshiftr (Rep_uint32 x) ((unat (Rep_uint32 y)) mod 32))"
     unfolding integer_of_uint32_def nat_of_integer_def
-    apply transfer
+    apply transfer'
     apply transfer
     apply (simp add: take_bit_eq_mod nat_mod_distrib)
     done
+  
   thus ?thesis
     using 1
     unfolding i32_impl_abs_def uint32_sshiftr_def
@@ -206,6 +211,7 @@ lemma "int_rotl (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (Abs_uint32' (w
 lemma "int_rotr (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (Abs_uint32' (word_rotr (nat_of_uint32 y) (Rep_uint32' x)))"
   by (simp add: i32_impl_abs_def Abs_uint32'.rep_eq I32.int_rotr_def int_rotr_i32.abs_eq nat_of_uint32_def)
 
+  
 lemma[code]:
 "int_rotl (i32_impl_abs x) (i32_impl_abs y) =
   i32_impl_abs (let n = nat_of_uint32 (y mod 32) in
@@ -215,27 +221,30 @@ lemma[code]:
   i32_impl_abs (let n = nat_of_uint32 (y mod 32) in
     (drop_bit n x) OR (push_bit (32-n) (take_bit n x)))"
 proof -
-  have x:"\<And>y::int. (take_bit 32 (take_bit 32 y mod 32)) = take_bit 32 y mod 32"
-    unfolding take_bit_eq_mod
-    by simp
-  have y:"\<And>y::int. (nat (take_bit 32 y) mod 32) = nat ((take_bit 32 y) mod 32)"
-    unfolding take_bit_eq_mod
-    by (simp add: nat_mod_distrib)
+  have [simp]: "unat (Rep_i32 (i32_impl_abs y)) = nat_of_uint32 y" for y  
+    by (simp add: i32_impl_abs.rep_eq uint32.nat_of_eq_word_of)
+  
+  have [simp]: "nat_of_uint32 (y mod 32) = nat_of_uint32 y mod 32" for y  
+    unfolding nat_of_uint32_def
+    by (simp add: uint32.word_of_mod unat_mod)
+    
   show "int_rotl (i32_impl_abs x) (i32_impl_abs y) =
           i32_impl_abs (let n = nat_of_uint32 (y mod 32) in
            (drop_bit (32-n) x) OR push_bit n (take_bit (32-n) x))"
-    apply transfer
+    unfolding int_rotl_i32_def       
+    apply transfer'
     unfolding I32.int_rotl_def
-    apply transfer
-    apply (simp add: Let_def x y concat_bit_def take_bit_drop_bit)
+    apply transfer'
+    apply (simp add: Let_def concat_bit_def take_bit_drop_bit)
     done
   show "int_rotr (i32_impl_abs x) (i32_impl_abs y) =
           i32_impl_abs (let n = nat_of_uint32 (y mod 32) in
             (drop_bit n x) OR (push_bit (32-n) (take_bit n x)))"
-    apply transfer
+    unfolding int_rotr_i32_def
+    apply transfer'
     unfolding I32.int_rotr_def
-    apply transfer
-    apply (simp add: Let_def x y concat_bit_def take_bit_drop_bit)
+    apply transfer'
+    apply (simp add: Let_def concat_bit_def take_bit_drop_bit)
     done
 qed
 
@@ -305,14 +314,17 @@ proof -
   have a:"\<And>x. comp_fun_commute (\<lambda>n acc. if bit x n then acc+1 else acc)"
     unfolding comp_fun_commute_def
     by auto
+  then interpret comp_fun_commute "(\<lambda>n acc. if bit x n then acc+1 else acc)" .
+    
   have b:"Finite_Set.fold (\<lambda>n acc. if bit x n then acc+1 else acc) 0 {0..63} = fold (\<lambda>n acc. if bit x n then acc+1 else acc) [0..<64] 0"
-      using comp_fun_commute.fold_set_fold_remdups[OF a, of x 0 "[0..<64]"]
+      using fold_set_fold_remdups[of 0 "[0..<64]"]
       by (simp add: atLeastAtMost_upt)
   have "pop_count (Rep_uint64' x) = (fold_atLeastAtMost_nat (\<lambda>n acc. if bit x n then acc+1 else acc) 0 63 0)"
     using length_filter_fold[of _ "[0..<64]" 0]
     by (simp add: bit_uint64.rep_eq[symmetric] b rev_filter[symmetric] pop_count_def to_bl_unfold fold_atLeastAtMost_nat[OF a])
   thus ?thesis
-    by (simp add: uint64_of_int.rep_eq uint64_of_nat_def i64_impl_abs_def Abs_uint64'.rep_eq I64.int_popcnt_def int_popcnt_i64.abs_eq)
+    by (simp add: uint64.word_of_word uint64_of_nat_def i64_impl_abs_def I64.int_popcnt_def int_popcnt_i64.abs_eq)
+    
 qed
 
 lemma[code]: "int_add (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (x + y)"
@@ -332,8 +344,8 @@ lemma[code]: "int_div_u (i64_impl_abs x) (i64_impl_abs y) = (if y = 0 then None 
 lemma[code]: "int_div_s (i64_impl_abs x) (i64_impl_abs y) = (if y = 0 \<or> (x = -9223372036854775808 \<and> y = -1) then None else Some (i64_impl_abs (uint64_sdiv x y)))"
   apply (cases "y = 0 \<or> (x = -9223372036854775808 \<and> y = -1)")
   apply (simp_all add: i64_impl_abs_def uint64_sdiv_code I64.int_div_s_def int_div_s_i64.abs_eq)
-  apply (metis Rep_uint64_neg_numeral one_uint64.rep_eq uminus_uint64.rep_eq zero_uint64.rep_eq)
-  apply (metis Rep_uint64_inject Rep_uint64_neg_numeral one_uint64.rep_eq uminus_uint64.rep_eq zero_uint64.rep_eq)
+  subgoal using one_uint64.rep_eq uint64.word_of_minus uint64.word_of_numeral zero_uint64.rep_eq by presburger
+  subgoal using one_uint64.rep_eq uint64.word_of_eqI uint64.word_of_minus zero_uint64.rep_eq by force
   done
 
 lemma[code]: "int_rem_u (i64_impl_abs x) (i64_impl_abs y) = (if y = 0 then None else Some (i64_impl_abs (uint64_mod x y)))"
@@ -373,15 +385,15 @@ proof -
     by (meson unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
   have 2:"(Rep_uint64 (x << (nat_of_integer (integer_of_uint64 y mod 64)))) =
             ((Rep_uint64 x) << (unat (Rep_uint64 y) mod 64))"
-    unfolding integer_of_uint64_def nat_of_integer_def
-    apply transfer
+    unfolding integer_of_uint64_def nat_of_integer_def shiftl_def
+    apply transfer'
     apply transfer
     apply (simp add: take_bit_eq_mod nat_mod_distrib)
     done
   thus ?thesis
     using 1
     unfolding i64_impl_abs_def uint64_shiftl_def
-    by (simp add: shiftl_eq_push_bit I64.int_shl_def int_shl_i64.abs_eq)
+    by (simp add: shiftl_def I64.int_shl_def int_shl_i64.abs_eq)
 qed
 
 lemma[code]: "int_shr_u (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (uint64_shiftr x ((integer_of_uint64 y) mod 64))"
@@ -390,25 +402,25 @@ proof -
     by (meson unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
   have 2:"(Rep_uint64 (shiftr x (nat_of_integer ((integer_of_uint64 y) mod 64)))) =
             (shiftr (Rep_uint64 x) ((unat (Rep_uint64 y)) mod 64))"
-    unfolding integer_of_uint64_def nat_of_integer_def
-    apply transfer
+    unfolding integer_of_uint64_def nat_of_integer_def shiftr_def
+    apply transfer'
     apply transfer
     apply (simp add: take_bit_eq_mod nat_mod_distrib)
     done
   thus ?thesis
     using 1
     unfolding i64_impl_abs_def uint64_shiftr_def
-    by (simp add: shiftr_eq_drop_bit I64.int_shr_u_def int_shr_u_i64.abs_eq)
+    by (simp add: shiftr_def I64.int_shr_u_def int_shr_u_i64.abs_eq)
 qed
 
 lemma[code]: "int_shr_s (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (uint64_sshiftr x ((integer_of_uint64 y) mod 64))"
 proof -
   have 1:"\<not>(integer_of_uint64 y mod 64 < 0 \<or> 64 \<le> integer_of_uint64 y mod 64)"
     by (meson unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
-  have 2:"(Rep_uint64 (sshiftr_uint64 x (nat_of_integer ((integer_of_uint64 y) mod 64)))) =
+  have 2:"(Rep_uint64 (signed_drop_bit_uint64 (nat_of_integer ((integer_of_uint64 y) mod 64)) x)) =
             (sshiftr (Rep_uint64 x) ((unat (Rep_uint64 y)) mod 64))"
     unfolding integer_of_uint64_def nat_of_integer_def
-    apply transfer
+    apply transfer'
     apply transfer
     apply (simp add: take_bit_eq_mod nat_mod_distrib)
     done
@@ -439,20 +451,31 @@ proof -
   have y:"\<And>y::int. (nat (take_bit 64 y) mod 64) = nat ((take_bit 64 y) mod 64)"
     unfolding take_bit_eq_mod
     by (simp add: nat_mod_distrib)
+    
+  have [simp]: "unat (Rep_i64 (i64_impl_abs y)) = nat_of_uint64 y" for y  
+    by (simp add: i64_impl_abs.rep_eq uint64.nat_of_eq_word_of)
+  
+  have [simp]: "nat_of_uint64 (y mod 64) = nat_of_uint64 y mod 64" for y  
+    unfolding nat_of_uint64_def
+    by (simp add: uint64.word_of_mod unat_mod)
+    
+    
   show "int_rotl (i64_impl_abs x) (i64_impl_abs y) =
           i64_impl_abs (let n = nat_of_uint64 (y mod 64) in
            (drop_bit (64-n) x) OR push_bit n (take_bit (64-n) x))"
-    apply transfer
+    unfolding int_rotl_i64_def
+    apply transfer'
     unfolding I64.int_rotl_def
-    apply transfer
+    apply transfer'
     apply (simp add: Let_def x y concat_bit_def take_bit_drop_bit)
     done
   show "int_rotr (i64_impl_abs x) (i64_impl_abs y) =
           i64_impl_abs (let n = nat_of_uint64 (y mod 64) in
             (drop_bit n x) OR (push_bit (64-n) (take_bit n x)))"
-    apply transfer
+    unfolding int_rotr_i64_def
+    apply transfer'
     unfolding I64.int_rotr_def
-    apply transfer
+    apply transfer'
     apply (simp add: Let_def x y concat_bit_def take_bit_drop_bit)
     done
 qed

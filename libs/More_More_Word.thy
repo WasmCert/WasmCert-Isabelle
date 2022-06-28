@@ -1,4 +1,11 @@
-theory More_More_Word imports Word_Lib.More_Word_Operations Word_Lib.Rsplit begin
+theory More_More_Word 
+imports 
+  Word_Lib.More_Word_Operations 
+  Word_Lib.Rsplit 
+  Word_Lib.Syntax_Bundles 
+begin
+
+unbundle bit_projection_infix_syntax
 
 fun bin_rsplit_rev :: "nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> int list"
   where "bin_rsplit_rev n m c =
@@ -38,7 +45,7 @@ definition word_rsplit_rev :: "'a::len word \<Rightarrow> 'b::len word list"
 lemma word_rsplit_rev_is: "word_rsplit_rev = rev \<circ> word_rsplit"
   using bin_rsplit_rev_is
   unfolding word_rsplit_def bin_rsplit_def word_rsplit_rev_def comp_def
-  by (metis (no_types, hide_lams) append_Nil fst_conv rev.simps(1) rev_map snd_conv)
+  by (metis (no_types, opaque_lifting) append_self_conv2 fst_eqD rev_append rev_map snd_eqD)
 
 definition word_rcat_rev :: \<open>'a::len word list \<Rightarrow> 'b::len word\<close>
   where \<open>word_rcat_rev = word_of_int \<circ> horner_sum uint (2 ^ LENGTH('a))\<close>
@@ -89,7 +96,7 @@ proof -
 
   show ?thesis
     using test_bit_rcat[OF 1 3] assms
-    by (simp add: size_word.rep_eq test_bit_eq_bit)
+    by (simp add: size_word.rep_eq)
 qed
 
 lemma bit_word_scast_iff':
@@ -238,7 +245,7 @@ lemma word_rcat_rev_is_word_rcat_rev_takefill:
   shows "((word_rcat_rev::(('b::len word) list)\<Rightarrow>'a word) ws) = 
          (word_rcat_rev::(('b::len word) list)\<Rightarrow>'a word) (takefill 0 l ws)"
   using ucast_word_rcat_rev_is_word_rcat_rev_takefill ucast_id
-  by (metis (no_types, hide_lams) assms(1,2) dual_order.trans mult_le_mono1 order_refl)
+  by (smt (verit, ccfv_SIG) assms(1) assms(2) dual_order.refl mult.commute mult_le_mono2 order_trans)
 
 lemma ucast_word_rcat_rev_is_word_rcat_rev:
   assumes "(LENGTH('b::len)) \<ge> (LENGTH('a::len))"

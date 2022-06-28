@@ -670,7 +670,7 @@ proof -
       using b_e_check_single_type_not_bot_sound b_e_typing.tee_local
       unfolding to_ct_list_def
       apply (simp split: if_splits)
-      apply (metis (no_types, hide_lams) list.simps(8,9))
+      apply (metis (no_types) list.simps(8,9))
       done
   next
     case (34 \<C> i ts)
@@ -678,7 +678,7 @@ proof -
       using b_e_check_single_type_not_bot_sound b_e_typing.get_global
       unfolding to_ct_list_def
       apply (simp split: if_splits)
-      apply (metis (no_types, hide_lams) list.simps(8))
+      apply (metis (no_types) list.simps(8))
       done
   next
     case (35 \<C> i ts)
@@ -686,7 +686,7 @@ proof -
       using b_e_check_single_type_not_bot_sound b_e_typing.set_global
       unfolding to_ct_list_def
       apply (simp split: if_splits)
-      apply (metis (no_types, hide_lams) list.simps(8,9))
+      apply (metis (no_types) list.simps(8,9))
       done
   next
     case (36 \<C> t tp_sx a off ts)

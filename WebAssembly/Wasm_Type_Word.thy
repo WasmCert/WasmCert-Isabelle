@@ -423,7 +423,7 @@ proof -
     hence sgn: "sgn a = sgn b" using of_int_0_le_iff of_int_le_0_iff by fastforce
     hence "a sdiv b = \<lfloor>rat_of_int a / rat_of_int b\<rfloor>"
       unfolding signed_divide_int_def
-      by (simp add: div_eq_sgn_abs floor_divide_of_int_eq)
+      by (auto simp: div_eq_sgn_abs floor_divide_of_int_eq)
     thus ?thesis unfolding trunc using True by simp
   next
     case False

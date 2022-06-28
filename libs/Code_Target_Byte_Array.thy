@@ -32,7 +32,8 @@ proof -
     by auto
   thus ?thesis
     unfolding Uint8_def map_fun_def integer_of_uint8_def comp_def
-    by simp
+    by (auto simp: Rep_uint8_inverse)
+    
 qed
 
 (* TODO: if extraction of wider accesses is implemented correctly, raw byte accesses should never be used *)

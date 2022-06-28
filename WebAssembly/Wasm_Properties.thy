@@ -1594,7 +1594,7 @@ lemma types_preserved_get_local:
 proof -
   have "(local \<C>)!i = typeof v"
     using assms(2,3)
-    by (metis (no_types, hide_lams) append_Cons length_map list.simps(9) map_append nth_append_length)
+    by (metis (no_types) append_Cons length_map list.simps(9) map_append nth_append_length)
   hence "ts' = ts@[typeof v]"
     using assms(1) unlift_b_e[of s \<C> "[Get_local i]"] b_e_type_get_local
     by fastforce
@@ -1611,7 +1611,7 @@ lemma types_preserved_set_local:
 proof -
   have v_type:"(local \<C>)!i = typeof v"
     using assms(2,3)
-    by (metis (no_types, hide_lams) append_Cons length_map list.simps(9) map_append nth_append_length)
+    by (metis (no_types) append_Cons length_map list.simps(9) map_append nth_append_length)
   obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> [$C v'] : (ts _> ts'')" 
                              "s\<bullet>\<C> \<turnstile> [$Set_local i] : (ts'' _> ts')"
     using e_type_comp assms

@@ -9,47 +9,6 @@ So this theory can be removed once it's in a release.
 
 text\<open>Some auxiliaries for shifting by the entire word length or more\<close>
 
-lemma sshiftr_clamp_pos:
-  assumes
-    "LENGTH('a) \<le> n"
-    "0 \<le> sint x"
-  shows "(x::'a::len word) >>> n = 0"
-  apply (rule word_sint.Rep_eqD)
-  apply (unfold sshiftr_div_2n Word.sint_0)
-  apply (rule div_pos_pos_trivial)
-  subgoal using assms(2) .
-  apply (rule order.strict_trans[where b="2 ^ (LENGTH('a) - 1)"])
-  using sint_lt assms(1) by auto
-
-lemma sshiftr_clamp_neg:
-  assumes
-    "LENGTH('a) \<le> n"
-    "sint x < 0"
-  shows "(x::'a::len word) >>> n = -1"
-proof -
-  have *: "- (2 ^ n) < sint x"
-    apply (rule order.strict_trans2[where b="- (2 ^ (LENGTH('a) - 1))"])
-    using assms(1) sint_ge by auto
-  show ?thesis
-    apply (rule word_sint.Rep_eqD)
-    apply (unfold sshiftr_div_2n Word.sint_n1)
-    apply (subst div_minus_minus[symmetric])
-    apply (rule div_pos_neg_trivial)
-    subgoal using assms(2) by linarith
-    using * by simp
-qed
-
-lemma sshiftr_clamp:
-  assumes "LENGTH('a) \<le> n"
-  shows "(x::'a::len word) >>> n = x >>> LENGTH('a)"
-  apply (cases "0 \<le> sint x")
-  subgoal
-    apply (subst sshiftr_clamp_pos[OF assms])
-    defer apply (subst sshiftr_clamp_pos)
-    by auto
-  apply (subst sshiftr_clamp_neg[OF assms])
-  defer apply (subst sshiftr_clamp_neg)
-  by auto
 
 text\<open>
 Like @{thm shiftr1_bl_of}, but the precondition is stronger because we need to pick the msb out of
