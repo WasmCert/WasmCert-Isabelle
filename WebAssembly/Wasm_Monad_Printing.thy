@@ -20,7 +20,6 @@ proof -
     apply transfer'
     apply (simp add: drop_bit_take_bit)
     by (metis add_diff_cancel_left' drop_bit_mask_eq min_minus min_pm1 take_bit_of_mask)
-    
 qed
 
 lemma[code]: "((mask n) :: uint64) = shiftr (-1) (64 - n)"

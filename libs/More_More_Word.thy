@@ -244,8 +244,8 @@ lemma word_rcat_rev_is_word_rcat_rev_takefill:
           "length (ws::'b word list) \<le> l"
   shows "((word_rcat_rev::(('b::len word) list)\<Rightarrow>'a word) ws) = 
          (word_rcat_rev::(('b::len word) list)\<Rightarrow>'a word) (takefill 0 l ws)"
-  using ucast_word_rcat_rev_is_word_rcat_rev_takefill ucast_id
-  by (smt (verit, ccfv_SIG) assms(1) assms(2) dual_order.refl mult.commute mult_le_mono2 order_trans)
+  using ucast_word_rcat_rev_is_word_rcat_rev_takefill[OF _ assms(1)] ucast_id
+  by (metis assms(1,2) dual_order.trans le_refl mult.commute mult_le_mono2)
 
 lemma ucast_word_rcat_rev_is_word_rcat_rev:
   assumes "(LENGTH('b::len)) \<ge> (LENGTH('a::len))"

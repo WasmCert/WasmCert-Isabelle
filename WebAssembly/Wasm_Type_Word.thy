@@ -5,7 +5,6 @@ theory Wasm_Type_Word
     Wasm_Type_Abs
     "Word_Lib.Signed_Division_Word"
     "Word_Lib.More_Word_Operations"
-    Sshiftr
 begin
 
 lemma mult_inv_le: "(a::int) < 0 \<Longrightarrow> b \<ge> 0 \<Longrightarrow> a * b \<le> -b"
