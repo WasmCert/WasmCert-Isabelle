@@ -1262,7 +1262,7 @@ lemma make_empty_inst_m_triple:
 lemma make_empty_store_m_triple: 
   "<emp>
   make_empty_store_m
-  <\<lambda>r. s_m_assn ([], []) \<lparr>s.funcs = [], tabs = [], mems = [], globs = [] \<rparr> r * inst_assocs_assn ([], [])>"
+  <\<lambda>r. s_m_assn ([], []) empty_store r * inst_assocs_assn ([], [])>"
   unfolding make_empty_store_m_def s_m_assn_def 
     funcs_m_assn_def tabs_m_assn_def mems_m_assn_def globs_m_assn_def inst_assocs_assn_def
   by sep_auto 
@@ -1275,4 +1275,54 @@ lemma make_empty_frame_m_triple:
   unfolding make_empty_frame_m_def empty_frame_def locs_m_assn_def 
   by (sep_auto heap:make_empty_inst_m_triple)
 
+  
+definition "make_invoke_config_m \<equiv> \<lambda>d (s, vs, i). do {
+  (f_locs1, f_inst2) \<leftarrow> make_empty_frame_m;
+  return ((Config_m d s (Frame_context_m (Redex (rev vs) [Invoke i] []) [] 0 f_locs1 f_inst2) []))
+}"
+
+lemma run_invoke_v_m_alt: "run_invoke_v_m n d (s, vs, i) = do {
+  cfg \<leftarrow> make_invoke_config_m d (s, vs, i);
+  (cfg',res) \<leftarrow> run_iter_m n cfg;
+  case cfg' of (Config_m d s fc fcs) \<Rightarrow> return (s,res)
+}"
+  unfolding make_invoke_config_m_def
+  apply (simp add: )
+  by (metis (no_types, lifting) cond_case_prod_eta old.prod.case return_bind)
+
+  
+
+(*
+lemma "contains_inst i_s (f_inst empty_frame, f_inst2)"  
+  unfolding inst_at_def
+  apply (auto simp:  split: prod.split)
+
+
+lemma "< s_m_assn i_s s s_m > 
+    make_invoke_config_m d (s_m,vs,i) 
+  <\<lambda>r. cfg_m_assn 
+      i_s 
+      ((Config d s (Frame_context (Redex (rev vs) [Invoke i] []) [] 0 empty_frame) [])) 
+      r>"  
+  unfolding make_invoke_config_m_def cfg_m_assn_def fc_m_assn_def fcs_m_assn_def
+  apply (sep_auto heap: make_empty_frame_m_triple)
+  subgoal
+    apply (simp add: inst_at_def split: prod.split)
+  
+  
+term run_fuzz    
+    
+lemma "<emp> run_invoke_v_m fuel d (s, vargs, i_cl) <\<lambda>r. emp>"  
+  unfolding run_invoke_v_m_alt
+  apply (sep_auto 
+    heap: make_empty_frame_m_triple run_iter_m_triple)
+  thm run_iter_m_triple  
+  apply (heap_rule run_iter_m_triple)  
+    
+  
+term run_invoke_v_m  
+*)  
+   
+  
+  
 end

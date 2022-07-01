@@ -1214,4 +1214,27 @@ definition interp_instantiate_init :: "s \<Rightarrow> m \<Rightarrow> v_ext lis
                                          | (s'', RValue []) \<Rightarrow> (s'', RI_res inst v_exps [])
                                          | (s'', RValue (x#xs)) \<Rightarrow> (s'', RI_crash (Error_invalid (STR ''start function''))))
                                      | x \<Rightarrow> x)"
+                                     
+                                     
+(* TODO: Naming should be run_fuzz, and run_fuzz_m for the monadic version. 
+  But name run_fuzz fixed for code-export, so not changing it now! *)
+definition run_fuzz' :: "fuel \<Rightarrow> depth \<Rightarrow> s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (v list) option \<Rightarrow> (s \<times> res)" where
+  "run_fuzz' n d s m v_imps opt_vs = (let
+   i_res = interp_instantiate_init s m v_imps in
+   case i_res of
+     (s', RI_res inst v_exps init_es) \<Rightarrow>
+     (case (List.find (\<lambda>exp. case (E_desc exp) of Ext_func i \<Rightarrow> True | _ \<Rightarrow> False) v_exps) of
+        Some exp \<Rightarrow> (case (E_desc exp) of Ext_func i \<Rightarrow> (
+                       let cl = nth (s.funcs s') i in
+                       case (cl_type cl) of
+                         (t1 _> t2) \<Rightarrow>
+                           let params = case opt_vs of Some vs \<Rightarrow> (rev vs) | None \<Rightarrow> (map bitzero t1) in
+                           run_invoke_v n d (s', params, i) ))
+      | None \<Rightarrow> (s', RCrash (Error_invariant (STR ''no import to invoke''))))
+  | (s', RI_crash res) \<Rightarrow> (s', RCrash res)
+  | (s', RI_trap msg) \<Rightarrow> (s', RTrap msg) )"
+
+definition run_fuzz_entry' :: "fuel \<Rightarrow> m \<Rightarrow> (v list) option \<Rightarrow> s \<times> res" where
+  "run_fuzz_entry' n m vs_opt = run_fuzz' n 300 empty_store m [] vs_opt"
+                                     
 end

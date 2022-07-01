@@ -711,4 +711,91 @@ lemma interp_instantiate_init_m_triple:
   apply(sep_auto heap:interp_instantiate_m_triple run_instantiate_m_triple
       split:res_inst_m.splits res_inst.splits prod.splits res.splits)
   done
+
+
+
+
+
+lemma fcs_m_assn_empty: "fcs_m_assn i_s [] [] = emp"
+  by (auto simp: fcs_m_assn_def)
+
+lemma inst_assocs_assn_snoc: "inst_assocs_assn (is@[i],i_ms@[im]) = inst_assocs_assn (is,i_ms) * inst_m_assn i im"
+  by (auto simp: inst_assocs_assn_def split: prod.splits)
+
+lemma contains_inst_snoc: "length as = length bs \<Longrightarrow> contains_inst (as@[a],bs@[b]) (a,b)"
+  apply (auto simp: inst_at_def) 
+  by (metis lessI nth_append_length)
+
+lemma inst_at_snoc_preserve: "inst_at (is, i_ms) iim j \<Longrightarrow> inst_at (is @ [i], i_ms @ [i_m]) iim j"  
+  by (auto simp: inst_at_def)
+  
+lemma cl_m_agree_snoc_preserve: "\<lbrakk>cl_m_agree (is, i_ms) cl clm ;length i_ms = length is\<rbrakk> \<Longrightarrow> cl_m_agree (is @ [i], i_ms @ [i_m]) cl clm"  
+  by (cases cl; cases clm; auto simp: cl_m_agree_def cl_m_agree_j_def intro: inst_at_snoc_preserve)
+  
+lemma s_m_assn_snoc_preserve: "length i_ms = length is \<Longrightarrow> s_m_assn (is,i_ms) s sm \<Longrightarrow>\<^sub>A s_m_assn (is @ [i], i_ms @ [i_m]) s sm"  
+  by (sep_auto simp: s_m_assn_def funcs_m_assn_def list_all2_conv_all_nth intro: cl_m_agree_snoc_preserve)
+  
+lemma inst_assoc_assn_pure[extract_pure_rules]: "h\<Turnstile>inst_assocs_assn (is, i_ms) \<Longrightarrow> length i_ms = length is"  
+  unfolding inst_assocs_assn_def apply simp
+  by extract_pre_pure  
+  
+definition "append_inst \<equiv> \<lambda>(xs,ys) (x,y). (xs@[x], ys@[y])"
+  
+lemma make_invoke_config_m_triple: "
+  <inst_assocs_assn i_s * s_m_assn i_s s sm> 
+    make_invoke_config_m d (sm, vs, i) 
+  <\<lambda>cfg_m. \<exists>\<^sub>Af_inst2. cfg_m_assn (append_inst i_s (f_inst empty_frame,f_inst2)) (make_invoke_config d (s,vs,i)) cfg_m>\<^sub>t"
+  unfolding make_invoke_config_m_def cfg_m_assn_def make_invoke_config_def append_inst_def
+  apply (cases i_s)
+  apply (sep_auto heap: make_empty_frame_m_triple)
+  apply (sep_auto simp: fc_m_assn_def fcs_m_assn_empty inst_assocs_assn_snoc)
+  apply (rule contains_inst_snoc)
+  subgoal by extract_pre_pure
+    
+  apply extract_pre_pure  
+  apply(ent_backward_all r:s_m_assn_snoc_preserve)
+  apply sep_auto
+  done
+  
+
+lemma run_invoke_v_m_triple: "
+  < inst_assocs_assn i_s * s_m_assn i_s s sm > 
+    run_invoke_v_m n d (sm,vs,i) 
+  < \<lambda>sr. \<exists>\<^sub>Afi. inst_assocs_assn (append_inst i_s (f_inst empty_frame, fi)) * s_m_vs_pair_assn ((append_inst i_s (f_inst empty_frame, fi))) (run_invoke_v n d (s,vs,i)) sr >\<^sub>t"
+  unfolding run_invoke_v_m_alt run_invoke_v_alt
+  apply (sep_auto 
+    heap: make_empty_frame_m_triple make_invoke_config_m_triple run_iter_m_triple
+    split: config_m.split
+    )
+  unfolding cfg_m_assn_def    
+  by (sep_auto split: prod.splits config.split)
+
+(* TODO: Delete all those simp-lemmas, right after defs (best: change fun to definition! )*)  
+lemmas [simp del] = run_invoke_v_m.simps run_invoke_v.simps run_fuzz.simps
+  
+    
+lemma run_fuzz_triple: "
+  <inst_assocs_assn i_s * s_m_assn i_s s sm> 
+    run_fuzz n d sm m v_imps opt_vs 
+  <\<lambda>r. \<exists>\<^sub>Ai_s'. inst_assocs_assn i_s' * s_m_vs_pair_assn i_s' (run_fuzz' n d s m v_imps opt_vs) r>\<^sub>t"
+  unfolding run_fuzz.simps run_fuzz'_def
+  apply (sep_auto 
+    heap: interp_instantiate_init_m_triple funcs_nth_triple_s run_invoke_v_m_triple
+    split: res_inst_m.split res_inst.split prod.splits v_ext.split tf.split option.splits
+    simp: cl_m_agree_type
+  )
+  
+  apply (auto simp add:find_Some_iff)
+  done
+  
+  
+lemma run_fuzz_entry_triple: "
+  <emp> 
+    run_fuzz_entry n m v_imps 
+  <\<lambda>r. \<exists>\<^sub>Ai_s. inst_assocs_assn i_s * s_m_vs_pair_assn i_s (run_fuzz_entry' n m v_imps) r>\<^sub>t"
+  unfolding run_fuzz_entry.simps run_fuzz_entry'_def
+  by (sep_auto heap: make_empty_store_m_triple run_fuzz_triple)
+  
+  
+  
 end

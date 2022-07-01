@@ -814,4 +814,16 @@ fun run_invoke_v :: "fuel \<Rightarrow> depth \<Rightarrow> (s \<times> v list \
      (let (cfg',res) = run_iter n (Config d s (Frame_context (Redex (rev vs) [Invoke i] []) [] 0 empty_frame) []) in
       case cfg' of (Config d s fc fcs) \<Rightarrow> (s,res))"
 
+definition "make_invoke_config \<equiv> \<lambda>d (s, vs, i). (Config d s (Frame_context (Redex (rev vs) [Invoke i] []) [] 0 empty_frame) [])"
+
+lemma run_invoke_v_alt:
+  "run_invoke_v n d (s, vs, i) =
+     (let (cfg',res) = run_iter n (make_invoke_config d (s,vs,i)) in
+      case cfg' of (Config d s fc fcs) \<Rightarrow> (s,res))"
+  by (simp add: make_invoke_config_def)
+      
+abbreviation "empty_store \<equiv> \<lparr>s.funcs = [], tabs = [], mems = [], globs = []\<rparr>"
+
+      
+      
 end

@@ -252,4 +252,28 @@ definition interp_instantiate_init_m :: "s_m \<Rightarrow> m \<Rightarrow> v_ext
                                                   | (s'', RValue []) \<Rightarrow> return (s'', RI_res_m inst v_exps [])
                                                   | (s'', RValue (x#xs)) \<Rightarrow> return (s'', RI_crash_m (Error_invalid (STR ''start function''))))}
                                             | x \<Rightarrow> return x }"
+                                            
+                                            
+fun run_fuzz :: "fuel \<Rightarrow> depth \<Rightarrow> s_m \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (v list) option \<Rightarrow> (s_m \<times> res) Heap" where
+  "run_fuzz n d s m v_imps opt_vs = do {
+   i_res \<leftarrow> interp_instantiate_init_m s m v_imps;
+   case i_res of
+     (s', RI_res_m inst v_exps init_es) \<Rightarrow>
+     (case (List.find (\<lambda>exp. case (E_desc exp) of Ext_func i \<Rightarrow> True | _ \<Rightarrow> False) v_exps) of
+        Some exp \<Rightarrow> (case (E_desc exp) of Ext_func i \<Rightarrow> do {
+                       cl \<leftarrow> Array.nth (s_m.funcs s') i;
+                       case (cl_m_type cl) of
+                         (t1 _> t2) \<Rightarrow>
+                           let params = case opt_vs of Some vs \<Rightarrow> (rev vs) | None \<Rightarrow> (map bitzero t1) in
+                           run_invoke_v_m n d (s', params, i) })
+      | None \<Rightarrow> return (s', RCrash (Error_invariant (STR ''no import to invoke''))))
+  | (s', RI_crash_m res) \<Rightarrow> return (s', RCrash res)
+  | (s', RI_trap_m msg) \<Rightarrow> return (s', RTrap msg) }"
+
+fun run_fuzz_entry :: "fuel \<Rightarrow> m \<Rightarrow> (v list) option \<Rightarrow> (s_m \<times> res) Heap" where
+  "run_fuzz_entry n m vs_opt = do {
+     s_m \<leftarrow> make_empty_store_m;
+     run_fuzz n 300 s_m m [] vs_opt }"
+                                            
+                                            
 end
