@@ -522,12 +522,12 @@ code_printing
 | type_constructor ocaml_i64 \<rightharpoonup> (OCaml) "Int64.t"
 | type_constructor ocaml_char \<rightharpoonup> (OCaml) "Char.t"
 
-axiomatization
-  ocaml_i32_to_integer :: "ocaml_i32 \<Rightarrow> integer" and
-  integer_to_ocaml_i32 :: "integer \<Rightarrow> ocaml_i32" and
-  ocaml_i64_to_integer :: "ocaml_i64 \<Rightarrow> integer" and
-  integer_to_ocaml_i64 :: "integer \<Rightarrow> ocaml_i64" and
-  ocaml_char_to_integer :: "ocaml_char \<Rightarrow> integer" and
+consts
+  ocaml_i32_to_integer :: "ocaml_i32 \<Rightarrow> integer"
+  integer_to_ocaml_i32 :: "integer \<Rightarrow> ocaml_i32"
+  ocaml_i64_to_integer :: "ocaml_i64 \<Rightarrow> integer"
+  integer_to_ocaml_i64 :: "integer \<Rightarrow> ocaml_i64"
+  ocaml_char_to_integer :: "ocaml_char \<Rightarrow> integer"
   integer_to_ocaml_char :: "integer \<Rightarrow> ocaml_char"
 
 code_printing
@@ -557,41 +557,41 @@ definition isabelle_byte_to_ocaml_char :: "byte \<Rightarrow> ocaml_char" where
   "isabelle_byte_to_ocaml_char n \<equiv> integer_to_ocaml_char (integer_of_uint8 n)"
 
 (* axiomatise the existence of conversions between floats and OCaml ints/char lists *)
-axiomatization
-  f32_convert_u_ocaml_i32 :: "ocaml_i32 \<Rightarrow> f32" and
-  f32_convert_s_ocaml_i32 :: "ocaml_i32 \<Rightarrow> f32" and
-  f32_convert_u_ocaml_i64 :: "ocaml_i64 \<Rightarrow> f32" and
-  f32_convert_s_ocaml_i64 :: "ocaml_i64 \<Rightarrow> f32" and
-  f64_convert_u_ocaml_i32 :: "ocaml_i32 \<Rightarrow> f64" and
-  f64_convert_s_ocaml_i32 :: "ocaml_i32 \<Rightarrow> f64" and
-  f64_convert_u_ocaml_i64 :: "ocaml_i64 \<Rightarrow> f64" and
-  f64_convert_s_ocaml_i64 :: "ocaml_i64 \<Rightarrow> f64" and
+consts
+  f32_convert_u_ocaml_i32 :: "ocaml_i32 \<Rightarrow> f32" 
+  f32_convert_s_ocaml_i32 :: "ocaml_i32 \<Rightarrow> f32" 
+  f32_convert_u_ocaml_i64 :: "ocaml_i64 \<Rightarrow> f32" 
+  f32_convert_s_ocaml_i64 :: "ocaml_i64 \<Rightarrow> f32" 
+  f64_convert_u_ocaml_i32 :: "ocaml_i32 \<Rightarrow> f64" 
+  f64_convert_s_ocaml_i32 :: "ocaml_i32 \<Rightarrow> f64" 
+  f64_convert_u_ocaml_i64 :: "ocaml_i64 \<Rightarrow> f64" 
+  f64_convert_s_ocaml_i64 :: "ocaml_i64 \<Rightarrow> f64" 
 
-  ocaml_i32_trunc_u_f32 :: "f32 \<Rightarrow> ocaml_i32 option" and
-  ocaml_i32_trunc_s_f32 :: "f32 \<Rightarrow> ocaml_i32 option" and
-  ocaml_i32_trunc_u_f64 :: "f64 \<Rightarrow> ocaml_i32 option" and
-  ocaml_i32_trunc_s_f64 :: "f64 \<Rightarrow> ocaml_i32 option" and
-  ocaml_i64_trunc_u_f32 :: "f32 \<Rightarrow> ocaml_i64 option" and
-  ocaml_i64_trunc_s_f32 :: "f32 \<Rightarrow> ocaml_i64 option" and
-  ocaml_i64_trunc_u_f64 :: "f64 \<Rightarrow> ocaml_i64 option" and
-  ocaml_i64_trunc_s_f64 :: "f64 \<Rightarrow> ocaml_i64 option" and
-  ocaml_i32_trunc_sat_u_f32 :: "f32 \<Rightarrow> ocaml_i32" and
-  ocaml_i32_trunc_sat_s_f32 :: "f32 \<Rightarrow> ocaml_i32" and
-  ocaml_i32_trunc_sat_u_f64 :: "f64 \<Rightarrow> ocaml_i32" and
-  ocaml_i32_trunc_sat_s_f64 :: "f64 \<Rightarrow> ocaml_i32" and
-  ocaml_i64_trunc_sat_u_f32 :: "f32 \<Rightarrow> ocaml_i64" and
-  ocaml_i64_trunc_sat_s_f32 :: "f32 \<Rightarrow> ocaml_i64" and
-  ocaml_i64_trunc_sat_u_f64 :: "f64 \<Rightarrow> ocaml_i64" and
-  ocaml_i64_trunc_sat_s_f64 :: "f64 \<Rightarrow> ocaml_i64" and
+  ocaml_i32_trunc_u_f32 :: "f32 \<Rightarrow> ocaml_i32 option"
+  ocaml_i32_trunc_s_f32 :: "f32 \<Rightarrow> ocaml_i32 option"
+  ocaml_i32_trunc_u_f64 :: "f64 \<Rightarrow> ocaml_i32 option"
+  ocaml_i32_trunc_s_f64 :: "f64 \<Rightarrow> ocaml_i32 option"
+  ocaml_i64_trunc_u_f32 :: "f32 \<Rightarrow> ocaml_i64 option"
+  ocaml_i64_trunc_s_f32 :: "f32 \<Rightarrow> ocaml_i64 option"
+  ocaml_i64_trunc_u_f64 :: "f64 \<Rightarrow> ocaml_i64 option"
+  ocaml_i64_trunc_s_f64 :: "f64 \<Rightarrow> ocaml_i64 option"
+  ocaml_i32_trunc_sat_u_f32 :: "f32 \<Rightarrow> ocaml_i32"
+  ocaml_i32_trunc_sat_s_f32 :: "f32 \<Rightarrow> ocaml_i32"
+  ocaml_i32_trunc_sat_u_f64 :: "f64 \<Rightarrow> ocaml_i32"
+  ocaml_i32_trunc_sat_s_f64 :: "f64 \<Rightarrow> ocaml_i32"
+  ocaml_i64_trunc_sat_u_f32 :: "f32 \<Rightarrow> ocaml_i64"
+  ocaml_i64_trunc_sat_s_f32 :: "f32 \<Rightarrow> ocaml_i64"
+  ocaml_i64_trunc_sat_u_f64 :: "f64 \<Rightarrow> ocaml_i64"
+  ocaml_i64_trunc_sat_s_f64 :: "f64 \<Rightarrow> ocaml_i64"
 
-  f32_serialise_ocaml_char :: "f32 \<Rightarrow> ocaml_char list" and
-  f64_serialise_ocaml_char :: "f64 \<Rightarrow> ocaml_char list" and
-  f32_deserialise_ocaml_char :: "ocaml_char list \<Rightarrow> f32" and
-  f64_deserialise_ocaml_char :: "ocaml_char list \<Rightarrow> f64" and
+  f32_serialise_ocaml_char :: "f32 \<Rightarrow> ocaml_char list"
+  f64_serialise_ocaml_char :: "f64 \<Rightarrow> ocaml_char list"
+  f32_deserialise_ocaml_char :: "ocaml_char list \<Rightarrow> f32"
+  f64_deserialise_ocaml_char :: "ocaml_char list \<Rightarrow> f64"
 
-  ocaml_i32_reinterpret_f32 :: "f32 \<Rightarrow> ocaml_i32" and
-  ocaml_i64_reinterpret_f64 :: "f64 \<Rightarrow> ocaml_i64" and
-  ocaml_f32_reinterpret_i32 :: "ocaml_i32 \<Rightarrow> f32" and
+  ocaml_i32_reinterpret_f32 :: "f32 \<Rightarrow> ocaml_i32"
+  ocaml_i64_reinterpret_f64 :: "f64 \<Rightarrow> ocaml_i64"
+  ocaml_f32_reinterpret_i32 :: "ocaml_i32 \<Rightarrow> f32"
   ocaml_f64_reinterpret_i64 :: "ocaml_i64 \<Rightarrow> f64"
 
 code_printing

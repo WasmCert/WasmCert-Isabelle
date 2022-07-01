@@ -8,13 +8,13 @@ lemma [code]: "pred_option P None = True"
 
 lemmas[code] = Option.option.pred_inject(2)
 
-axiomatization
-  failwith_nth :: 'a where
-  nth_emp[code]: "nth [] n = failwith_nth"
+definition "failwith_nth n \<equiv> []!n"
 
-code_printing
-  constant failwith_nth \<rightharpoonup> (OCaml) "failwith \"nth\""
+declare [[code abort: failwith_nth]]
 
+lemma nth_emp[code]: "nth [] n = failwith_nth n"
+  unfolding failwith_nth_def ..
+  
 (* The model uses a naive list-based memory *)
 (* The list can get very large, so relevant functions must be tail-recursive *)
 
