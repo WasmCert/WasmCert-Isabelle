@@ -10,8 +10,6 @@ abbreviation expect :: "'a option \<Rightarrow> ('a \<Rightarrow> 'b) \<Rightarr
 definition name :: "'a :: typerep \<Rightarrow> String.literal" where
   "name a = (case (typerep_of a) of Typerep.Typerep s _ \<Rightarrow> s)"
 
-type_synonym v_stack = "v list"
-
 datatype res_error =
   Error_invalid String.literal
 | Error_invariant String.literal
@@ -453,9 +451,6 @@ qed simp_all
 abbreviation v_stack_to_b_es :: " v_stack \<Rightarrow> b_e list"
   where "v_stack_to_b_es v \<equiv> map (\<lambda>v. C v) (rev v)"
 
-abbreviation v_stack_to_es :: " v_stack \<Rightarrow> e list"
-  where "v_stack_to_es v \<equiv> $C* (rev v)"
-
 definition e_is_trap :: "e \<Rightarrow> bool" where
   "e_is_trap e = (case e of Trap \<Rightarrow> True | _ \<Rightarrow> False)"
 
@@ -806,8 +801,6 @@ fun run_v :: "fuel \<Rightarrow> depth \<Rightarrow> (s \<times> f \<times> b_e 
   "run_v n d (s, f, b_es) =
      (let (cfg',res) = run_iter n (Config d s (Frame_context (Redex [] [] b_es) [] 0 f) []) in
       case cfg' of (Config d s fc fcs) \<Rightarrow> (s,res))"
-
-definition "empty_frame \<equiv> \<lparr>f_locs = [],f_inst = \<lparr> types = [], funcs = [], tabs = [], mems = [], globs = []\<rparr>\<rparr>"
 
 fun run_invoke_v :: "fuel \<Rightarrow> depth \<Rightarrow> (s \<times> v list \<times> i) \<Rightarrow> (s \<times> res)" where
   "run_invoke_v n d (s, vs, i) =

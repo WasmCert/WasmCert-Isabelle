@@ -289,4 +289,16 @@ lemma reduce_irrtrans_trans:"reduce_irrtrans a b \<Longrightarrow> reduce_trans 
   unfolding reduce_irrtrans_def reduce_trans_def
   by simp
 
+type_synonym v_stack = "v list"
+
+abbreviation v_stack_to_es :: " v_stack \<Rightarrow> e list"
+  where "v_stack_to_es v \<equiv> $C* (rev v)"
+
+
+definition "computes cfg s' vs \<equiv> \<exists>f'. reduce_trans cfg (s', f', v_stack_to_es vs)"
+  
+definition "empty_frame \<equiv> \<lparr>f_locs = [],f_inst = \<lparr> types = [], funcs = [], tabs = [], mems = [], globs = []\<rparr>\<rparr>"
+
+definition "invoke_config s vargs i \<equiv> (s, empty_frame, ($C* vargs) @ [Invoke i])"
+
 end

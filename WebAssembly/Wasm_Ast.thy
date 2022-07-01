@@ -150,8 +150,9 @@ free_constructors case_tg_ext for tg_ext
   by blast+
 
 datatype \<comment> \<open>function types\<close>
-  tf = Tf "t list" "t list" ("_ '_> _" 60)
-
+  tf = Tf (dom: "t list") (ran: "t list") ("_ '_> _" 60)
+hide_const (open) tf.dom tf.ran
+  
 datatype \<comment> \<open>block types\<close>
   tb = Tbf i | Tbv "t option"
 

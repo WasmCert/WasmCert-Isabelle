@@ -1,4 +1,6 @@
-theory Wasm_Instantiation imports Wasm_Module_Checker Wasm_Interpreter_Properties begin
+theory Wasm_Instantiation 
+imports Wasm_Module_Checker Wasm_Interpreter_Properties "../libs/Misc_Generic_Lemmas"
+begin
 
 fun alloc_Xs :: "(s \<Rightarrow> 'a \<Rightarrow> (s \<times> i)) \<Rightarrow> s \<Rightarrow> 'a list \<Rightarrow> (s \<times> i list)" where
   "alloc_Xs f s [] = (s,[])"
@@ -373,6 +375,37 @@ inductive instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarro
     List.map2 (\<lambda>n d. Init_mem n (d_init d)) (map nat_of_int d_offs) (m_data m) = e_init_mems
     \<rbrakk> \<Longrightarrow> instantiate s m v_imps ((s', inst, v_exps), e_init_tabs@e_init_mems@start)"
 
+(* TODO: Move these to better places! *)    
+    
+abbreviation "is_first_fun_idx exps i \<equiv> 
+  \<exists>exp. is_first_elem_with_prop (is_Ext_func o E_desc) exps exp
+    \<and> i = v_ext.the_idx (E_desc exp)
+"  
+
+abbreviation "type_of_fun_idx s i \<equiv> cl_type (s.funcs s ! i)" (* TODO:  No guarantee that index is in bounds *)
+
+definition "make_params s i vs_opt \<equiv> case vs_opt of
+  Some vs \<Rightarrow> rev vs
+| None \<Rightarrow> map bitzero (tf.dom (type_of_fun_idx s i))
+"
+
+
+definition "instantiate_config s inst es \<equiv> (s, \<lparr>f_locs = [], f_inst = inst\<rparr>, es)"
+
+definition "run_fuzz_abs s m v_imps vs_opt  s' vs \<equiv> \<exists>s\<^sub>1 s\<^sub>2 inst exps init_es i. 
+    instantiate s m v_imps ((s\<^sub>1,inst,exps),init_es)
+  \<and> computes (instantiate_config s\<^sub>1 inst init_es) s\<^sub>2 []
+  \<and> is_first_fun_idx exps i  
+  \<and> computes (invoke_config s\<^sub>2 (make_params s\<^sub>2 i vs_opt) i) s' vs"  
+    
+    
+    
+    
+    
+    
+    
+    
+    
 definition interp_get_v :: "s \<Rightarrow> inst \<Rightarrow> b_e list \<Rightarrow> v" where
   "interp_get_v s inst b_es = 
      (case run_v 2 0 (s,\<lparr> f_locs = [], f_inst = inst \<rparr>,b_es) of

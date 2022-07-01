@@ -676,4 +676,58 @@ proof -
   qed
 qed
 
+  
+theorem run_instantiate_sound:
+  assumes "run_instantiate n d (s,inst,es) = (s',RValue vs)"
+  shows "computes (instantiate_config s inst es) s' vs"
+  using assms
+  by (auto  
+    simp: instantiate_config_def computes_def
+    dest!: run_iter_sound
+    split: prod.splits config.splits)
+
+(* TODO: Delete all those simp-lemmas, right after defs (best: change fun to definition! )*)  
+lemmas [simp del] = run_invoke_v.simps
+lemmas [simp del] = interp_instantiate.simps run_instantiate.simps
+    
+lemma interp_instantiate_init_sound:
+  assumes "interp_instantiate_init s m v_imps = (s', RI_res inst exps es)"
+  shows "\<exists>sh esh. 
+    instantiate s m v_imps ((sh, inst, exps), esh)
+  \<and> es = []
+  \<and> computes (instantiate_config sh inst esh) s' []
+  "
+  using assms
+  unfolding interp_instantiate_init_def
+  by (auto 0 4
+    split: prod.splits res_inst.splits res.splits list.splits config.splits
+    dest!: run_instantiate_sound
+    simp: instantiate_equiv_interp_instantiate[symmetric]
+  )
+
+(* TODO: Also write simplified check in definitions! *)  
+lemma simplify_check_is_Ext_func: "(\<lambda>exp. case E_desc exp of Ext_func i \<Rightarrow> True | _ \<Rightarrow> False) = is_Ext_func o E_desc"    
+  by (auto simp: fun_eq_iff split: v_ext.splits)
+
+  
+  
+  
+theorem run_fuzz'_sound: "run_fuzz' n d s m v_imps vs_opt = (s',RValue vs) \<Longrightarrow>
+  run_fuzz_abs s m v_imps vs_opt  s' vs"
+  unfolding run_fuzz'_def run_fuzz_abs_def
+  apply (auto 
+    split: prod.splits res_inst.splits option.splits v_ext.splits tf.splits
+    simp: instantiate_equiv_interp_instantiate[symmetric] simplify_check_is_Ext_func find_finds_first
+    simp: make_params_def Let_def
+    dest!: interp_instantiate_init_sound run_invoke_v_sound'
+    dest: is_first_elem_with_prop_propI
+  )
+  apply fastforce+
+  done
+
+theorem run_fuzz_entry'_sound: "run_fuzz_entry' n m vs_opt = (s',RValue vs) \<Longrightarrow> run_fuzz_abs empty_store m [] vs_opt s' vs"
+  by (auto simp: run_fuzz_entry'_def dest!: run_fuzz'_sound)
+        
+
+
 end

@@ -770,9 +770,7 @@ lemma run_invoke_v_m_triple: "
   unfolding cfg_m_assn_def    
   by (sep_auto split: prod.splits config.split)
 
-(* TODO: Delete all those simp-lemmas, right after defs (best: change fun to definition! )*)  
-lemmas [simp del] = run_invoke_v_m.simps run_invoke_v.simps run_fuzz.simps
-  
+lemmas [simp del] = run_invoke_v_m.simps run_fuzz.simps run_fuzz_entry.simps
     
 lemma run_fuzz_triple: "
   <inst_assocs_assn i_s * s_m_assn i_s s sm> 
@@ -796,6 +794,42 @@ lemma run_fuzz_entry_triple: "
   unfolding run_fuzz_entry.simps run_fuzz_entry'_def
   by (sep_auto heap: make_empty_store_m_triple run_fuzz_triple)
   
-  
+theorem run_fuzz_triple_abs: "
+  <inst_assocs_assn i_s * s_m_assn i_s s sm> 
+    run_fuzz n d sm m v_imps opt_vs 
+  <\<lambda>(sm',res). \<exists>\<^sub>Ai_s' s'. 
+    inst_assocs_assn i_s' * s_m_assn i_s' s' sm'
+    * \<up>(case res of 
+        RValue vs \<Rightarrow> run_fuzz_abs s m v_imps opt_vs s' vs
+      | _ \<Rightarrow> True  
+      )
+  >\<^sub>t"
+  apply (sep_auto eintros del: exI heap: run_fuzz_triple split: prod.splits)
+  subgoal for s_m res insts insts_m s res'
+    apply (cases res'; simp)
+    subgoal by (auto split: res.splits intro: ent_refl) 
+    subgoal by (auto split: res.splits intro: ent_refl) 
+    subgoal by (auto 0 4 split: res.splits intro: ent_refl dest!: run_fuzz'_sound) 
+    done
+  done
+
+theorem run_fuzz_entry_triple_abs: "
+  <emp> 
+    run_fuzz_entry n m v_imps
+  <\<lambda>(sm',res). \<exists>\<^sub>Ai_s' s'. 
+    inst_assocs_assn i_s' * s_m_assn i_s' s' sm'
+    * \<up>(case res of 
+        RValue vs \<Rightarrow> run_fuzz_abs empty_store m [] v_imps s' vs
+      | _ \<Rightarrow> True  
+      )
+  >\<^sub>t"
+  apply (sep_auto eintros del: exI heap: run_fuzz_entry_triple split: prod.splits)
+  subgoal for s_m res insts insts_m s res'
+    apply (cases res; cases res'; simp)
+    subgoal by (auto split: res.splits intro: ent_refl) 
+    subgoal by (auto split: res.splits intro: ent_refl) 
+    subgoal by (auto 0 4 split: res.splits intro: ent_refl dest!: run_fuzz_entry'_sound) 
+    done
+  done
   
 end

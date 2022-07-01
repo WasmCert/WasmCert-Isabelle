@@ -2481,4 +2481,11 @@ theorem run_invoke_v_sound_trap:
   shows "(\<exists>f'. reduce_trans (s,empty_frame,($C* vargs)@[Invoke i_cl]) (s',f',[Trap]))"
   using assms run_iter_sound[of fuel d s "(Frame_context (Redex (rev vargs) [Invoke i_cl] []) [] 0 empty_frame)" "[]"]
   by (simp split: prod.splits config.splits)
+  
+theorem run_invoke_v_sound':
+  assumes "run_invoke_v fuel d (s, vargs, i_cl) = (s', RValue vs)"
+  shows "computes (invoke_config s vargs i_cl) s' vs"
+  using run_invoke_v_sound[OF assms] unfolding computes_def invoke_config_def .
+  
+  
 end

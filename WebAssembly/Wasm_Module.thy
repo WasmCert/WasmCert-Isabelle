@@ -24,10 +24,11 @@ datatype imp_desc =
 | Imp_glob tg
 
 datatype v_ext =
-  Ext_func i
-| Ext_tab i
-| Ext_mem i
-| Ext_glob i
+  Ext_func (the_idx: i)
+| Ext_tab (the_idx: i)
+| Ext_mem (the_idx: i)
+| Ext_glob (the_idx: i)
+hide_const (open) v_ext.the_idx
 
 type_synonym exp_desc = v_ext
 
