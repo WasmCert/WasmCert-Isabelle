@@ -444,9 +444,12 @@ abbreviation "s_m_vs_pair_assn i_s \<equiv> \<lambda>(s, vs) (s_m, vs_m). s_m_as
 axiomatization 
   host_apply_impl_m:: "s_m \<Rightarrow> tf \<Rightarrow> host \<Rightarrow> v list \<Rightarrow> ((s_m \<times> v list) option) Heap"
   where host_apply_impl_m_triple:
-   "< s_m_assn i_s s s_m>
+   "< s_m_assn ias s s_m * inst_assocs_assn ias>
    host_apply_impl_m s_m tf h vs
-   <\<lambda>r_opt. expect_assn (\<lambda>r r_m. s_m_vs_pair_assn i_s r r_m) (s_m_assn i_s s s_m)
+   <\<lambda>r_opt. expect_assn 
+    (\<lambda>r r_m. \<exists>\<^sub>A ias'. s_m_vs_pair_assn ias' r r_m * inst_assocs_assn ias' 
+      * \<up>(inst_assocs_extension ias ias')) 
+    (\<exists>\<^sub>A ias'. s_m_assn ias' s s_m * inst_assocs_assn ias' * \<up>(inst_assocs_extension ias ias'))              
   (host_apply_impl s tf h vs) r_opt >"
 
 

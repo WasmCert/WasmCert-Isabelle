@@ -1050,9 +1050,9 @@ lemma app_s_f_init_tab_m_triple:
   done
 
 lemma run_step_e_m_triple:
-    "<cfg_m_assn i_s cfg cfg_m> 
+    "<cfg_m_assn ias cfg cfg_m> 
     run_step_e_m e cfg_m 
-    <\<lambda>r. cfg_m_pair_assn i_s (run_step_e e cfg) r>\<^sub>t"
+    <\<lambda>r.\<exists>\<^sub>A ias'. cfg_m_pair_assn ias' (run_step_e e cfg) r * \<up>(inst_assocs_extension ias ias') >\<^sub>t"
 proof -
   obtain d s fc fcs where config:"cfg = Config d s fc fcs"
     by(erule config.exhaust)
@@ -1071,8 +1071,8 @@ proof -
   note unfold_vars = config frame redex unfold_vars_m
   note unfold_vars_assns = unfold_vars cfg_m_assn_def fc_m_assn_def
 
-  obtain j where j_def:"cfg_m_assn i_s cfg cfg_m \<Longrightarrow>\<^sub>A 
-    \<up>(inst_at i_s ((f_inst f), f_inst2) j) * cfg_m_assn i_s cfg cfg_m"
+  obtain j where j_def:"cfg_m_assn ias cfg cfg_m \<Longrightarrow>\<^sub>A 
+    \<up>(inst_at ias ((f_inst f), f_inst2) j) * cfg_m_assn ias cfg cfg_m"
     unfolding unfold_vars_assns by sep_auto
 
   note extract_j = cons_pre_rulet[OF ent_imp_entt[OF j_def]]
@@ -1086,29 +1086,91 @@ proof -
       unfolding unfold_vars_m by simp
     have 2:"run_step_e (Basic b_e) cfg = run_step_b_e b_e cfg"
       unfolding unfold_vars by simp 
-    show ?thesis unfolding Basic 1 2 by(sep_auto heap:run_step_b_e_m_triple)
+    show ?thesis unfolding Basic 1 2 
+      apply(sep_auto heap:run_step_b_e_m_triple)
+      apply(sep_auto simp:cfg_m_assn_def 
+          split:config.splits config_m.splits prod.splits)
+      using inst_assocs_assn_extension_id mod_starD by blast
   next
     case (Invoke i_cl)
 
-    show ?thesis unfolding Invoke unfold_vars_assns
-      apply(sep_auto heap: funcs_nth_triple_s split:cl_m.splits) 
-      supply [simp] = Let_def and 
+    define cl where "cl = (s.funcs s)!i_cl"
+
+    show ?thesis 
+    proof(cases cl)
+      case (Func_native i' tf ts es_f)
+      show ?thesis using cl_def Func_native unfolding Invoke unfold_vars_assns 
+        apply(sep_auto heap: funcs_nth_triple_s split:cl_m.splits cl.splits
+            simp:cl_m_agree_def cl_m_agree_j_def)  
+        supply [simp] = Let_def and 
         [split] = v.splits option.splits 
         cl.splits cl_m.splits tf.splits nat.splits
-
-       apply(sep_auto simp:cl_m_agree_def cl_m_agree_j_def locs_m_assn_def s_m_assn_def 
+         apply(sep_auto simp:locs_m_assn_def s_m_assn_def 
           funcs_m_assn_def fc_m_assn_def)
-      apply(sep_auto heap:host_apply_impl_m_triple simp: cl_m_agree_def cl_m_agree_j_def)
-      done
+        apply(auto)
+        subgoal using inst_assocs_assn_extension_id mod_starD by blast
+         apply(sep_auto)
+        subgoal using inst_assocs_assn_extension_id mod_starD by blast
+         apply(sep_auto simp:locs_m_assn_def s_m_assn_def funcs_m_assn_def fc_m_assn_def)
+        apply(sep_auto)
+        subgoal using inst_assocs_assn_extension_id mod_starD by blast
+        apply(sep_auto simp:locs_m_assn_def s_m_assn_def funcs_m_assn_def fc_m_assn_def)
+        done
+    next
+      case (Func_host tf h)
+      show ?thesis using cl_def Func_host unfolding Invoke unfold_vars_assns
+        apply(sep_auto heap: funcs_nth_triple_s split:cl_m.splits cl.splits
+            simp:cl_m_agree_def cl_m_agree_j_def)  
+        apply(sep_auto split:tf.splits)
+          apply(sep_auto heap: host_apply_impl_m_triple)
+         apply(sep_auto split:option.splits eintros del: exI)
+             apply(match premises in "inst_assocs_extension ias ias'" for ias'
+               \<Rightarrow> \<open>rule exI[where x="fst ias'"], rule exI[where x="snd ias'"]\<close>)
+             apply(sep_auto)
+        subgoal using inst_assocs_extension_preserves_inst_at by blast 
+        (* todo: something about ent_backward_all doesn't work *)
+        subgoal using inst_assocs_extension_preserves_fcs_m_assn
+          by (smt (verit, del_insts) assn_aci(10) ent_refl_true ent_star_mono)
+            apply(sep_auto eintros del: exI)
+            apply(match premises in "inst_assocs_extension ias ias'" for ias'
+               \<Rightarrow> \<open>rule exI[where x="fst ias'"], rule exI[where x="snd ias'"]\<close>)
+            apply(sep_auto)
+        subgoal using inst_assocs_extension_preserves_inst_at by blast
+        subgoal using inst_assocs_extension_preserves_fcs_m_assn
+          by (smt (verit, del_insts) assn_aci(10) ent_refl_true ent_star_mono)
+
+           apply(sep_auto)
+          apply(sep_auto)
+        apply(sep_auto eintros del: exI)
+         apply(match premises in "inst_assocs_extension ias ias'" for ias'
+               \<Rightarrow> \<open>rule exI[where x="fst ias'"], rule exI[where x="snd ias'"]\<close>)
+         apply(sep_auto)
+        subgoal using inst_assocs_extension_preserves_inst_at by blast
+        subgoal using inst_assocs_extension_preserves_fcs_m_assn 
+          by (smt (verit, del_insts) assn_aci(10) ent_refl_true ent_star_mono)
+
+        apply(sep_auto)
+        subgoal using inst_assocs_assn_extension_id mod_starD by blast
+        done
+    qed
   next
     case Trap
-    then show ?thesis unfolding unfold_vars by sep_auto
+    then show ?thesis unfolding unfold_vars 
+      apply(sep_auto simp:cfg_m_assn_def 
+          split:config.splits config_m.splits prod.splits)
+      using inst_assocs_assn_extension_id mod_starD by blast
   next
     case (Label x41 x42 x43)
-    then show ?thesis unfolding unfold_vars by sep_auto
+    then show ?thesis unfolding unfold_vars 
+      apply(sep_auto simp:cfg_m_assn_def 
+          split:config.splits config_m.splits prod.splits)
+      using inst_assocs_assn_extension_id mod_starD by blast
   next
     case (Frame x51 x52 x53)
-    then show ?thesis unfolding unfold_vars by sep_auto
+    then show ?thesis unfolding unfold_vars
+      apply(sep_auto simp:cfg_m_assn_def 
+          split:config.splits config_m.splits prod.splits)
+      using inst_assocs_assn_extension_id mod_starD by blast
   next
     case (Init_mem x61 x62)
     then show ?thesis
@@ -1116,7 +1178,11 @@ proof -
       unfolding unfold_for_j
       apply(sep_auto split:prod.splits)
       apply(extract_reinsert_list_idx j heap:app_s_f_init_mem_m_triple)
-      by (sep_auto)
+      apply (sep_auto)
+      apply(fold list_assn_conv_idx)
+      using inst_assocs_assn_extension_id[simplified inst_assocs_assn_def]
+      apply(auto)
+      by (meson mod_star_conv)
   next
     case (Init_tab x71 x72)
     then show ?thesis
@@ -1124,7 +1190,11 @@ proof -
       unfolding unfold_for_j
       apply(sep_auto split:prod.splits)
       apply(extract_reinsert_list_idx j heap:app_s_f_init_tab_m_triple)
-      by (sep_auto)
+      apply (sep_auto)
+      apply(fold list_assn_conv_idx)
+      using inst_assocs_assn_extension_id[simplified inst_assocs_assn_def]
+      apply(auto)
+      by (meson mod_star_conv)
   qed
 qed 
 
@@ -1152,12 +1222,17 @@ lemma update_redex_lc_preserve_assn:"cfg_m_assn i_s
   by (sep_auto)
 
 lemma run_iter_m_triple:
-    "<cfg_m_assn i_s cfg cfg_m> 
+    "<cfg_m_assn ias cfg cfg_m> 
     run_iter_m n cfg_m 
-    <\<lambda>r. cfg_m_pair_assn i_s (run_iter n cfg) r>\<^sub>t"
-proof(induct n arbitrary: i_s cfg cfg_m)
+    <\<lambda>r. \<exists>\<^sub>Aias'. cfg_m_pair_assn ias' (run_iter n cfg) r
+    * \<up>(inst_assocs_extension ias ias')>\<^sub>t"
+proof(induct n arbitrary: ias cfg cfg_m)
   case 0
-  show ?case unfolding 0 by sep_auto
+  show ?case unfolding 0 
+    apply(sep_auto)
+    apply(sep_auto simp:cfg_m_assn_def 
+          split:config.splits config_m.splits prod.splits)
+      using inst_assocs_assn_extension_id mod_starD by blast
 next
   case (Suc n)
 
@@ -1182,6 +1257,9 @@ next
       run_step_e_m.simps run_step_e.simps
     apply(extract_pre_pure, simp add:cfg_m_assn_pure_def fc_m_assn_pure_def)
     apply(sep_auto)
+    subgoal apply(sep_auto simp:cfg_m_assn_def 
+          split:config.splits config_m.splits prod.splits)
+      using inst_assocs_assn_extension_id mod_starD by blast
        apply(cases fcs, auto)
        apply(rule cons_pre_rule[OF update_fc_return_preserve_assn])
        apply(sep_auto heap:Suc)
@@ -1195,23 +1273,32 @@ next
       apply(rule cons_pre_rule[OF update_redex_lc_preserve_assn])
       apply(sep_auto heap:run_step_b_e_m_triple)
      apply(sep_auto split:prod.splits res_step.splits heap:Suc)
-    apply(sep_auto)
-     apply(rule cons_pre_rule[OF update_redex_lc_preserve_assn])
-     apply(sep_auto heap:run_step_e_m_triple)
+    subgoal apply(sep_auto simp:cfg_m_assn_def 
+          split:config.splits config_m.splits prod.splits)
+      using inst_assocs_assn_extension_id mod_starD by blast
+      apply(sep_auto)
+    subgoal apply(sep_auto simp:cfg_m_assn_def 
+          split:config.splits config_m.splits prod.splits)
+      using inst_assocs_assn_extension_id mod_starD by blast
+     apply(sep_auto heap:Suc)
+    apply(rule cons_pre_rule[OF update_redex_lc_preserve_assn])
+    apply(sep_auto heap:run_step_e_m_triple)
     apply(sep_auto split:res_step.splits prod.splits heap:Suc)
+    apply(sep_auto simp:inst_assocs_extension_def)
     done
 qed
 
 
 lemma run_v_m_triple: 
-  assumes "inst_at i_s (f_inst f, f_inst2) j" 
-  shows "< s_m_assn i_s s s_m * inst_assocs_assn i_s * locs_m_assn (f_locs f) f_locs1 > 
+  assumes "inst_at ias (f_inst f, f_inst2) j" 
+  shows "< s_m_assn ias s s_m * inst_assocs_assn ias * locs_m_assn (f_locs f) f_locs1 > 
   run_v_m n d (s_m, f_locs1, f_inst2, b_es) 
   <\<lambda>(s_m', res_m). let (s', res) = run_v n d (s, f, b_es) in 
-  \<up>(res_m = res) * s_m_assn i_s s' s_m' * inst_assocs_assn i_s >\<^sub>t"
+  \<exists>\<^sub>A ias'. \<up>(res_m = res) * s_m_assn ias' s' s_m' * inst_assocs_assn ias'
+   * \<up>(inst_assocs_extension ias ias') >\<^sub>t"
 proof - 
-  have 1:"s_m_assn i_s s s_m * inst_assocs_assn i_s * locs_m_assn (f_locs f) f_locs1
-      \<Longrightarrow>\<^sub>A cfg_m_assn i_s 
+  have 1:"s_m_assn ias s s_m * inst_assocs_assn ias * locs_m_assn (f_locs f) f_locs1
+      \<Longrightarrow>\<^sub>A cfg_m_assn ias 
       (Config d s (Frame_context (Redex [] [] b_es) [] 0 f) [])
       (Config_m d s_m (Frame_context_m (Redex [] [] b_es) [] 0 f_locs1 f_inst2) [])"
     using assms
@@ -1226,18 +1313,19 @@ qed
 
 
 lemma run_instantiate_m_triple:
-  assumes "inst_at i_s (i, i_m) j" 
-  shows "< s_m_assn i_s s s_m * inst_assocs_assn i_s> 
+  assumes "inst_at ias (i, i_m) j" 
+  shows "< s_m_assn ias s s_m * inst_assocs_assn ias> 
   run_instantiate_m n d (s_m, i_m, es)
-  <\<lambda>(s_m', res_m). let (s', res) = run_instantiate n d (s, i, es) in \<up>(res_m = res) 
-  * s_m_assn i_s s' s_m' * inst_assocs_assn i_s >\<^sub>t"
+  <\<lambda>(s_m', res_m). let (s', res) = run_instantiate n d (s, i, es) in
+   \<exists>\<^sub>A ias'. \<up>(res_m = res) * s_m_assn ias' s' s_m' * inst_assocs_assn ias' 
+  * \<up>(inst_assocs_extension ias ias')>\<^sub>t"
 proof - 
   note 1 = cfg_m_assn_def fc_m_assn_def fcs_m_assn_def  locs_m_assn_def
 
   {
     fix locs
-    have "locs \<mapsto>\<^sub>a [] * s_m_assn i_s s s_m * inst_assocs_assn i_s
-      \<Longrightarrow>\<^sub>A cfg_m_assn i_s 
+    have "locs \<mapsto>\<^sub>a [] * s_m_assn ias s s_m * inst_assocs_assn ias
+      \<Longrightarrow>\<^sub>A cfg_m_assn ias 
           (Config d s (Frame_context (Redex [] es []) [] 0 \<lparr>f_locs = [], f_inst=i\<rparr>) [])
           (Config_m d s_m (Frame_context_m (Redex [] es []) [] 0 locs i_m) [])"
       unfolding 1 using assms by sep_auto

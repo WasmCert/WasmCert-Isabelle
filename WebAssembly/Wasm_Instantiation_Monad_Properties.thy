@@ -701,15 +701,19 @@ proof -
 qed
 
 lemma interp_instantiate_init_m_triple:
-  "< s_m_assn i_s s s_m * inst_assocs_assn i_s> 
+  "< s_m_assn ias s s_m * inst_assocs_assn ias> 
   interp_instantiate_init_m s_m m v_imps
   <\<lambda>(s_m', res_m). let (s', res) = interp_instantiate_init s m v_imps in 
-  \<exists>\<^sub>Ai_s'. \<up>(res_inst_m_agree i_s' res res_m) * s_m_assn i_s' s' s_m' * inst_assocs_assn i_s' >\<^sub>t" 
+  \<exists>\<^sub>Aias'. \<up>(res_inst_m_agree ias' res res_m) * s_m_assn ias' s' s_m' * inst_assocs_assn ias' >\<^sub>t" 
   unfolding interp_instantiate_init_m_def interp_instantiate_init_def 
   supply [simp del] = interp_instantiate_m.simps interp_instantiate.simps
     run_instantiate_m.simps run_instantiate.simps
+  
   apply(sep_auto heap:interp_instantiate_m_triple run_instantiate_m_triple
       split:res_inst_m.splits res_inst.splits prod.splits res.splits)
+   apply(rule inst_assocs_extension_preserves_inst_at)
+    apply(auto)
+  apply(sep_auto)
   done
 
 
@@ -742,11 +746,12 @@ lemma inst_assoc_assn_pure[extract_pure_rules]: "h\<Turnstile>inst_assocs_assn (
 definition "append_inst \<equiv> \<lambda>(xs,ys) (x,y). (xs@[x], ys@[y])"
   
 lemma make_invoke_config_m_triple: "
-  <inst_assocs_assn i_s * s_m_assn i_s s sm> 
+  <inst_assocs_assn ias * s_m_assn ias s sm> 
     make_invoke_config_m d (sm, vs, i) 
-  <\<lambda>cfg_m. \<exists>\<^sub>Af_inst2. cfg_m_assn (append_inst i_s (f_inst empty_frame,f_inst2)) (make_invoke_config d (s,vs,i)) cfg_m>\<^sub>t"
+  <\<lambda>cfg_m. \<exists>\<^sub>Af_inst2. 
+  cfg_m_assn (append_inst ias (f_inst empty_frame,f_inst2)) (make_invoke_config d (s,vs,i)) cfg_m>\<^sub>t"
   unfolding make_invoke_config_m_def cfg_m_assn_def make_invoke_config_def append_inst_def
-  apply (cases i_s)
+  apply (cases ias)
   apply (sep_auto heap: make_empty_frame_m_triple)
   apply (sep_auto simp: fc_m_assn_def fcs_m_assn_empty inst_assocs_assn_snoc)
   apply (rule contains_inst_snoc)
@@ -759,16 +764,18 @@ lemma make_invoke_config_m_triple: "
   
 
 lemma run_invoke_v_m_triple: "
-  < inst_assocs_assn i_s * s_m_assn i_s s sm > 
+  < inst_assocs_assn ias * s_m_assn ias s sm > 
     run_invoke_v_m n d (sm,vs,i) 
-  < \<lambda>sr. \<exists>\<^sub>Afi. inst_assocs_assn (append_inst i_s (f_inst empty_frame, fi)) * s_m_vs_pair_assn ((append_inst i_s (f_inst empty_frame, fi))) (run_invoke_v n d (s,vs,i)) sr >\<^sub>t"
+  < \<lambda>sr. \<exists>\<^sub>Afi ias'. 
+  inst_assocs_assn ias' * s_m_vs_pair_assn ias' (run_invoke_v n d (s,vs,i)) sr >\<^sub>t"
   unfolding run_invoke_v_m_alt run_invoke_v_alt
   apply (sep_auto 
     heap: make_empty_frame_m_triple make_invoke_config_m_triple run_iter_m_triple
     split: config_m.split
     )
   unfolding cfg_m_assn_def    
-  by (sep_auto split: prod.splits config.split)
+  apply (sep_auto split: prod.splits config.split)
+  done
 
 lemmas [simp del] = run_invoke_v_m.simps run_fuzz.simps run_fuzz_entry.simps
     
