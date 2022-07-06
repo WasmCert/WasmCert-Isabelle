@@ -2487,5 +2487,9 @@ theorem run_invoke_v_sound':
   shows "computes (invoke_config s vargs i_cl) s' vs"
   using run_invoke_v_sound[OF assms] unfolding computes_def invoke_config_def .
   
+theorem run_invoke_v_sound_trap':
+  assumes "run_invoke_v fuel d (s, vargs, i_cl) = (s', RTrap str)"
+  shows "traps (invoke_config s vargs i_cl) s'"
+  using run_invoke_v_sound_trap[OF assms] unfolding traps_def invoke_config_def .
   
 end

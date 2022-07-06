@@ -686,6 +686,17 @@ theorem run_instantiate_sound:
     dest!: run_iter_sound
     split: prod.splits config.splits)
 
+theorem run_instantiate_sound_trap:
+  assumes "run_instantiate n d (s,inst,es) = (s',RTrap str)"
+  shows "traps (instantiate_config s inst es) s'"
+  using assms
+  by (auto  
+    simp: instantiate_config_def traps_def
+    dest!: run_iter_sound
+    split: prod.splits config.splits)
+    
+    
+    
 (* TODO: Delete all those simp-lemmas, right after defs (best: change fun to definition! )*)  
 lemmas [simp del] = run_invoke_v.simps
 lemmas [simp del] = interp_instantiate.simps run_instantiate.simps
@@ -705,6 +716,28 @@ lemma interp_instantiate_init_sound:
     simp: instantiate_equiv_interp_instantiate[symmetric]
   )
 
+(*  
+lemma interp_instantiate_init_sound_traps:
+  assumes "interp_instantiate_init s m v_imps = (s', RI_trap str)"
+  shows "\<exists>sh esh. 
+    instantiate s m v_imps ((sh, inst, exps), esh) \<leftarrow> This could fail, too!
+  \<and> es = []
+  \<and> traps (instantiate_config sh inst esh) s'
+  "
+  using assms
+  unfolding interp_instantiate_init_def
+  apply (auto 0 4
+    split: prod.splits res_inst.splits res.splits list.splits config.splits
+    dest!: run_instantiate_sound_trap
+    simp: instantiate_equiv_interp_instantiate[symmetric]
+  )
+  find_theorems interp_instantiate RI_trap
+  (* TODO: Missing abstract characterization of trapping instantiation. 
+    There's only instantiate, which describes successful instantiation.
+  *)
+  oops
+*)  
+  
 (* TODO: Also write simplified check in definitions! *)  
 lemma simplify_check_is_Ext_func: "(\<lambda>exp. case E_desc exp of Ext_func i \<Rightarrow> True | _ \<Rightarrow> False) = is_Ext_func o E_desc"    
   by (auto simp: fun_eq_iff split: v_ext.splits)

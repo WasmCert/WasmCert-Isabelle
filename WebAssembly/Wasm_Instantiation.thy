@@ -398,13 +398,18 @@ definition "run_fuzz_abs s m v_imps vs_opt  s' vs \<equiv> \<exists>s\<^sub>1 s\
   \<and> is_first_fun_idx exps i  
   \<and> computes (invoke_config s\<^sub>2 (make_params s\<^sub>2 i vs_opt) i) s' vs"  
     
-    
-    
-    
-    
-    
-    
-    
+(*
+TODO: instantiate can trap, too! Missing abstract predicate for trapping instantiate!
+definition "run_fuzz_abs_traps s m v_imps vs_opt s' \<equiv> \<exists>s\<^sub>1 s\<^sub>2 inst exps init_es i. 
+    instantiate s m v_imps ((s\<^sub>1,inst,exps),init_es)
+  \<and> (
+        traps (instantiate_config s\<^sub>1 inst init_es) s\<^sub>2
+    \<or>
+        computes (instantiate_config s\<^sub>1 inst init_es) s\<^sub>2 []
+      \<and> is_first_fun_idx exps i  
+      \<and> traps (invoke_config s\<^sub>2 (make_params s\<^sub>2 i vs_opt) i) s
+    )"
+*)    
     
 definition interp_get_v :: "s \<Rightarrow> inst \<Rightarrow> b_e list \<Rightarrow> v" where
   "interp_get_v s inst b_es = 

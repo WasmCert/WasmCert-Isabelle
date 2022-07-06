@@ -297,6 +297,8 @@ abbreviation v_stack_to_es :: " v_stack \<Rightarrow> e list"
 
 definition "computes cfg s' vs \<equiv> \<exists>f'. reduce_trans cfg (s', f', v_stack_to_es vs)"
   
+definition "traps cfg s' \<equiv> \<exists>f'. reduce_trans cfg (s',f',[Trap])"
+
 definition "empty_frame \<equiv> \<lparr>f_locs = [],f_inst = \<lparr> types = [], funcs = [], tabs = [], mems = [], globs = []\<rparr>\<rparr>"
 
 definition "invoke_config s vargs i \<equiv> (s, empty_frame, ($C* vargs) @ [Invoke i])"
