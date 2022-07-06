@@ -70,7 +70,22 @@ definition inst_at :: "inst_assocs \<Rightarrow> (inst \<times> inst_m) \<Righta
 
 abbreviation "contains_inst i_s i \<equiv> \<exists> j. inst_at i_s i j"
 
+definition inst_assocs_extension :: "inst_assocs \<Rightarrow> inst_assocs \<Rightarrow> bool" where
+  "inst_assocs_extension \<equiv> \<lambda>(is, i_ms) (is', i_ms'). 
+  length is = length i_ms \<and> (\<exists>a b. is' = is @ a \<and> i_ms' = i_ms @ b)"
 
+lemma inst_assocs_extension_preserves_inst_at:
+  assumes "inst_assocs_extension ias ias'" "inst_at ias i j"
+  shows "inst_at ias' i j"
+  using assms unfolding inst_at_def inst_assocs_extension_def
+  by auto
+
+lemma inst_assocs_assn_extension_id:
+  "h \<Turnstile> inst_assocs_assn ias \<Longrightarrow> inst_assocs_extension ias ias"
+  unfolding inst_assocs_assn_def inst_assocs_extension_def
+  apply(sep_auto)
+  apply(extract_pre_pure)
+  done
 
 definition cl_m_agree_j :: "inst_assocs \<Rightarrow> nat \<Rightarrow> cl \<Rightarrow> cl_m \<Rightarrow> bool" where 
   "cl_m_agree_j i_s j cl cl_m = (case cl of 
@@ -121,7 +136,21 @@ definition fc_m_assn :: "inst_assocs \<Rightarrow> frame_context \<Rightarrow> f
   * locs_m_assn (f_locs f) f_locs1
 )"
 
+lemma inst_assocs_extension_preserves_fc_m_assn:
+  assumes "inst_assocs_extension ias ias'" 
+  shows "fc_m_assn ias fc fc_m \<Longrightarrow>\<^sub>A fc_m_assn ias' fc fc_m"
+  using inst_assocs_extension_preserves_inst_at[OF assms] 
+  unfolding fc_m_assn_def
+  by (sep_auto split:frame_context.splits frame_context_m.splits)
+
 definition "fcs_m_assn i_s fcs fcs_m \<equiv> list_assn (fc_m_assn i_s) fcs fcs_m"
+
+lemma inst_assocs_extension_preserves_fcs_m_assn:
+  assumes "inst_assocs_extension ias ias'" 
+  shows "fcs_m_assn ias fcs fcs_m \<Longrightarrow>\<^sub>A fcs_m_assn ias' fcs fcs_m"
+  using inst_assocs_extension_preserves_fc_m_assn[OF assms] 
+  unfolding fcs_m_assn_def
+  by (rule list_assn_mono)
 
 definition cfg_m_assn :: "inst_assocs \<Rightarrow> config \<Rightarrow> config_m \<Rightarrow> assn" where
   "cfg_m_assn i_s cfg cfg_m = (
