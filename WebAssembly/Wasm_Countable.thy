@@ -50,22 +50,6 @@ qed (simp add: Rep_f64_inject)
 instance v128 :: countable
 proof(rule countable_classI[of "unat o Rep_v128"])
 qed (simp add: Rep_v128_inject)
-
-(*axiomatization where
-  f32_countable: "OFCLASS(f32, countable_class)" and
-  f64_countable: "OFCLASS(f64, countable_class)" and
-  v128_countable: "OFCLASS(v128, countable_class)"
-  
-
-instance f32 :: countable
-  by (rule f32_countable)
-
-instance f64 :: countable
-  by (rule f64_countable)
-
-instance v128 :: countable
-  by (rule v128_countable)
-*)
   
 instance v_num :: countable
   by countable_datatype
