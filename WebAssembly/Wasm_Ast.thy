@@ -18,10 +18,15 @@ type_synonym \<comment> \<open>alignment exponent\<close>
 \<comment> \<open>primitive types\<close>
 typedef i32 = "UNIV :: (32 word) set" ..
 typedef i64 = "UNIV :: (64 word) set" ..
-typedecl f32
-typedecl f64
 
+typedef f32 = "UNIV :: (32 word) set" ..
+typedef f64 = "UNIV :: (64 word) set" ..
+typedef v128 = "UNIV :: (128 word) set" ..
+
+(*typedecl f32
+typedecl f64
 typedecl v128
+*)
 
 setup_lifting type_definition_i32
 declare Quotient_i32[transfer_rule]
@@ -243,12 +248,109 @@ datatype
     Store_128
   | Store_lane shape_vec_i i
 
-typedecl unop_vec
-typedecl binop_vec
-typedecl ternop_vec
-typedecl testop_vec
-typedecl shiftop_vec
+  
+consts unop_vec_carrier :: "nat set"  
+specification (unop_vec_carrier) 
+  unop_vec_finite[simp]: "finite unop_vec_carrier" 
+  unop_vec_ne: "unop_vec_carrier \<noteq> {}" 
+  by blast  
 
+typedef unop_vec = "unop_vec_carrier" using unop_vec_ne by blast
+
+lemma range_unop_vec[simp]: "range Rep_unop_vec = unop_vec_carrier"
+  apply (auto)
+  apply (simp add: Rep_unop_vec)
+  by (metis Rep_unop_vec_cases rangeI)
+
+instance unop_vec :: finite
+  apply standard
+  apply (rule finite_imageD[where f=Rep_unop_vec])
+  apply (auto)
+  by (meson Rep_unop_vec_inject inj_onI)
+
+
+
+consts binop_vec_carrier :: "nat set"  
+specification (binop_vec_carrier) 
+  binop_vec_finite[simp]: "finite binop_vec_carrier" 
+  binop_vec_ne: "binop_vec_carrier \<noteq> {}" 
+  by blast  
+
+typedef binop_vec = "binop_vec_carrier" using binop_vec_ne by blast
+
+lemma range_binop_vec[simp]: "range Rep_binop_vec = binop_vec_carrier"
+  apply (auto)
+  apply (simp add: Rep_binop_vec)
+  by (metis Rep_binop_vec_cases rangeI)
+
+instance binop_vec :: finite
+  apply standard
+  apply (rule finite_imageD[where f=Rep_binop_vec])
+  apply (auto)
+  by (meson Rep_binop_vec_inject inj_onI)
+  
+  
+consts ternop_vec_carrier :: "nat set"  
+specification (ternop_vec_carrier) 
+  ternop_vec_finite[simp]: "finite ternop_vec_carrier" 
+  ternop_vec_ne: "ternop_vec_carrier \<noteq> {}" 
+  by blast  
+
+typedef ternop_vec = "ternop_vec_carrier" using ternop_vec_ne by blast
+
+lemma range_ternop_vec[simp]: "range Rep_ternop_vec = ternop_vec_carrier"
+  apply (auto)
+  apply (simp add: Rep_ternop_vec)
+  by (metis Rep_ternop_vec_cases rangeI)
+
+instance ternop_vec :: finite
+  apply standard
+  apply (rule finite_imageD[where f=Rep_ternop_vec])
+  apply (auto)
+  by (meson Rep_ternop_vec_inject inj_onI)
+  
+
+  
+consts testop_vec_carrier :: "nat set"  
+specification (testop_vec_carrier) 
+  testop_vec_finite[simp]: "finite testop_vec_carrier" 
+  testop_vec_ne: "testop_vec_carrier \<noteq> {}" 
+  by blast  
+
+typedef testop_vec = "testop_vec_carrier" using testop_vec_ne by blast
+
+lemma range_testop_vec[simp]: "range Rep_testop_vec = testop_vec_carrier"
+  apply (auto)
+  apply (simp add: Rep_testop_vec)
+  by (metis Rep_testop_vec_cases rangeI)
+
+instance testop_vec :: finite
+  apply standard
+  apply (rule finite_imageD[where f=Rep_testop_vec])
+  apply (auto)
+  by (meson Rep_testop_vec_inject inj_onI)
+
+  
+consts shiftop_vec_carrier :: "nat set"  
+specification (shiftop_vec_carrier) 
+  shiftop_vec_finite[simp]: "finite shiftop_vec_carrier" 
+  shiftop_vec_ne: "shiftop_vec_carrier \<noteq> {}" 
+  by blast  
+
+typedef shiftop_vec = "shiftop_vec_carrier" using shiftop_vec_ne by blast
+
+lemma range_shiftop_vec[simp]: "range Rep_shiftop_vec = shiftop_vec_carrier"
+  apply (auto)
+  apply (simp add: Rep_shiftop_vec)
+  by (metis Rep_shiftop_vec_cases rangeI)
+
+instance shiftop_vec :: finite
+  apply standard
+  apply (rule finite_imageD[where f=Rep_shiftop_vec])
+  apply (auto)
+  by (meson Rep_shiftop_vec_inject inj_onI)
+  
+      
 datatype \<comment> \<open>basic instructions\<close>
   b_e =
     Unreachable

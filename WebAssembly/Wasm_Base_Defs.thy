@@ -184,10 +184,16 @@ consts
   serialise_v128 :: "v128 \<Rightarrow> bytes"
   deserialise_v128 :: "bytes \<Rightarrow> v128"
 
+specification (serialise_f32) serialise_f32_len: "serialise_f32 x = bs \<Longrightarrow> length bs = 4" apply (rule exI[where x="\<lambda>_. replicate 4 undefined"]) by auto
+specification (serialise_f64) serialise_f64_len: "serialise_f64 x = bs \<Longrightarrow> length bs = 8" apply (rule exI[where x="\<lambda>_. replicate 8 undefined"]) by auto
+specification (serialise_v128) serialise_v128_len: "serialise_v128 x = bs \<Longrightarrow> length bs = 16" apply (rule exI[where x="\<lambda>_. replicate 16 undefined"]) by auto
+  
+(*  
 axiomatization where
   serialise_f32_len: "serialise_f32 x = bs \<Longrightarrow> length bs = 4" and
   serialise_f64_len: "serialise_f64 y = bs \<Longrightarrow> length bs = 8" and
   serialise_v128_len: "serialise_v128 z = bs \<Longrightarrow> length bs = 16"
+*)  
 
 (* TODO: check correctness of the below *)
 (* intra-int conversions *)

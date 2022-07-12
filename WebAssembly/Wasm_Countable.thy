@@ -39,10 +39,23 @@ instance i64 :: countable
 proof(rule countable_classI[of "\<lambda>n::i64. nat_of_int n"])
 qed (simp add: Rep_i64_inject nat_of_int_i64.rep_eq)
 
-axiomatization where
+instance f32 :: countable
+proof(rule countable_classI[of "unat o Rep_f32"])
+qed (simp add: Rep_f32_inject)
+
+instance f64 :: countable
+proof(rule countable_classI[of "unat o Rep_f64"])
+qed (simp add: Rep_f64_inject)
+
+instance v128 :: countable
+proof(rule countable_classI[of "unat o Rep_v128"])
+qed (simp add: Rep_v128_inject)
+
+(*axiomatization where
   f32_countable: "OFCLASS(f32, countable_class)" and
   f64_countable: "OFCLASS(f64, countable_class)" and
   v128_countable: "OFCLASS(v128, countable_class)"
+  
 
 instance f32 :: countable
   by (rule f32_countable)
@@ -52,7 +65,8 @@ instance f64 :: countable
 
 instance v128 :: countable
   by (rule v128_countable)
-
+*)
+  
 instance v_num :: countable
   by countable_datatype
 
@@ -104,27 +118,15 @@ instance shape_vec_f :: countable
 instance shape_vec :: countable
   by countable_datatype
 
-axiomatization where
-  unop_vec_countable: "OFCLASS(unop_vec, countable_class)" and
-  binop_vec_countable: "OFCLASS(binop_vec, countable_class)" and
-  ternop_vec_countable: "OFCLASS(ternop_vec, countable_class)" and
-  testop_vec_countable: "OFCLASS(testop_vec, countable_class)" and
-  shiftop_vec_countable: "OFCLASS(shiftop_vec, countable_class)"
+instance unop_vec :: countable ..
 
-instance unop_vec :: countable
-  by (rule unop_vec_countable)
+instance binop_vec :: countable ..
 
-instance binop_vec :: countable
-  by (rule binop_vec_countable)
+instance ternop_vec :: countable ..
 
-instance ternop_vec :: countable
-  by (rule ternop_vec_countable)
+instance testop_vec :: countable ..
 
-instance testop_vec :: countable
-  by (rule testop_vec_countable)
-
-instance shiftop_vec :: countable
-  by (rule shiftop_vec_countable)
+instance shiftop_vec :: countable ..
 
 instance loadop_vec :: countable
   by countable_datatype
