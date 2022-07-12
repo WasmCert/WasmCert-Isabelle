@@ -703,8 +703,8 @@ definition isabelle_i64_trunc_sat_u_f64 :: "f64 \<Rightarrow>i64" where
 definition isabelle_i64_trunc_sat_s_f64 :: "f64 \<Rightarrow>i64" where
   "isabelle_i64_trunc_sat_s_f64 f = ocaml_int64_to_isabelle_int64 (ocaml_i64_trunc_sat_s_f64 f)"
 
-definition f32_serialise_isabelle_bytes :: "f32 \<Rightarrow> bytes" where
-  "f32_serialise_isabelle_bytes f = List.map ocaml_char_to_isabelle_byte (f32_serialise_ocaml_char f)"
+definition f32_serialise_isabelle_bytes :: "f32 \<Rightarrow> bytes" where                                     
+  "f32_serialise_isabelle_bytes f = List.map ocaml_char_to_isabelle_byte (f32_serialise_ocaml_char f)"  
 
 definition f64_serialise_isabelle_bytes :: "f64 \<Rightarrow> bytes" where
   "f64_serialise_isabelle_bytes f = List.map ocaml_char_to_isabelle_byte (f64_serialise_ocaml_char f)"
@@ -715,37 +715,43 @@ definition f32_deserialise_isabelle_bytes :: "bytes \<Rightarrow> f32" where
 definition f64_deserialise_isabelle_bytes :: "bytes \<Rightarrow> f64" where
   "f64_deserialise_isabelle_bytes bs = f64_deserialise_ocaml_char (List.map isabelle_byte_to_ocaml_char bs)"
 
+specification (f32_convert_ui32) f32_convert_ui32_is[code]: "f32_convert_ui32 \<equiv> f32_convert_u_isabelle_i32" by blast
+specification (f32_convert_si32) f32_convert_si32_is[code]: "f32_convert_si32 \<equiv> f32_convert_s_isabelle_i32" by blast
+specification (f32_convert_ui64) f32_convert_ui64_is[code]: "f32_convert_ui64 \<equiv> f32_convert_u_isabelle_i64" by blast
+specification (f32_convert_si64) f32_convert_si64_is[code]: "f32_convert_si64 \<equiv> f32_convert_s_isabelle_i64" by blast
+specification (f64_convert_ui32) f64_convert_ui32_is[code]: "f64_convert_ui32 \<equiv> f64_convert_u_isabelle_i32" by blast
+specification (f64_convert_si32) f64_convert_si32_is[code]: "f64_convert_si32 \<equiv> f64_convert_s_isabelle_i32" by blast
+specification (f64_convert_ui64) f64_convert_ui64_is[code]: "f64_convert_ui64 \<equiv> f64_convert_u_isabelle_i64" by blast
+specification (f64_convert_si64) f64_convert_si64_is[code]: "f64_convert_si64 \<equiv> f64_convert_s_isabelle_i64" by blast
+
+
+specification (ui32_trunc_f32) ui32_trunc_f32_is[code]: "ui32_trunc_f32 \<equiv> isabelle_i32_trunc_u_f32"  by blast
+specification (si32_trunc_f32) si32_trunc_f32_is[code]: "si32_trunc_f32 \<equiv> isabelle_i32_trunc_s_f32"  by blast
+specification (ui32_trunc_f64) ui32_trunc_f64_is[code]: "ui32_trunc_f64 \<equiv> isabelle_i32_trunc_u_f64"  by blast
+specification (si32_trunc_f64) si32_trunc_f64_is[code]: "si32_trunc_f64 \<equiv> isabelle_i32_trunc_s_f64"  by blast
+specification (ui64_trunc_f32) ui64_trunc_f32_is[code]: "ui64_trunc_f32 \<equiv> isabelle_i64_trunc_u_f32"  by blast
+specification (si64_trunc_f32) si64_trunc_f32_is[code]: "si64_trunc_f32 \<equiv> isabelle_i64_trunc_s_f32"  by blast
+specification (ui64_trunc_f64) ui64_trunc_f64_is[code]: "ui64_trunc_f64 \<equiv> isabelle_i64_trunc_u_f64"  by blast
+specification (si64_trunc_f64) si64_trunc_f64_is[code]: "si64_trunc_f64 \<equiv> isabelle_i64_trunc_s_f64"  by blast
+  
+specification (ui32_trunc_sat_f32) ui32_trunc_sat_f32_is[code]: "ui32_trunc_sat_f32 \<equiv> isabelle_i32_trunc_sat_u_f32" by blast
+specification (si32_trunc_sat_f32) si32_trunc_sat_f32_is[code]: "si32_trunc_sat_f32 \<equiv> isabelle_i32_trunc_sat_s_f32" by blast
+specification (ui32_trunc_sat_f64) ui32_trunc_sat_f64_is[code]: "ui32_trunc_sat_f64 \<equiv> isabelle_i32_trunc_sat_u_f64" by blast
+specification (si32_trunc_sat_f64) si32_trunc_sat_f64_is[code]: "si32_trunc_sat_f64 \<equiv> isabelle_i32_trunc_sat_s_f64" by blast
+specification (ui64_trunc_sat_f32) ui64_trunc_sat_f32_is[code]: "ui64_trunc_sat_f32 \<equiv> isabelle_i64_trunc_sat_u_f32" by blast
+specification (si64_trunc_sat_f32) si64_trunc_sat_f32_is[code]: "si64_trunc_sat_f32 \<equiv> isabelle_i64_trunc_sat_s_f32" by blast
+specification (ui64_trunc_sat_f64) ui64_trunc_sat_f64_is[code]: "ui64_trunc_sat_f64 \<equiv> isabelle_i64_trunc_sat_u_f64" by blast
+specification (si64_trunc_sat_f64) si64_trunc_sat_f64_is[code]: "si64_trunc_sat_f64 \<equiv> isabelle_i64_trunc_sat_s_f64" by blast
+
+(*specification (serialise_f32  ) serialise_f32_is[code]:   "serialise_f32   \<equiv> f32_serialise_isabelle_bytes"   by blast  
+specification (serialise_f64  ) serialise_f64_is[code]:   "serialise_f64   \<equiv> f64_serialise_isabelle_bytes"   by blast*)
+specification (deserialise_f32) deserialise_f32_is[code]: "deserialise_f32 \<equiv> f32_deserialise_isabelle_bytes" by blast
+specification (deserialise_f64) deserialise_f64_is[code]: "deserialise_f64 \<equiv> f64_deserialise_isabelle_bytes" by blast
+
+  
 axiomatization where
-  f32_convert_ui32_is[code]: "f32_convert_ui32 \<equiv> f32_convert_u_isabelle_i32" and
-  f32_convert_si32_is[code]: "f32_convert_si32 \<equiv> f32_convert_s_isabelle_i32" and
-  f32_convert_ui64_is[code]: "f32_convert_ui64 \<equiv> f32_convert_u_isabelle_i64" and
-  f32_convert_si64_is[code]: "f32_convert_si64 \<equiv> f32_convert_s_isabelle_i64" and
-  f64_convert_ui32_is[code]: "f64_convert_ui32 \<equiv> f64_convert_u_isabelle_i32" and
-  f64_convert_si32_is[code]: "f64_convert_si32 \<equiv> f64_convert_s_isabelle_i32" and
-  f64_convert_ui64_is[code]: "f64_convert_ui64 \<equiv> f64_convert_u_isabelle_i64" and
-  f64_convert_si64_is[code]: "f64_convert_si64 \<equiv> f64_convert_s_isabelle_i64" and
-
-  ui32_trunc_f32_is[code]: "ui32_trunc_f32 \<equiv> isabelle_i32_trunc_u_f32" and
-  si32_trunc_f32_is[code]: "si32_trunc_f32 \<equiv> isabelle_i32_trunc_s_f32" and
-  ui32_trunc_f64_is[code]: "ui32_trunc_f64 \<equiv> isabelle_i32_trunc_u_f64" and
-  si32_trunc_f64_is[code]: "si32_trunc_f64 \<equiv> isabelle_i32_trunc_s_f64" and
-  ui64_trunc_f32_is[code]: "ui64_trunc_f32 \<equiv> isabelle_i64_trunc_u_f32" and
-  si64_trunc_f32_is[code]: "si64_trunc_f32 \<equiv> isabelle_i64_trunc_s_f32" and
-  ui64_trunc_f64_is[code]: "ui64_trunc_f64 \<equiv> isabelle_i64_trunc_u_f64" and
-  si64_trunc_f64_is[code]: "si64_trunc_f64 \<equiv> isabelle_i64_trunc_s_f64" and
-  ui32_trunc_sat_f32_is[code]: "ui32_trunc_sat_f32 \<equiv> isabelle_i32_trunc_sat_u_f32" and
-  si32_trunc_sat_f32_is[code]: "si32_trunc_sat_f32 \<equiv> isabelle_i32_trunc_sat_s_f32" and
-  ui32_trunc_sat_f64_is[code]: "ui32_trunc_sat_f64 \<equiv> isabelle_i32_trunc_sat_u_f64" and
-  si32_trunc_sat_f64_is[code]: "si32_trunc_sat_f64 \<equiv> isabelle_i32_trunc_sat_s_f64" and
-  ui64_trunc_sat_f32_is[code]: "ui64_trunc_sat_f32 \<equiv> isabelle_i64_trunc_sat_u_f32" and
-  si64_trunc_sat_f32_is[code]: "si64_trunc_sat_f32 \<equiv> isabelle_i64_trunc_sat_s_f32" and
-  ui64_trunc_sat_f64_is[code]: "ui64_trunc_sat_f64 \<equiv> isabelle_i64_trunc_sat_u_f64" and
-  si64_trunc_sat_f64_is[code]: "si64_trunc_sat_f64 \<equiv> isabelle_i64_trunc_sat_s_f64" and
-
   serialise_f32_is[code]: "serialise_f32 \<equiv> f32_serialise_isabelle_bytes" and
   serialise_f64_is[code]: "serialise_f64 \<equiv> f64_serialise_isabelle_bytes" and
-  deserialise_f32_is[code]: "deserialise_f32 \<equiv> f32_deserialise_isabelle_bytes" and
-  deserialise_f64_is[code]: "deserialise_f64 \<equiv> f64_deserialise_isabelle_bytes" and
 
   ocaml_i32_reinterpret_f32_is: "ocaml_int32_to_isabelle_int32 (ocaml_i32_reinterpret_f32 f32) \<equiv> deserialise_i32 (serialise_f32 f32)" and
   ocaml_f32_reinterpret_i32_is: "(ocaml_f32_reinterpret_i32 (isabelle_int32_to_ocaml_int32 i32)) \<equiv> deserialise_f32 (serialise_i32 i32)" and
@@ -784,9 +790,10 @@ definition v128_serialise_isabelle_bytes :: "v128 \<Rightarrow> bytes" where
 definition v128_deserialise_isabelle_bytes :: "bytes \<Rightarrow> v128" where
   "v128_deserialise_isabelle_bytes bs = v128_deserialise_ocaml_char (List.map isabelle_byte_to_ocaml_char bs)"
 
+specification (deserialise_v128) deserialise_v128_is[code]: "deserialise_v128 \<equiv> v128_deserialise_isabelle_bytes" by blast
+  
 axiomatization where
-  serialise_v128_is[code]: "serialise_v128 \<equiv> v128_serialise_isabelle_bytes" and
-  deserialise_v128_is[code]: "deserialise_v128 \<equiv> v128_deserialise_isabelle_bytes"
+  serialise_v128_is[code]: "serialise_v128 \<equiv> v128_serialise_isabelle_bytes"
 
 code_printing
   type_constructor unop_vec \<rightharpoonup> (OCaml) "V128Wrapper.unop'_vec'_t"
@@ -810,12 +817,11 @@ code_printing
 | constant ocaml_app_shift_vec_v \<rightharpoonup> (OCaml) "V128Wrapper.shift'_vec"
 
 (* 1.1 vector ops *)
-axiomatization where
-  app_unop_vec_v_is[code]: "app_unop_vec_v \<equiv> ocaml_app_unop_vec_v" and
-  app_binop_vec_v_is[code]: "app_binop_vec_v \<equiv> ocaml_app_binop_vec_v" and
-  app_ternop_vec_v_is[code]: "app_ternop_vec_v \<equiv> ocaml_app_ternop_vec_v" and
-  app_test_vec_v_is[code]: "app_test_vec_v op1 v \<equiv> ocaml_int32_to_isabelle_int32 (ocaml_app_test_vec_v op1 v)" and
-  app_shift_vec_v_is[code]: "app_shift_vec_v op2 v n \<equiv> ocaml_app_shift_vec_v op2 v (isabelle_int32_to_ocaml_int32 n)"
+specification (app_unop_vec_v  ) app_unop_vec_v_is[code]:   "app_unop_vec_v          \<equiv> ocaml_app_unop_vec_v" by blast
+specification (app_binop_vec_v ) app_binop_vec_v_is[code]:  "app_binop_vec_v         \<equiv> ocaml_app_binop_vec_v" by blast
+specification (app_ternop_vec_v) app_ternop_vec_v_is[code]: "app_ternop_vec_v        \<equiv> ocaml_app_ternop_vec_v" by blast
+specification (app_test_vec_v ) app_test_vec_v_is[code]:   "app_test_vec_v op1 v    \<equiv> ocaml_int32_to_isabelle_int32 (ocaml_app_test_vec_v op1 v)" by auto
+specification (app_shift_vec_v) app_shift_vec_v_is[code]:  "app_shift_vec_v op2 v n \<equiv> ocaml_app_shift_vec_v op2 v (isabelle_int32_to_ocaml_int32 n)" by auto
 
 (* arithmetic *)
 code_printing
