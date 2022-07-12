@@ -24,10 +24,11 @@ datatype imp_desc =
 | Imp_glob tg
 
 datatype v_ext =
-  Ext_func i
-| Ext_tab i
-| Ext_mem i
-| Ext_glob i
+  Ext_func (the_idx: i)
+| Ext_tab (the_idx: i)
+| Ext_mem (the_idx: i)
+| Ext_glob (the_idx: i)
+hide_const (open) v_ext.the_idx
 
 type_synonym exp_desc = v_ext
 
@@ -89,14 +90,16 @@ inductive module_glob_typing :: "t_context \<Rightarrow> module_glob \<Rightarro
   "\<lbrakk>const_exprs \<C> es; \<C> \<turnstile> es : ([] _> [tg_t tg])\<rbrakk> \<Longrightarrow> module_glob_typing \<C> \<lparr>g_type=tg, g_init=es\<rparr> tg"
 
 inductive module_elem_typing :: "t_context \<Rightarrow> module_elem \<Rightarrow> bool" where
-  "\<lbrakk>const_exprs \<C> es;
-    \<C> \<turnstile> es : ([] _> [T_i32]);
+  "\<lbrakk>t = 0;
+    const_exprs \<C> es;
+    \<C> \<turnstile> es : ([] _> [T_num T_i32]);
     t < length (table \<C>);
     list_all (\<lambda>i. i < length (func_t \<C>)) is\<rbrakk> \<Longrightarrow> module_elem_typing \<C> \<lparr>e_tab=t, e_off=es, e_init=is\<rparr>"
 
 inductive module_data_typing :: "t_context \<Rightarrow> module_data \<Rightarrow> bool" where
-  "\<lbrakk>const_exprs \<C> es;
-    \<C> \<turnstile> es : ([] _> [T_i32]);
+  "\<lbrakk>d = 0;
+    const_exprs \<C> es;
+    \<C> \<turnstile> es : ([] _> [T_num T_i32]);
     d < length (memory \<C>)\<rbrakk> \<Longrightarrow> module_data_typing \<C> \<lparr>d_data=d, d_off=es, d_init=bs\<rparr>"
 
 inductive module_start_typing :: "t_context \<Rightarrow> i \<Rightarrow> bool" where
@@ -135,8 +138,7 @@ record m = \<comment> \<open>module\<close>
   m_exports :: "module_export list"
 
 inductive module_typing :: "m \<Rightarrow> extern_t list \<Rightarrow> extern_t list \<Rightarrow> bool" where
-"\<lbrakk>list_all (\<lambda>tf. case tf of (tn _> tm) \<Rightarrow> length tm \<le> 1) tfs; \<comment> \<open>\<open>MVP restriction\<close>\<close>
-  list_all2 (module_func_typing \<C>) fs fts;
+"\<lbrakk>list_all2 (module_func_typing \<C>) fs fts;
   list_all (module_tab_typing) ts;
   list_all (module_mem_typing) ms;
   list_all2 (module_glob_typing \<C>') gs gts;

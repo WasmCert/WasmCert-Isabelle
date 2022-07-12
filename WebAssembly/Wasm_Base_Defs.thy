@@ -6,6 +6,7 @@ theory Wasm_Base_Defs
     Wasm_Type_Abs
     Wasm_Type_Word
     Word_Lib.Rsplit
+    "../libs/More_More_Word"
 begin
 
 text\<open>
@@ -126,6 +127,19 @@ end
 instantiation f32 :: wasm_float begin instance .. end
 instantiation f64 :: wasm_float begin instance .. end
 
+instantiation v128 :: wasm_base begin instance .. end
+
+(* 1.1 vector ops *)
+consts
+  binop_vec_wf :: "binop_vec \<Rightarrow> bool"
+
+  app_unop_vec_v :: "unop_vec \<Rightarrow> v128 \<Rightarrow> v128"
+  app_binop_vec_v :: "binop_vec \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 option"
+  app_shuffle_vec_v :: "i list \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128"
+  app_ternop_vec_v :: "ternop_vec \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128 \<Rightarrow> v128"
+  app_test_vec_v :: "testop_vec \<Rightarrow> v128 \<Rightarrow> i32"
+  app_shift_vec_v :: "shiftop_vec \<Rightarrow> v128 \<Rightarrow> i32 \<Rightarrow> v128"
+
 consts
   (* inter-type conversions *)
   (* float to i32 *)
@@ -138,6 +152,16 @@ consts
   si64_trunc_f32 :: "f32 \<Rightarrow> i64 option"
   ui64_trunc_f64 :: "f64 \<Rightarrow> i64 option"
   si64_trunc_f64 :: "f64 \<Rightarrow> i64 option"
+  (* 1.1: saturating float to i32 *)
+  ui32_trunc_sat_f32 :: "f32 \<Rightarrow> i32"
+  si32_trunc_sat_f32 :: "f32 \<Rightarrow> i32"
+  ui32_trunc_sat_f64 :: "f64 \<Rightarrow> i32"
+  si32_trunc_sat_f64 :: "f64 \<Rightarrow> i32"
+  (* 1.1: saturating float to i64 *)
+  ui64_trunc_sat_f32 :: "f32 \<Rightarrow> i64"
+  si64_trunc_sat_f32 :: "f32 \<Rightarrow> i64"
+  ui64_trunc_sat_f64 :: "f64 \<Rightarrow> i64"
+  si64_trunc_sat_f64 :: "f64 \<Rightarrow> i64"
   (* int to f32 *)
   f32_convert_ui32 :: "i32 \<Rightarrow> f32"
   f32_convert_si32 :: "i32 \<Rightarrow> f32"
@@ -156,6 +180,14 @@ consts
   serialise_f64 :: "f64 \<Rightarrow> bytes"
   deserialise_f32 :: "bytes \<Rightarrow> f32"
   deserialise_f64 :: "bytes \<Rightarrow> f64"
+  (* vector byte encoding *)
+  serialise_v128 :: "v128 \<Rightarrow> bytes"
+  deserialise_v128 :: "bytes \<Rightarrow> v128"
+
+specification (serialise_f32) serialise_f32_len: "serialise_f32 x = bs \<Longrightarrow> length bs = 4" apply (rule exI[where x="\<lambda>_. replicate 4 undefined"]) by auto
+specification (serialise_f64) serialise_f64_len: "serialise_f64 x = bs \<Longrightarrow> length bs = 8" apply (rule exI[where x="\<lambda>_. replicate 8 undefined"]) by auto
+specification (serialise_v128) serialise_v128_len: "serialise_v128 x = bs \<Longrightarrow> length bs = 16" apply (rule exI[where x="\<lambda>_. replicate 16 undefined"]) by auto
+  
 (* TODO: check correctness of the below *)
 (* intra-int conversions *)
 lift_definition wasm_wrap :: "i64 \<Rightarrow> i32" is "Word.ucast" .
@@ -164,66 +196,12 @@ lift_definition wasm_extend_s :: "i32 \<Rightarrow> i64" is "Word.scast" .
 
 (* int byte encoding *)
 
-fun bin_rsplit_rev :: "nat \<Rightarrow> nat \<Rightarrow> int \<Rightarrow> int list"
-  where "bin_rsplit_rev n m c =
-    (if m = 0 \<or> n = 0 then []
-     else
-      let (a, b) = bin_split n c
-      in b # bin_rsplit_rev n (m - n) a)"
+lift_definition serialise_i32 :: "i32 \<Rightarrow> bytes" is "(map Abs_uint8')\<circ>word_rsplit_rev" .
+lift_definition serialise_i64 :: "i64 \<Rightarrow> bytes" is "(map Abs_uint8')\<circ>word_rsplit_rev" .
 
-lemma bin_rsplit_rev_is:
-  "(rev acc)@(bin_rsplit_rev n m c) = rev (bin_rsplit_aux n m c acc)"
-proof (induction n m c arbitrary: acc rule: bin_rsplit_rev.induct)
-  case (1 n m c)
-  consider (1) "m = 0 \<or> n = 0" | (2) "\<not>(m = 0 \<or> n = 0)"
-    by blast
-  thus ?case
-  proof (cases)
-    case 1
-    thus ?thesis
-      by fastforce
-  next
-    case 2
-    obtain a b where a:"(a,b) = bin_split n c"
-      by simp
-    have "rev (b # acc) @ bin_rsplit_rev n (m - n) a =
-            rev (bin_rsplit_aux n (m - n) a (b # acc))"
-      using 2 1 a
-      by blast
-    thus ?thesis
-      using 2 a bin_rsplit_aux.elims
-      by fastforce
-  qed
-qed
-
-definition word_rsplit_rev :: "'a::len word \<Rightarrow> 'b::len word list"
-  where "word_rsplit_rev w = map word_of_int (bin_rsplit_rev (LENGTH('b)) (LENGTH('a)) (uint w))"
-
-lemma word_rsplit_rev_is: "word_rsplit_rev = rev \<circ> word_rsplit"
-  using bin_rsplit_rev_is
-  unfolding word_rsplit_def bin_rsplit_def word_rsplit_rev_def comp_def
-  by (metis (no_types, hide_lams) append_Nil fst_conv rev.simps(1) rev_map snd_conv)
-
-lift_definition serialise_i32 :: "i32 \<Rightarrow> bytes" is "word_rsplit_rev" .
-lift_definition serialise_i64 :: "i64 \<Rightarrow> bytes" is "word_rsplit_rev" .
-
-definition word_rcat_rev :: \<open>'a::len word list \<Rightarrow> 'b::len word\<close>
-  where \<open>word_rcat_rev = word_of_int \<circ> horner_sum uint (2 ^ LENGTH('a))\<close>
-
-lemma word_rcat_rev_is: "word_rcat_rev = word_rcat \<circ> rev"
-  unfolding word_rcat_def word_rcat_rev_def comp_def
-  by simp
-
-lemma word_rcat_rsplit_rev: "word_rcat_rev (word_rsplit_rev w) = w"
-  using word_rcat_rsplit[of w]
-  by (simp add: word_rcat_rev_is word_rsplit_rev_is)
-
-(* For some reason declaring these in two stages makes code extraction work better *)
-lift_definition deserialise_i32_aux :: "8 word list \<Rightarrow> i32" is "(\<lambda>x :: (8 word list). (word_rcat_rev x))" .
-lift_definition deserialise_i64_aux :: "8 word list \<Rightarrow> i64" is "(\<lambda>x :: (8 word list). (word_rcat_rev x))" .
-
-lift_definition deserialise_i32 :: "bytes \<Rightarrow> i32" is deserialise_i32_aux .
-lift_definition deserialise_i64 :: "bytes \<Rightarrow> i64" is "deserialise_i64_aux" .
+(* TODO: check code extraction works here *)
+lift_definition deserialise_i32 :: "bytes \<Rightarrow> i32" is "word_rcat_rev\<circ>(map Rep_uint8')" .
+lift_definition deserialise_i64 :: "bytes \<Rightarrow> i64" is "word_rcat_rev\<circ>(map Rep_uint8')" .
 
 lift_definition wasm_bool :: "bool \<Rightarrow> i32" is "(\<lambda>b. if b then 1 else 0)" .
 lift_definition  int32_minus_one :: i32 is "max_word" .
@@ -247,7 +225,9 @@ definition load :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> nat \<
 
 definition sign_extend :: "sx \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> bytes" where
   "sign_extend sx l bytes = (let msb = msb_byte (msbyte bytes) in
-                          let byte = (case sx of U \<Rightarrow> zero_byte | S \<Rightarrow> if msb then negone_byte else zero_byte) in
+                          let byte = (case sx of
+                                        U \<Rightarrow> zero_byte
+                                      | S \<Rightarrow> if msb then negone_byte else zero_byte) in
                           bytes_takefill byte l bytes)"
 
 definition load_packed :: "sx \<Rightarrow> mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes option" where
@@ -261,23 +241,119 @@ definition store :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes
 definition store_packed :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes \<Rightarrow> nat \<Rightarrow> mem option" where
   "store_packed = store"
 
+definition store_tab :: "tabinst \<Rightarrow> nat \<Rightarrow> i list \<Rightarrow> tabinst option" where
+  "store_tab tab n icls = (if (tab_size tab \<ge> (n+(length icls)))
+                          then Some (((take n (fst tab)) @ (map Some icls) @ (drop (n + length icls) (fst tab))), snd tab)
+                          else None)"
+
 consts
   (* host *)
   host_apply :: "s \<Rightarrow> tf \<Rightarrow> host \<Rightarrow> v list \<Rightarrow> host_state \<Rightarrow> (s \<times> v list) option \<Rightarrow> bool"
 
+definition wasm_deserialise_num :: "bytes \<Rightarrow> t_num \<Rightarrow> v_num" where
+  "wasm_deserialise_num bs t = (case t of
+                                  T_i32 \<Rightarrow> ConstInt32 (deserialise_i32 bs)
+                                | T_i64 \<Rightarrow> ConstInt64 (deserialise_i64 bs)
+                                | T_f32 \<Rightarrow> ConstFloat32 (deserialise_f32 bs)
+                                | T_f64 \<Rightarrow> ConstFloat64 (deserialise_f64 bs))"
+
 definition wasm_deserialise :: "bytes \<Rightarrow> t \<Rightarrow> v" where
   "wasm_deserialise bs t = (case t of
-                              T_i32 \<Rightarrow> ConstInt32 (deserialise_i32 bs)
-                            | T_i64 \<Rightarrow> ConstInt64 (deserialise_i64 bs)
-                            | T_f32 \<Rightarrow> ConstFloat32 (deserialise_f32 bs)
-                            | T_f64 \<Rightarrow> ConstFloat64 (deserialise_f64 bs))"
+                              T_num t_n \<Rightarrow> V_num (wasm_deserialise_num bs t_n)
+                            | T_vec t_v \<Rightarrow> V_vec (ConstVec128 (deserialise_v128 bs)))"
 
-definition typeof :: " v \<Rightarrow> t" where
+definition bits_num :: "v_num \<Rightarrow> bytes" where
+  "bits_num v = (case v of
+                   ConstInt32 c \<Rightarrow> (serialise_i32 c)
+                 | ConstInt64 c \<Rightarrow> (serialise_i64 c)
+                 | ConstFloat32 c \<Rightarrow> (serialise_f32 c)
+                 | ConstFloat64 c \<Rightarrow> (serialise_f64 c))"
+
+definition bits_vec :: "v_vec \<Rightarrow> bytes" where
+  "bits_vec v = (case v of
+                   ConstVec128 c \<Rightarrow> (serialise_v128 c))"
+
+definition bits :: "v \<Rightarrow> bytes" where
+  "bits v = (case v of
+               V_num v_n \<Rightarrow> bits_num v_n
+             | V_vec v_v \<Rightarrow> bits_vec v_v)"
+
+definition bitzero_num :: "t_num \<Rightarrow> v_num" where
+  "bitzero_num t = (case t of
+                      T_i32 \<Rightarrow> ConstInt32 0
+                    | T_i64 \<Rightarrow> ConstInt64 0
+                    | T_f32 \<Rightarrow> ConstFloat32 0
+                    | T_f64 \<Rightarrow> ConstFloat64 0)"
+
+definition bitzero_vec :: "t_vec \<Rightarrow> v_vec" where
+  "bitzero_vec t = (case t of
+                      T_v128 \<Rightarrow> ConstVec128 0)"
+
+definition bitzero :: "t \<Rightarrow> v" where
+  "bitzero t = (case t of
+                 T_num t_n \<Rightarrow> V_num (bitzero_num t_n)
+               | T_vec t_v \<Rightarrow> V_vec (bitzero_vec t_v))"
+
+definition n_zeros :: "t list \<Rightarrow> v list" where
+  "n_zeros ts = (map (\<lambda>t. bitzero t) ts)"
+
+definition typeof_num :: " v_num \<Rightarrow> t_num" where
+  "typeof_num v = (case v of
+                     ConstInt32 _ \<Rightarrow> T_i32
+                   | ConstInt64 _ \<Rightarrow> T_i64
+                   | ConstFloat32 _ \<Rightarrow> T_f32
+                   | ConstFloat64 _ \<Rightarrow> T_f64)"
+
+definition typeof_vec :: " v_vec \<Rightarrow> t_vec" where
+  "typeof_vec v = (case v of ConstVec128 _ \<Rightarrow> T_v128)"
+
+definition typeof :: "v \<Rightarrow> t" where
   "typeof v = (case v of
-                 ConstInt32 _ \<Rightarrow> T_i32
-               | ConstInt64 _ \<Rightarrow> T_i64
-               | ConstFloat32 _ \<Rightarrow> T_f32
-               | ConstFloat64 _ \<Rightarrow> T_f64)"
+                 V_num v_n \<Rightarrow> T_num (typeof_num v_n)
+               | V_vec v_v \<Rightarrow> T_vec (typeof_vec v_v))"
+
+definition vec_lane_t :: "shape_vec \<Rightarrow> t_num" where
+  "vec_lane_t sv = (case sv of
+                      Svi I8_16 \<Rightarrow> T_i32
+                    | Svi I16_8 \<Rightarrow> T_i32
+                    | Svi I32_4 \<Rightarrow> T_i32
+                    | Svi I64_2 \<Rightarrow> T_i64
+                    | Svf F32_4 \<Rightarrow> T_f32
+                    | Svf F64_2 \<Rightarrow> T_f64)"
+
+definition vec_i_length :: "shape_vec_i \<Rightarrow> nat" where
+  "vec_i_length sv = (case sv of
+                       I8_16 \<Rightarrow> 1
+                     | I16_8 \<Rightarrow> 2
+                     | I32_4 \<Rightarrow> 4
+                     | I64_2 \<Rightarrow> 8)"
+
+definition vec_f_length :: "shape_vec_f \<Rightarrow> nat" where
+  "vec_f_length sv = (case sv of
+                       F32_4 \<Rightarrow> 4
+                     | F64_2 \<Rightarrow> 8)"
+
+definition vec_length :: "shape_vec \<Rightarrow> nat" where
+  "vec_length sv = (case sv of
+                     Svi svi \<Rightarrow> vec_i_length svi
+                   | Svf svf \<Rightarrow> vec_f_length svf)"
+
+definition vec_i_num :: "shape_vec_i \<Rightarrow> nat" where
+  "vec_i_num sv = (case sv of
+                   I8_16 \<Rightarrow> 16
+                 | I16_8 \<Rightarrow> 8
+                 | I32_4 \<Rightarrow> 4
+                 | I64_2 \<Rightarrow> 2)"
+
+definition vec_f_num :: "shape_vec_f \<Rightarrow> nat" where
+  "vec_f_num sv = (case sv of
+                   F32_4 \<Rightarrow> 4
+                 | F64_2 \<Rightarrow> 2)"
+
+definition vec_num :: "shape_vec \<Rightarrow> nat" where
+  "vec_num sv = (case sv of
+                   Svi svi \<Rightarrow> vec_i_num svi
+                 | Svf svf \<Rightarrow> vec_f_num svf)"
 
 definition option_projl :: "('a \<times> 'b) option \<Rightarrow> 'a option" where
   "option_projl x = map_option fst x"
@@ -285,53 +361,75 @@ definition option_projl :: "('a \<times> 'b) option \<Rightarrow> 'a option" whe
 definition option_projr :: "('a \<times> 'b) option \<Rightarrow> 'b option" where
   "option_projr x = map_option snd x"
 
+definition t_num_length :: "t_num \<Rightarrow> nat" where
+ "t_num_length t = (case t of
+                      T_i32 \<Rightarrow> 4
+                    | T_i64 \<Rightarrow> 8
+                    | T_f32 \<Rightarrow> 4
+                    | T_f64 \<Rightarrow> 8)"
+
+definition t_vec_length :: "t_vec \<Rightarrow> nat" where
+ "t_vec_length t = (case t of
+                      T_v128 \<Rightarrow> 16)"
+
 definition t_length :: "t \<Rightarrow> nat" where
  "t_length t = (case t of
-                  T_i32 \<Rightarrow> 4
-                | T_i64 \<Rightarrow> 8
-                | T_f32 \<Rightarrow> 4
-                | T_f64 \<Rightarrow> 8)"
+                  T_num t_n \<Rightarrow> t_num_length t_n
+                | T_vec t_v \<Rightarrow> t_vec_length t_v)"
 
-definition tp_length :: "tp \<Rightarrow> nat" where
- "tp_length tp = (case tp of
-                 Tp_i8 \<Rightarrow> 1
-               | Tp_i16 \<Rightarrow> 2
-               | Tp_i32 \<Rightarrow> 4)"
+definition tp_num_length :: "tp_num \<Rightarrow> nat" where
+ "tp_num_length tp = (case tp of
+                       Tp_i8 \<Rightarrow> 1
+                     | Tp_i16 \<Rightarrow> 2
+                     | Tp_i32 \<Rightarrow> 4)"
 
-definition is_int_t :: "t \<Rightarrow> bool" where
- "is_int_t t = (case t of
-                  T_i32 \<Rightarrow> True
-                | T_i64 \<Rightarrow> True
-                | T_f32 \<Rightarrow> False
-                | T_f64 \<Rightarrow> False)"
+definition tp_vec_length :: "tp_vec \<Rightarrow> nat" where
+ "tp_vec_length tp = (case tp of
+                       Tp_v8_8 \<Rightarrow> 1
+                     | Tp_v16_4 \<Rightarrow> 2
+                     | Tp_v32_2 \<Rightarrow> 4)"
 
-definition is_float_t :: "t \<Rightarrow> bool" where
- "is_float_t t = (case t of
-                    T_i32 \<Rightarrow> False
-                  | T_i64 \<Rightarrow> False
-                  | T_f32 \<Rightarrow> True
-                  | T_f64 \<Rightarrow> True)"
+definition tp_vec_num :: "tp_vec \<Rightarrow> nat" where
+ "tp_vec_num tp = (case tp of
+                     Tp_v8_8 \<Rightarrow> 8
+                   | Tp_v16_4 \<Rightarrow> 4
+                   | Tp_v32_2 \<Rightarrow> 2)"
+
+definition is_int_t_num :: "t_num \<Rightarrow> bool" where
+ "is_int_t_num t = (case t of
+                      T_i32 \<Rightarrow> True
+                    | T_i64 \<Rightarrow> True
+                    | T_f32 \<Rightarrow> False
+                    | T_f64 \<Rightarrow> False)"
+
+definition is_float_t_num :: "t_num \<Rightarrow> bool" where
+ "is_float_t_num t = (case t of
+                        T_i32 \<Rightarrow> False
+                      | T_i64 \<Rightarrow> False
+                      | T_f32 \<Rightarrow> True
+                      | T_f64 \<Rightarrow> True)"
 
 definition is_mut :: "tg \<Rightarrow> bool" where
   "is_mut tg = (tg_mut tg = T_mut)"
 
-definition unop_t_agree :: "unop \<Rightarrow> t \<Rightarrow> bool" where
-  "unop_t_agree unop t =
+definition unop_t_num_agree :: "unop \<Rightarrow> t_num \<Rightarrow> bool" where
+  "unop_t_num_agree unop t =
      (case unop of
-        Unop_i _ \<Rightarrow> is_int_t t
-      | Unop_f _ \<Rightarrow> is_float_t t)"
+        Unop_i _ \<Rightarrow> is_int_t_num t
+      | Unop_f _ \<Rightarrow> is_float_t_num t
+      | Extend_s tp \<Rightarrow> is_int_t_num t \<and> t_num_length t > tp_num_length tp)"
 
-definition binop_t_agree :: "binop \<Rightarrow> t \<Rightarrow> bool" where
-  "binop_t_agree binop t =
+definition binop_t_num_agree :: "binop \<Rightarrow> t_num \<Rightarrow> bool" where
+  "binop_t_num_agree binop t =
      (case binop of
-        Binop_i _ \<Rightarrow> is_int_t t
-      | Binop_f _ \<Rightarrow> is_float_t t)"
+        Binop_i _ \<Rightarrow> is_int_t_num t
+      | Binop_f _ \<Rightarrow> is_float_t_num t)"
 
-definition relop_t_agree :: "relop \<Rightarrow> t \<Rightarrow> bool" where
-  "relop_t_agree relop t =
+definition relop_t_num_agree :: "relop \<Rightarrow> t_num \<Rightarrow> bool" where
+  "relop_t_num_agree relop t =
      (case relop of
-        Relop_i _ \<Rightarrow> is_int_t t
-      | Relop_f _ \<Rightarrow> is_float_t t)"
+        Relop_i _ \<Rightarrow> is_int_t_num t
+      | Relop_f _ \<Rightarrow> is_float_t_num t)"
 
 definition app_unop_i :: "unop_i \<Rightarrow> 'i::wasm_int \<Rightarrow> 'i::wasm_int" where
   "app_unop_i iop c =
@@ -340,7 +438,7 @@ definition app_unop_i :: "unop_i \<Rightarrow> 'i::wasm_int \<Rightarrow> 'i::wa
    | Clz \<Rightarrow> int_clz c
    | Popcnt \<Rightarrow> int_popcnt c)"
 
-definition app_unop_i_v :: "unop_i \<Rightarrow> v \<Rightarrow> v" where
+definition app_unop_i_v :: "unop_i \<Rightarrow> v_num \<Rightarrow> v_num" where
   "app_unop_i_v iop v =
     (case v of
        (ConstInt32 c) \<Rightarrow> ConstInt32 (app_unop_i iop c)
@@ -358,18 +456,23 @@ definition app_unop_f :: "unop_f \<Rightarrow> 'f::wasm_float \<Rightarrow> 'f::
                   | Nearest \<Rightarrow> float_nearest c
                   | Sqrt \<Rightarrow> float_sqrt c)"
 
-definition app_unop_f_v :: "unop_f \<Rightarrow> v \<Rightarrow> v" where
+definition app_unop_f_v :: "unop_f \<Rightarrow> v_num \<Rightarrow> v_num" where
   "app_unop_f_v fop v =
     (case v of
        (ConstFloat32 c) \<Rightarrow> ConstFloat32 (app_unop_f fop c)
      | (ConstFloat64 c) \<Rightarrow> ConstFloat64 (app_unop_f fop c)
      | v' \<Rightarrow> v')"
 
-definition app_unop :: "unop \<Rightarrow> v \<Rightarrow> v" where
+definition app_extend_s :: "tp_num \<Rightarrow> v_num \<Rightarrow> v_num" where
+  "app_extend_s tp v =
+     wasm_deserialise_num (sign_extend S (t_num_length (typeof_num v)) (take (tp_num_length tp) (bits_num v))) (typeof_num v)"
+
+definition app_unop :: "unop \<Rightarrow> v_num \<Rightarrow> v_num" where
   "app_unop uop v =
     (case uop of
        Unop_i iop \<Rightarrow> app_unop_i_v iop v
-     | Unop_f fop \<Rightarrow> app_unop_f_v fop v)"
+     | Unop_f fop \<Rightarrow> app_unop_f_v fop v
+     | Extend_s tp \<Rightarrow> app_extend_s tp v)"
 
 definition app_binop_i :: "binop_i \<Rightarrow> 'i::wasm_int \<Rightarrow> 'i::wasm_int \<Rightarrow> ('i::wasm_int) option" where
   "app_binop_i iop c1 c2 = (case iop of
@@ -389,7 +492,7 @@ definition app_binop_i :: "binop_i \<Rightarrow> 'i::wasm_int \<Rightarrow> 'i::
                             | Rotl \<Rightarrow> Some (int_rotl c1 c2)
                             | Rotr \<Rightarrow> Some (int_rotr c1 c2))"
 
-definition app_binop_i_v :: "binop_i \<Rightarrow> v \<Rightarrow> v \<Rightarrow> v option" where
+definition app_binop_i_v :: "binop_i \<Rightarrow> v_num \<Rightarrow> v_num \<Rightarrow> v_num option" where
   "app_binop_i_v iop v1 v2 =
     (case (v1,v2) of
        ((ConstInt32 c1), (ConstInt32 c2)) \<Rightarrow> map_option ConstInt32 (app_binop_i iop c1 c2)
@@ -406,14 +509,14 @@ definition app_binop_f :: "binop_f \<Rightarrow> 'f::wasm_float \<Rightarrow> 'f
                             | Max \<Rightarrow> Some (float_max c1 c2)
                             | Copysign \<Rightarrow> Some (float_copysign c1 c2))"
 
-definition app_binop_f_v :: "binop_f \<Rightarrow> v \<Rightarrow> v \<Rightarrow> v option" where
+definition app_binop_f_v :: "binop_f \<Rightarrow> v_num \<Rightarrow> v_num \<Rightarrow> v_num option" where
   "app_binop_f_v fop v1 v2 =
     (case (v1,v2) of
        ((ConstFloat32 c1), (ConstFloat32 c2)) \<Rightarrow> map_option ConstFloat32 (app_binop_f fop c1 c2)
      | ((ConstFloat64 c1), (ConstFloat64 c2)) \<Rightarrow> map_option ConstFloat64 (app_binop_f fop c1 c2)
      | _ \<Rightarrow> None)"
 
-definition app_binop :: "binop \<Rightarrow> v \<Rightarrow> v \<Rightarrow> v option" where
+definition app_binop :: "binop \<Rightarrow> v_num \<Rightarrow> v_num \<Rightarrow> v_num option" where
   "app_binop bop v1 v2 =
     (case bop of
        Binop_i iop \<Rightarrow> app_binop_i_v iop v1 v2
@@ -422,7 +525,7 @@ definition app_binop :: "binop \<Rightarrow> v \<Rightarrow> v \<Rightarrow> v o
 definition app_testop_i :: "testop \<Rightarrow> 'i::wasm_int \<Rightarrow> bool" where
   "app_testop_i testop c = (case testop of Eqz \<Rightarrow> int_eqz c)"
 
-definition app_testop :: "testop \<Rightarrow> v \<Rightarrow> v" where
+definition app_testop :: "testop \<Rightarrow> v_num \<Rightarrow> v_num" where
   "app_testop op v =
     (case v of
        ConstInt32 c \<Rightarrow> ConstInt32 (wasm_bool (app_testop_i op c))
@@ -443,7 +546,7 @@ definition app_relop_i :: "relop_i \<Rightarrow> 'i::wasm_int \<Rightarrow> 'i::
                             | Ge U \<Rightarrow> int_ge_u c1 c2
                             | Ge S \<Rightarrow> int_ge_s c1 c2)"
 
-definition app_relop_i_v :: "relop_i \<Rightarrow> v \<Rightarrow> v \<Rightarrow> v" where
+definition app_relop_i_v :: "relop_i \<Rightarrow> v_num \<Rightarrow> v_num \<Rightarrow> v_num" where
   "app_relop_i_v iop v1 v2 =
     (case (v1,v2) of
        ((ConstInt32 c1), (ConstInt32 c2)) \<Rightarrow> ConstInt32 (wasm_bool (app_relop_i iop c1 c2))
@@ -459,24 +562,113 @@ definition app_relop_f :: "relop_f \<Rightarrow> 'f::wasm_float \<Rightarrow> 'f
                             | Lef \<Rightarrow> float_le c1 c2
                             | Gef \<Rightarrow> float_ge c1 c2)"
 
-definition app_relop_f_v :: "relop_f \<Rightarrow> v \<Rightarrow> v \<Rightarrow> v" where
+definition app_relop_f_v :: "relop_f \<Rightarrow> v_num \<Rightarrow> v_num \<Rightarrow> v_num" where
   "app_relop_f_v fop v1 v2 =
     (case (v1,v2) of
        ((ConstFloat32 c1), (ConstFloat32 c2)) \<Rightarrow> ConstInt32 (wasm_bool (app_relop_f fop c1 c2))
      | ((ConstFloat64 c1), (ConstFloat64 c2)) \<Rightarrow> ConstInt32 (wasm_bool (app_relop_f fop c1 c2))
      | _ \<Rightarrow> ConstInt32 0)"
 
-definition app_relop :: "relop \<Rightarrow> v \<Rightarrow> v \<Rightarrow> v" where
+definition app_relop :: "relop \<Rightarrow> v_num \<Rightarrow> v_num \<Rightarrow> v_num" where
   "app_relop rop v1 v2 =
     (case rop of
        Relop_i iop \<Rightarrow> app_relop_i_v iop v1 v2
      | Relop_f fop \<Rightarrow> app_relop_f_v fop v1 v2)"
 
-definition types_agree :: "t \<Rightarrow> v \<Rightarrow> bool" where
-  "types_agree t v = (typeof v = t)"
+(* vector ops *)
+
+definition insert_lane_vec_bs :: "nat \<Rightarrow> i \<Rightarrow> bytes \<Rightarrow> bytes \<Rightarrow> bytes" where
+  "insert_lane_vec_bs len_lane i bs_lane bs_vec =
+     ((take (i * len_lane) bs_vec) @ (take len_lane bs_lane) @ (drop ((i+1) * len_lane) bs_vec))"
+
+definition app_unop_vec :: "unop_vec \<Rightarrow> v_vec \<Rightarrow> v_vec" where
+  "app_unop_vec uop v1 =
+     (case v1 of ConstVec128 c \<Rightarrow> ConstVec128 (app_unop_vec_v uop c))"
+
+definition app_binop_vec :: "binop_vec \<Rightarrow> v_vec \<Rightarrow> v_vec \<Rightarrow> v_vec option" where
+  "app_binop_vec bop v1 v2 =
+    (case (v1,v2) of (ConstVec128 c1,ConstVec128 c2) \<Rightarrow> map_option ConstVec128 (app_binop_vec_v bop c1 c2))"
+
+definition app_shuffle_vec :: "i list \<Rightarrow> v_vec \<Rightarrow> v_vec \<Rightarrow> v_vec" where
+  "app_shuffle_vec is v1 v2 =
+     (case (v1,v2) of (ConstVec128 c1,ConstVec128 c2) \<Rightarrow> ConstVec128 (app_shuffle_vec_v is c1 c2))"
+
+definition app_ternop_vec :: "ternop_vec \<Rightarrow> v_vec \<Rightarrow> v_vec \<Rightarrow> v_vec \<Rightarrow> v_vec" where
+  "app_ternop_vec op v1 v2 v3 = 
+     (case (v1,v2,v3) of (ConstVec128 c1,ConstVec128 c2,ConstVec128 c3) \<Rightarrow> ConstVec128 (app_ternop_vec_v op c1 c2 c3))"
+
+definition app_test_vec :: "testop_vec \<Rightarrow> v_vec \<Rightarrow> i32" where
+  "app_test_vec op v1 =
+    (case v1 of ConstVec128 c \<Rightarrow> (app_test_vec_v op c))"
+
+definition app_shift_vec :: "shiftop_vec \<Rightarrow> v_vec \<Rightarrow> i32 \<Rightarrow> v_vec" where
+  "app_shift_vec sop v cn =
+     (case v of ConstVec128 cv \<Rightarrow> ConstVec128 (app_shift_vec_v sop cv cn))"
+
+definition app_splat_vec :: "shape_vec \<Rightarrow> v_num \<Rightarrow> v_vec" where
+  "app_splat_vec sv v = ConstVec128 (deserialise_v128 ((\<lambda>bs. concat (replicate (vec_num sv) bs)) (take (vec_length sv) (bits_num v))))"
+
+definition app_extract_vec :: "shape_vec \<Rightarrow> sx \<Rightarrow> i \<Rightarrow> v_vec \<Rightarrow> v_num" where
+  "app_extract_vec sv sx i vv =
+     (let bs_v = bits_vec vv in
+      let len_lane = vec_length sv in
+      let bs_n = (take len_lane (drop (i * len_lane) bs_v)) in
+      case sv of
+        Svi I8_16 \<Rightarrow> ConstInt32 (deserialise_i32 (sign_extend sx 4 bs_n))
+      | Svi I16_8 \<Rightarrow> ConstInt32 (deserialise_i32 (sign_extend sx 4 bs_n))
+      | Svi I32_4 \<Rightarrow> ConstInt32 (deserialise_i32 bs_n)
+      | Svi I64_2 \<Rightarrow> ConstInt64 (deserialise_i64 bs_n)
+      | Svf F32_4 \<Rightarrow> ConstFloat32 (deserialise_f32 bs_n)
+      | Svf F64_2 \<Rightarrow> ConstFloat64 (deserialise_f64 bs_n))"
+
+definition app_replace_vec :: "shape_vec \<Rightarrow> i \<Rightarrow> v_vec \<Rightarrow> v_num \<Rightarrow> v_vec" where
+  "app_replace_vec sv i vv vn =
+     (let bs_v = bits_vec vv in
+      let bs_n = bits_num vn in
+      ConstVec128 (deserialise_v128 (insert_lane_vec_bs (vec_length sv) i bs_n bs_v)))"
+
+fun read_bytes_vec :: "nat \<Rightarrow> nat \<Rightarrow> sx \<Rightarrow> mem \<Rightarrow> nat \<Rightarrow> bytes" where
+  "read_bytes_vec 0 len sx m ind = []"
+| "read_bytes_vec (Suc n) len sx m ind = (sign_extend sx (len*2) (read_bytes m ind len)) @ (read_bytes_vec n len sx m (ind+len))"
+
+definition load_packed_vec :: "tp_vec \<Rightarrow> sx \<Rightarrow> mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes option" where
+  "load_packed_vec tp sx m n off = (if (mem_length m \<ge> (n+off+((tp_vec_num tp)*(tp_vec_length tp))))
+                                     then Some (read_bytes_vec (tp_vec_num tp) (tp_vec_length tp) sx m (n+off))
+                                     else None)"
+
+definition load_vec :: "loadop_vec \<Rightarrow> mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes option" where
+  "load_vec lvop m n off  = (case lvop of
+                               Load_128 \<Rightarrow> load m n off (t_vec_length T_v128)
+                             | Load_packed_vec tp sx \<Rightarrow> load_packed_vec tp sx m n off
+                             | Load_32_zero \<Rightarrow> map_option (\<lambda>bs. bytes_takefill zero_byte (t_vec_length T_v128) bs) (load m n off 4)
+                             | Load_64_zero \<Rightarrow> map_option (\<lambda>bs. bytes_takefill zero_byte (t_vec_length T_v128) bs) (load m n off 8)
+                             | Load_splat svi \<Rightarrow> map_option (\<lambda>bs. concat (replicate (vec_i_num svi) bs)) (load m n off (vec_i_length svi)))"
+
+definition insert_lane_vec :: "shape_vec_i \<Rightarrow> i \<Rightarrow> bytes \<Rightarrow> v128 \<Rightarrow> v128" where
+  "insert_lane_vec svi i bs v =
+     (let bs_v = (serialise_v128 v) in
+     deserialise_v128 (insert_lane_vec_bs (vec_i_length svi) i bs bs_v))"
+
+definition store_serialise_vec :: "storeop_vec \<Rightarrow> v128 \<Rightarrow> bytes" where
+  "store_serialise_vec svop v = (case svop of
+                                  Store_128 \<Rightarrow> serialise_v128 v
+                                | Store_lane svi i \<Rightarrow> take (vec_i_length svi) (drop (i * (vec_i_length svi)) (serialise_v128 v)))"
 
 definition cl_type :: "cl \<Rightarrow> tf" where
   "cl_type cl = (case cl of Func_native _ tf _ _ \<Rightarrow> tf | Func_host tf _ \<Rightarrow> tf)"
+
+definition tb_tf :: "inst \<Rightarrow> tb \<Rightarrow> tf" where
+  "tb_tf inst tb = (case tb of
+                      Tbf i \<Rightarrow> (inst.types inst)!i
+                    | Tbv (Some t) \<Rightarrow> ([] _> [t])
+                    | Tbv None \<Rightarrow> ([] _> []))"
+
+definition tb_tf_t :: "t_context \<Rightarrow> tb \<Rightarrow> tf option" where
+  "tb_tf_t \<C> tb = (case tb of
+                      Tbf i \<Rightarrow> let tfs = (types_t \<C>) in
+                               if i < length tfs then Some (tfs!i) else None
+                    | Tbv (Some t) \<Rightarrow> Some ([] _> [t])
+                    | Tbv None \<Rightarrow> Some ([] _> []))"
 
 definition rglob_is_mut :: "global \<Rightarrow> bool" where
   "rglob_is_mut g = (g_mut g = T_mut)"
@@ -512,6 +704,9 @@ definition stab_cl_ind :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> i
 
 definition stab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> i option" where
   "stab s i j = (case (inst.tabs i) of (k#_) => stab_cl_ind s k j | [] => None)"
+
+definition stab_ind :: "inst \<Rightarrow> nat option" where
+  "stab_ind i = (case (inst.tabs i) of (n#_) \<Rightarrow> Some n | [] \<Rightarrow> None)"
 
 definition update_glob :: "global list \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v \<Rightarrow> global list" where
   "update_glob gs i j v =  (let k = sglob_ind i j in gs[k:=(gs!k)\<lparr>g_val := v\<rparr>])"
@@ -561,105 +756,110 @@ inductive Lfilled_exact :: "nat \<Rightarrow> Lholed \<Rightarrow> e list \<Righ
   (* "Lfill (LRec vs ts es' l es'') es = vs @ [Label ts es' (Lfill l es)] @ es''" *)
 | LN:"\<lbrakk>lholed = (LRec vs n es' l es''); Lfilled_exact k l es lfilledk\<rbrakk> \<Longrightarrow> Lfilled_exact (k+1) lholed es (($C* vs) @ [Label n es' lfilledk] @ es'')"
 
-definition load_store_t_bounds :: "a \<Rightarrow> tp option \<Rightarrow> t \<Rightarrow> bool" where
+definition load_store_t_bounds :: "a \<Rightarrow> tp_num option \<Rightarrow> t_num \<Rightarrow> bool" where
   "load_store_t_bounds a tp t = (case tp of
-                                   None \<Rightarrow> 2^a \<le> t_length t
-                                 | Some tp \<Rightarrow> 2^a \<le> tp_length tp \<and> tp_length tp < t_length t \<and>  is_int_t t)"
+                                   None \<Rightarrow> 2^a \<le> t_num_length t
+                                 | Some tp \<Rightarrow> 2^a \<le> tp_num_length tp \<and> tp_num_length tp < t_num_length t \<and>  is_int_t_num t)"
 
-definition cvt_i32 :: "sx option \<Rightarrow> v \<Rightarrow> i32 option" where
-  "cvt_i32 sx v = (case v of
-                   ConstInt32 c \<Rightarrow> None
-                 | ConstInt64 c \<Rightarrow> Some (wasm_wrap c)
-                 | ConstFloat32 c \<Rightarrow> (case sx of
-                                        Some U \<Rightarrow> ui32_trunc_f32 c
-                                      | Some S \<Rightarrow> si32_trunc_f32 c
-                                      | None \<Rightarrow> None)
-                 | ConstFloat64 c \<Rightarrow> (case sx of
-                                        Some U \<Rightarrow> ui32_trunc_f64 c
-                                      | Some S \<Rightarrow> si32_trunc_f64 c
-                                      | None \<Rightarrow> None))"
+definition load_vec_t_bounds :: "loadop_vec \<Rightarrow> a \<Rightarrow> bool" where
+  "load_vec_t_bounds lv a = (case lv of
+                              Load_packed_vec tp sx \<Rightarrow> 2^a \<le> (tp_vec_length tp) * (tp_vec_num tp)
+                            | Load_splat svi \<Rightarrow> 2^a \<le> (vec_i_length svi)
+                            | _ \<Rightarrow> 2^a \<le> (t_vec_length T_v128))"
 
-definition cvt_i64 :: "sx option \<Rightarrow> v \<Rightarrow> i64 option" where
-  "cvt_i64 sx v = (case v of
-                   ConstInt32 c \<Rightarrow> (case sx of
-                                        Some U \<Rightarrow> Some (wasm_extend_u c)
-                                      | Some S \<Rightarrow> Some (wasm_extend_s c)
-                                      | None \<Rightarrow> None)
-                 | ConstInt64 c \<Rightarrow> None
-                 | ConstFloat32 c \<Rightarrow> (case sx of
-                                        Some U \<Rightarrow> ui64_trunc_f32 c
-                                      | Some S \<Rightarrow> si64_trunc_f32 c
-                                      | None \<Rightarrow> None)
-                 | ConstFloat64 c \<Rightarrow> (case sx of
-                                        Some U \<Rightarrow> ui64_trunc_f64 c
-                                      | Some S \<Rightarrow> si64_trunc_f64 c
-                                      | None \<Rightarrow> None))"
+definition store_vec_t_bounds :: "storeop_vec \<Rightarrow> a \<Rightarrow> bool" where
+  "store_vec_t_bounds sv a = (case sv of
+                               Store_lane svi i \<Rightarrow> i < vec_i_num svi \<and> 2^a \<le> (vec_i_length svi)
+                             | _ \<Rightarrow> 2^a \<le> (t_vec_length T_v128))"
 
-definition cvt_f32 :: "sx option \<Rightarrow> v \<Rightarrow> f32 option" where
-  "cvt_f32 sx v = (case v of
-                   ConstInt32 c \<Rightarrow> (case sx of
-                                      Some U \<Rightarrow> Some (f32_convert_ui32 c)
-                                    | Some S \<Rightarrow> Some (f32_convert_si32 c)
-                                    | _ \<Rightarrow> None)
-                 | ConstInt64 c \<Rightarrow> (case sx of
-                                      Some U \<Rightarrow> Some (f32_convert_ui64 c)
-                                    | Some S \<Rightarrow> Some (f32_convert_si64 c)
-                                    | _ \<Rightarrow> None)
-                 | ConstFloat32 c \<Rightarrow> None
-                 | ConstFloat64 c \<Rightarrow> Some (wasm_demote c))"
+definition cvt_i32 :: "(sat \<times> sx) option \<Rightarrow> v_num \<Rightarrow> i32 option" where
+  "cvt_i32 sat_sx v = (case v of
+                         ConstInt32 c \<Rightarrow> None
+                       | ConstInt64 c \<Rightarrow> Some (wasm_wrap c)
+                       | ConstFloat32 c \<Rightarrow> (case sat_sx of
+                                              Some (Nonsat, U) \<Rightarrow> ui32_trunc_f32 c
+                                            | Some (Nonsat, S) \<Rightarrow> si32_trunc_f32 c
+                                            | Some (Sat, U) \<Rightarrow> Some (ui32_trunc_sat_f32 c)
+                                            | Some (Sat, S) \<Rightarrow> Some (si32_trunc_sat_f32 c)
+                                            | None \<Rightarrow> None)
+                       | ConstFloat64 c \<Rightarrow> (case sat_sx of
+                                              Some (Nonsat, U) \<Rightarrow> ui32_trunc_f64 c
+                                            | Some (Nonsat, S) \<Rightarrow> si32_trunc_f64 c
+                                            | Some (Sat, U) \<Rightarrow> Some (ui32_trunc_sat_f64 c)
+                                            | Some (Sat, S) \<Rightarrow> Some (si32_trunc_sat_f64 c)
+                                        | None \<Rightarrow> None))"
 
-definition cvt_f64 :: "sx option \<Rightarrow> v \<Rightarrow> f64 option" where
-  "cvt_f64 sx v = (case v of
-                   ConstInt32 c \<Rightarrow> (case sx of
-                                      Some U \<Rightarrow> Some (f64_convert_ui32 c)
-                                    | Some S \<Rightarrow> Some (f64_convert_si32 c)
-                                    | _ \<Rightarrow> None)
-                 | ConstInt64 c \<Rightarrow> (case sx of
-                                      Some U \<Rightarrow> Some (f64_convert_ui64 c)
-                                    | Some S \<Rightarrow> Some (f64_convert_si64 c)
-                                    | _ \<Rightarrow> None)
-                 | ConstFloat32 c \<Rightarrow> Some (wasm_promote c)
-                 | ConstFloat64 c \<Rightarrow> None)"
+definition cvt_i64 :: "(sat \<times> sx) option \<Rightarrow> v_num \<Rightarrow> i64 option" where
+  "cvt_i64 sat_sx v = (case v of
+                         ConstInt32 c \<Rightarrow> (case sat_sx of
+                                              Some (_, U) \<Rightarrow> Some (wasm_extend_u c)
+                                            | Some (_, S) \<Rightarrow> Some (wasm_extend_s c)
+                                            | None \<Rightarrow> None)
+                       | ConstInt64 c \<Rightarrow> None
+                       | ConstFloat32 c \<Rightarrow> (case sat_sx of
+                                              Some (Nonsat, U) \<Rightarrow> ui64_trunc_f32 c
+                                            | Some (Nonsat, S) \<Rightarrow> si64_trunc_f32 c
+                                            | Some (Sat, U) \<Rightarrow> Some (ui64_trunc_sat_f32 c)
+                                            | Some (Sat, S) \<Rightarrow> Some (si64_trunc_sat_f32 c)
+                                            | None \<Rightarrow> None)
+                       | ConstFloat64 c \<Rightarrow> (case sat_sx of
+                                              Some (Nonsat, U) \<Rightarrow> ui64_trunc_f64 c
+                                            | Some (Nonsat, S) \<Rightarrow> si64_trunc_f64 c
+                                            | Some (Sat, U) \<Rightarrow> Some (ui64_trunc_sat_f64 c)
+                                            | Some (Sat, S) \<Rightarrow> Some (si64_trunc_sat_f64 c)
+                                            | None \<Rightarrow> None))"
 
-definition cvt :: "t \<Rightarrow> sx option \<Rightarrow> v \<Rightarrow> v option" where
-  "cvt t sx v = (case t of
-                 T_i32 \<Rightarrow> (case (cvt_i32 sx v) of Some c \<Rightarrow> Some (ConstInt32 c) | None \<Rightarrow> None)
-               | T_i64 \<Rightarrow> (case (cvt_i64 sx v) of Some c \<Rightarrow> Some (ConstInt64 c) | None \<Rightarrow> None)
-               | T_f32 \<Rightarrow> (case (cvt_f32 sx v) of Some c \<Rightarrow> Some (ConstFloat32 c) | None \<Rightarrow> None)
-               | T_f64 \<Rightarrow> (case (cvt_f64 sx v) of Some c \<Rightarrow> Some (ConstFloat64 c) | None \<Rightarrow> None))"
+definition cvt_f32 :: "(sat \<times> sx) option \<Rightarrow> v_num \<Rightarrow> f32 option" where
+  "cvt_f32 sat_sx v = (case v of
+                         ConstInt32 c \<Rightarrow> (case sat_sx of
+                                            Some (_, U) \<Rightarrow> Some (f32_convert_ui32 c)
+                                          | Some (_, S) \<Rightarrow> Some (f32_convert_si32 c)
+                                          | _ \<Rightarrow> None)
+                       | ConstInt64 c \<Rightarrow> (case sat_sx of
+                                            Some (_, U) \<Rightarrow> Some (f32_convert_ui64 c)
+                                          | Some (_, S) \<Rightarrow> Some (f32_convert_si64 c)
+                                          | _ \<Rightarrow> None)
+                       | ConstFloat32 c \<Rightarrow> None
+                       | ConstFloat64 c \<Rightarrow> Some (wasm_demote c))"
 
-definition bits :: "v \<Rightarrow> bytes" where
-  "bits v = (case v of
-               ConstInt32 c \<Rightarrow> (serialise_i32 c)
-             | ConstInt64 c \<Rightarrow> (serialise_i64 c)
-             | ConstFloat32 c \<Rightarrow> (serialise_f32 c)
-             | ConstFloat64 c \<Rightarrow> (serialise_f64 c))"
+definition cvt_f64 :: "(sat \<times> sx) option \<Rightarrow> v_num \<Rightarrow> f64 option" where
+  "cvt_f64 sat_sx v = (case v of
+                         ConstInt32 c \<Rightarrow> (case sat_sx of
+                                            Some (_, U) \<Rightarrow> Some (f64_convert_ui32 c)
+                                          | Some (_, S) \<Rightarrow> Some (f64_convert_si32 c)
+                                          | _ \<Rightarrow> None)
+                       | ConstInt64 c \<Rightarrow> (case sat_sx of
+                                            Some (_, U) \<Rightarrow> Some (f64_convert_ui64 c)
+                                          | Some (_, S) \<Rightarrow> Some (f64_convert_si64 c)
+                                          | _ \<Rightarrow> None)
+                       | ConstFloat32 c \<Rightarrow> Some (wasm_promote c)
+                       | ConstFloat64 c \<Rightarrow> None)"
 
-definition bitzero :: "t \<Rightarrow> v" where
-  "bitzero t = (case t of
-                T_i32 \<Rightarrow> ConstInt32 0
-              | T_i64 \<Rightarrow> ConstInt64 0
-              | T_f32 \<Rightarrow> ConstFloat32 0
-              | T_f64 \<Rightarrow> ConstFloat64 0)"
+definition cvt :: "t_num \<Rightarrow> (sat \<times> sx) option \<Rightarrow> v_num \<Rightarrow> v_num option" where
+  "cvt t sat_sx v = (case t of
+                       T_i32 \<Rightarrow> (case (cvt_i32 sat_sx v) of Some c \<Rightarrow> Some (ConstInt32 c) | None \<Rightarrow> None)
+                     | T_i64 \<Rightarrow> (case (cvt_i64 sat_sx v) of Some c \<Rightarrow> Some (ConstInt64 c) | None \<Rightarrow> None)
+                     | T_f32 \<Rightarrow> (case (cvt_f32 sat_sx v) of Some c \<Rightarrow> Some (ConstFloat32 c) | None \<Rightarrow> None)
+                     | T_f64 \<Rightarrow> (case (cvt_f64 sat_sx v) of Some c \<Rightarrow> Some (ConstFloat64 c) | None \<Rightarrow> None))"
 
-definition n_zeros :: "t list \<Rightarrow> v list" where
-  "n_zeros ts = (map (\<lambda>t. bitzero t) ts)"
+definition wasm_reinterpret :: "t_num \<Rightarrow> v_num \<Rightarrow> v_num" where
+  "wasm_reinterpret t v = (wasm_deserialise_num (bits_num v) t)"
 
 lemma is_int_t_exists:
-  assumes "is_int_t t"
+  assumes "is_int_t_num t"
   shows "t = T_i32 \<or> t = T_i64"
   using assms
-  by (cases t) (auto simp add: is_int_t_def)
+  by (cases t) (auto simp add: is_int_t_num_def)
 
 lemma is_float_t_exists:
-  assumes "is_float_t t"
+  assumes "is_float_t_num t"
   shows "t = T_f32 \<or> t = T_f64"
   using assms
-  by (cases t) (auto simp add: is_float_t_def)
+  by (cases t) (auto simp add: is_float_t_num_def)
 
 
-lemma int_float_disjoint: "is_int_t t = -(is_float_t t)"
-  by simp (metis is_float_t_def is_int_t_def t.exhaust t.simps(13-16))
+lemma int_float_disjoint: "is_int_t_num t = -(is_float_t_num t)"
+  by simp (metis is_float_t_num_def is_int_t_num_def t_num.exhaust t_num.simps(13-16))
 
 lemma stab_unfold:
   assumes "stab s i j = Some i_cl"
@@ -674,7 +874,7 @@ lemma inj_basic: "inj Basic"
   by (meson e.inject(1) injI)
 
 lemma inj_basic_econst: "inj (\<lambda>v. $C v)"
-  by (meson b_e.inject(16) e.inject(1) injI)
+  by (simp add: inj_def)
 
 lemma to_e_list_1:"[$ a] = $* [a]"
   by simp
@@ -744,8 +944,10 @@ next
     by blast
   moreover
   have "typeof (bitzero t) = t"
-    unfolding typeof_def bitzero_def
-    by (cases t, simp_all)
+    unfolding typeof_def bitzero_def typeof_num_def typeof_vec_def bitzero_num_def
+    apply (simp split: t.splits t_num.splits t_vec.splits)
+    apply (metis (full_types) t_vec.exhaust)
+    done
   ultimately
   show ?case
     using Cons

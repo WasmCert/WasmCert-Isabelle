@@ -2,103 +2,64 @@ section {* Auxiliary Type System Properties *}
 
 theory Wasm_Properties_Aux imports Wasm_Axioms begin
 
-lemma typeof_i32:
-  assumes "typeof v = T_i32"
+lemma typeof_num_i32:
+  assumes "typeof_num v = T_i32"
   shows "\<exists>c. v = ConstInt32 c"
   using assms
-  unfolding typeof_def
+  unfolding typeof_num_def
   by (cases v) auto
 
-lemma typeof_i64:
-  assumes "typeof v = T_i64"
+lemma typeof_num_i64:
+  assumes "typeof_num v = T_i64"
   shows "\<exists>c. v = ConstInt64 c"
   using assms
-  unfolding typeof_def
+  unfolding typeof_num_def
   by (cases v) auto
 
-lemma typeof_f32:
-  assumes "typeof v = T_f32"
+lemma typeof_num_f32:
+  assumes "typeof_num v = T_f32"
   shows "\<exists>c. v = ConstFloat32 c"
   using assms
-  unfolding typeof_def
+  unfolding typeof_num_def
   by (cases v) auto
 
-lemma typeof_f64:
-  assumes "typeof v = T_f64"
+lemma typeof_num_f64:
+  assumes "typeof_num v = T_f64"
   shows "\<exists>c. v = ConstFloat64 c"
   using assms
-  unfolding typeof_def
+  unfolding typeof_num_def
   by (cases v) auto
 
-lemma typeof_app_unop:
-  assumes "typeof v = t"
-  shows "typeof (app_unop op v) = t"
+lemma typeof_num_app_unop:
+  assumes "typeof_num v = t"
+  shows "typeof_num (app_unop op v) = t"
   using assms
-  unfolding typeof_def app_unop_def app_unop_i_v_def app_unop_f_v_def
-  by (simp split: unop.splits unop_i.splits unop_f.splits v.splits)
+  unfolding typeof_num_def app_unop_def app_unop_i_v_def app_unop_f_v_def app_extend_s_def wasm_deserialise_num_def
+  by (simp split: unop.splits unop_i.splits unop_f.splits v.splits v_num.splits)
 
-lemma typeof_app_testop:
-  shows "typeof (app_testop op v) = T_i32"
-  unfolding typeof_def app_testop_def
-  by (auto split: v.splits)
+lemma typeof_num_app_testop:
+  shows "typeof_num (app_testop op v) = T_i32"
+  unfolding typeof_num_def app_testop_def
+  by (auto split: v_num.splits)
 
-lemma typeof_app_binop:
-  assumes "typeof v1 = t"
-          "typeof v2 = t"
+lemma typeof_num_app_binop:
+  assumes "typeof_num v1 = t"
+          "typeof_num v2 = t"
           "(app_binop op v1 v2) = Some v"
-  shows "typeof v = t"
+  shows "typeof_num v = t"
   using assms
-  unfolding typeof_def app_binop_def app_binop_i_v_def app_binop_f_v_def
-  by (auto split: binop.splits binop_i.splits binop_f.splits v.splits)
+  unfolding typeof_num_def app_binop_def app_binop_i_v_def app_binop_f_v_def
+  by (auto split: binop.splits binop_i.splits binop_f.splits v_num.splits)
 
-lemma typeof_app_relop:
-  shows "typeof (app_relop op v1 v2) = T_i32"
-  unfolding typeof_def app_relop_def app_relop_i_v_def app_relop_f_v_def
-  by (auto split: relop.splits relop_i.splits relop_f.splits v.splits)
+lemma typeof_num_app_relop:
+  shows "typeof_num (app_relop op v1 v2) = T_i32"
+  unfolding typeof_num_def app_relop_def app_relop_i_v_def app_relop_f_v_def
+  by (auto split: relop.splits relop_i.splits relop_f.splits v_num.splits)
 
 
-lemma exists_v_typeof: "\<exists>v v. typeof v = t"
-proof (cases t)
-  case T_i32
-  fix v
-  have "typeof (ConstInt32 v) = t"
-    using T_i32
-    unfolding typeof_def
-    by simp
-  thus ?thesis
-    using T_i32
-    by fastforce
-next
-  case T_i64
-  fix v
-  have "typeof (ConstInt64 v) = t"
-    using T_i64
-    unfolding typeof_def
-    by simp
-  thus ?thesis
-    using T_i64
-    by fastforce
-next
-  case T_f32
-  fix v
-  have "typeof (ConstFloat32 v) = t"
-    using T_f32
-    unfolding typeof_def
-    by simp
-  thus ?thesis
-    using T_f32
-    by fastforce
-next
-  case T_f64
-  fix v
-  have "typeof (ConstFloat64 v) = t"
-    using T_f64
-    unfolding typeof_def
-    by simp
-  thus ?thesis
-    using T_f64
-    by fastforce
-qed
+lemma exists_v_typeof_num: "\<exists>v v. typeof_num v = t"
+  unfolding typeof_num_def
+  by (metis t_num.exhaust v_num.simps(17,18,19,20))
 
 lemma set_local_access: 
   assumes "j < Suc (length vi + length vs)"
@@ -243,6 +204,22 @@ next
     by fastforce
 qed
 
+lemma e_type_empty1[dest]: assumes "\<S>\<bullet>\<C> \<turnstile> [] : (ts _> ts')" shows "ts = ts'"
+  using assms
+  by (induction "[]::(e list)" "(ts _> ts')" arbitrary: ts ts', auto)
+
+lemma e_type_empty: "(\<S>\<bullet>\<C> \<turnstile> [] : (ts _> ts')) = (ts = ts')"
+proof (safe)
+  assume "\<S>\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
+  thus "ts = ts'"
+    by blast
+next
+  assume "ts = ts'"
+  thus "\<S>\<bullet>\<C> \<turnstile> [] : (ts' _> ts')"
+    using b_e_typing.empty e_typing_l_typing.intros(1)[OF b_e_typing.weakening]
+    by fastforce
+qed
+
 lemma b_e_type_value:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = C v"
@@ -253,7 +230,7 @@ lemma b_e_type_value:
 lemma b_e_type_load:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Load t tp_sx a off"
-  shows "\<exists>ts'' sec n. ts = ts''@[T_i32] \<and> ts' = ts''@[t] \<and> length (memory \<C>) \<ge> 1"
+  shows "\<exists>ts'' sec n. ts = ts''@[T_num T_i32] \<and> ts' = ts''@[T_num t] \<and> length (memory \<C>) \<ge> 1"
         "load_store_t_bounds a (option_projl tp_sx) t"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
@@ -261,23 +238,48 @@ lemma b_e_type_load:
 lemma b_e_type_store:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Store t tp a off"
-    shows "ts = ts'@[T_i32, t]"
+    shows "ts = ts'@[T_num T_i32, T_num t]"
           "\<exists>sec n. length (memory \<C>) \<ge> 1"
           "load_store_t_bounds a tp t"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
+lemma b_e_type_load_vec:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Load_vec lv a off"
+  shows "\<exists>ts'' sec n. ts = ts''@[T_num T_i32] \<and> ts' = ts''@[T_vec T_v128] \<and> length (memory \<C>) \<ge> 1"
+        "load_vec_t_bounds lv a"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
+lemma b_e_type_load_lane_vec:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Load_lane_vec svi i a off"
+  shows "\<exists>ts'' sec n. ts = ts''@[T_num T_i32, T_vec T_v128] \<and> ts' = ts''@[T_vec T_v128] \<and> length (memory \<C>) \<ge> 1"
+        "i < vec_i_num svi \<and> 2^a \<le> (vec_i_length svi)"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
+lemma b_e_type_store_vec:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Store_vec sv a off"
+    shows "ts = ts'@[T_num T_i32, T_vec T_v128]"
+          "\<exists>sec n. length (memory \<C>) \<ge> 1"
+          "store_vec_t_bounds sv a"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
 lemma b_e_type_current_memory:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Current_memory"
-  shows "\<exists>sec n. ts' = ts @ [T_i32] \<and> length (memory \<C>) \<ge> 1"
+  shows "\<exists>sec n. ts' = ts @ [T_num T_i32] \<and> length (memory \<C>) \<ge> 1"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
 lemma b_e_type_grow_memory:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Grow_memory"
-  shows "\<exists>ts''. ts = ts''@[T_i32] \<and> ts = ts' \<and> length (memory \<C>) \<ge> 1"
+  shows "\<exists>ts''. ts = ts''@[T_num T_i32] \<and> ts = ts' \<and> length (memory \<C>) \<ge> 1"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct) auto
 
@@ -288,7 +290,7 @@ lemma b_e_type_nop:
   using assms
   by (induction "[e]"  "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
-definition arity_2_result :: "b_e \<Rightarrow> t" where
+definition arity_2_result :: "b_e \<Rightarrow> t_num" where
   "arity_2_result op2 = (case op2 of
                            Binop t _ \<Rightarrow> t
                          | Relop t _ \<Rightarrow> T_i32)"
@@ -296,9 +298,9 @@ definition arity_2_result :: "b_e \<Rightarrow> t" where
 lemma b_e_type_binop_relop:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Binop t bop \<or> e = Relop t rop"
-  shows "\<exists>ts''. ts = ts''@[t,t] \<and> ts' = ts''@[arity_2_result(e)]"
-        "e =  Binop t bop \<Longrightarrow> binop_t_agree bop t"
-        "e = Relop t rop \<Longrightarrow> relop_t_agree rop t"
+  shows "\<exists>ts''. ts = ts''@[T_num t,T_num t] \<and> ts' = ts''@[T_num (arity_2_result e)]"
+        "e =  Binop t bop \<Longrightarrow> binop_t_num_agree bop t"
+        "e = Relop t rop \<Longrightarrow> relop_t_num_agree rop t"
   using assms
   unfolding arity_2_result_def
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
@@ -310,7 +312,7 @@ lemma b_e_type_testop_drop_cvt0:
   using assms
   by (induction "[e]" "ts _> ts'" arbitrary: ts' rule: b_e_typing.induct, auto)
 
-definition arity_1_result :: "b_e \<Rightarrow> t" where
+definition arity_1_result :: "b_e \<Rightarrow> t_num" where
   "arity_1_result op1 = (case op1 of
                            Unop t _ \<Rightarrow> t
                          | Testop t _ \<Rightarrow> T_i32
@@ -319,9 +321,9 @@ definition arity_1_result :: "b_e \<Rightarrow> t" where
 lemma b_e_type_unop_testop:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Unop t uop \<or> e = Testop t top'"
-  shows "\<exists>ts''. ts = ts''@[t] \<and> ts' = ts''@[arity_1_result e]"
-        "e = Unop t uop \<Longrightarrow> unop_t_agree uop t"
-        "e = Testop t top' \<Longrightarrow> is_int_t t"
+  shows "\<exists>ts''. ts = ts''@[T_num t] \<and> ts' = ts''@[T_num (arity_1_result e)]"
+        "e = Unop t uop \<Longrightarrow> unop_t_num_agree uop t"
+        "e = Testop t top' \<Longrightarrow> is_int_t_num t"
   using assms
   unfolding arity_1_result_def
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
@@ -329,11 +331,67 @@ lemma b_e_type_unop_testop:
 lemma b_e_type_cvtop:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Cvtop t1 cvtop t sx"
-  shows "\<exists>ts''. ts = ts''@[t] \<and> ts' = ts''@[arity_1_result e]"
-        "cvtop = Convert \<Longrightarrow> (t1 \<noteq> t) \<and> (sx = None) = ((is_float_t t1 \<and> is_float_t t) \<or> (is_int_t t1 \<and> is_int_t t \<and> (t_length t1 < t_length t)))"
-        "cvtop = Reinterpret \<Longrightarrow> (t1 \<noteq> t) \<and> t_length t1 = t_length t"
+  shows "\<exists>ts''. ts = ts''@[T_num t] \<and> ts' = ts''@[T_num (arity_1_result e)]"
+        "cvtop = Convert \<Longrightarrow> (t1 \<noteq> t) \<and> (sx = None) = ((is_float_t_num t1 \<and> is_float_t_num t) \<or> (is_int_t_num t1 \<and> is_int_t_num t \<and> (t_num_length t1 < t_num_length t)))"
+        "cvtop = Reinterpret \<Longrightarrow> (t1 \<noteq> t) \<and> t_num_length t1 = t_num_length t"
   using assms
   unfolding arity_1_result_def
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
+lemma b_e_type_unop_vec:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Unop_vec op"
+  shows "\<exists>ts''. ts = ts''@[T_vec T_v128] \<and> ts' = ts''@[T_vec T_v128]"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
+lemma b_e_type_binop_vec:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Binop_vec op"
+  shows "\<exists>ts''. ts = ts''@[T_vec T_v128, T_vec T_v128] \<and> ts' = ts''@[T_vec T_v128]"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
+lemma b_e_type_ternop_vec:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Ternop_vec op"
+  shows "\<exists>ts''. ts = ts''@[T_vec T_v128, T_vec T_v128, T_vec T_v128] \<and> ts' = ts''@[T_vec T_v128]"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
+lemma b_e_type_test_vec:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Test_vec op"
+  shows "\<exists>ts''. ts = ts''@[T_vec T_v128] \<and> ts' = ts''@[T_num T_i32]"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
+lemma b_e_type_shift_vec:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Shift_vec op"
+  shows "\<exists>ts''. ts = ts''@[T_vec T_v128, T_num T_i32] \<and> ts' = ts''@[T_vec T_v128]"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
+lemma b_e_type_splat_vec:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Splat_vec sv"
+  shows "\<exists>ts''. ts = ts''@[T_num (vec_lane_t sv)] \<and> ts' = ts''@[T_vec T_v128]"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
+lemma b_e_type_extract_vec:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Extract_vec sv sx i"
+  shows "\<exists>ts''. ts = ts''@[T_vec T_v128] \<and> ts' = ts''@[T_num (vec_lane_t sv)] \<and> i < vec_num sv \<and> (sx = U \<or> vec_length sv \<le> 2)"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
+lemma b_e_type_replace_vec:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Replace_vec sv i"
+  shows "\<exists>ts''. ts = ts''@[T_vec T_v128, T_num (vec_lane_t sv)] \<and> ts' = ts''@[T_vec T_v128] \<and> i < vec_num sv"
+  using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
 lemma b_e_type_drop:
@@ -346,7 +404,7 @@ by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, aut
 lemma b_e_type_select:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Select"
-  shows "\<exists>ts'' t. ts = ts''@[t,t,T_i32] \<and> ts' = ts''@[t]"
+  shows "\<exists>ts'' t. ts = ts''@[t,t,T_num T_i32] \<and> ts' = ts''@[t]"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
@@ -362,7 +420,7 @@ lemma b_e_type_call_indirect:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Call_indirect i"
   shows "i < length (types_t \<C>) \<and> length (table \<C>) \<ge> 1"
-        "\<exists>ts'' tf1 tf2. ts = ts''@tf1@[T_i32] \<and> ts' = ts''@tf2 \<and> (types_t \<C>)!i = (tf1 _> tf2)"
+        "\<exists>ts'' tf1 tf2. ts = ts''@tf1@[T_num T_i32] \<and> ts' = ts''@tf2 \<and> (types_t \<C>)!i = (tf1 _> tf2)"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
@@ -403,26 +461,26 @@ lemma b_e_type_set_global:
 
 lemma b_e_type_block:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = Block tf es"
-  shows "\<exists>ts'' tfn tfm. tf = (tfn _> tfm) \<and> (ts = ts''@tfn) \<and> (ts' = ts''@tfm) \<and>
-                        (\<C>\<lparr>label :=  [tfm] @ label \<C>\<rparr> \<turnstile> es : tf)"
+          "e = Block tb es"
+  shows "\<exists>ts'' tfn tfm. (tb_tf_t \<C> tb) = Some (tfn _> tfm) \<and> (ts = ts''@tfn) \<and> (ts' = ts''@tfm) \<and>
+                        (\<C>\<lparr>label :=  [tfm] @ label \<C>\<rparr> \<turnstile> es : (tfn _> tfm))"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
 lemma b_e_type_loop:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = Loop tf es"
-  shows "\<exists>ts'' tfn tfm. tf = (tfn _> tfm) \<and> (ts = ts''@tfn) \<and> (ts' = ts''@tfm) \<and>
-                        (\<C>\<lparr>label :=  [tfn] @ label \<C>\<rparr> \<turnstile> es : tf)"
+          "e = Loop tb es"
+  shows "\<exists>ts'' tfn tfm. (tb_tf_t \<C> tb) = Some (tfn _> tfm) \<and> (ts = ts''@tfn) \<and> (ts' = ts''@tfm) \<and>
+                        (\<C>\<lparr>label :=  [tfn] @ label \<C>\<rparr> \<turnstile> es : (tfn _> tfm))"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
 lemma b_e_type_if:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = If tf es1 es2"
-  shows "\<exists>ts'' tfn tfm. tf = (tfn _> tfm) \<and> (ts = ts''@tfn @ [T_i32]) \<and> (ts' = ts''@tfm) \<and>
-                        (\<C>\<lparr>label := [tfm] @ label \<C>\<rparr> \<turnstile> es1 : tf) \<and>
-                        (\<C>\<lparr>label := [tfm] @ label \<C>\<rparr> \<turnstile> es2 : tf)"
+          "e = If tb es1 es2"
+  shows "\<exists>ts'' tfn tfm. (tb_tf_t \<C> tb) = Some (tfn _> tfm) \<and> (ts = ts''@tfn @ [T_num T_i32]) \<and> (ts' = ts''@tfm) \<and>
+                        (\<C>\<lparr>label := [tfm] @ label \<C>\<rparr> \<turnstile> es1 : (tfn _> tfm)) \<and>
+                        (\<C>\<lparr>label := [tfm] @ label \<C>\<rparr> \<turnstile> es2 : (tfn _> tfm))"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
@@ -438,14 +496,14 @@ lemma b_e_type_br_if:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Br_if i"
         shows "i < length(label \<C>)"
-              "\<exists>ts_c ts''. ts = ts_c @ ts'' @ [T_i32] \<and> ts' = ts_c @ ts'' \<and> (label \<C>)!i = ts''"
+              "\<exists>ts_c ts''. ts = ts_c @ ts'' @ [T_num T_i32] \<and> ts' = ts_c @ ts'' \<and> (label \<C>)!i = ts''"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
 lemma b_e_type_br_table:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Br_table is i"
-  shows "\<exists>ts_c ts''. list_all (\<lambda>i. i < length(label \<C>) \<and> (label \<C>)!i = ts'') (is@[i]) \<and> ts = ts_c @ ts''@[T_i32]"
+  shows "\<exists>ts_c ts''. list_all (\<lambda>i. i < length(label \<C>) \<and> (label \<C>)!i = ts'') (is@[i]) \<and> ts = ts_c @ ts''@[T_num T_i32]"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, fastforce+)
 
@@ -502,6 +560,23 @@ proof -
   thus ?thesis
     using b_e_type_value ts'_def(2)
     by fastforce
+qed
+
+lemma b_e_type_value3:
+  assumes "\<C> \<turnstile> [C v1, C v2, C v3] : (t1s _> t2s)"
+  shows "t2s = t1s @ [typeof v1, typeof v2, typeof v3]"
+proof -
+  obtain ts' ts'' where ts'_def:"\<C> \<turnstile> [C v1] : (t1s _> ts')"
+                                "\<C> \<turnstile> [C v2] : (ts' _> ts'')"
+                                "\<C> \<turnstile> [C v3] : (ts'' _> t2s)"
+    using b_e_type_comp assms
+    by (metis append_butlast_last_id butlast.simps(2) last_ConsL last_ConsR list.distinct(1))
+  have "ts' = t1s @ [typeof v1]"
+    using b_e_type_value ts'_def(1)
+    by fastforce
+  thus ?thesis
+    using b_e_type_value ts'_def(2,3)
+    by (metis append.left_neutral append_Cons append_assoc)
 qed
 
 (* Lifting the previous results to all expressions. *)
@@ -684,6 +759,22 @@ next
   thus ?case
     by fastforce
 qed blast
+
+lemma e_type_init_mem:
+  assumes "s\<bullet>\<C> \<turnstile> [Init_mem n bs] : (ts _> ts')"
+  shows "(ts = ts') \<and> length (memory \<C>) \<ge> 1 \<and> (s\<bullet>\<C> \<turnstile> [Init_mem n bs] : ([] _> []))"
+  using assms
+  apply (induction s \<C> "[Init_mem n bs]" "(ts _> ts')" arbitrary: ts ts')
+  apply (auto simp add: e_typing_l_typing.intros(8))
+  done
+
+lemma e_type_init_tab:
+  assumes "s\<bullet>\<C> \<turnstile> [Init_tab n icls] : (ts _> ts')"
+  shows "(ts = ts') \<and> length (table \<C>) \<ge> 1 \<and> (list_all (\<lambda>icl. icl < length (funcs s)) icls) \<and> (s\<bullet>\<C> \<turnstile> [Init_tab n icls] : ([] _> []))"
+  using assms
+  apply (induction s \<C> "[Init_tab n icls]" "(ts _> ts')" arbitrary: ts ts')
+  apply (auto simp add: e_typing_l_typing.intros(9))
+  done
 
 lemma cl_typing_native:
   assumes "cl_typing s (Func_native i tf ts es) tf'"
@@ -1416,6 +1507,77 @@ lemma store_extension_refl:
   unfolding store_extension.simps
   by (metis (mono_tags) append_Nil2 list_all2_conv_all_nth s.cases)
 
+lemma global_extension_trans:
+  assumes "global_extension g g''"
+          "global_extension g'' g'"
+  shows "global_extension g g'"
+  using assms
+  unfolding global_extension_def
+  by auto
+
+lemma mem_extension_trans:
+  assumes "mem_extension m m''"
+          "mem_extension m'' m'"
+  shows "mem_extension m m'"
+  using assms
+  unfolding mem_extension_def
+  by auto
+
+lemma tab_extension_trans:
+  assumes "tab_extension t t''"
+          "tab_extension t'' t'"
+  shows "tab_extension t t'"
+  using assms
+  unfolding tab_extension_def
+  by auto
+
+lemma store_extension_trans:
+  assumes "store_extension s s''"
+          "store_extension s'' s'"
+        shows "store_extension s s'"
+proof -
+  obtain cls ts ms gs ts'' ms'' gs'' cls''_rest ts''_rest ms''_rest gs''_rest where s_is:
+    "s = \<lparr>s.funcs = cls, s.tabs = ts, s.mems = ms, s.globs = gs\<rparr>"
+    "s'' = \<lparr>s.funcs = cls@cls''_rest, s.tabs = ts''@ts''_rest, s.mems = ms''@ms''_rest, s.globs = gs''@gs''_rest\<rparr>"
+    "list_all2 tab_extension ts ts''"
+    "list_all2 mem_extension ms ms''"
+    "list_all2 global_extension gs gs''"
+    using assms(1)
+    by (cases rule: store_extension.cases) blast
+  obtain cls'_rest ts' ts'_rest ms' ms'_rest gs' gs'_rest where s'_is:
+    "s' = \<lparr>s.funcs = cls@cls''_rest@cls'_rest, s.tabs = ts'@ts'_rest, s.mems = ms'@ms'_rest, s.globs = gs'@gs'_rest\<rparr>"
+    "list_all2 tab_extension (ts''@ts''_rest) ts'"
+    "list_all2 mem_extension (ms''@ms''_rest) ms'"
+    "list_all2 global_extension (gs''@gs''_rest) gs'"
+    using assms(2) s_is(2)
+    apply (cases rule: store_extension.cases)
+    apply (metis (no_types, lifting) append.assoc s.ext_inject)
+    done
+  obtain ts'_' ts'_rest_' ms'_' ms'_rest_' gs'_' gs'_rest'_' where s'_is_alt:
+    "ts' = ts'_'@ts'_rest_'"
+    "ms' = ms'_'@ms'_rest_'"
+    "gs' = gs'_'@gs'_rest'_'"
+    "list_all2 tab_extension ts'' ts'_'"
+    "list_all2 mem_extension ms'' ms'_'"
+    "list_all2 global_extension gs'' gs'_'"
+    using s'_is
+          list_all2_append1[of tab_extension "ts''" "ts''_rest" ts']
+          list_all2_append1[of mem_extension "ms''" "ms''_rest" ms']
+          list_all2_append1[of global_extension "gs''" "gs''_rest" gs']
+    apply simp
+    apply (metis (no_types, lifting))
+    done
+  have
+    "list_all2 tab_extension ts ts'_'"
+    "list_all2 mem_extension ms ms'_'"
+    "list_all2 global_extension gs gs'_'"
+    using s_is(3,4,5) s'_is_alt list_all2_trans tab_extension_trans mem_extension_trans global_extension_trans
+    by blast+
+  thus ?thesis
+    using s'_is s'_is_alt
+    by (simp add: s_is store_extension.simps) blast
+qed
+
 lemma global_extension_update:
   assumes "g_mut g = T_mut"
           "typeof (g_val g) = typeof v"
@@ -1459,6 +1621,19 @@ proof -
   show "memi_agree (mems s) k (hd (memory \<C>))"
     using assms
     unfolding inst_typing.simps smem_ind_def
+    apply (simp split: list.splits)
+    apply (metis list.sel(1) list_all2_Cons1)
+    done
+qed
+
+lemma inst_typing_imp_tabi_agree:
+  assumes "inst_typing s i \<C>"
+          "(stab_ind i) = Some k"
+  shows "tabi_agree (tabs s) k (hd (table \<C>))"
+proof -
+  show "tabi_agree (tabs s) k (hd (table \<C>))"
+    using assms
+    unfolding inst_typing.simps stab_ind_def
     apply (simp split: list.splits)
     apply (metis list.sel(1) list_all2_Cons1)
     done
@@ -1631,7 +1806,22 @@ lemma store_mem_exists:
   assumes "inst_typing s i \<C>"
   shows "length (memory \<C>) = length (inst.mems i)"
   using assms list_all2_lengthD
-  unfolding inst_typing.simps memi_agree_def
+  unfolding inst_typing.simps
+  by fastforce
+
+lemma store_tab_exists:
+  assumes "inst_typing s i \<C>"
+  shows "length (table \<C>) = length (inst.tabs i)"
+  using assms list_all2_lengthD
+  unfolding inst_typing.simps
+  by fastforce
+
+
+lemma store_types_exists:
+  assumes "inst_typing s i \<C>"
+  shows "types_t \<C> = inst.types i"
+  using assms list_all2_lengthD
+  unfolding inst_typing.simps
   by fastforce
 
 lemma globi_agree_store_extension:
@@ -1777,17 +1967,36 @@ proof (induction s \<C> es tf and s rs f es ts rule: e_typing_l_typing.inducts)
     using e_typing_l_typing.intros(6) 6(2)
     by simp
 next
-  case (8 \<S> f \<C> rs es ts)
+  case (8 \<C> \<S> bs n)
+  thus ?case
+    using e_typing_l_typing.intros(8)
+    unfolding store_extension.simps
+    by (auto simp add: list_all2_lengthD)
+next
+  case (9 \<C> \<S> tis n)
+  hence 1:"length (s.funcs \<S>) \<le> length (s.funcs s')"
+    unfolding store_extension.simps
+    by (auto simp add: list_all2_lengthD)
+  hence "list_all (\<lambda>ti. ti < length (s.funcs s')) tis"
+    using list.pred_mono[of "(\<lambda>ti. ti < length (s.funcs \<S>))"
+                            "(\<lambda>ti. ti < length (s.funcs s'))"]
+          9(2)
+          dual_order.strict_trans le_eq_less_or_eq
+    by auto
+  thus ?case
+    using e_typing_l_typing.intros(9)[of _ s'] 9(1)
+    by (auto simp add: list_all2_lengthD)
+next
+  case (10 \<S> f \<C> rs es ts)
   thus ?case
     using frame_typing_store_extension_inv
-          e_typing_l_typing.intros(8)
+          e_typing_l_typing.intros(10)
     by blast
 qed (auto simp add: e_typing_l_typing.intros)
 
 lemma tab_agree_store_extension_inv:
   assumes "store_extension s s'"
           "tab_agree s t"
-          "(tabs s) = (tabs s')"
   shows "tab_agree s' t"
   using assms
   unfolding tab_agree_def list_all_length store_extension.simps
@@ -1798,6 +2007,14 @@ lemma store_typing_in_mem_agree:
           "j < length (s.mems s)"
           "s.mems s ! j = m"
   shows "mem_agree m"
+  using assms
+  by (auto simp add: store_typing.simps list_all_length)
+
+lemma store_typing_in_tab_agree:
+  assumes "store_typing s"
+          "j < length (s.tabs s)"
+          "s.tabs s ! j = t"
+  shows "tab_agree s t"
   using assms
   by (auto simp add: store_typing.simps list_all_length)
 
@@ -1842,6 +2059,55 @@ proof -
     by (metis (no_types, lifting) "0"(2) assms(1) list.pred_mono_strong s'_def sh1 store_typing.cases tab_agree_store_extension_inv)
   ultimately
   show "store_typing (s\<lparr>s.mems := (s.mems s)[j := m']\<rparr>)"
+    using store_typing.simps tab_agree_store_extension_inv[OF sh1]
+    unfolding s'_def list_all_length
+    apply (simp add: store_typing.simps)
+    apply (metis (no_types, lifting) assms(1,4) nth_list_update nth_list_update_neq store_typing.cases)
+    done
+qed
+
+lemma store_extension_tab_leq:
+  assumes "store_typing s"
+          "s.tabs s ! j = t"
+          "tab_size t \<le> tab_size t'"
+          "tab_agree s t'"
+          "tab_max t = tab_max t'"
+  shows "store_extension s (s\<lparr>s.tabs := (s.tabs s)[j := t']\<rparr>)"
+        "store_typing (s\<lparr>s.tabs := (s.tabs s)[j := t']\<rparr>)"
+proof -
+  obtain s' where s'_def:"s' = (s\<lparr>s.tabs := (s.tabs s)[j := t']\<rparr>)"
+    by blast
+  have 0:"funcs s = funcs s'"
+         "mems s = mems s'"
+         "globs s = globs s'"
+    using s'_def
+    by simp_all
+  have "tab_extension t t'"
+    using assms(3,5)
+    unfolding tab_extension_def
+    by simp
+  hence "list_all2 tab_extension (tabs s) (tabs s')"
+    using assms(2) s'_def
+    by (simp, metis eq_iff list.rel_refl list_all2_update_cong list_update_id tab_extension_def)
+  thus sh1:"store_extension s (s\<lparr>s.tabs := (s.tabs s)[j := t']\<rparr>)"
+    using store_extension.intros[OF _
+                                    _
+                                    list_all2_refl[OF mem_extension_refl]
+                                    list_all2_refl[OF global_extension_refl],
+                                 of _ _ _ _ _ _ "[]" "[]" "[]" "[]"]
+          s'_def
+    by (metis (full_types) 0 append_Nil2 unit.exhaust s.surjective)
+
+  have "list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) (s.funcs s')"
+    using assms(1) cl_typing_store_extension_inv[OF sh1] 0(1)
+    unfolding store_typing.simps list_all_length
+    by (metis s'_def)
+  moreover
+  have "list_all mem_agree (s.mems s')"
+    using 0(2) assms(1) store_typing.cases
+    by fastforce
+  ultimately
+  show "store_typing (s\<lparr>s.tabs := (s.tabs s)[j := t']\<rparr>)"
     using store_typing.simps tab_agree_store_extension_inv[OF sh1]
     unfolding s'_def list_all_length
     apply (simp add: store_typing.simps)
@@ -1899,14 +2165,13 @@ proof -
 qed
 
 lemma types_agree_imp_e_typing:
-  assumes "types_agree t v"
+  assumes "typeof v = t"
   shows "\<S>\<bullet>\<C> \<turnstile> [$C v] : ([] _> [t])"
   using assms e_typing_l_typing.intros(1)[OF b_e_typing.intros(1)]
-  unfolding types_agree_def
   by fastforce
 
 lemma list_types_agree_imp_e_typing:
-  assumes "list_all2 types_agree ts vs"
+  assumes "list_all2 (\<lambda>t v. typeof v = t) ts vs"
   shows "\<S>\<bullet>\<C> \<turnstile> $C* vs : ([] _> ts)"
   using assms
 proof (induction rule: list_all2_induct)
@@ -1926,7 +2191,7 @@ qed
 
 lemma b_e_typing_imp_list_types_agree:
   assumes "\<C> \<turnstile> (map (\<lambda>v. C v) vs) : (ts' _> ts'@ts)"
-  shows "list_all2 types_agree ts vs"
+  shows "list_all2 (\<lambda>t v. typeof v = t) ts vs"
   using assms
 proof (induction "(map (\<lambda>v. C v) vs)" "(ts' _> ts'@ts)" arbitrary: ts ts' vs rule: b_e_typing.induct)
   case (composition \<C> es t1s t2s e)
@@ -1950,11 +2215,11 @@ proof (induction "(map (\<lambda>v. C v) vs)" "(ts' _> ts'@ts)" arbitrary: ts ts
   show ?case
     using composition(2,4,5) es_e_def
     by (auto simp add: list_all2_appendI)
-qed (auto simp add: types_agree_def)
+qed auto
 
 lemma e_typing_imp_list_types_agree:
   assumes "\<S>\<bullet>\<C> \<turnstile> ($C* vs) : (ts' _> ts'@ts)"
-  shows "list_all2 types_agree ts vs"
+  shows "list_all2 (\<lambda>t v. typeof v = t) ts vs"
 proof -
   have "($C* vs) = $* (map (\<lambda>v. C v) vs)"
     by simp
