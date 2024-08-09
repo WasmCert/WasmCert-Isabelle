@@ -1,4 +1,4 @@
-section {* Augmented Type Syntax for Concrete Checker *}
+section \<open>Augmented Type Syntax for Concrete Checker\<close>
 
 theory Wasm_Checker_Types imports Wasm "HOL-Library.Sublist" begin
 

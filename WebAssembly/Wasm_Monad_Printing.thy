@@ -1,4 +1,4 @@
-theory Wasm_Monad_Printing imports OCaml_Printing Wasm_Instantiation_Monad Wasm_Checker_Printing Wasm_Interpreter_Monad_Printing Wasm_Type_Printing "../libs/Code_Target_Byte_Array" "HOL-Library.Code_Target_Nat" "Native_Word.Code_Target_Bits_Int" begin
+theory Wasm_Monad_Printing imports OCaml_Printing Wasm_Instantiation_Monad Wasm_Checker_Printing Wasm_Interpreter_Monad_Printing Wasm_Type_Printing "../libs/Code_Target_Byte_Array" "HOL-Library.Code_Target_Nat" "Native_Word.Code_Target_Integer_Bit" begin
 
 (* avoid name-mangling *)
 code_identifier constant Neg \<rightharpoonup> (OCaml) "WasmRef_Isa.Neg"

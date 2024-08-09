@@ -1,4 +1,4 @@
-section {* Executable Type Checker *}
+section \<open>Executable Type Checker\<close>
 
 theory Wasm_Checker imports Wasm_Checker_Types begin
 

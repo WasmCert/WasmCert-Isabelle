@@ -1,8 +1,8 @@
-section {* Lemmas for Soundness Proof *}
+section \<open>Lemmas for Soundness Proof\<close>
 
 theory Wasm_Properties imports Wasm_Properties_Aux begin
 
-subsection {* Preservation *}
+subsection \<open>Preservation\<close>
 
 lemma t_num_cvt: assumes "cvt t sx v = Some v'" shows "t = typeof_num v'"
   using assms
@@ -2034,7 +2034,7 @@ proof -
     done
 qed
 
-subsection {* Progress *}
+subsection \<open>Progress\<close>
 
 lemma const_list_no_progress:
   assumes "const_list es"

@@ -1,4 +1,4 @@
-section {* WebAssembly Base Definitions *}
+section \<open> WebAssembly Base Definitions \<close>
 
 theory Wasm_Base_Defs
   imports

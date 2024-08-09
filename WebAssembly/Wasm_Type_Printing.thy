@@ -399,7 +399,8 @@ qed
 lemma[code]: "int_shr_u (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (uint64_shiftr x ((integer_of_uint64 y) mod 64))"
 proof -
   have 1:"\<not>(integer_of_uint64 y mod 64 < 0 \<or> 64 \<le> integer_of_uint64 y mod 64)"
-    by (meson unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
+    by
+      (meson unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
   have 2:"(Rep_uint64 (shiftr x (nat_of_integer ((integer_of_uint64 y) mod 64)))) =
             (shiftr (Rep_uint64 x) ((unat (Rep_uint64 y)) mod 64))"
     unfolding integer_of_uint64_def nat_of_integer_def shiftr_def
