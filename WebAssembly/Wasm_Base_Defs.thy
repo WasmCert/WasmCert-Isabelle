@@ -72,7 +72,7 @@ instantiation i32 :: wasm_int begin
   lift_definition nat_of_int_i32 :: "i32 \<Rightarrow> nat" is unat .
   lift_definition int_of_nat_i32 :: "nat \<Rightarrow> i32" is of_nat .
 instance
-  apply (rule Wasm_Type_Abs.class.Wasm_Type_Abs.wasm_int.of_class.intro)
+  apply (rule Wasm_Type_Abs.wasm_int.intro_of_class)
   apply (unfold int_clz_i32_def int_ctz_i32_def int_popcnt_i32_def int_add_i32_def int_sub_i32_def
   int_mul_i32_def int_div_u_i32_def int_div_s_i32_def int_rem_u_i32_def int_rem_s_i32_def
   int_and_i32_def int_or_i32_def int_xor_i32_def int_shl_i32_def int_shr_u_i32_def int_shr_s_i32_def
@@ -114,7 +114,7 @@ instantiation i64 :: wasm_int begin
   lift_definition nat_of_int_i64 :: "i64 \<Rightarrow> nat" is unat .
   lift_definition int_of_nat_i64 :: "nat \<Rightarrow> i64" is of_nat .
 instance
-  apply (rule Wasm_Type_Abs.class.Wasm_Type_Abs.wasm_int.of_class.intro)
+  apply (rule Wasm_Type_Abs.wasm_int.intro_of_class)
   apply (unfold int_clz_i64_def int_ctz_i64_def int_popcnt_i64_def int_add_i64_def int_sub_i64_def
   int_mul_i64_def int_div_u_i64_def int_div_s_i64_def int_rem_u_i64_def int_rem_s_i64_def
   int_and_i64_def int_or_i64_def int_xor_i64_def int_shl_i64_def int_shr_u_i64_def int_shr_s_i64_def
