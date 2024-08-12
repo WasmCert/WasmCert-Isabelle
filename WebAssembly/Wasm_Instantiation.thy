@@ -685,14 +685,14 @@ next
     using Cons(4)
     by (fastforce split: prod.splits)
   have "external_typing s' (Ext_glob i_g) (Te_glob (g_type y))"
-    using alloc_glob_ext_typing[OF i_gs_is(2) Cons(1)] alloc_globs_range[OF i_gs_is(3)] list_all2_lengthD[OF Cons(2)]
+    using alloc_glob_ext_typing[OF i_gs_is(2) Cons(2)] alloc_globs_range[OF i_gs_is(3)] list_all2_lengthD[OF Cons(1)]
           nth_append[of "s.globs s''"]
     unfolding external_typing.simps
     apply simp
     apply (metis length_append trans_less_add1)
     done
   thus ?case
-    using alloc_glob_ext_typing[OF i_gs_is(2) Cons(1)] Cons(3)[OF i_gs_is(3)] i_gs_is(1)
+    using alloc_glob_ext_typing[OF i_gs_is(2) Cons(2)] Cons(3)[OF i_gs_is(3)] i_gs_is(1)
     by (simp split: prod.splits)
 qed
 
@@ -706,7 +706,8 @@ proof (induction t_imps rule: list_all2_induct)
     by (simp add: map_filter_simps(2))
 next
   case (Cons x xs y ys)
-  thus ?case
+  show ?case
+    using Cons(2,1,3)
   proof (cases rule: external_typing.cases)
     case (4 i gt)
     thus ?thesis
