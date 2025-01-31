@@ -154,9 +154,11 @@ lemma[code]: "int_xor (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (xor x y)
 
 lemma[code]: "int_shl (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (uint32_shiftl x ((integer_of_uint32 y) mod 32))"
 proof -
+  have 0: "integer_of_uint32 y mod 32 \<ge> 0"
+    by (simp add: integer_of_uint32.rep_eq less_eq_integer.rep_eq)
   have 1:"\<not>(((integer_of_uint32 y) mod 32) < 0 \<or> 32 \<le> (integer_of_uint32 y) mod 32)"
-    apply (meson unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1 zero_less_numeral)
-    sorry
+    apply (meson 0 unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1 zero_less_numeral)
+    using less_eq_integer.rep_eq by fastforce
   have 2:"(Rep_uint32 (x << (nat_of_integer (integer_of_uint32 y mod 32)))) =
             ((Rep_uint32 x) << (unat (Rep_uint32 y) mod 32))" 
     unfolding integer_of_uint32_def nat_of_integer_def shiftl_def
@@ -173,9 +175,11 @@ qed
 
 lemma[code]: "int_shr_u (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (uint32_shiftr x ((integer_of_uint32 y) mod 32))"
 proof -
+  have 0: "integer_of_uint32 y mod 32 \<ge> 0"
+    by (simp add: integer_of_uint32.rep_eq less_eq_integer.rep_eq)
   have 1:"\<not>(integer_of_uint32 y mod 32 < 0 \<or> 32 \<le> integer_of_uint32 y mod 32)"
-    apply (meson unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
-    sorry
+    apply (meson 0 unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
+    using less_eq_integer.rep_eq by force
   have 2:"(Rep_uint32 (shiftr x (nat_of_integer ((integer_of_uint32 y) mod 32)))) =
             (shiftr (Rep_uint32 x) ((unat (Rep_uint32 y)) mod 32))"
     unfolding integer_of_uint32_def nat_of_integer_def shiftr_def
@@ -191,9 +195,11 @@ qed
 
 lemma[code]: "int_shr_s (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (uint32_sshiftr x ((integer_of_uint32 y) mod 32))"
 proof -
+  have 0: "integer_of_uint32 y mod 32 \<ge> 0"
+    by (simp add: integer_of_uint32.rep_eq less_eq_integer.rep_eq)
   have 1:"\<not>(integer_of_uint32 y mod 32 < 0 \<or> 32 \<le> integer_of_uint32 y mod 32)"
-    apply (meson unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
-    sorry
+    apply (meson 0 unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
+    using less_eq_integer.rep_eq by fastforce
   have 2:"(Rep_uint32 (signed_drop_bit_uint32 (nat_of_integer ((integer_of_uint32 y) mod 32)) x)) =
             (sshiftr (Rep_uint32 x) ((unat (Rep_uint32 y)) mod 32))"
     unfolding integer_of_uint32_def nat_of_integer_def
@@ -384,9 +390,11 @@ lemma[code]: "int_xor (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (xor x y)
 
 lemma[code]: "int_shl (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (uint64_shiftl x ((integer_of_uint64 y) mod 64))"
 proof -
+  have 0: "integer_of_uint64 y mod 64 \<ge> 0"
+    by (simp add: integer_of_uint32.rep_eq less_eq_integer.rep_eq)
   have 1:"\<not>(integer_of_uint64 y mod 64 < 0 \<or> 64 \<le> integer_of_uint64 y mod 64)"
-    apply (meson unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
-    sorry
+    apply (meson 0 unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
+    using less_eq_integer.rep_eq by fastforce
   have 2:"(Rep_uint64 (x << (nat_of_integer (integer_of_uint64 y mod 64)))) =
             ((Rep_uint64 x) << (unat (Rep_uint64 y) mod 64))"
     unfolding integer_of_uint64_def nat_of_integer_def shiftl_def
@@ -405,7 +413,7 @@ proof -
   have 1:"\<not>(integer_of_uint64 y mod 64 < 0 \<or> 64 \<le> integer_of_uint64 y mod 64)"
     apply
       (meson unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
-    sorry
+    using less_eq_integer.rep_eq linorder_not_less by fastforce+
   have 2:"(Rep_uint64 (shiftr x (nat_of_integer ((integer_of_uint64 y) mod 64)))) =
             (shiftr (Rep_uint64 x) ((unat (Rep_uint64 y)) mod 64))"
     unfolding integer_of_uint64_def nat_of_integer_def shiftr_def
@@ -423,7 +431,7 @@ lemma[code]: "int_shr_s (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (uint64
 proof -
   have 1:"\<not>(integer_of_uint64 y mod 64 < 0 \<or> 64 \<le> integer_of_uint64 y mod 64)"
     apply (meson unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
-    sorry
+    using less_eq_integer.rep_eq linorder_not_less by fastforce+
   have 2:"(Rep_uint64 (signed_drop_bit_uint64 (nat_of_integer ((integer_of_uint64 y) mod 64)) x)) =
             (sshiftr (Rep_uint64 x) ((unat (Rep_uint64 y)) mod 64))"
     unfolding integer_of_uint64_def nat_of_integer_def
