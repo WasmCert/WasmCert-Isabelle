@@ -8,4 +8,4 @@ The type soundness statement and proof can be found in WebAssembly/Wasm_Soundnes
 
 ## Building
 
-Currently this repository contains only free-standing Isabelle/HOL files, which have been updated for use with Isabelle2021-1. The extracted OCaml executable definitions can be found in the code subdirectory. A version of the Wasm OCaml reference interpreter, modified to work with our verified extracted definitions, can be found [here](https://github.com/conrad-watt/spec/tree/conrad-interpreter/interpreter).
+Currently this repository contains only free-standing Isabelle/HOL files, which have been updated for use with Isabelle2024. The extracted OCaml executable definitions can be found in the code subdirectory, but are currently not fully functional. For a working interpreter build, see one of the interpreter branches.
