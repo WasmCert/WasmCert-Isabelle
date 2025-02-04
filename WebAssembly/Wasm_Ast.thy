@@ -1,10 +1,11 @@
-section {* WebAssembly Core AST *}
+section \<open>WebAssembly Core AST\<close>
 
 theory Wasm_Ast
   imports
     Main
     "HOL-Library.Word"
     "Word_Lib.Reversed_Bit_Lists"
+    "Native_Word.Uint8"
 begin
 
 type_synonym \<comment> \<open>immediate\<close>
@@ -17,8 +18,15 @@ type_synonym \<comment> \<open>alignment exponent\<close>
 \<comment> \<open>primitive types\<close>
 typedef i32 = "UNIV :: (32 word) set" ..
 typedef i64 = "UNIV :: (64 word) set" ..
-typedecl f32
+
+typedef f32 = "UNIV :: (32 word) set" ..
+typedef f64 = "UNIV :: (64 word) set" ..
+typedef v128 = "UNIV :: (128 word) set" ..
+
+(*typedecl f32
 typedecl f64
+typedecl v128
+*)
 
 setup_lifting type_definition_i32
 declare Quotient_i32[transfer_rule]
@@ -26,20 +34,14 @@ setup_lifting type_definition_i64
 declare Quotient_i64[transfer_rule]
 
 \<comment> \<open>memory\<close>
-(* type_synonym byte = "8 word" *)
-typedef byte = "UNIV :: (8 word) set" ..
-setup_lifting type_definition_byte
-declare Quotient_byte[transfer_rule]
+type_synonym byte = uint8
 
-(* For some reason this lemma does get automatically generated *)
-lemmas[code] = Abs_byte_inverse[simplified]
+definition "msb_byte = (msb::byte \<Rightarrow> bool)"
+definition "zero_byte = (0::byte)"
+definition "negone_byte = (-1::byte)"
 
-lift_definition msb_byte :: "byte \<Rightarrow> bool" is msb .
-lift_definition zero_byte :: "byte" is 0 .
-lift_definition negone_byte :: "byte" is "max_word" .
-
-lift_definition nat_of_byte :: "byte \<Rightarrow> nat" is "unat" .
-lift_definition byte_of_nat :: "nat \<Rightarrow> byte" is "of_nat" .
+definition "nat_of_byte = nat_of_uint8"
+definition "byte_of_nat = uint8_of_nat"
 
 type_synonym bytes = "byte list"
 
@@ -125,11 +127,21 @@ lemma read_bytes_map:
 typedecl host
 typedecl host_state
 
-datatype \<comment> \<open>value types\<close>
-  t = T_i32 | T_i64 | T_f32 | T_f64
+datatype \<comment> \<open>numeric types\<close>
+  t_num = T_i32 | T_i64 | T_f32 | T_f64
 
-datatype \<comment> \<open>packed types\<close>
-  tp = Tp_i8 | Tp_i16 | Tp_i32
+(* 1.1: vector operators *)
+datatype \<comment> \<open>vector types\<close>
+  t_vec = T_v128
+ 
+datatype \<comment> \<open>value types\<close>
+  t = T_num t_num | T_vec t_vec
+
+datatype \<comment> \<open>packed numeric types\<close>
+  tp_num = Tp_i8 | Tp_i16 | Tp_i32
+
+datatype \<comment> \<open>packed vector types\<close>
+  tp_vec = Tp_v8_8 | Tp_v16_4 | Tp_v32_2
 
 datatype \<comment> \<open>mutability\<close>
   mut = T_immut | T_mut
@@ -143,7 +155,11 @@ free_constructors case_tg_ext for tg_ext
   by blast+
 
 datatype \<comment> \<open>function types\<close>
-  tf = Tf "t list" "t list" ("_ '_> _" 60)
+  tf = Tf (dom: "t list") (ran: "t list") ("_ '_> _" 60)
+hide_const (open) tf.dom tf.ran
+  
+datatype \<comment> \<open>block types\<close>
+  tb = Tbf i | Tbv "t option"
 
 (* TYPING *)
 record t_context =
@@ -156,8 +172,25 @@ record t_context =
   label :: "(t list) list"
   return :: "(t list) option"
 
+datatype \<comment> \<open>numeric values\<close>
+  v_num = ConstInt32 i32
+        | ConstInt64 i64
+        | ConstFloat32 f32
+        | ConstFloat64 f64
+
+datatype \<comment> \<open>vector values\<close>
+  v_vec = ConstVec128 v128
+
+datatype \<comment> \<open>values\<close>
+  v = V_num v_num | V_vec v_vec
+
 datatype
   sx = S | U
+
+datatype
+  sat = Sat | Nonsat
+
+(* numeric ops *)
 
 datatype
   unop_i = Clz | Ctz | Popcnt
@@ -167,6 +200,8 @@ datatype
 
 datatype
   unop = Unop_i unop_i | Unop_f unop_f
+           (* 1.1: sign-extension operators *)
+         | Extend_s tp_num
 
 datatype
   binop_i = Add | Sub | Mul | Div sx | Rem sx | And | Or | Xor | Shl | Shr sx | Rotl | Rotr
@@ -189,26 +224,142 @@ datatype
 datatype
   relop = Relop_i relop_i | Relop_f relop_f
 
-  
 datatype
   cvtop = Convert | Reinterpret
 
-datatype \<comment> \<open>values\<close>
-  v =
-    ConstInt32 i32
-    | ConstInt64 i64
-    | ConstFloat32 f32
-    | ConstFloat64 f64
+(* 1.1: vector ops *)
 
+datatype shape_vec_i = I8_16 | I16_8 | I32_4 | I64_2
+
+datatype shape_vec_f = F32_4 | F64_2
+
+datatype shape_vec = Svi shape_vec_i | Svf shape_vec_f
+
+datatype
+  loadop_vec =
+    Load_128
+  | Load_packed_vec tp_vec sx
+  | Load_32_zero
+  | Load_64_zero
+  | Load_splat shape_vec_i
+
+datatype
+  storeop_vec =
+    Store_128
+  | Store_lane shape_vec_i i
+
+  
+consts unop_vec_carrier :: "nat set"  
+specification (unop_vec_carrier) 
+  unop_vec_finite[simp]: "finite unop_vec_carrier" 
+  unop_vec_ne: "unop_vec_carrier \<noteq> {}" 
+  by blast  
+
+typedef unop_vec = "unop_vec_carrier" using unop_vec_ne by blast
+
+lemma range_unop_vec[simp]: "range Rep_unop_vec = unop_vec_carrier"
+  apply (auto)
+  apply (simp add: Rep_unop_vec)
+  by (metis Rep_unop_vec_cases rangeI)
+
+instance unop_vec :: finite
+  apply standard
+  apply (rule finite_imageD[where f=Rep_unop_vec])
+  apply (auto)
+  by (meson Rep_unop_vec_inject inj_onI)
+
+
+
+consts binop_vec_carrier :: "nat set"  
+specification (binop_vec_carrier) 
+  binop_vec_finite[simp]: "finite binop_vec_carrier" 
+  binop_vec_ne: "binop_vec_carrier \<noteq> {}" 
+  by blast  
+
+typedef binop_vec = "binop_vec_carrier" using binop_vec_ne by blast
+
+lemma range_binop_vec[simp]: "range Rep_binop_vec = binop_vec_carrier"
+  apply (auto)
+  apply (simp add: Rep_binop_vec)
+  by (metis Rep_binop_vec_cases rangeI)
+
+instance binop_vec :: finite
+  apply standard
+  apply (rule finite_imageD[where f=Rep_binop_vec])
+  apply (auto)
+  by (meson Rep_binop_vec_inject inj_onI)
+  
+  
+consts ternop_vec_carrier :: "nat set"  
+specification (ternop_vec_carrier) 
+  ternop_vec_finite[simp]: "finite ternop_vec_carrier" 
+  ternop_vec_ne: "ternop_vec_carrier \<noteq> {}" 
+  by blast  
+
+typedef ternop_vec = "ternop_vec_carrier" using ternop_vec_ne by blast
+
+lemma range_ternop_vec[simp]: "range Rep_ternop_vec = ternop_vec_carrier"
+  apply (auto)
+  apply (simp add: Rep_ternop_vec)
+  by (metis Rep_ternop_vec_cases rangeI)
+
+instance ternop_vec :: finite
+  apply standard
+  apply (rule finite_imageD[where f=Rep_ternop_vec])
+  apply (auto)
+  by (meson Rep_ternop_vec_inject inj_onI)
+  
+
+  
+consts testop_vec_carrier :: "nat set"  
+specification (testop_vec_carrier) 
+  testop_vec_finite[simp]: "finite testop_vec_carrier" 
+  testop_vec_ne: "testop_vec_carrier \<noteq> {}" 
+  by blast  
+
+typedef testop_vec = "testop_vec_carrier" using testop_vec_ne by blast
+
+lemma range_testop_vec[simp]: "range Rep_testop_vec = testop_vec_carrier"
+  apply (auto)
+  apply (simp add: Rep_testop_vec)
+  by (metis Rep_testop_vec_cases rangeI)
+
+instance testop_vec :: finite
+  apply standard
+  apply (rule finite_imageD[where f=Rep_testop_vec])
+  apply (auto)
+  by (meson Rep_testop_vec_inject inj_onI)
+
+  
+consts shiftop_vec_carrier :: "nat set"  
+specification (shiftop_vec_carrier) 
+  shiftop_vec_finite[simp]: "finite shiftop_vec_carrier" 
+  shiftop_vec_ne: "shiftop_vec_carrier \<noteq> {}" 
+  by blast  
+
+typedef shiftop_vec = "shiftop_vec_carrier" using shiftop_vec_ne by blast
+
+lemma range_shiftop_vec[simp]: "range Rep_shiftop_vec = shiftop_vec_carrier"
+  apply (auto)
+  apply (simp add: Rep_shiftop_vec)
+  by (metis Rep_shiftop_vec_cases rangeI)
+
+instance shiftop_vec :: finite
+  apply standard
+  apply (rule finite_imageD[where f=Rep_shiftop_vec])
+  apply (auto)
+  by (meson Rep_shiftop_vec_inject inj_onI)
+  
+      
 datatype \<comment> \<open>basic instructions\<close>
   b_e =
     Unreachable
     | Nop
     | Drop
     | Select
-    | Block tf "b_e list"
-    | Loop tf "b_e list"
-    | If tf "b_e list" "b_e list"
+    | Block tb "b_e list"
+    | Loop tb "b_e list"
+    | If tb "b_e list" "b_e list"
     | Br i
     | Br_if i
     | Br_table "i list" i
@@ -220,16 +371,30 @@ datatype \<comment> \<open>basic instructions\<close>
     | Tee_local i
     | Get_global i
     | Set_global i
-    | Load t "(tp \<times> sx) option" a off
-    | Store t "tp option" a off
+    | Load t_num "(tp_num \<times> sx) option" a off
+    | Store t_num "tp_num option" a off
+    | Load_vec loadop_vec a off
+    | Load_lane_vec shape_vec_i i a off
+    | Store_vec storeop_vec a off
     | Current_memory
     | Grow_memory
     | EConst v ("C _" 60)
-    | Unop t unop
-    | Binop t binop
-    | Testop t testop
-    | Relop t relop
-    | Cvtop t cvtop t "sx option"
+    | Unop t_num unop
+    | Binop t_num binop
+    | Testop t_num testop
+    | Relop t_num relop
+    | Cvtop t_num cvtop t_num "(sat \<times> sx) option"
+    | Unop_vec unop_vec
+    | Binop_vec binop_vec
+    | Ternop_vec ternop_vec
+    | Test_vec testop_vec
+    | Shift_vec shiftop_vec
+    | Splat_vec shape_vec
+    | Extract_vec shape_vec sx i
+    | Replace_vec shape_vec i
+
+abbreviation "C\<^sub>n x \<equiv> C (V_num x)"
+abbreviation "C\<^sub>v x \<equiv> C (V_vec x)"
 
 record inst = \<comment> \<open>instances\<close>
   types :: "tf list"
@@ -267,6 +432,9 @@ datatype e = \<comment> \<open>administrative instruction\<close>
   | Invoke i
   | Label nat "e list" "e list"
   | Frame nat f "e list"
+  (* only used by instantiation *)
+  | Init_mem nat "byte list"
+  | Init_tab nat "i list"
 
 datatype Lholed =
     \<comment> \<open>L0 = v* [<hole>] e*\<close>

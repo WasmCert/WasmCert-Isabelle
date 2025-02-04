@@ -1,4 +1,6 @@
-theory Wasm_Instantiation imports Wasm_Module_Checker Wasm_Interpreter_Properties begin
+theory Wasm_Instantiation 
+imports Wasm_Module_Checker Wasm_Interpreter_Properties "../libs/Misc_Generic_Lemmas"
+begin
 
 fun alloc_Xs :: "(s \<Rightarrow> 'a \<Rightarrow> (s \<times> i)) \<Rightarrow> s \<Rightarrow> 'a list \<Rightarrow> (s \<times> i list)" where
   "alloc_Xs f s [] = (s,[])"
@@ -358,40 +360,57 @@ lemma alloc_module_equiv_interp_alloc_module:
   using alloc_module_imp_interp_alloc_module interp_alloc_module_imp_alloc_module
   by blast
 
-definition init_tab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> module_elem \<Rightarrow> s" where
-  "init_tab s inst e_ind e = (let t_ind = ((inst.tabs inst)!(e_tab e)) in
-                               let (tab_e,max) = (tabs s)!t_ind in
-                               let e_pay = map (\<lambda>i. Some ((inst.funcs inst)!i)) (e_init e) in
-                               let tab'_e = ((take e_ind tab_e) @ e_pay @ (drop (e_ind + length e_pay) tab_e)) in
-                               s\<lparr>tabs := (tabs s)[t_ind := (tab'_e,max)]\<rparr>)"
-
-definition init_tabs :: "s \<Rightarrow> inst \<Rightarrow> nat list \<Rightarrow> module_elem list \<Rightarrow> s" where
-  "init_tabs s inst e_inds es = foldl (\<lambda>s' (e_ind,e). init_tab s' inst e_ind e) s (zip e_inds es)"
-
-definition init_mem :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> module_data \<Rightarrow> s" where
-  "init_mem s inst d_ind d = (let m_ind = ((inst.mems inst)!(d_data d)) in
-                               let mem = (mems s)!m_ind in
-                               let mem' = write_bytes mem d_ind (d_init d) in
-                               s\<lparr>mems := (mems s)[m_ind := mem']\<rparr>)"
-
-definition init_mems :: "s \<Rightarrow> inst \<Rightarrow> nat list \<Rightarrow> module_data list \<Rightarrow> s" where
-  "init_mems s inst d_inds ds = foldl (\<lambda>s' (d_ind,d). init_mem s' inst d_ind d) s (zip d_inds ds)"
-
-inductive instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> ((s \<times> inst \<times> (module_export list)) \<times> (nat option)) \<Rightarrow> bool" where
+inductive instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> ((s \<times> inst \<times> (module_export list)) \<times> (e list)) \<Rightarrow> bool" where
   "\<lbrakk>module_typing m t_imps t_exps;
     list_all2 (external_typing s) v_imps t_imps;
     alloc_module s m v_imps g_inits (s', inst, v_exps);
     f = \<lparr> f_locs = [], f_inst = inst \<rparr>;
     list_all2 (\<lambda>g v. reduce_trans (s',f,$*(g_init g)) (s',f,[$C v])) (m_globs m) g_inits;
-    list_all2 (\<lambda>e c. reduce_trans (s',f,$*(e_off e)) (s',f,[$C ConstInt32 c])) (m_elem m) e_offs;
-    list_all2 (\<lambda>d c. reduce_trans (s',f,$*(d_off d)) (s',f,[$C ConstInt32 c])) (m_data m) d_offs;
-    list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m);
+    list_all2 (\<lambda>e c. reduce_trans (s',f,$*(e_off e)) (s',f,[$C\<^sub>n (ConstInt32 c)])) (m_elem m) e_offs;
+    list_all2 (\<lambda>d c. reduce_trans (s',f,$*(d_off d)) (s',f,[$C\<^sub>n (ConstInt32 c)])) (m_data m) d_offs;
+    list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> tab_size ((tabs s')!((inst.tabs inst)!(e_tab e)))) e_offs (m_elem m);
     list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs (m_data m);
-    map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) (m_start m) = start;
-    init_tabs s' inst (map nat_of_int e_offs) (m_elem m) = s'';
-    init_mems s'' inst (map nat_of_int d_offs) (m_data m) = s_end
-    \<rbrakk> \<Longrightarrow> instantiate s m v_imps ((s_end, inst, v_exps), start)"
+    (case (m_start m) of None \<Rightarrow> [] | Some i_s \<Rightarrow> [Invoke ((inst.funcs inst)!i_s)]) = start;
+    List.map2 (\<lambda>n e. Init_tab n (map (\<lambda>i. (inst.funcs inst)!i) (e_init e))) (map nat_of_int e_offs) (m_elem m) = e_init_tabs;
+    List.map2 (\<lambda>n d. Init_mem n (d_init d)) (map nat_of_int d_offs) (m_data m) = e_init_mems
+    \<rbrakk> \<Longrightarrow> instantiate s m v_imps ((s', inst, v_exps), e_init_tabs@e_init_mems@start)"
 
+(* TODO: Move these to better places! *)    
+    
+abbreviation "is_first_fun_idx exps i \<equiv> 
+  \<exists>exp. is_first_elem_with_prop (is_Ext_func o E_desc) exps exp
+    \<and> i = v_ext.the_idx (E_desc exp)
+"  
+
+abbreviation "type_of_fun_idx s i \<equiv> cl_type (s.funcs s ! i)" (* TODO:  No guarantee that index is in bounds *)
+
+definition "make_params s i vs_opt \<equiv> case vs_opt of
+  Some vs \<Rightarrow> rev vs
+| None \<Rightarrow> map bitzero (tf.dom (type_of_fun_idx s i))
+"
+
+
+definition "instantiate_config s inst es \<equiv> (s, \<lparr>f_locs = [], f_inst = inst\<rparr>, es)"
+
+definition "run_fuzz_abs s m v_imps vs_opt  s' vs \<equiv> \<exists>s\<^sub>1 s\<^sub>2 inst exps init_es i. 
+    instantiate s m v_imps ((s\<^sub>1,inst,exps),init_es)
+  \<and> computes (instantiate_config s\<^sub>1 inst init_es) s\<^sub>2 []
+  \<and> is_first_fun_idx exps i  
+  \<and> computes (invoke_config s\<^sub>2 (make_params s\<^sub>2 i vs_opt) i) s' vs"  
+    
+(*
+TODO: instantiate can trap, too! Missing abstract predicate for trapping instantiate!
+definition "run_fuzz_abs_traps s m v_imps vs_opt s' \<equiv> \<exists>s\<^sub>1 s\<^sub>2 inst exps init_es i. 
+    instantiate s m v_imps ((s\<^sub>1,inst,exps),init_es)
+  \<and> (
+        traps (instantiate_config s\<^sub>1 inst init_es) s\<^sub>2
+    \<or>
+        computes (instantiate_config s\<^sub>1 inst init_es) s\<^sub>2 []
+      \<and> is_first_fun_idx exps i  
+      \<and> traps (invoke_config s\<^sub>2 (make_params s\<^sub>2 i vs_opt) i) s
+    )"
+*)    
+    
 definition interp_get_v :: "s \<Rightarrow> inst \<Rightarrow> b_e list \<Rightarrow> v" where
   "interp_get_v s inst b_es = 
      (case run_v 2 0 (s,\<lparr> f_locs = [], f_inst = inst \<rparr>,b_es) of
@@ -400,10 +419,15 @@ definition interp_get_v :: "s \<Rightarrow> inst \<Rightarrow> b_e list \<Righta
 definition interp_get_i32 :: "s \<Rightarrow> inst \<Rightarrow> b_e list \<Rightarrow> i32" where
   "interp_get_i32 s inst b_es = 
      (case interp_get_v s inst b_es of
-        ConstInt32 c \<Rightarrow> c
+        V_num (ConstInt32 c) \<Rightarrow> c
       | _ \<Rightarrow> 0)"
 
-fun interp_instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> ((s \<times> inst \<times> (module_export list)) \<times> (nat option)) option" where
+datatype res_inst =
+    RI_crash res_error
+  | RI_trap String.literal
+  | RI_res inst "module_export list" "e list"
+
+fun interp_instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (s \<times> res_inst)" where
   "interp_instantiate s m v_imps =
      (case (module_type_checker m) of
         Some (t_imps, t_exps) \<Rightarrow>
@@ -415,13 +439,13 @@ fun interp_instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarr
             let d_offs = map (\<lambda>d. interp_get_i32 s' inst (d_off d)) (m_data m) in
             if (list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m) \<and>
                 list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs (m_data m)) then
-              let start = map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) (m_start m) in
-              let s'' = init_tabs s' inst (map nat_of_int e_offs) (m_elem m) in
-              let s_end = init_mems s'' inst (map nat_of_int d_offs) (m_data m) in
-              Some ((s_end, inst, v_exps), start)
-            else None
-          else None
-      | _ \<Rightarrow> None)"
+            let start = (case (m_start m) of None \<Rightarrow> [] | Some i_s \<Rightarrow> [Invoke ((inst.funcs inst)!i_s)]) in
+            let e_init_tabs = List.map2 (\<lambda>n e. Init_tab n (map (\<lambda>i. (inst.funcs inst)!i) (e_init e))) (map nat_of_int e_offs) (m_elem m) in
+            let e_init_mems = List.map2 (\<lambda>n d. Init_mem n (d_init d)) (map nat_of_int d_offs) (m_data m) in
+              (s', RI_res inst v_exps (e_init_tabs@e_init_mems@start))
+            else (s', RI_trap (STR ''segment out of bounds''))
+          else (s, RI_trap (STR ''invalid import''))
+      | _ \<Rightarrow> (s, RI_trap (STR ''invalid module'')))"
 
 lemma const_expr_is:
   assumes "const_expr \<C> b_e"
@@ -661,14 +685,14 @@ next
     using Cons(4)
     by (fastforce split: prod.splits)
   have "external_typing s' (Ext_glob i_g) (Te_glob (g_type y))"
-    using alloc_glob_ext_typing[OF i_gs_is(2) Cons(1)] alloc_globs_range[OF i_gs_is(3)] list_all2_lengthD[OF Cons(2)]
+    using alloc_glob_ext_typing[OF i_gs_is(2) Cons(2)] alloc_globs_range[OF i_gs_is(3)] list_all2_lengthD[OF Cons(1)]
           nth_append[of "s.globs s''"]
     unfolding external_typing.simps
     apply simp
     apply (metis length_append trans_less_add1)
     done
   thus ?case
-    using alloc_glob_ext_typing[OF i_gs_is(2) Cons(1)] Cons(3)[OF i_gs_is(3)] i_gs_is(1)
+    using alloc_glob_ext_typing[OF i_gs_is(2) Cons(2)] Cons(3)[OF i_gs_is(3)] i_gs_is(1)
     by (simp split: prod.splits)
 qed
 
@@ -682,7 +706,8 @@ proof (induction t_imps rule: list_all2_induct)
     by (simp add: map_filter_simps(2))
 next
   case (Cons x xs y ys)
-  thus ?case
+  show ?case
+    using Cons(2,1,3)
   proof (cases rule: external_typing.cases)
     case (4 i gt)
     thus ?thesis
@@ -771,10 +796,10 @@ proof -
 qed
 
 lemma interp_instantiate_imp_instantiate:
-  assumes "(interp_instantiate s m v_imps = Some ((s_end, inst, v_exps), start))"
-  shows "(instantiate s m v_imps ((s_end, inst, v_exps), start))"
+  assumes "(interp_instantiate s m v_imps = (s', RI_res inst v_exps init_es))"
+  shows "(instantiate s m v_imps ((s', inst, v_exps), init_es))"
 proof -
-  obtain t_imps t_exps g_inits s' e_offs d_offs s'' inst' where s_end_is:
+  obtain t_imps t_exps g_inits e_offs d_offs inst' start e_init_tabs e_init_mems where s_end_is:
     "module_type_checker m = Some (t_imps, t_exps)"
     "(list_all2 (external_typing s) v_imps t_imps)"
     "g_inits = map (\<lambda>g. interp_get_v s inst' (g_init g)) (m_globs m)"
@@ -783,10 +808,11 @@ proof -
     "d_offs = map (\<lambda>d. interp_get_i32 s' inst (d_off d)) (m_data m)"
     "list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m)"
     "list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs (m_data m)"
-    "start = map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) (m_start m)"
-    "s'' = init_tabs s' inst (map nat_of_int e_offs) (m_elem m)"
-    "s_end = init_mems s'' inst (map nat_of_int d_offs) (m_data m)"
+    "start = (case (m_start m) of None \<Rightarrow> [] | Some i_s \<Rightarrow> [Invoke ((inst.funcs inst)!i_s)])"
+    "e_init_tabs = List.map2 (\<lambda>n e. Init_tab n (map (\<lambda>i. (inst.funcs inst)!i) (e_init e))) (map nat_of_int e_offs) (m_elem m)"
+    "e_init_mems = List.map2 (\<lambda>n d. Init_mem n (d_init d)) (map nat_of_int d_offs) (m_data m)"
     "inst' = \<lparr>types=[],funcs=[],tabs=[],mems=[],globs=ext_globs v_imps\<rparr>"
+    "init_es = e_init_tabs@e_init_mems@start"
     using assms
     by (fastforce simp add: Let_def split: if_splits option.splits prod.splits)
 
@@ -918,25 +944,28 @@ proof -
       by fastforce
   qed
 
-  have 4:"list_all2 (\<lambda>e c. reduce_trans (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,$*(e_off e)) (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,[$C ConstInt32 c])) (m_elem m) e_offs"
+  have 4:"list_all2 (\<lambda>e c. reduce_trans (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,$*(e_off e)) (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,[$C\<^sub>n (ConstInt32 c)])) (m_elem m) e_offs"
   proof -
     { fix i
       assume local_assms:"length (m_elem m) = length e_offs" "i<length (m_elem m)"
       hence l1:"const_exprs \<C> (e_off (m_elem m ! i))"
         by (metis m_is(5,16) list_all_length m.select_convs(6) module_elem.select_convs(2) module_elem_typing.cases)
-      have l2:"\<C> \<turnstile> (e_off (m_elem m ! i)) : ([] _> [T_i32])"
+      have l2:"\<C> \<turnstile> (e_off (m_elem m ! i)) : ([] _> [T_num T_i32])"
         using local_assms
         by (metis m_is(5,16) list_all_length m.select_convs(6) module_elem.select_convs(2) module_elem_typing.cases)
-      obtain c_r where "run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, e_off (m_elem m ! i)) =  (s', RValue [ConstInt32 c_r])"
-        using const_exprs_run_v[OF l1 l2 _ 11, of inst "[]"] typeof_i32
-        by auto
-      hence run_v_is:"run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, e_off (m_elem m ! i)) = (s', RValue [ConstInt32 (e_offs ! i)])"
+      obtain c_r where "run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, e_off (m_elem m ! i)) =  (s', RValue [V_num (ConstInt32 c_r)])"
+        using const_exprs_run_v[OF l1 l2 _ 11, of inst "[]"] typeof_num_i32
+        unfolding typeof_def
+        apply (simp split: v.splits)
+        apply (metis v.exhaust)
+        done
+      hence run_v_is:"run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, e_off (m_elem m ! i)) = (s', RValue [V_num (ConstInt32 (e_offs ! i))])"
         using s_end_is(5) local_assms
         by (simp add: interp_get_i32_def interp_get_v_def split: v.splits)
-      obtain f_temp where "reduce_trans (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, $* e_off (m_elem m ! i)) (s', f_temp, [$C ConstInt32 (e_offs ! i)])"
+      obtain f_temp where "reduce_trans (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, $* e_off (m_elem m ! i)) (s', f_temp, [$C\<^sub>n (ConstInt32 (e_offs ! i))])"
         using run_v_sound[OF run_v_is]
         by auto
-      hence "reduce_trans (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, $* e_off (m_elem m ! i)) (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, [$C ConstInt32 (e_offs ! i)])"
+      hence "reduce_trans (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, $* e_off (m_elem m ! i)) (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, [$C\<^sub>n (ConstInt32 (e_offs ! i))])"
         using reduce_trans_length_locals reduce_trans_inst_is
         by (metis (full_types) f.select_convs(1) f.surjective length_greater_0_conv old.unit.exhaust)
     }
@@ -945,25 +974,28 @@ proof -
       unfolding list_all2_conv_all_nth
       by fastforce
   qed
-  have 5:"list_all2 (\<lambda>d c. reduce_trans (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,$*(d_off d)) (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,[$C ConstInt32 c])) (m_data m) d_offs"
+  have 5:"list_all2 (\<lambda>d c. reduce_trans (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,$*(d_off d)) (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,[$C\<^sub>n (ConstInt32 c)])) (m_data m) d_offs"
   proof -
     { fix i
       assume local_assms:"length (m_data m) = length d_offs" "i<length (m_data m)"
       hence l1:"const_exprs \<C> (d_off (m_data m ! i))"
         by (metis list_all_length m.select_convs(7) m_is(6,16) module_data.select_convs(2) module_data_typing.simps)
-      have l2:"\<C> \<turnstile> (d_off (m_data m ! i)) : ([] _> [T_i32])"
+      have l2:"\<C> \<turnstile> (d_off (m_data m ! i)) : ([] _> [T_num T_i32])"
         using local_assms
         by (metis list_all_length m.select_convs(7) m_is(6,16) module_data.select_convs(2) module_data_typing.simps)
-      obtain c_r where "run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, d_off (m_data m ! i)) =  (s', RValue [ConstInt32 c_r])"
-        using const_exprs_run_v[OF l1 l2 _ 11, of inst "[]"] typeof_i32
-        by auto
-      hence run_v_is:"run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, d_off (m_data m ! i)) = (s', RValue [ConstInt32 (d_offs ! i)])"
+      obtain c_r where "run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, d_off (m_data m ! i)) =  (s', RValue [V_num (ConstInt32 c_r)])"
+        using const_exprs_run_v[OF l1 l2 _ 11, of inst "[]"] typeof_num_i32
+        unfolding typeof_def
+        apply (simp split: v.splits)
+        apply (metis v.exhaust)
+        done
+      hence run_v_is:"run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, d_off (m_data m ! i)) = (s', RValue [V_num (ConstInt32 (d_offs ! i))])"
         using s_end_is(6) local_assms
         by (simp add: interp_get_i32_def interp_get_v_def split: v.splits)
-      obtain f_temp where "reduce_trans (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, $* d_off (m_data m ! i)) (s', f_temp, [$C ConstInt32 (d_offs ! i)])"
+      obtain f_temp where "reduce_trans (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, $* d_off (m_data m ! i)) (s', f_temp, [$C\<^sub>n (ConstInt32 (d_offs ! i))])"
         using run_v_sound[OF run_v_is]
         by auto
-      hence "reduce_trans (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, $* d_off (m_data m ! i)) (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, [$C ConstInt32 (d_offs ! i)])"
+      hence "reduce_trans (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, $* d_off (m_data m ! i)) (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, [$C\<^sub>n (ConstInt32 (d_offs ! i))])"
         using reduce_trans_length_locals reduce_trans_inst_is
         by (metis (full_types) f.select_convs(1) f.surjective length_greater_0_conv old.unit.exhaust)
     }
@@ -975,7 +1007,8 @@ proof -
    show ?thesis
      using instantiate.intros
            1 s_end_is(2) 2 3 4 5 s_end_is(7,8) s_end_is(9,10,11)[symmetric]
-      by blast
+           s_end_is(13)
+     by blast
 qed
 
 lemma map_intro_length:
@@ -986,8 +1019,8 @@ lemma map_intro_length:
   by (metis length_map nth_equalityI nth_map)
 
 lemma instantiate_imp_interp_instantiate:
-  assumes "(instantiate s m v_imps ((s_end, inst, v_exps), start))"
-  shows "(interp_instantiate s m v_imps = Some ((s_end, inst, v_exps), start))"
+  assumes "(instantiate s m v_imps ((s', inst, v_exps), init_es))"
+  shows "(interp_instantiate s m v_imps = (s', RI_res inst v_exps init_es))"
 proof -
   obtain fs ts ms gs els ds i_opt imps exps tfs where m_is:
     "m = \<lparr>m_types = tfs,
@@ -1007,19 +1040,20 @@ proof -
     using inst.cases
     by blast
 
-  obtain t_imps t_exps g_inits s' e_offs d_offs s'' f where s_end_is:
+  obtain t_imps t_exps g_inits e_offs d_offs f start e_init_tabs e_init_mems where s_end_is:
     "module_typing m t_imps t_exps"
     "list_all2 (external_typing s) v_imps t_imps"
     "alloc_module s m v_imps g_inits (s', inst, v_exps)"
     "list_all2 (\<lambda>g v. reduce_trans (s',f,$*(g_init g)) (s',f,[$C v])) gs g_inits"
-    "list_all2 (\<lambda>e c. reduce_trans (s',f,$*(e_off e)) (s',f,[$C ConstInt32 c])) els e_offs"
-    "list_all2 (\<lambda>d c. reduce_trans (s',f,$*(d_off d)) (s',f,[$C ConstInt32 c])) ds d_offs"
+    "list_all2 (\<lambda>e c. reduce_trans (s',f,$*(e_off e)) (s',f,[$C\<^sub>n (ConstInt32 c)])) els e_offs"
+    "list_all2 (\<lambda>d c. reduce_trans (s',f,$*(d_off d)) (s',f,[$C\<^sub>n (ConstInt32 c)])) ds d_offs"
     "list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs els"
     "list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs ds"
-    "map_option (\<lambda>i_s. ((inst.funcs inst)!i_s)) i_opt = start"
-    "init_tabs s' inst (map nat_of_int e_offs) els = s''"
-    "init_mems s'' inst (map nat_of_int d_offs) ds = s_end"
+    "(case (m_start m) of None \<Rightarrow> [] | Some i_s \<Rightarrow> [Invoke ((inst.funcs inst)!i_s)]) = start"
+    "List.map2 (\<lambda>n e. Init_tab n (map (\<lambda>i. (inst.funcs inst)!i) (e_init e))) (map nat_of_int e_offs) (m_elem m) = e_init_tabs"
+    "List.map2 (\<lambda>n d. Init_mem n (d_init d)) (map nat_of_int d_offs) (m_data m) = e_init_mems"
     "f = \<lparr> f_locs=[], f_inst=inst \<rparr>"
+    "init_es = e_init_tabs@e_init_mems@start"
     using assms m_is
     unfolding instantiate.simps
     by fastforce
@@ -1153,14 +1187,14 @@ proof -
     { fix i
       assume local_assms: "i < length els"
       have l2:"const_exprs \<C> (e_off (els ! i))"
-              "\<C> \<turnstile> e_off (els ! i) : ([] _> [T_i32])"
+              "\<C> \<turnstile> e_off (els ! i) : ([] _> [T_num T_i32])"
         using m_is_2(5)
         by (metis list_all_length local_assms module_elem.select_convs(2) module_elem_typing.cases)+
-      have l1:"reduce_trans (s',f,$*(e_off (els!i))) (s',f,[$C ConstInt32 (e_offs!i)])"
+      have l1:"reduce_trans (s',f,$*(e_off (els!i))) (s',f,[$C\<^sub>n (ConstInt32 (e_offs!i))])"
         using s_end_is(5) local_assms
         unfolding list_all2_conv_all_nth
         by blast
-      have "run_v 2 0 (s',f,(e_off (els!i))) = (s',RValue [ConstInt32 (e_offs!i)])"
+      have "run_v 2 0 (s',f,(e_off (els!i))) = (s',RValue [V_num (ConstInt32 (e_offs!i))])"
         using const_exprs_reduce_trans[OF l2(1,2) l1 _ 11]
         unfolding s_end_is(12)
         by fastforce
@@ -1179,14 +1213,14 @@ proof -
     { fix i
       assume local_assms: "i < length ds"
       have l2:"const_exprs \<C> (d_off (ds ! i))"
-              "\<C> \<turnstile> d_off (ds ! i) : ([] _> [T_i32])"
+              "\<C> \<turnstile> d_off (ds ! i) : ([] _> [T_num T_i32])"
         using m_is_2(6)
         by (metis list_all_length local_assms module_data.select_convs(2) module_data_typing.cases)+
-      have l1:"reduce_trans (s',f,$*(d_off (ds!i))) (s',f,[$C ConstInt32 (d_offs!i)])"
+      have l1:"reduce_trans (s',f,$*(d_off (ds!i))) (s',f,[$C\<^sub>n (ConstInt32 (d_offs!i))])"
         using s_end_is(6) local_assms
         unfolding list_all2_conv_all_nth
         by blast
-      have "run_v 2 0 (s',f,(d_off (ds!i))) = (s',RValue [ConstInt32 (d_offs!i)])"
+      have "run_v 2 0 (s',f,(d_off (ds!i))) = (s',RValue [V_num (ConstInt32 (d_offs!i))])"
         using const_exprs_reduce_trans[OF l2(1,2) l1 _ 11]
         unfolding s_end_is(12)
         by fastforce
@@ -1201,12 +1235,45 @@ proof -
   qed
   ultimately
   show ?thesis
-    using s_end_is(2,7,8,9,10,11) m_is inst'_is
+    using s_end_is(2,7,8,9,10,11,13) m_is inst'_is
     by simp
 qed
 
 theorem instantiate_equiv_interp_instantiate:
-  "(instantiate s m v_imps ((s_end, inst, v_exps), start)) = (interp_instantiate s m v_imps = Some ((s_end, inst, v_exps), start))"
+  "(instantiate s m v_imps ((s', inst, v_exps), init_es)) = (interp_instantiate s m v_imps = (s', RI_res inst v_exps init_es))"
   using instantiate_imp_interp_instantiate interp_instantiate_imp_instantiate
   by blast
+
+definition interp_instantiate_init :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (s \<times> res_inst)" where
+  "interp_instantiate_init s m v_imps = (case (interp_instantiate s m v_imps) of
+                                       (s', RI_res inst v_exps init_es) \<Rightarrow>
+                                         (case (run_instantiate (2^63) 300 (s', inst, init_es)) of
+                                           (s'', RCrash r) \<Rightarrow> (s'', RI_crash r)
+                                         | (s'', RTrap r) \<Rightarrow> (s'', RI_trap r)
+                                         | (s'', RValue []) \<Rightarrow> (s'', RI_res inst v_exps [])
+                                         | (s'', RValue (x#xs)) \<Rightarrow> (s'', RI_crash (Error_invalid (STR ''start function''))))
+                                     | x \<Rightarrow> x)"
+                                     
+                                     
+(* TODO: Naming should be run_fuzz, and run_fuzz_m for the monadic version. 
+  But name run_fuzz fixed for code-export, so not changing it now! *)
+definition run_fuzz' :: "fuel \<Rightarrow> depth \<Rightarrow> s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (v list) option \<Rightarrow> (s \<times> res)" where
+  "run_fuzz' n d s m v_imps opt_vs = (let
+   i_res = interp_instantiate_init s m v_imps in
+   case i_res of
+     (s', RI_res inst v_exps init_es) \<Rightarrow>
+     (case (List.find (\<lambda>exp. case (E_desc exp) of Ext_func i \<Rightarrow> True | _ \<Rightarrow> False) v_exps) of
+        Some exp \<Rightarrow> (case (E_desc exp) of Ext_func i \<Rightarrow> (
+                       let cl = nth (s.funcs s') i in
+                       case (cl_type cl) of
+                         (t1 _> t2) \<Rightarrow>
+                           let params = case opt_vs of Some vs \<Rightarrow> (rev vs) | None \<Rightarrow> (map bitzero t1) in
+                           run_invoke_v n d (s', params, i) ))
+      | None \<Rightarrow> (s', RCrash (Error_invariant (STR ''no import to invoke''))))
+  | (s', RI_crash res) \<Rightarrow> (s', RCrash res)
+  | (s', RI_trap msg) \<Rightarrow> (s', RTrap msg) )"
+
+definition run_fuzz_entry' :: "fuel \<Rightarrow> m \<Rightarrow> (v list) option \<Rightarrow> s \<times> res" where
+  "run_fuzz_entry' n m vs_opt = run_fuzz' n 300 empty_store m [] vs_opt"
+                                     
 end

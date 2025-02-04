@@ -1,4 +1,4 @@
-section {* Augmented Type Syntax for Concrete Checker *}
+section \<open>Augmented Type Syntax for Concrete Checker\<close>
 
 theory Wasm_Checker_Types imports Wasm "HOL-Library.Sublist" begin
 
@@ -555,13 +555,13 @@ fun select_return_top :: "[ct list] \<Rightarrow> ct \<Rightarrow> ct \<Rightarr
 
 fun type_update_select :: "checker_type \<Rightarrow> checker_type" where
   "type_update_select (Type ts) = (if (length ts \<ge> 3 \<and> (ts!(length ts-2)) = (ts!(length ts-3)))
-                                    then consume (Type ts) [TAny, TSome T_i32]
+                                    then consume (Type ts) [TAny, TSome (T_num T_i32)]
                                     else Bot)"
 | "type_update_select (TopType ts) = (case length ts of
                                         0 \<Rightarrow> TopType [TAny]
-                                      | Suc 0 \<Rightarrow> type_update (TopType ts) [TSome T_i32] (TopType [TAny])
-                                      | Suc (Suc 0) \<Rightarrow> consume (TopType ts) [TSome T_i32]
-                                      | _  \<Rightarrow> type_update (TopType ts) [TAny, TAny, TSome T_i32]
+                                      | Suc 0 \<Rightarrow> type_update (TopType ts) [TSome (T_num T_i32)] (TopType [TAny])
+                                      | Suc (Suc 0) \<Rightarrow> consume (TopType ts) [TSome (T_num T_i32)]
+                                      | _  \<Rightarrow> type_update (TopType ts) [TAny, TAny, TSome (T_num T_i32)]
                                                           (select_return_top ts (ts!(length ts-2)) (ts!(length ts-3))))"
 | "type_update_select _ = Bot"
 
@@ -833,16 +833,16 @@ lemma type_update_select_length1:
   assumes "type_update_select (TopType cts) = tm"
           "length cts = 1"
           "tm \<noteq> Bot"
-  shows "ct_list_compat cts [TSome T_i32]"
+  shows "ct_list_compat cts [TSome (T_num T_i32)]"
         "tm = TopType [TAny]"
 proof -
-  have 1:"type_update (TopType cts) [TSome T_i32] (TopType [TAny]) = tm"
+  have 1:"type_update (TopType cts) [TSome (T_num T_i32)] (TopType [TAny]) = tm"
     using assms(1,2)
     by simp
-  hence "ct_suffix cts [TSome T_i32] \<or> ct_suffix [TSome T_i32] cts"
+  hence "ct_suffix cts [TSome (T_num T_i32)] \<or> ct_suffix [TSome (T_num T_i32)] cts"
     using assms(3)
     by (metis consume.simps(2) produce.simps(7) type_update.simps)
-  thus "ct_list_compat cts [TSome T_i32]"
+  thus "ct_list_compat cts [TSome (T_num T_i32)]"
     using assms(2,3) ct_suffix_imp_ct_list_compat
     by (metis One_nat_def Suc_length_conv ct_list_compat_commute diff_Suc_1 drop_0 list.size(3))
   show "tm = TopType [TAny]"
@@ -856,24 +856,24 @@ lemma type_update_select_length2:
   assumes "type_update_select (TopType cts) = tm"
           "length cts = 2"
           "tm \<noteq> Bot"
-  shows "\<exists>t1 t2. cts = [t1, t2] \<and> ct_compat t2 (TSome T_i32) \<and> tm = TopType [t1]"
+  shows "\<exists>t1 t2. cts = [t1, t2] \<and> ct_compat t2 (TSome (T_num T_i32)) \<and> tm = TopType [t1]"
 proof -
   obtain x y where cts_def:"cts = [x,y]"
     using assms(2) List.length_Suc_conv[of cts "Suc 0"]
     by (metis length_0_conv length_Suc_conv numeral_2_eq_2)
   moreover
-  hence "consume (TopType [x,y]) [TSome T_i32] = tm"
+  hence "consume (TopType [x,y]) [TSome (T_num T_i32)] = tm"
     using assms(1,2)
     by simp
   moreover
-  hence "ct_suffix [x,y] [TSome T_i32] \<or> ct_suffix [TSome T_i32] [x,y]"
+  hence "ct_suffix [x,y] [TSome (T_num T_i32)] \<or> ct_suffix [TSome (T_num T_i32)] [x,y]"
     using assms(3)
     by (metis consume.simps(2))
-  hence "ct_suffix [TSome T_i32] ([x]@[y])"
+  hence "ct_suffix [TSome (T_num T_i32)] ([x]@[y])"
     using assms(2) ct_suffix_length
     by fastforce
   moreover
-  hence "ct_compat y (TSome T_i32)"
+  hence "ct_compat y (TSome (T_num T_i32))"
     by (metis ct_compat_commute ct_list_compat_def ct_suffix_cons2 list.rel_sel list.sel(1) list.simps(3)
               list.size(4))
   ultimately
@@ -884,7 +884,7 @@ qed
 lemma type_update_select_length3:
   assumes "type_update_select (TopType cts) = (TopType ctm)"
           "length cts \<ge> 3"
-  shows "\<exists>cts' ct1 ct2 ct3. cts = cts'@[ct1, ct2, ct3] \<and> ct_compat ct3 (TSome T_i32)"
+  shows "\<exists>cts' ct1 ct2 ct3. cts = cts'@[ct1, ct2, ct3] \<and> ct_compat ct3 (TSome (T_num T_i32))"
 proof -
   obtain cts' cts'' where cts_def:"cts = cts'@ cts''" "length cts'' = 3"
     using assms(2)
@@ -901,15 +901,15 @@ proof -
   obtain nat where "length cts = Suc (Suc (Suc nat))"
     using assms(2)
     by (simp add: cts_def)
-  hence "(type_update (TopType cts) [TAny, TAny, TSome T_i32] (select_return_top cts (cts ! (length cts - 2)) (cts ! (length cts - 3)))) = TopType ctm"
+  hence "(type_update (TopType cts) [TAny, TAny, TSome (T_num T_i32)] (select_return_top cts (cts ! (length cts - 2)) (cts ! (length cts - 3)))) = TopType ctm"
     using assms
     by simp
-  then obtain c_mid where "consume (TopType cts) [TAny, TAny, TSome T_i32] = TopType c_mid"
+  then obtain c_mid where "consume (TopType cts) [TAny, TAny, TSome (T_num T_i32)] = TopType c_mid"
     by (metis consume.simps(2) produce.simps(6) type_update.simps)
-  hence "ct_suffix [TAny, TAny, TSome T_i32] (cts'@ [ct1,ct2,ct3])"
+  hence "ct_suffix [TAny, TAny, TSome (T_num T_i32)] (cts'@ [ct1,ct2,ct3])"
     using assms(2) consume_top_geq cts_def2
     by (metis checker_type.distinct(3) ct_suffix_def length_Cons list.size(3) numeral_3_eq_3)
-  hence "ct_compat ct3 (TSome T_i32)"
+  hence "ct_compat ct3 (TSome (T_num T_i32))"
     using ct_suffix_def ct_list_compat_def
     by (simp, metis append_eq_append_conv length_Cons list_all2_Cons list_all2_lengthD)
   thus ?thesis
@@ -919,12 +919,12 @@ qed
 
 lemma type_update_select_type_length3:
   assumes "type_update_select (Type tn) = (Type tm)"
-  shows "\<exists>t ts'. tn = ts'@[t, t, T_i32]"
+  shows "\<exists>t ts'. tn = ts'@[t, t, (T_num T_i32)]"
 proof -
   have tn_cond:"(length tn \<ge> 3 \<and> (tn!(length tn-2)) = (tn!(length tn-3)))"
     using assms
     by (simp, metis checker_type.distinct(5))
-  hence tm_def:"consume (Type tn) [TAny, TSome T_i32] = Type tm"
+  hence tm_def:"consume (Type tn) [TAny, TSome (T_num T_i32)] = Type tm"
     using assms
     by simp
   obtain tn' tn'' where tn_split:"tn = tn'@tn''"
@@ -946,11 +946,11 @@ proof -
                                   not_less_eq_eq nth_Cons_0 nth_Cons_numeral
                                   nth_append numeral_2_eq_2 numeral_3_eq_3 numeral_One tn_split(2)
                                   zero_less_diff)
-  have "ct_suffix [TAny, TSome T_i32] (to_ct_list (tn' @ [t1, t2, t3]))"
+  have "ct_suffix [TAny, TSome (T_num T_i32)] (to_ct_list (tn' @ [t1, t2, t3]))"
     using tn_def tm_def
     by (simp, metis checker_type.distinct(5))
-  hence "t3 = T_i32"
-    using ct_suffix_unfold_one[of "[TAny]" "TSome T_i32" "to_ct_list (tn' @ [t1, t2])" "TSome t3"]
+  hence "t3 = (T_num T_i32)"
+    using ct_suffix_unfold_one[of "[TAny]" "TSome (T_num T_i32)" "to_ct_list (tn' @ [t1, t2])" "TSome t3"]
           ct_compat.simps(1)
     unfolding to_ct_list_def
     by simp
@@ -978,17 +978,17 @@ proof (cases xs)
 qed simp_all
 
 lemma type_update_select_conv_select_return_top:
-  assumes "ct_suffix [TSome T_i32] cts"
+  assumes "ct_suffix [TSome (T_num T_i32)] cts"
           "length cts \<ge> 3"
   shows "type_update_select (TopType cts) = (select_return_top cts (cts!(length cts-2)) (cts!(length cts-3)))"
 proof -
   obtain nat where nat_def:"length cts = Suc (Suc (Suc nat))"
     using assms(2)
     by (metis add_eq_if diff_Suc_1 le_Suc_ex numeral_3_eq_3 nat.distinct(2))
-  have "ct_suffix [TAny, TAny, TSome T_i32] cts"
+  have "ct_suffix [TAny, TAny, TSome (T_num T_i32)] cts"
     using assms ct_suffix_extend_any1
     by simp
-  then obtain cts' where "consume (TopType cts) [TAny, TAny, TSome T_i32] = TopType cts'"
+  then obtain cts' where "consume (TopType cts) [TAny, TAny, TSome (T_num T_i32)] = TopType cts'"
     by simp
   thus ?thesis
     using nat_def select_return_top_exists
@@ -1035,7 +1035,7 @@ proof (cases c1)
       using ct_suffix_cons_ct_list[of "take (length cts - 3) cts" "[TSome x2]"]
             assms(3) c_types_agree.simps(2)[of ctm cm] ct_list_compat_ts_conv_eq
       unfolding ct_list_compat_def to_ct_list_def
-      by (metis (no_types, hide_lams) list.simps(8,9))
+      by (metis (no_types) list.simps(8,9))
     thus ?thesis
       using TSome outer_TAny
       by simp
@@ -1054,7 +1054,7 @@ next
       using ct_suffix_cons_ct_list[of "take (length cts - 3) cts" "[TSome x2]"]
             assms(3) c_types_agree.simps(2)[of ctm cm] ct_list_compat_ts_conv_eq
       unfolding ct_list_compat_def to_ct_list_def
-      by (metis (no_types, hide_lams) list.simps(8,9))
+      by (metis (no_types) list.simps(8,9))
     thus ?thesis
       using TSome TAny
       by simp
@@ -1071,7 +1071,7 @@ next
       using ct_suffix_cons_ct_list[of "take (length cts - 3) cts" "[TSome x2]"]
             assms(3) c_types_agree.simps(2)[of ctm cm] ct_list_compat_ts_conv_eq
       unfolding ct_list_compat_def to_ct_list_def
-      by (metis (no_types, hide_lams) list.simps(8,9))
+      by (metis (no_types) list.simps(8,9))
     thus ?thesis
       using TSome outer_TSome x_eq
       by simp

@@ -1,4 +1,4 @@
-section {* Soundness Theorems *}
+section \<open>Soundness Theorems\<close>
 
 theory Wasm_Soundness imports Main Wasm_Properties begin
 
