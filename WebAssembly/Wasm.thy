@@ -3,7 +3,8 @@ theory Wasm imports Wasm_Base_Defs begin
 (* TYPING RELATION *)
 inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<turnstile> _ : _" 60) where
   \<comment> \<open>\<open>num ops\<close>\<close>
-  const:"\<C> \<turnstile> [C v] :([] _> [(typeof v)])"
+  const_num:"\<C> \<turnstile> [EConstNum v] :([] _> [T_num (typeof_num v)])"
+| const_vec:"\<C> \<turnstile> [EConstVec v] :([] _> [T_vec (typeof_vec v)])"
 | unop:"unop_t_num_agree op t   \<Longrightarrow> \<C> \<turnstile> [Unop t op]  : ([T_num t]   _> [T_num t])"
 | binop:"binop_t_num_agree op t \<Longrightarrow> \<C> \<turnstile> [Binop t op] : ([T_num t,T_num t] _> [T_num t])"
 | testop:"is_int_t_num t   \<Longrightarrow> \<C> \<turnstile> [Testop t _]      : ([T_num t]   _> [T_num T_i32])"

@@ -178,11 +178,16 @@ datatype \<comment> \<open>numeric values\<close>
         | ConstFloat32 f32
         | ConstFloat64 f64
 
+datatype
+  v_ref = ConstNull t
+  | ConstRef i
+  | ConstRefExtern host
+
 datatype \<comment> \<open>vector values\<close>
   v_vec = ConstVec128 v128
 
 datatype \<comment> \<open>values\<close>
-  v = V_num v_num | V_vec v_vec
+  v = V_num v_num | V_vec v_vec | V_ref v_ref
 
 datatype
   sx = S | U
@@ -378,7 +383,9 @@ datatype \<comment> \<open>basic instructions\<close>
     | Store_vec storeop_vec a off
     | Current_memory
     | Grow_memory
-    | EConst v ("C _" 60)
+    (*| EConst v ("C _" 60) *)
+    | EConstNum v_num
+    | EConstVec v_vec
     | Unop t_num unop
     | Binop t_num binop
     | Testop t_num testop
@@ -393,8 +400,9 @@ datatype \<comment> \<open>basic instructions\<close>
     | Extract_vec shape_vec sx i
     | Replace_vec shape_vec i
 
+(*
 abbreviation "C\<^sub>n x \<equiv> C (V_num x)"
-abbreviation "C\<^sub>v x \<equiv> C (V_vec x)"
+abbreviation "C\<^sub>v x \<equiv> C (V_vec x)" *)
 
 record inst = \<comment> \<open>instances\<close>
   types :: "tf list"
@@ -427,11 +435,13 @@ record f = \<comment> \<open>frame\<close>
   f_inst :: inst
 
 datatype e = \<comment> \<open>administrative instruction\<close>
-  Basic b_e ("$_" 60)
+  Basic b_e ("$_" 50)
   | Trap
   | Invoke i
   | Label nat "e list" "e list"
   | Frame nat f "e list"
+  | Ref v_ref
+
   (* only used by instantiation *)
   | Init_mem nat "byte list"
   | Init_tab nat "i list"

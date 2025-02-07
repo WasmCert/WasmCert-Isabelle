@@ -739,8 +739,19 @@ inductive store_extension :: "s \<Rightarrow> s \<Rightarrow> bool" where
 abbreviation to_e_list :: "b_e list \<Rightarrow> e list" ("$* _" 60) where
   "to_e_list b_es \<equiv> map Basic b_es"
 
+(*
+datatype \<comment> \<open>values\<close>
+  v = V_num v_num | V_vec v_vec | V_ref v_ref
+*)
+definition v_to_e :: "v \<Rightarrow> e" ("$C _" 60) where
+  "v_to_e ve \<equiv> (case ve of
+    V_num x \<Rightarrow>  $ EConstNum x |
+    V_vec v \<Rightarrow> $ EConstVec v |
+    V_ref r \<Rightarrow> Ref r
+)"
+
 abbreviation v_to_e_list :: "v list \<Rightarrow> e list" ("$C* _" 60) where
-  "v_to_e_list ves \<equiv> map (\<lambda>v. $C v) ves"
+  "v_to_e_list ves \<equiv> map (\<lambda>x. $C x) ves"
 
   (* Lfilled depth thing-to-fill fill-with result *)
 inductive Lfilled :: "nat \<Rightarrow> Lholed \<Rightarrow> e list \<Rightarrow> e list \<Rightarrow> bool" where

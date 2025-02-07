@@ -220,10 +220,17 @@ next
     by fastforce
 qed
 
-lemma b_e_type_value:
+lemma b_e_type_cnum:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = C v"
-  shows "ts' = ts @ [typeof v]"
+          "e = EConstNum v_n"
+  shows "ts' = ts @ [T_num (typeof_num v_n)]"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
+lemma b_e_type_cvec:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = EConstVec v_v"
+  shows "ts' = ts @ [T_vec (typeof_vec v_v)]"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
