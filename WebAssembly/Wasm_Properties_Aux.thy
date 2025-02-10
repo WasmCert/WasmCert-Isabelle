@@ -553,6 +553,44 @@ lemma b_e_type_comp2_relift:
         e_typing_l_typing.intros(3)[of \<S> \<C> "([$e1,$e2])" t1s t2s ts]
   by simp
 
+lemma b_e_type_value2_nn:
+  assumes "\<C> \<turnstile> [EConstNum v1, EConstNum v2] : (t1s _> t2s)"
+  shows "t2s = t1s @ [T_num (typeof_num v1), T_num (typeof_num v2)]"
+proof -
+  obtain ts' where ts'_def:"\<C> \<turnstile> [EConstNum v1] : (t1s _> ts')"
+                           "\<C> \<turnstile> [EConstNum v2] : (ts' _> t2s)"
+    using b_e_type_comp assms
+    by (metis append_butlast_last_id butlast.simps(2) last_ConsL last_ConsR list.distinct(1))
+  have "ts' = t1s @ [T_num (typeof_num v1)]"
+    unfolding typeof_def
+    using b_e_type_cnum b_e_type_cvec ts'_def(1)
+    by (auto split: v.splits)
+  thus ?thesis
+    using b_e_type_cnum ts'_def(2)
+    by fastforce
+qed
+
+lemma b_e_type_value2_vv:
+  assumes "\<C> \<turnstile> [EConstVec v1, EConstVec v2] : (t1s _> t2s)"
+  shows "t2s = t1s @ [T_vec (typeof_vec v1), T_vec (typeof_vec v2)]"
+proof -
+  obtain ts' where ts'_def:"\<C> \<turnstile> [EConstVec v1] : (t1s _> ts')"
+                           "\<C> \<turnstile> [EConstVec v2] : (ts' _> t2s)"
+    using b_e_type_comp assms
+    by (metis append_butlast_last_id butlast.simps(2) last_ConsL last_ConsR list.distinct(1))
+  have "ts' = t1s @ [T_vec (typeof_vec v1)]"
+    unfolding typeof_def
+    using b_e_type_cnum b_e_type_cvec ts'_def(1)
+    by (auto split: v.splits)
+  thus ?thesis
+    using b_e_type_cvec ts'_def(2)
+    by fastforce
+qed
+
+(*
+Do we need 4 versions of the lemma instead of 2?
+*)
+(*
 lemma b_e_type_value2:
   assumes "\<C> \<turnstile> [C v1, C v2] : (t1s _> t2s)"
   shows "t2s = t1s @ [typeof v1, typeof v2]"
@@ -562,13 +600,54 @@ proof -
     using b_e_type_comp assms
     by (metis append_butlast_last_id butlast.simps(2) last_ConsL last_ConsR list.distinct(1))
   have "ts' = t1s @ [typeof v1]"
-    using b_e_type_value ts'_def(1)
-    by fastforce
+    unfolding typeof_def
+    using b_e_type_cnum b_e_type_cvec ts'_def(1)
+    apply (auto split: v.splits simp add: C_def)
+    sledgehammer
+    
   thus ?thesis
     using b_e_type_value ts'_def(2)
     by fastforce
 qed
+*)
 
+
+lemma b_e_type_value3_nnn:
+  assumes "\<C> \<turnstile> [EConstNum v1, EConstNum v2, EConstNum v3] : (t1s _> t2s)"
+  shows "t2s = t1s @ [T_num (typeof_num v1), T_num (typeof_num v2), T_num (typeof_num v3)]"
+proof -
+  obtain ts' ts'' where ts'_def:"\<C> \<turnstile> [EConstNum v1] : (t1s _> ts')"
+                                "\<C> \<turnstile> [EConstNum v2] : (ts' _> ts'')"
+                                "\<C> \<turnstile> [EConstNum v3] : (ts'' _> t2s)"
+    using b_e_type_comp assms
+    by (metis append_butlast_last_id butlast.simps(2) last_ConsL last_ConsR list.distinct(1))
+  have "ts' = t1s @ [T_num (typeof_num v1)]"
+    using b_e_type_cnum ts'_def(1)
+    by fastforce
+  thus ?thesis
+    using b_e_type_cnum ts'_def(2,3)
+    by (metis append.left_neutral append_Cons append_assoc)
+qed
+
+
+lemma b_e_type_value3_vvv:
+  assumes "\<C> \<turnstile> [EConstVec v1, EConstVec v2, EConstVec v3] : (t1s _> t2s)"
+  shows "t2s = t1s @ [T_vec (typeof_vec v1), T_vec (typeof_vec v2), T_vec (typeof_vec v3)]"
+proof -
+  obtain ts' ts'' where ts'_def:"\<C> \<turnstile> [EConstVec v1] : (t1s _> ts')"
+                                "\<C> \<turnstile> [EConstVec v2] : (ts' _> ts'')"
+                                "\<C> \<turnstile> [EConstVec v3] : (ts'' _> t2s)"
+    using b_e_type_comp assms
+    by (metis append_butlast_last_id butlast.simps(2) last_ConsL last_ConsR list.distinct(1))
+  have "ts' = t1s @ [T_vec (typeof_vec v1)]"
+    using b_e_type_cvec ts'_def(1)
+    by fastforce
+  thus ?thesis
+    using b_e_type_cvec ts'_def(2,3)
+    by (metis append.left_neutral append_Cons append_assoc)
+qed
+
+(*
 lemma b_e_type_value3:
   assumes "\<C> \<turnstile> [C v1, C v2, C v3] : (t1s _> t2s)"
   shows "t2s = t1s @ [typeof v1, typeof v2, typeof v3]"
@@ -585,6 +664,8 @@ proof -
     using b_e_type_value ts'_def(2,3)
     by (metis append.left_neutral append_Cons append_assoc)
 qed
+*)
+
 
 (* Lifting the previous results to all expressions. *)
 lemma e_type_comp:
@@ -700,6 +781,33 @@ proof -
     by fastforce
 qed
 
+lemma b_e_type_value_list_n:
+  assumes "(\<C> \<turnstile> es@[EConstNum v] : (ts _> ts'@[t]))"
+  shows "(\<C> \<turnstile> es : (ts _> ts'))"
+        "(T_num (typeof_num v) = t)"
+proof -
+  obtain ts'' where "(\<C> \<turnstile> es : (ts _> ts''))" "(\<C> \<turnstile> [EConstNum v] : (ts'' _> ts' @ [t]))"
+    using b_e_type_comp assms
+    by blast
+  thus "(\<C> \<turnstile> es : (ts _> ts'))" "(T_num (typeof_num v) = t)"
+    using b_e_type_cnum[of \<C> "EConstNum v" "ts''" "ts' @ [t]"]
+    by auto
+qed
+
+lemma b_e_type_value_list_v:
+  assumes "(\<C> \<turnstile> es@[EConstVec v] : (ts _> ts'@[t]))"
+  shows "(\<C> \<turnstile> es : (ts _> ts'))"
+        "(T_vec (typeof_vec v) = t)"
+proof -
+  obtain ts'' where "(\<C> \<turnstile> es : (ts _> ts''))" "(\<C> \<turnstile> [EConstVec v] : (ts'' _> ts' @ [t]))"
+    using b_e_type_comp assms
+    by blast
+  thus "(\<C> \<turnstile> es : (ts _> ts'))" "(T_vec (typeof_vec v) = t)"
+    using b_e_type_cvec[of \<C> "EConstVec v" "ts''" "ts' @ [t]"]
+    by auto
+qed
+
+(*
 lemma b_e_type_value_list:
   assumes "(\<C> \<turnstile> es@[C v] : (ts _> ts'@[t]))"
   shows "(\<C> \<turnstile> es : (ts _> ts'))"
@@ -712,6 +820,7 @@ proof -
     using b_e_type_value[of \<C> "C v" "ts''" "ts' @ [t]"]
     by auto
 qed
+*)
 
 lemma e_type_label:
   assumes "\<S>\<bullet>\<C> \<turnstile> [Label n es0 es] : (ts _> ts')"
@@ -733,7 +842,7 @@ next
   then show ?case
     by simp
 next
-  case (7 \<S> \<C> t2s)
+  case (8 \<S> \<C> t2s)
   then show ?case
     by fastforce
 qed blast
@@ -762,7 +871,7 @@ next
     thus ?case
     by fastforce
 next
-  case (6 \<S> \<C>)
+  case (7 \<S> \<C>)
   thus ?case
     by fastforce
 qed blast
@@ -772,7 +881,7 @@ lemma e_type_init_mem:
   shows "(ts = ts') \<and> length (memory \<C>) \<ge> 1 \<and> (s\<bullet>\<C> \<turnstile> [Init_mem n bs] : ([] _> []))"
   using assms
   apply (induction s \<C> "[Init_mem n bs]" "(ts _> ts')" arbitrary: ts ts')
-  apply (auto simp add: e_typing_l_typing.intros(8))
+  apply (auto simp add: e_typing_l_typing.intros(9))
   done
 
 lemma e_type_init_tab:
@@ -780,7 +889,7 @@ lemma e_type_init_tab:
   shows "(ts = ts') \<and> length (table \<C>) \<ge> 1 \<and> (list_all (\<lambda>icl. icl < length (funcs s)) icls) \<and> (s\<bullet>\<C> \<turnstile> [Init_tab n icls] : ([] _> []))"
   using assms
   apply (induction s \<C> "[Init_tab n icls]" "(ts _> ts')" arbitrary: ts ts')
-  apply (auto simp add: e_typing_l_typing.intros(9))
+  apply (auto simp add: e_typing_l_typing.intros(10))
   done
 
 lemma cl_typing_native:
@@ -847,10 +956,13 @@ proof (cases e)
   then show ?thesis
     using assms
   proof (cases x1)
-    case (EConst x23)
-      thus ?thesis
-        using Basic e_typing_l_typing.intros(1,3)
-        by fastforce
+    case (EConstNum x26)
+      then show ?thesis
+        by (metis Basic v.simps(10) v_to_e_def)
+    next
+      case (EConstVec x27)
+      then show ?thesis
+        by (metis Basic v.simps(11) v_to_e_def)
   qed  (simp_all add: is_const_def)
 qed (simp_all add: is_const_def)
 

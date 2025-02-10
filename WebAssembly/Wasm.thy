@@ -113,6 +113,7 @@ inductive cl_typing :: "[s, cl, tf] \<Rightarrow> bool" where
    "\<lbrakk>inst_typing s i \<C>; tf = (t1s _> t2s); \<C>\<lparr>local := t1s @ ts, label := ([t2s] @ (label \<C>)), return := Some t2s\<rparr> \<turnstile> es : ([] _> t2s)\<rbrakk> \<Longrightarrow> cl_typing s (Func_native i tf ts es) (t1s _> t2s)"
  |  "cl_typing s (Func_host tf h) tf"
 
+
 (* lifting the b_e_typing relation to the administrative operators *)
 inductive e_typing :: "[s, t_context, e list, tf] \<Rightarrow> bool" ("_\<bullet>_ \<turnstile> _ : _" 60)
 and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> bool" ("_\<bullet>_ \<tturnstile>' _;_ : _" 60) where
@@ -123,6 +124,7 @@ and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> boo
 | "\<lbrakk>\<S>\<bullet>\<C> \<turnstile> es : (t1s _> t2s); \<S>\<bullet>\<C> \<turnstile> [e] : (t2s _> t3s)\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> es @ [e] : (t1s _> t3s)"
   (* weakening *)
 | "\<S>\<bullet>\<C> \<turnstile> es : (t1s _> t2s) \<Longrightarrow>\<S>\<bullet>\<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"
+| "\<S>\<bullet>\<C> \<turnstile> [Ref v_r] :([] _> [T_ref (typeof_ref v_r)])"
   (* trap *)
 | "\<S>\<bullet>\<C> \<turnstile> [Trap] : tf"
   (* frame *)
@@ -155,59 +157,61 @@ inductive config_typing :: "[s, f, e list, t list] \<Rightarrow> bool" ("\<turns
 
 inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rparr> \<leadsto> \<lparr>_\<rparr>" 60) where
   \<comment> \<open>\<open>unary ops\<close>\<close>
-  unop:"\<lparr>[$C\<^sub>n v, $(Unop t op)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>n (app_unop op v)]\<rparr>"
+  unop:"\<lparr>[$EConstNum v, $(Unop t op)]\<rparr> \<leadsto> \<lparr>[$EConstNum (app_unop op v)]\<rparr>"
   \<comment> \<open>\<open>binary ops\<close>\<close>
-| binop_Some:"\<lbrakk>app_binop op v1 v2 = (Some v)\<rbrakk> \<Longrightarrow> \<lparr>[$C\<^sub>n v1, $C\<^sub>n v2, $(Binop t op)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>n v]\<rparr>"
-| binop_None:"\<lbrakk>app_binop op v1 v2 = None\<rbrakk> \<Longrightarrow> \<lparr>[$C\<^sub>n v1, $C\<^sub>n v2, $(Binop t op)]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
+| binop_Some:"\<lbrakk>app_binop op v1 v2 = (Some v)\<rbrakk> \<Longrightarrow> \<lparr>[$EConstNum v1, $EConstNum v2, $(Binop t op)]\<rparr> \<leadsto> \<lparr>[$EConstNum v]\<rparr>"
+| binop_None:"\<lbrakk>app_binop op v1 v2 = None\<rbrakk> \<Longrightarrow> \<lparr>[$EConstNum v1, $EConstNum v2, $(Binop t op)]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
   \<comment> \<open>\<open>testops\<close>\<close>
-| testop:"\<lparr>[$C\<^sub>n v, $(Testop t op)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>n (app_testop op v)]\<rparr>"
+| testop:"\<lparr>[$EConstNum v, $(Testop t op)]\<rparr> \<leadsto> \<lparr>[$EConstNum (app_testop op v)]\<rparr>"
   \<comment> \<open>\<open>relops\<close>\<close>
-| relop:"\<lparr>[$C\<^sub>n v1, $C\<^sub>n v2, $(Relop t op)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>n (app_relop op v1 v2)]\<rparr>"
+| relop:"\<lparr>[$EConstNum v1, $EConstNum v2, $(Relop t op)]\<rparr> \<leadsto> \<lparr>[$EConstNum (app_relop op v1 v2)]\<rparr>"
   \<comment> \<open>\<open>convert\<close>\<close>
 | convert_Some:"\<lbrakk>(typeof_num v) = t1; cvt t2 sat_sx v = (Some v')\<rbrakk> \<Longrightarrow> \<lparr>[$(C\<^sub>n v), $(Cvtop t2 Convert t1 sat_sx)]\<rparr> \<leadsto> \<lparr>[$(C\<^sub>n v')]\<rparr>"
 | convert_None:"\<lbrakk>(typeof_num v) = t1; cvt t2 sat_sx v = None\<rbrakk> \<Longrightarrow> \<lparr>[$(C\<^sub>n v), $(Cvtop t2 Convert t1 sat_sx)]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
   \<comment> \<open>\<open>reinterpret\<close>\<close>
 | reinterpret:"(typeof_num v) = t1 \<Longrightarrow> \<lparr>[$(C\<^sub>n v), $(Cvtop t2 Reinterpret t1 None)]\<rparr> \<leadsto> \<lparr>[$(C\<^sub>n (wasm_reinterpret t2 v))]\<rparr>"
   \<comment> \<open>\<open>unary vector ops\<close>\<close>
-| unop_vec:"\<lparr>[$C\<^sub>v v, $(Unop_vec op)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>v (app_unop_vec op v)]\<rparr>"
+| unop_vec:"\<lparr>[$EConstVec v, $(Unop_vec op)]\<rparr> \<leadsto> \<lparr>[$EConstVec (app_unop_vec op v)]\<rparr>"
   \<comment> \<open>\<open>binary vector ops\<close>\<close>
-| binop_vec_Some:"\<lbrakk>app_binop_vec op v1 v2 = Some v\<rbrakk> \<Longrightarrow> \<lparr>[$C\<^sub>v v1, $C\<^sub>v v2, $(Binop_vec op)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>v v]\<rparr>"
-| binop_vec_None:"\<lbrakk>app_binop_vec op v1 v2 = None\<rbrakk> \<Longrightarrow> \<lparr>[$C\<^sub>v v1, $C\<^sub>v v2, $(Binop_vec op)]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
+| binop_vec_Some:"\<lbrakk>app_binop_vec op v1 v2 = Some v\<rbrakk> \<Longrightarrow> \<lparr>[$EConstVec v1, $EConstVec v2, $(Binop_vec op)]\<rparr> \<leadsto> \<lparr>[$EConstVec v]\<rparr>"
+| binop_vec_None:"\<lbrakk>app_binop_vec op v1 v2 = None\<rbrakk> \<Longrightarrow> \<lparr>[$EConstVec v1, $EConstVec v2, $(Binop_vec op)]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
   \<comment> \<open>\<open>ternary vector ops\<close>\<close>
-| ternop_vec:"\<lparr>[$C\<^sub>v v1, $C\<^sub>v v2, $C\<^sub>v v3, $(Ternop_vec op)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>v (app_ternop_vec op v1 v2 v3)]\<rparr>"
+| ternop_vec:"\<lparr>[$EConstVec v1, $EConstVec v2, $EConstVec v3, $(Ternop_vec op)]\<rparr> \<leadsto> \<lparr>[$EConstVec (app_ternop_vec op v1 v2 v3)]\<rparr>"
   \<comment> \<open>\<open>test vector ops\<close>\<close>
-| test_vec:"\<lparr>[$C\<^sub>v v, $(Test_vec op)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>n (ConstInt32 (app_test_vec op v))]\<rparr>"
+| test_vec:"\<lparr>[$EConstVec v, $(Test_vec op)]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 (app_test_vec op v))]\<rparr>"
   \<comment> \<open>\<open>shift vector ops\<close>\<close>
-| shift_vec:"\<lparr>[$C\<^sub>v v, $C\<^sub>n (ConstInt32 n), $(Shift_vec op)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>v (app_shift_vec op v n)]\<rparr>"
+| shift_vec:"\<lparr>[$EConstVec v, $EConstNum (ConstInt32 n), $(Shift_vec op)]\<rparr> \<leadsto> \<lparr>[$EConstVec (app_shift_vec op v n)]\<rparr>"
   \<comment> \<open>\<open>splat vector ops\<close>\<close>
-| splat_vec:"\<lparr>[$C\<^sub>n v, $(Splat_vec sv)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>v (app_splat_vec sv v)]\<rparr>"
+| splat_vec:"\<lparr>[$EConstNum v, $(Splat_vec sv)]\<rparr> \<leadsto> \<lparr>[$EConstVec (app_splat_vec sv v)]\<rparr>"
   \<comment> \<open>\<open>extract vector ops\<close>\<close>
-| extract_vec:"\<lparr>[$C\<^sub>v v, $(Extract_vec sv sx i)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>n (app_extract_vec sv sx i v)]\<rparr>"
+| extract_vec:"\<lparr>[$EConstVec v, $(Extract_vec sv sx i)]\<rparr> \<leadsto> \<lparr>[$EConstNum (app_extract_vec sv sx i v)]\<rparr>"
   \<comment> \<open>\<open>replace vector ops\<close>\<close>
-| replace_vec:"\<lparr>[$C\<^sub>v v, $C\<^sub>n vn, $(Replace_vec sv i)]\<rparr> \<leadsto> \<lparr>[$C\<^sub>v (app_replace_vec sv i v vn)]\<rparr>"
+| replace_vec:"\<lparr>[$EConstVec v, $EConstNum vn, $(Replace_vec sv i)]\<rparr> \<leadsto> \<lparr>[$EConstVec (app_replace_vec sv i v vn)]\<rparr>"
   \<comment> \<open>\<open>unreachable\<close>\<close>
 | unreachable:"\<lparr>[$ Unreachable]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
   \<comment> \<open>\<open>nop\<close>\<close>
 | nop:"\<lparr>[$ Nop]\<rparr> \<leadsto> \<lparr>[]\<rparr>"
+
+(*REVIEW THINGS BELLOW*)
   \<comment> \<open>\<open>drop\<close>\<close>
-| drop:"\<lparr>[$(C v), ($ Drop)]\<rparr> \<leadsto> \<lparr>[]\<rparr>"
+| drop:"\<lparr>[$C v, ($ Drop)]\<rparr> \<leadsto> \<lparr>[]\<rparr>"
   \<comment> \<open>\<open>select\<close>\<close>
-| select_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$(C v1), $(C v2), $C\<^sub>n (ConstInt32 n), ($ Select)]\<rparr> \<leadsto> \<lparr>[$(C v2)]\<rparr>"
-| select_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$(C v1), $(C v2), $C\<^sub>n (ConstInt32 n), ($ Select)]\<rparr> \<leadsto> \<lparr>[$(C v1)]\<rparr>"
+| select_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$C v1, $C v2, $EConstNum (ConstInt32 n), ($ Select)]\<rparr> \<leadsto> \<lparr>[$(C v2)]\<rparr>"
+| select_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$C v1, $C v2, $EConstNum (ConstInt32 n), ($ Select)]\<rparr> \<leadsto> \<lparr>[$(C v1)]\<rparr>"
   \<comment> \<open>\<open>if\<close>\<close>
-| if_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$C\<^sub>n (ConstInt32 n), $(If tb e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tb e2s)]\<rparr>"
-| if_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$C\<^sub>n (ConstInt32 n), $(If tb e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tb e1s)]\<rparr>"
+| if_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$EConstNum (ConstInt32 n), $(If tb e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tb e2s)]\<rparr>"
+| if_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$EConstNum (ConstInt32 n), $(If tb e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tb e1s)]\<rparr>"
   \<comment> \<open>\<open>label\<close>\<close>
 | label_const:"\<lparr>[Label n es ($C* vs)]\<rparr> \<leadsto> \<lparr>($C* vs)\<rparr>"
 | label_trap:"\<lparr>[Label n es [Trap]]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
   \<comment> \<open>\<open>br\<close>\<close>
 | br:"\<lbrakk>length vs = n; Lfilled i lholed (($C* vs) @ [$(Br i)]) LI\<rbrakk> \<Longrightarrow> \<lparr>[Label n es LI]\<rparr> \<leadsto> \<lparr>($C* vs) @ es\<rparr>"
   \<comment> \<open>\<open>br_if\<close>\<close>
-| br_if_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$C\<^sub>n (ConstInt32 n), $(Br_if i)]\<rparr> \<leadsto> \<lparr>[]\<rparr>"
-| br_if_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$C\<^sub>n (ConstInt32 n), $(Br_if i)]\<rparr> \<leadsto> \<lparr>[$(Br i)]\<rparr>"
+| br_if_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$EConstNum (ConstInt32 n), $(Br_if i)]\<rparr> \<leadsto> \<lparr>[]\<rparr>"
+| br_if_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$EConstNum (ConstInt32 n), $(Br_if i)]\<rparr> \<leadsto> \<lparr>[$(Br i)]\<rparr>"
   \<comment> \<open>\<open>br_table\<close>\<close>
-| br_table:"\<lbrakk>length is > (nat_of_int c)\<rbrakk> \<Longrightarrow> \<lparr>[$C\<^sub>n (ConstInt32 c), $(Br_table is i)]\<rparr> \<leadsto> \<lparr>[$(Br (is!(nat_of_int c)))]\<rparr>"
-| br_table_length:"\<lbrakk>length is \<le> (nat_of_int c)\<rbrakk> \<Longrightarrow> \<lparr>[$C\<^sub>n (ConstInt32 c), $(Br_table is i)]\<rparr> \<leadsto> \<lparr>[$(Br i)]\<rparr>"
+| br_table:"\<lbrakk>length is > (nat_of_int c)\<rbrakk> \<Longrightarrow> \<lparr>[$EConstNum (ConstInt32 c), $(Br_table is i)]\<rparr> \<leadsto> \<lparr>[$(Br (is!(nat_of_int c)))]\<rparr>"
+| br_table_length:"\<lbrakk>length is \<le> (nat_of_int c)\<rbrakk> \<Longrightarrow> \<lparr>[$EConstNum (ConstInt32 c), $(Br_table is i)]\<rparr> \<leadsto> \<lparr>[$(Br i)]\<rparr>"
   \<comment> \<open>\<open>local\<close>\<close>
 | local_const:"\<lparr>[Frame n f ($C* vs)]\<rparr> \<leadsto> \<lparr>($C* vs)\<rparr>"
 | local_trap:"\<lparr>[Frame n f [Trap]]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
@@ -220,12 +224,13 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
 (* full reduction rule *)
 inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>_;_;_\<rparr> \<leadsto> \<lparr>_;_;_\<rparr>" 60) where
   \<comment> \<open>\<open>lifting basic reduction\<close>\<close>
+
   basic:"\<lparr>e\<rparr> \<leadsto> \<lparr>e'\<rparr> \<Longrightarrow> \<lparr>s;f;e\<rparr> \<leadsto> \<lparr>s;f;e'\<rparr>"
   \<comment> \<open>\<open>call\<close>\<close>
 | call:"\<lparr>s;f;[$(Call j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke (sfunc_ind (f_inst f) j)]\<rparr>"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
-| call_indirect_Some:"\<lbrakk>(f_inst f) = i; stab s i (nat_of_int c) = Some i_cl; stypes i j = tf; cl_type (funcs s!i_cl) = tf\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke i_cl]\<rparr>"
-| call_indirect_None:"\<lbrakk>(f_inst f) = i; (stab s i (nat_of_int c) = Some i_cl \<and> stypes i j \<noteq> cl_type (funcs s!i_cl)) \<or> stab s i (nat_of_int c) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| call_indirect_Some:"\<lbrakk>(f_inst f) = i; stab s i (nat_of_int c) = Some i_cl; stypes i j = tf; cl_type (funcs s!i_cl) = tf\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke i_cl]\<rparr>"
+| call_indirect_None:"\<lbrakk>(f_inst f) = i; (stab s i (nat_of_int c) = Some i_cl \<and> stypes i j \<noteq> cl_type (funcs s!i_cl)) \<or> stab s i (nat_of_int c) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>invoke\<close>\<close>
 | invoke_native:"\<lbrakk>(funcs s!i_cl) = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs) \<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;[Frame m \<lparr> f_locs = vcs@zs, f_inst = j \<rparr> [(Label m [] ($*es))]]\<rparr>"
 | invoke_host_Some:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs (Some (s', vcs'))\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f;($C* vcs')\<rparr>"
@@ -239,32 +244,32 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
   \<comment> \<open>\<open>set_global\<close>\<close>
 | set_global:"supdate_glob s (f_inst f) j v = s' \<Longrightarrow> \<lparr>s;f;[$(C v), $(Set_global j)]\<rparr> \<leadsto> \<lparr>s';f;[]\<rparr>"
   \<comment> \<open>\<open>load\<close>\<close>
-| load_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load m (nat_of_int k) off (t_num_length t) = Some bs\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 k), $(Load t None a off)]\<rparr> \<leadsto> \<lparr>s;f;[$C\<^sub>n (wasm_deserialise_num bs t)]\<rparr>"
-| load_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load m (nat_of_int k) off (t_num_length t) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 k), $(Load t None a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| load_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load m (nat_of_int k) off (t_num_length t) = Some bs\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $(Load t None a off)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (wasm_deserialise_num bs t)]\<rparr>"
+| load_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load m (nat_of_int k) off (t_num_length t) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $(Load t None a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>load packed\<close>\<close>
-| load_packed_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load_packed sx m (nat_of_int k) off (tp_num_length tp) (t_num_length t) = Some bs\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 k), $(Load t (Some (tp, sx)) a off)]\<rparr> \<leadsto> \<lparr>s;f;[$C\<^sub>n (wasm_deserialise_num bs t)]\<rparr>"
-| load_packed_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load_packed sx m (nat_of_int k) off (tp_num_length tp) (t_num_length t) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 k), $(Load t (Some (tp, sx)) a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| load_packed_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load_packed sx m (nat_of_int k) off (tp_num_length tp) (t_num_length t) = Some bs\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $(Load t (Some (tp, sx)) a off)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (wasm_deserialise_num bs t)]\<rparr>"
+| load_packed_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load_packed sx m (nat_of_int k) off (tp_num_length tp) (t_num_length t) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $(Load t (Some (tp, sx)) a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>store\<close>\<close>
-| store_Some:"\<lbrakk>(typeof_num v) = t; smem_ind (f_inst f) = Some j; ((mems s)!j) = m; store m (nat_of_int k) off (bits_num v) (t_num_length t) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 k), $C\<^sub>n v, $(Store t None a off)]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[]\<rparr>"
-| store_None:"\<lbrakk>(typeof_num v) = t; smem_ind (f_inst f) = Some j; ((mems s)!j) = m; store m (nat_of_int k) off (bits_num v) (t_num_length t) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 k), $C\<^sub>n v, $(Store t None a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| store_Some:"\<lbrakk>(typeof_num v) = t; smem_ind (f_inst f) = Some j; ((mems s)!j) = m; store m (nat_of_int k) off (bits_num v) (t_num_length t) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $EConstNum v, $(Store t None a off)]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[]\<rparr>"
+| store_None:"\<lbrakk>(typeof_num v) = t; smem_ind (f_inst f) = Some j; ((mems s)!j) = m; store m (nat_of_int k) off (bits_num v) (t_num_length t) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $EConstNum v, $(Store t None a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>store packed\<close>\<close> (* take only (tp_length tp) lower order bytes *)
-| store_packed_Some:"\<lbrakk>(typeof_num v) = t; smem_ind (f_inst f) = Some j; ((mems s)!j) = m; store_packed m (nat_of_int k) off (bits_num v) (tp_num_length tp) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 k), $C\<^sub>n v, $(Store t (Some tp) a off)]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[]\<rparr>"
-| store_packed_None:"\<lbrakk>(typeof_num v) = t; smem_ind (f_inst f) = Some j; ((mems s)!j) = m; store_packed m (nat_of_int k) off (bits_num v) (tp_num_length tp) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 k), $C\<^sub>n v, $(Store t (Some tp) a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| store_packed_Some:"\<lbrakk>(typeof_num v) = t; smem_ind (f_inst f) = Some j; ((mems s)!j) = m; store_packed m (nat_of_int k) off (bits_num v) (tp_num_length tp) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $EConstNum v, $(Store t (Some tp) a off)]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[]\<rparr>"
+| store_packed_None:"\<lbrakk>(typeof_num v) = t; smem_ind (f_inst f) = Some j; ((mems s)!j) = m; store_packed m (nat_of_int k) off (bits_num v) (tp_num_length tp) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $EConstNum v, $(Store t (Some tp) a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>load vector\<close>\<close>
-| load_vec_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load_vec lv m (nat_of_int k) off = Some bs\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 k), $(Load_vec lv a off)]\<rparr> \<leadsto> \<lparr>s;f;[$C\<^sub>v (ConstVec128 (deserialise_v128 bs))]\<rparr>"
-| load_vec_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load_vec lv m (nat_of_int k) off = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 k), $(Load_vec lv a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| load_vec_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load_vec lv m (nat_of_int k) off = Some bs\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $(Load_vec lv a off)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstVec (ConstVec128 (deserialise_v128 bs))]\<rparr>"
+| load_vec_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load_vec lv m (nat_of_int k) off = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $(Load_vec lv a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>load lane vector\<close>\<close>
-| load_lane_vec_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load m (nat_of_int k) off (vec_i_length svi) = Some bs\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 k), $C\<^sub>v (ConstVec128 v), $(Load_lane_vec svi i a off)]\<rparr> \<leadsto> \<lparr>s;f;[$C\<^sub>v (ConstVec128 (insert_lane_vec svi i bs v))]\<rparr>"
-| load_lane_vec_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load m (nat_of_int k) off (vec_i_length svi) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 k), $C\<^sub>v (ConstVec128 v), $(Load_lane_vec svi i a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| load_lane_vec_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load m (nat_of_int k) off (vec_i_length svi) = Some bs\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $EConstVec (ConstVec128 v), $(Load_lane_vec svi i a off)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstVec (ConstVec128 (insert_lane_vec svi i bs v))]\<rparr>"
+| load_lane_vec_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load m (nat_of_int k) off (vec_i_length svi) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $EConstVec (ConstVec128 v), $(Load_lane_vec svi i a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>store vector\<close>\<close>
-| store_vec_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; (store_serialise_vec sv v) = bs; store m (nat_of_int k) off bs (length bs) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 k), $C\<^sub>v (ConstVec128 v), $(Store_vec sv a off)]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[]\<rparr>"
-| store_vec_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; (store_serialise_vec sv v) = bs; store m (nat_of_int k) off bs (length bs) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 k), $C\<^sub>v (ConstVec128 v), $(Store_vec sv a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| store_vec_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; (store_serialise_vec sv v) = bs; store m (nat_of_int k) off bs (length bs) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $EConstVec (ConstVec128 v), $(Store_vec sv a off)]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[]\<rparr>"
+| store_vec_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; (store_serialise_vec sv v) = bs; store m (nat_of_int k) off bs (length bs) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $EConstVec (ConstVec128 v), $(Store_vec sv a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>current_memory\<close>\<close>
-| current_memory:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;f;[ $(Current_memory)]\<rparr> \<leadsto> \<lparr>s;f;[$C\<^sub>n (ConstInt32 (int_of_nat n))]\<rparr>"
+| current_memory:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;f;[ $(Current_memory)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat n))]\<rparr>"
   \<comment> \<open>\<open>grow_memory\<close>\<close>
-| grow_memory:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 c), $(Grow_memory)]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[$C\<^sub>n (ConstInt32 (int_of_nat n))]\<rparr>"
+| grow_memory:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Grow_memory)]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[$EConstNum (ConstInt32 (int_of_nat n))]\<rparr>"
   \<comment> \<open>\<open>grow_memory fail\<close>\<close>
-| grow_memory_fail:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$C\<^sub>n (ConstInt32 c),$(Grow_memory)]\<rparr> \<leadsto> \<lparr>s;f;[$C\<^sub>n (ConstInt32 int32_minus_one)]\<rparr>"
+| grow_memory_fail:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c),$(Grow_memory)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 int32_minus_one)]\<rparr>"
   \<comment> \<open>\<open>block\<close>\<close>
 | block:"\<lbrakk>length vs = n; tb_tf (f_inst f) tb = (t1s _> t2s); length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>s;f;($C* vs) @ [$(Block tb es)]\<rparr> \<leadsto> \<lparr>s;f;[Label m [] (($C* vs) @ ($* es))]\<rparr>"
   \<comment> \<open>\<open>loop\<close>\<close>

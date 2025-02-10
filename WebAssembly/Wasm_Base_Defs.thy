@@ -273,6 +273,8 @@ definition bits_vec :: "v_vec \<Rightarrow> bytes" where
   "bits_vec v = (case v of
                    ConstVec128 c \<Rightarrow> (serialise_v128 c))"
 
+
+
 definition bits :: "v \<Rightarrow> bytes" where
   "bits v = (case v of
                V_num v_n \<Rightarrow> bits_num v_n
@@ -289,28 +291,45 @@ definition bitzero_vec :: "t_vec \<Rightarrow> v_vec" where
   "bitzero_vec t = (case t of
                       T_v128 \<Rightarrow> ConstVec128 0)"
 
+definition bitzero_ref :: "t_ref \<Rightarrow> v_ref" where
+  "bitzero_ref t = (case t of
+                      T_func_ref \<Rightarrow> ConstNull (T_func_ref)
+                    | T_ext_ref \<Rightarrow> ConstNull (T_ext_ref)
+                    
+)"
+
+
 definition bitzero :: "t \<Rightarrow> v" where
   "bitzero t = (case t of
                  T_num t_n \<Rightarrow> V_num (bitzero_num t_n)
-               | T_vec t_v \<Rightarrow> V_vec (bitzero_vec t_v))"
+               | T_vec t_v \<Rightarrow> V_vec (bitzero_vec t_v)
+               | T_ref t_r \<Rightarrow> V_ref (bitzero_ref t_r))"
 
 definition n_zeros :: "t list \<Rightarrow> v list" where
   "n_zeros ts = (map (\<lambda>t. bitzero t) ts)"
 
-definition typeof_num :: " v_num \<Rightarrow> t_num" where
+definition typeof_num :: "v_num \<Rightarrow> t_num" where
   "typeof_num v = (case v of
                      ConstInt32 _ \<Rightarrow> T_i32
                    | ConstInt64 _ \<Rightarrow> T_i64
                    | ConstFloat32 _ \<Rightarrow> T_f32
                    | ConstFloat64 _ \<Rightarrow> T_f64)"
 
-definition typeof_vec :: " v_vec \<Rightarrow> t_vec" where
+definition typeof_vec :: "v_vec \<Rightarrow> t_vec" where
   "typeof_vec v = (case v of ConstVec128 _ \<Rightarrow> T_v128)"
+
+definition typeof_ref :: "v_ref \<Rightarrow> t_ref" where
+  "typeof_ref v = (case v of
+                     ConstRef _ \<Rightarrow> T_func_ref
+                   | ConstRefExtern _ \<Rightarrow> T_ext_ref
+                   | ConstNull t_ref \<Rightarrow> t_ref)"
+
 
 definition typeof :: "v \<Rightarrow> t" where
   "typeof v = (case v of
                  V_num v_n \<Rightarrow> T_num (typeof_num v_n)
-               | V_vec v_v \<Rightarrow> T_vec (typeof_vec v_v))"
+               | V_vec v_v \<Rightarrow> T_vec (typeof_vec v_v)
+               | V_ref v_r \<Rightarrow> T_ref (typeof_ref v_r))"
 
 definition vec_lane_t :: "shape_vec \<Rightarrow> t_num" where
   "vec_lane_t sv = (case sv of
@@ -715,7 +734,7 @@ definition supdate_glob :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow>
   "supdate_glob s i j v = s\<lparr>globs := (update_glob (globs s) i j v)\<rparr>"
 
 definition is_const :: "e \<Rightarrow> bool" where
-  "is_const e = (case e of Basic (C _) \<Rightarrow> True | _ \<Rightarrow> False)"
+  "is_const e = (case e of Basic (EConstNum _) \<Rightarrow> True | _ \<Rightarrow> False)"
 
 definition const_list :: "e list \<Rightarrow> bool" where
   "const_list xs = list_all is_const xs"
@@ -885,7 +904,7 @@ lemma inj_basic: "inj Basic"
   by (meson e.inject(1) injI)
 
 lemma inj_basic_econst: "inj (\<lambda>v. $C v)"
-  by (simp add: inj_def)
+  by (simp add: inj_def v_to_e_def split: v.splits)
 
 lemma to_e_list_1:"[$ a] = $* [a]"
   by simp
@@ -896,12 +915,36 @@ lemma to_e_list_2:"[$ a, $ b] = $* [a, b]"
 lemma to_e_list_3:"[$ a, $ b, $ c] = $* [a, b, c]"
   by simp
 
+(*This is now wrong*)
+(*It is also not used?*)
+(*
 lemma v_exists_b_e:"\<exists>ves. ($C*vs) = ($*ves)"
 proof (induction vs)
   case (Cons a vs)
+  obtain ves where "$C* vs = $* ves" by (metis Cons.IH)
+  have h1: "$C* a # vs = v_to_e a # ($C* vs)" by simp
+  have h2: "\<exists>be. (Basic be) =  v_to_e a"
+  proof(cases a)
+    case (V_num x1)
+    then show ?thesis
+      using v_to_e_def by force
+  next
+    case (V_vec x2)
+    then show ?thesis
+      using v_to_e_def by fastforce+
+  next
+    case (V_ref x3)
+    then show ?thesis
+      sledgehammer
+  qed
+  obtain ve where "v_to_e a = ve" by simp
+  have h2: "$C* [] = $* []" by simp
   thus ?case
-  by (metis list.simps(9))
+    apply (auto simp add: list.simps(9))
+    by (metis list.simps(9) )
+
 qed auto
+*)
 
 lemma Lfilled_exact_imp_Lfilled:
   assumes "Lfilled_exact n lholed es LI"
@@ -955,9 +998,8 @@ next
     by blast
   moreover
   have "typeof (bitzero t) = t"
-    unfolding typeof_def bitzero_def typeof_num_def typeof_vec_def bitzero_num_def
-    apply (simp split: t.splits t_num.splits t_vec.splits)
-    apply (metis (full_types) t_vec.exhaust)
+    unfolding typeof_def bitzero_def typeof_num_def typeof_vec_def typeof_ref_def bitzero_ref_def bitzero_vec_def bitzero_num_def
+    apply (simp split: t.splits t_num.splits t_vec.splits t_ref.splits)
     done
   ultimately
   show ?case

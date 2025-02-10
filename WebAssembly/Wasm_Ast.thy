@@ -133,9 +133,12 @@ datatype \<comment> \<open>numeric types\<close>
 (* 1.1: vector operators *)
 datatype \<comment> \<open>vector types\<close>
   t_vec = T_v128
- 
+
+datatype
+  t_ref = T_func_ref | T_ext_ref
+
 datatype \<comment> \<open>value types\<close>
-  t = T_num t_num | T_vec t_vec
+  t = T_num t_num | T_vec t_vec | T_ref t_ref
 
 datatype \<comment> \<open>packed numeric types\<close>
   tp_num = Tp_i8 | Tp_i16 | Tp_i32
@@ -179,7 +182,7 @@ datatype \<comment> \<open>numeric values\<close>
         | ConstFloat64 f64
 
 datatype
-  v_ref = ConstNull t
+  v_ref = ConstNull t_ref
   | ConstRef i
   | ConstRefExtern host
 
