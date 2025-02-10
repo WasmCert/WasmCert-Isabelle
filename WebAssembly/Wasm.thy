@@ -242,7 +242,7 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
   \<comment> \<open>\<open>get_global\<close>\<close>
 | get_global:"\<lparr>s;f;[$(Get_global j)]\<rparr> \<leadsto> \<lparr>s;f;[$ C(sglob_val s (f_inst f) j)]\<rparr>"
   \<comment> \<open>\<open>set_global\<close>\<close>
-| set_global:"supdate_glob s (f_inst f) j v = s' \<Longrightarrow> \<lparr>s;f;[$(C v), $(Set_global j)]\<rparr> \<leadsto> \<lparr>s';f;[]\<rparr>"
+| set_global:"supdate_glob s (f_inst f) j v = s' \<Longrightarrow> \<lparr>s;f;[$C v, $(Set_global j)]\<rparr> \<leadsto> \<lparr>s';f;[]\<rparr>"
   \<comment> \<open>\<open>load\<close>\<close>
 | load_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load m (nat_of_int k) off (t_num_length t) = Some bs\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $(Load t None a off)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (wasm_deserialise_num bs t)]\<rparr>"
 | load_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load m (nat_of_int k) off (t_num_length t) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $(Load t None a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
