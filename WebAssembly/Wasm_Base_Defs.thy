@@ -734,7 +734,10 @@ definition supdate_glob :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow>
   "supdate_glob s i j v = s\<lparr>globs := (update_glob (globs s) i j v)\<rparr>"
 
 definition is_const :: "e \<Rightarrow> bool" where
-  "is_const e = (case e of Basic (EConstNum _) \<Rightarrow> True | _ \<Rightarrow> False)"
+  "is_const e = (case e of Basic (EConstNum _) \<Rightarrow> True
+                         | Basic (EConstVec _) \<Rightarrow> True
+                         | Ref _ \<Rightarrow> True
+                         | _ \<Rightarrow> False)"
 
 definition const_list :: "e list \<Rightarrow> bool" where
   "const_list xs = list_all is_const xs"
