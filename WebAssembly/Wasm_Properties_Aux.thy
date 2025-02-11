@@ -242,6 +242,17 @@ lemma b_e_type_cnum:
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
+lemma e_type_cnum:
+  assumes "\<S>\<bullet>\<C> \<turnstile> [$e] : (ts _> ts')"
+          "e = EConstNum v_n"
+  shows "ts' = ts @ [T_num (typeof_num v_n)]"
+  using assms
+proof(induction  "\<S>" "\<C>" "[$e]" "(ts _> ts')" arbitrary: ts ts')
+  case (1 \<C> b_es \<S>)
+  then show ?case
+    using b_e_type_cnum by blast
+qed auto+
+
 lemma b_e_type_cvec:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = EConstVec v_v"
@@ -249,12 +260,49 @@ lemma b_e_type_cvec:
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
+lemma e_type_cvec:
+  assumes "\<S>\<bullet>\<C> \<turnstile> [$e] : (ts _> ts')"
+          "e = EConstVec v_n"
+  shows "ts' = ts @ [T_vec (typeof_vec v_n)]"
+  using assms
+proof(induction  "\<S>" "\<C>" "[$e]" "(ts _> ts')" arbitrary: ts ts')
+  case (1 \<C> b_es \<S>)
+  then show ?case
+    using b_e_type_cvec by blast
+qed auto+
+
+
 lemma e_type_cref:
   assumes "\<S>\<bullet>\<C> \<turnstile> [e] : (ts _> ts')"
   shows "e = Ref v_r \<Longrightarrow> ts' = ts @ [T_ref (typeof_ref v_r)]"
   using assms
 proof (induction "\<S>" "\<C>" "[e]" "(ts _> ts')" arbitrary: ts ts')
 qed auto+
+
+lemma e_type_value:
+  assumes "\<S>\<bullet>\<C> \<turnstile> [e] : (ts _> ts')" "e = $C v"
+  shows "ts' = ts @ [typeof v]"
+proof(cases v)
+  case (V_num x1)
+  then have "e = ($EConstNum  x1)"
+    by (simp add: assms(2) v_to_e_def)
+  then show ?thesis
+    using V_num assms(1) e_type_cnum typeof_def by auto
+next
+  case (V_vec x2)
+  then have "e = ($EConstVec  x2)"
+    by (simp add: assms(2) v_to_e_def)
+  then show ?thesis
+    using V_vec assms(1) e_type_cvec typeof_def by auto
+next
+  case (V_ref x3)
+  have "\<S>\<bullet>\<C> \<turnstile> [e] : (ts _> ts')" using assms by simp
+  then have "e = (Ref x3)"
+    by (simp add: V_ref assms(2) v_to_e_def)
+  then show ?thesis
+    using V_ref assms(1) e_type_cref typeof_def by auto
+qed
+
 
 lemma b_e_type_load:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
@@ -626,6 +674,23 @@ proof -
     by fastforce
 qed
 
+lemma b_e_type_value2_nv:
+  assumes "\<C> \<turnstile> [EConstNum v1, EConstVec v2] : (t1s _> t2s)"
+  shows "t2s = t1s @ [T_num (typeof_num v1), T_vec (typeof_vec v2)]"
+proof -
+  obtain ts' where ts'_def:"\<C> \<turnstile> [EConstNum v1] : (t1s _> ts')"
+                           "\<C> \<turnstile> [EConstVec v2] : (ts' _> t2s)"
+    using b_e_type_comp assms
+    by (metis append_butlast_last_id butlast.simps(2) last_ConsL last_ConsR list.distinct(1))
+  have "ts' = t1s @ [T_num (typeof_num v1)]"
+    unfolding typeof_def
+    using b_e_type_cnum b_e_type_cvec ts'_def(1)
+    by (auto split: v.splits)
+  thus ?thesis
+    using b_e_type_cvec ts'_def(2)
+    by fastforce
+qed
+
 
 (*
 Do we need 4 versions of the lemma instead of 2?
@@ -846,6 +911,20 @@ proof -
     using b_e_type_cvec[of \<C> "EConstVec v" "ts''" "ts' @ [t]"]
     by auto
 qed
+
+
+lemma e_type_value_list:
+  assumes "(s\<bullet>\<C> \<turnstile> es@[$C v] : (ts _> ts'@[t]))"
+  shows "(s\<bullet>\<C> \<turnstile> es : (ts _> ts'))"
+        "((typeof v) = t)"
+proof -
+  obtain ts'' where h: "(s\<bullet>\<C> \<turnstile> es : (ts _> ts''))" "(s\<bullet>\<C> \<turnstile> [$C v] : (ts'' _> ts' @ [t]))"
+    using b_e_type_comp assms
+    by (meson e_type_comp)
+  thus "(s\<bullet>\<C> \<turnstile> es : (ts _> ts'))" "typeof v = t"
+    using e_type_value h(2) by fastforce+
+qed
+
 
 (*
 lemma b_e_type_value_list:
