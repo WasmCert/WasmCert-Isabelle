@@ -3078,7 +3078,7 @@ next
     unfolding const_list_def v_to_e_def
     by fastforce
   have t_def:"typeof v = T_num t"
-    using cs_def(2) b_e_type_cnum[OF unlift_b_e[of s \<C> "[C v]" "([] _> [T_num t])"]]
+    using cs_def(2) b_e_type_cnum[OF unlift_b_e[of s \<C> "[C v]" "([] _> [T_num t])"]] const_typeof
     by fastforce
   obtain j where mem_some:"smem_ind (f_inst f) = Some j"
     using store(1,8)
@@ -3139,8 +3139,8 @@ next
   proof (cases "load_vec lvop ((mems s)!j) (nat_of_int c) off")
     case None
     thus ?thesis
-      using reduce.load_vec_None c_def mem_some
-      by (metis (no_types, lifting) append_Cons append_Nil list.simps(8,9))
+      using reduce.load_vec_None[OF mem_some _ None] c_def v_to_e_def
+      by fastforce
   next
     case (Some a)
     thus ?thesis
@@ -3478,15 +3478,19 @@ proof -
     thus ?case
       by auto
   next
-    case (4 s \<C>)
+    case (4 \<S> \<C> v_r)
+    then show ?case  using v_to_e_def
+      by (metis "4.prems"(7) const_list_def consts_const_list is_const1 list.pred_inject(1,2) list_all_append v.case(3))
+  next
+    case (5 s \<C>)
     have cs_es_def:"Lfilled 0 (LBase cs []) [Trap] cs_es"
-      using Lfilled.intros(1)[ of _ _ "[]" "[Trap]"] 4(2) 
+      using Lfilled.intros(1)[ of _ _ "[]" "[Trap]"] 5(2) 
       by fastforce
     thus ?case
-      using reduce_simple.trap[OF 4(6) cs_es_def] reduce.intros(1)
+      using reduce_simple.trap[OF 5(6) cs_es_def] reduce.intros(1)
       by blast
   next
-    case (5 s ts fa es n \<C>)
+    case (6 s ts fa es n \<C>)
     consider (1) "(\<And>k lholed. \<not> Lfilled k lholed [$Return] es)"
                  "(\<And>k lholed i. (Lfilled k lholed [$Br i] es) \<Longrightarrow> i < k)"
                  "es \<noteq> [Trap]"
@@ -3500,10 +3504,10 @@ proof -
     proof (cases)
       case 1
       obtain s' f'' a where temp1:"\<lparr>s;fa;es\<rparr> \<leadsto> \<lparr>s';f'';a\<rparr>"
-        using 5(3)[OF 1(1) _ 1(3,4) 5(11)] 1(2)
+        using 6(3)[OF 1(1) _ 1(3,4) 6(11)] 1(2)
         by fastforce
       show ?thesis
-        using reduce.intros(32)[OF temp1] progress_L0[where ?vs = cs] 5(5)
+        using reduce.intros(32)[OF temp1] progress_L0[where ?vs = cs] 6(5)
         by fastforce
     next
       case 2
@@ -3511,14 +3515,14 @@ proof -
         by blast
       then obtain lholed' vs' \<C>' where lholed'_def:"(Lfilled k lholed' (($C*vs')@[$Return]) es)"
                                                    "s\<bullet>\<C>' \<turnstile> ($C*vs') : ([] _> ts)"
-        using progress_LN_return[OF local_assms, of s _ ts ts] s_type_unfold[OF 5(1)]
+        using progress_LN_return[OF local_assms, of s _ ts ts] s_type_unfold[OF 6(1)]
         by fastforce
       hence temp1:"\<exists>a. \<lparr>[Frame n fa es]\<rparr> \<leadsto> \<lparr>($C*vs')\<rparr>"
         using reduce_simple.return[OF _ lholed'_def(1)]
-              e_type_consts[OF lholed'_def(2)] 5(2,3)
+              e_type_consts[OF lholed'_def(2)] 6(2,3)
         by fastforce
       show ?thesis
-        using temp1 progress_L0[OF reduce.intros(1)] 5(5)
+        using temp1 progress_L0[OF reduce.intros(1)] 6(5)
         by fastforce
     next
       case 3
@@ -3528,10 +3532,10 @@ proof -
       proof (cases)
         case 1
         have "length es = length ts"
-          using s_type_unfold[OF 5(1)] e_type_const_list[OF 1]
+          using s_type_unfold[OF 6(1)] e_type_const_list[OF 1]
           by fastforce
         thus ?thesis
-          using reduce_simple.local_const reduce.intros(1) 5(2)
+          using reduce_simple.local_const reduce.intros(1) 6(2)
           by (metis "1" e_type_const_conv_vs)
       next
         case 2
@@ -3540,7 +3544,7 @@ proof -
           by fastforce
       qed
       thus ?thesis
-        using progress_L0[where ?vs = cs] 5(5)
+        using progress_L0[where ?vs = cs] 6(5)
         by fastforce
     next
       case 4
@@ -3550,19 +3554,19 @@ proof -
       obtain \<C>' \<C>j where c_def:"s\<bullet>\<C>' \<turnstile> es : ([] _> ts)"
                                "inst_typing s (f_inst fa) \<C>j"
                                "\<C>' = \<C>j\<lparr>local := (map typeof (f_locs fa)), return := Some ts\<rparr>"
-        using 5(1) s_type_unfold
+        using 6(1) s_type_unfold
         by metis
       hence "length (label \<C>') = 0"
-        using c_def store_local_label_empty 5(12)
+        using c_def store_local_label_empty 6(12)
         by fastforce
       thus ?thesis 
         using progress_LN1[OF temp1 c_def(1)]
         by linarith
     qed
   next
-    case (6 i_cl s tf \<C>)
+    case (7 i_cl s tf \<C>)
     obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> ($C*cs) : ([] _> ts'')" "s\<bullet>\<C> \<turnstile> [Invoke i_cl] : (ts'' _> ts')"
-      using 6(3,4) e_type_comp_conc1
+      using 7(3,4) e_type_comp_conc1
       by fastforce
     obtain ts_c t1s t2s where cl_def:"(ts'' = ts_c @ t1s)"
                                      "(ts' = ts_c @ t2s)"
@@ -3589,7 +3593,7 @@ proof -
         unfolding n_zeros_def
         by blast
       thus ?thesis
-        using progress_L0 vs_def(3) 6(4)
+        using progress_L0 vs_def(3) 7(4)
         by fastforce
     next
       case (Func_host x21 x22)
@@ -3617,11 +3621,11 @@ proof -
           by fastforce
       qed
       thus ?thesis
-        using vs_def(3) 6(4) progress_L0
+        using vs_def(3) 7(4) progress_L0
         by fastforce
     qed
   next
-    case (7 s \<C> e0s ts t2s es n)
+    case (8 s \<C> e0s ts t2s es n)
     consider (1) "(\<And>k lholed. \<not> Lfilled k lholed [$Return] es)"
                  "(\<And>k lholed i. (Lfilled k lholed [$Br i] es) \<Longrightarrow> i < k)"
                  "es \<noteq> [Trap]"
@@ -3642,8 +3646,8 @@ proof -
         using b_e_typing.empty e_typing_l_typing.intros(1)
         by fastforce
       hence "\<exists>s' f' a. \<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';a\<rparr>"
-        using 7(5)[OF 7(2) _ _ 1(1) _ 1(3,4), of "[]"]
-              1(2,3,4) 7
+        using 8(5)[OF 8(2) _ _ 1(1) _ 1(3,4), of "[]"]
+              1(2,3,4) 8
         unfolding const_list_def
         by auto
       then obtain s' f' a where red_def:"\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';a\<rparr>"
@@ -3653,25 +3657,25 @@ proof -
         unfolding const_list_def
         by fastforce
       hence temp5:"Lfilled 1 (LRec cs n e0s (LBase [] []) []) es (($C*cs)@[Label n e0s es])"
-        using Lfilled.intros(2)[of "(LRec cs n e0s (LBase [] []) [])" _ n e0s "(LBase [] [])" "[]" 0 es es] 7(8)
+        using Lfilled.intros(2)[of "(LRec cs n e0s (LBase [] []) [])" _ n e0s "(LBase [] [])" "[]" 0 es es] 8(8)
         unfolding const_list_def
         by fastforce
       have temp6:"Lfilled 1 (LRec cs n e0s (LBase [] []) []) a (($C*cs)@[Label n e0s a])"
-        using temp4 Lfilled.intros(2)[of "(LRec cs n e0s (LBase [] []) [])" _ n e0s "(LBase [] [])" "[]" 0 a a] 7(8)
+        using temp4 Lfilled.intros(2)[of "(LRec cs n e0s (LBase [] []) [])" _ n e0s "(LBase [] [])" "[]" 0 a a] 8(8)
         unfolding const_list_def
         by fastforce
       show ?thesis
-        using label temp5 temp6 7(7) red_def
+        using label temp5 temp6 8(7) red_def
         by fastforce
     next
       case 2
       then obtain k lholed where "(Lfilled k lholed [$Return] es)"
         by blast
       hence "(Lfilled (k+1) (LRec cs n e0s lholed []) [$Return] (($C*cs)@[Label n e0s es]))"
-        using Lfilled.intros(2) 7(8)
+        using Lfilled.intros(2) 8(8)
         by fastforce
       thus ?thesis
-        using 7(10)[of "k+1"] 7(7,9)
+        using 8(10)[of "k+1"] 8(7,9)
       by fastforce
     next
       case 3
@@ -3679,7 +3683,7 @@ proof -
         using reduce_simple.label_const reduce_simple.label_trap reduce.intros(1)
         by (metis (full_types) e_type_const_conv_vs)
       show ?thesis
-        using progress_L0 7(7) temp1
+        using progress_L0 8(7) temp1
         by fastforce
     next
       case 4
@@ -3687,17 +3691,17 @@ proof -
         by fastforce
       then obtain lholed' vs' \<C>' where lholed'_def:"(Lfilled k lholed' (($C*vs')@[$Br (k)]) es)"
                                                    "s\<bullet>\<C>' \<turnstile> $C*vs' : ([] _> ts)"
-        using progress_LN[OF lholed_def 7(2), of ts]
+        using progress_LN[OF lholed_def 8(2), of ts]
         by fastforce
       have "\<exists>es' a. \<lparr>[Label n e0s es]\<rparr> \<leadsto> \<lparr>($C*vs')@e0s\<rparr>"
-        using reduce_simple.br[OF _ lholed'_def(1)] 7(3)
+        using reduce_simple.br[OF _ lholed'_def(1)] 8(3)
               e_type_consts[OF lholed'_def(2)]
         by fastforce
       hence "\<exists>es' a. \<lparr>s;f;[Label n e0s es]\<rparr> \<leadsto> \<lparr>s;f;es'\<rparr>"
         using reduce.intros(1)
         by fastforce
       thus ?thesis
-        using progress_L0 7(7,8)
+        using progress_L0 8(7,8)
         by fastforce
     next
       case 5
@@ -3705,51 +3709,51 @@ proof -
         using less_imp_add_positive
         by blast
       have k1_def:"Lfilled (k+1) (LRec cs n e0s lholed []) [$Br i] cs_es"
-        using 7(7) Lfilled.intros(2)
+        using 8(7) Lfilled.intros(2)
         by (simp add: lholed_def(1))
       thus ?thesis
-        using 7(10)[OF k1_def] lholed_def(2)
+        using 8(10)[OF k1_def] lholed_def(2)
         by simp
     qed
   next
-    case (8 \<C> \<S> n bs)
+    case (9 \<C> \<S> n bs)
     obtain j m where j_is:"smem_ind (f_inst f) = Some j"
                           "s.mems \<S> ! j = m"
-      using 8(1,11)
+      using 9(1,11)
       unfolding smem_ind_def
       by (fastforce split: list.splits)
     thus ?case
       using progress_L0_left[OF reduce.init_mem_None[OF j_is, of n bs]]
             progress_L0_left[OF reduce.init_mem_Some[OF j_is, of n bs]]
-            8(3)
+            9(3)
       apply (cases "store m n 0 bs (length bs)")
       apply blast+
       done
   next
-    case (9 \<C> \<S> tis n)
+    case (10 \<C> \<S> tis n)
     obtain j t where j_is:"stab_ind (f_inst f) = Some j"
                           "s.tabs \<S> ! j = t"
-      using 9(1,13)
+      using 10(1,13)
       unfolding stab_ind_def
       by (fastforce split: list.splits)
     thus ?case
       using progress_L0_left[OF reduce.init_tab_None[OF j_is, of n tis]]
             progress_L0_left[OF reduce.init_tab_Some[OF j_is, of n tis]]
-            9(4)
+            10(4)
       apply (cases "store_tab t n tis")
       apply blast+
       done
   next
-    case (10 \<S> f \<C> rs es ts)
+    case (11 \<S> f \<C> rs es ts)
     have "length (local \<C>) = length (f_locs f)"
          "length (memory \<C>) = length (inst.mems (f_inst f))"
          "length (table \<C>) = length (inst.tabs (f_inst f))"
          "types_t \<C> = inst.types (f_inst f)"
-      using store_local_label_empty 10(1) store_mem_exists store_tab_exists store_types_exists
+      using store_local_label_empty 11(1) store_mem_exists store_tab_exists store_types_exists
       unfolding frame_typing.simps
       by fastforce+
     thus ?case
-      using 10(3)[OF 10(2) _ _ 10(4) _ 10(6,7,8), of "[]" "[]" f] 10(5)
+      using 11(3)[OF 11(2) _ _ 11(4) _ 11(6,7,8), of "[]" "[]" f] 11(5)
             e_typing_l_typing.intros(1)[OF b_e_typing.empty[of "\<C>\<lparr>return := rs\<rparr>"]]
       unfolding const_list_def
       by simp
@@ -3835,13 +3839,14 @@ proof (induction rule: reduce_simple.induct)
   case (trap lholed es)
   thus ?case
     using Lfilled.simps[of 0] consts_app_ex(2)
-    by simp fastforce
-qed auto
+    by (metis basic consts_const_list reduce_simple.trap terminal_no_progress)
+qed (metis basic consts_const_list reduce_simple.intros terminal_no_progress)+
 
 lemma reduce_not_value:
   assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
   shows "es \<noteq> $C* ves"
   using assms
+(* TODO: this proof is far too verbose *)
 proof (induction es' arbitrary: ves rule: reduce.induct)
   case (basic e e' s vs i)
   thus ?case
@@ -3872,13 +3877,13 @@ next
     using not_const_vs_to_es_list
     by (metis append.right_neutral)
 next
-  case (block vs n t1s t2s m es)
+  case (block vs n f tb t1s t2s m s es)
   thus ?case
-    by (metis b_e.distinct const_list_cons_last(2) consts_const_list e.inject(1) e_type_const_unwrap)
+    by (metis const_list_no_progress consts_const_list reduce.block)
 next
-  case (loop vs n t1s t2s m es)
+  case (loop vs n f tb t1s t2s m s es)
   thus ?case
-    by (metis b_e.distinct const_list_cons_last(2) consts_const_list e.inject(1) e_type_const_unwrap)
+    by (metis const_list_no_progress consts_const_list reduce.loop)
 next
   case (label s vs es i s' vs' es' k lholed les les')
   show ?case
@@ -3888,7 +3893,7 @@ next
     {
       assume "($C*lvs) @ les @ les' = $C* ves"
       hence "(\<forall>y\<in>set (($C*lvs) @ les @ les'). \<exists>x. y = $C x)"
-        by simp
+        by auto
       hence "(\<forall>y\<in>set les. \<exists>x. y = $C x)"
         by simp
       hence "\<exists>vs1. les = $C* vs1"
@@ -3906,7 +3911,128 @@ next
       using not_const_vs_to_es_list
       by fastforce
   qed
-qed auto
+next
+  case (call s f j)
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.call)
+next
+  case (call_indirect_Some f i s c i_cl j tf)
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.call_indirect_Some)
+next
+  case (call_indirect_None f i s c i_cl j)
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.call_indirect_None)
+next
+  case (get_local vi j f v vs s)
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.get_local)
+next
+  case (set_local vi j s v vs i v')
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.set_local)
+next
+  case (get_global s f j)
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.get_global)
+next
+  case (set_global s f j v s')
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.set_global)
+next
+  case (load_Some f j s m k off t bs a)
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.load_Some)
+next
+  case (load_None f j s m k off t a)
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.load_None)
+next
+  case (load_packed_Some f j s m sx k off tp t bs a)
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.load_packed_Some)
+next
+  case (load_packed_None f j s m sx k off tp t a)
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.load_packed_None)
+next
+  case (store_Some v t f j s m k off mem' a)
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.store_Some)
+next
+  case (store_None v t f j s m k off a)
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.store_None)
+next
+  case (store_packed_Some v t f j s m k off tp mem' a)
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.store_packed_Some)
+next
+  case (store_packed_None v t f j s m k off tp a)
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.store_packed_None)
+next
+  case (load_vec_Some f j s m lv k off bs a)
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.load_vec_Some)
+next
+  case (load_vec_None f j s m lv k off a)
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.load_vec_None)
+next
+  case (load_lane_vec_Some f j s m k off svi bs v i a)
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.load_lane_vec_Some)
+next
+  case (load_lane_vec_None f j s m k off svi v i a)
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.load_lane_vec_None)
+next
+  case (store_vec_Some f j s m sv v bs k off mem' a)
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.store_vec_Some)
+next
+  case (store_vec_None f j s m sv v bs k off a)
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.store_vec_None)
+next
+  case (init_mem_Some f j s m n bs mem')
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.init_mem_Some)
+next
+  case (init_mem_None f j s m n bs)
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.init_mem_None)
+next
+  case (init_tab_Some f j s t n icls tab')
+  then show ?case
+  using const_list_no_progress consts_const_list
+  by (metis reduce.init_tab_Some)
+
+qed (metis const_list_no_progress consts_const_list  reduce.intros)+
 
 lemma reduce_simple_not_nil:
   assumes "\<lparr>es\<rparr> \<leadsto> \<lparr>es'\<rparr>"
@@ -4196,7 +4322,7 @@ next
     using reduce_trans_L0[OF assms]
     by blast
   have 2:"($C*ves)@[Trap]@esc \<noteq> [Trap]"
-    by (metis False Lfilled.L0 Lholed.inject(1) e.distinct(15) lfilled_single not_Cons_self2)
+    by (simp add: False append_eq_Cons_conv)
   show ?thesis
     using reduce.basic[OF reduce_simple.trap[OF 2, of "LBase ves esc"], of s' f'] Lfilled.simps[of 0]
           reduce_trans_app_end[OF _ 1]
