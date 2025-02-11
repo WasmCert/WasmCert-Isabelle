@@ -166,10 +166,10 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
   \<comment> \<open>\<open>relops\<close>\<close>
 | relop:"\<lparr>[$EConstNum v1, $EConstNum v2, $(Relop t op)]\<rparr> \<leadsto> \<lparr>[$EConstNum (app_relop op v1 v2)]\<rparr>"
   \<comment> \<open>\<open>convert\<close>\<close>
-| convert_Some:"\<lbrakk>(typeof_num v) = t1; cvt t2 sat_sx v = (Some v')\<rbrakk> \<Longrightarrow> \<lparr>[$(C\<^sub>n v), $(Cvtop t2 Convert t1 sat_sx)]\<rparr> \<leadsto> \<lparr>[$(C\<^sub>n v')]\<rparr>"
-| convert_None:"\<lbrakk>(typeof_num v) = t1; cvt t2 sat_sx v = None\<rbrakk> \<Longrightarrow> \<lparr>[$(C\<^sub>n v), $(Cvtop t2 Convert t1 sat_sx)]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
+| convert_Some:"\<lbrakk>(typeof_num v) = t1; cvt t2 sat_sx v = (Some v')\<rbrakk> \<Longrightarrow> \<lparr>[$(EConstNum v), $(Cvtop t2 Convert t1 sat_sx)]\<rparr> \<leadsto> \<lparr>[$(EConstNum v')]\<rparr>"
+| convert_None:"\<lbrakk>(typeof_num v) = t1; cvt t2 sat_sx v = None\<rbrakk> \<Longrightarrow> \<lparr>[$(EConstNum v), $(Cvtop t2 Convert t1 sat_sx)]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
   \<comment> \<open>\<open>reinterpret\<close>\<close>
-| reinterpret:"(typeof_num v) = t1 \<Longrightarrow> \<lparr>[$(C\<^sub>n v), $(Cvtop t2 Reinterpret t1 None)]\<rparr> \<leadsto> \<lparr>[$(C\<^sub>n (wasm_reinterpret t2 v))]\<rparr>"
+| reinterpret:"(typeof_num v) = t1 \<Longrightarrow> \<lparr>[$(EConstNum v), $(Cvtop t2 Reinterpret t1 None)]\<rparr> \<leadsto> \<lparr>[$(EConstNum (wasm_reinterpret t2 v))]\<rparr>"
   \<comment> \<open>\<open>unary vector ops\<close>\<close>
 | unop_vec:"\<lparr>[$EConstVec v, $(Unop_vec op)]\<rparr> \<leadsto> \<lparr>[$EConstVec (app_unop_vec op v)]\<rparr>"
   \<comment> \<open>\<open>binary vector ops\<close>\<close>

@@ -609,6 +609,24 @@ proof -
     by fastforce
 qed
 
+lemma b_e_type_value2_vn:
+  assumes "\<C> \<turnstile> [EConstVec v1, EConstNum v2] : (t1s _> t2s)"
+  shows "t2s = t1s @ [T_vec (typeof_vec v1), T_num (typeof_num v2)]"
+proof -
+  obtain ts' where ts'_def:"\<C> \<turnstile> [EConstVec v1] : (t1s _> ts')"
+                           "\<C> \<turnstile> [EConstNum v2] : (ts' _> t2s)"
+    using b_e_type_comp assms
+    by (metis append_butlast_last_id butlast.simps(2) last_ConsL last_ConsR list.distinct(1))
+  have "ts' = t1s @ [T_vec (typeof_vec v1)]"
+    unfolding typeof_def
+    using b_e_type_cnum b_e_type_cvec ts'_def(1)
+    by (auto split: v.splits)
+  thus ?thesis
+    using b_e_type_cnum ts'_def(2)
+    by fastforce
+qed
+
+
 (*
 Do we need 4 versions of the lemma instead of 2?
 *)
