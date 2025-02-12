@@ -9,6 +9,9 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | binop:"binop_t_num_agree op t \<Longrightarrow> \<C> \<turnstile> [Binop t op] : ([T_num t,T_num t] _> [T_num t])"
 | testop:"is_int_t_num t   \<Longrightarrow> \<C> \<turnstile> [Testop t _]      : ([T_num t]   _> [T_num T_i32])"
 | relop:"relop_t_num_agree op t   \<Longrightarrow> \<C> \<turnstile> [Relop t op] : ([T_num t,T_num t] _> [T_num T_i32])"
+  \<comment> \<open>\<open>references\<close>\<close>
+| is_null_ref:"\<C> \<turnstile> [Is_null_ref] :([T_ref t] _> [T_num T_i32])"
+| func_ref:"\<C> \<turnstile> [Func_ref j] :([] _> [T_ref t])"
   \<comment> \<open>\<open>vector ops\<close>\<close>
 | unop_vec:"\<C> \<turnstile> [Unop_vec op]  : ([T_vec T_v128]   _> [T_vec T_v128])"
 | binop_vec:"\<lbrakk>binop_vec_wf op\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Binop_vec op]  : ([T_vec T_v128, T_vec T_v128]   _> [T_vec T_v128])"
@@ -170,6 +173,10 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
 | convert_None:"\<lbrakk>(typeof_num v) = t1; cvt t2 sat_sx v = None\<rbrakk> \<Longrightarrow> \<lparr>[$(EConstNum v), $(Cvtop t2 Convert t1 sat_sx)]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
   \<comment> \<open>\<open>reinterpret\<close>\<close>
 | reinterpret:"(typeof_num v) = t1 \<Longrightarrow> \<lparr>[$(EConstNum v), $(Cvtop t2 Reinterpret t1 None)]\<rparr> \<leadsto> \<lparr>[$(EConstNum (wasm_reinterpret t2 v))]\<rparr>"
+  \<comment> \<open>\<open>references\<close>\<close>
+| null: "\<lparr>[$(Null_ref t)]\<rparr> \<leadsto> \<lparr>[Ref (ConstNull t)]\<rparr>"
+| is_null_true: "is_null_ref v_r \<Longrightarrow> \<lparr>[Ref v_r]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 (wasm_bool True))]\<rparr>"
+| is_null_false: "is_not_null_ref v_r \<Longrightarrow> \<lparr>[Ref v_r]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 (wasm_bool False))]\<rparr>"
   \<comment> \<open>\<open>unary vector ops\<close>\<close>
 | unop_vec:"\<lparr>[$EConstVec v, $(Unop_vec op)]\<rparr> \<leadsto> \<lparr>[$EConstVec (app_unop_vec op v)]\<rparr>"
   \<comment> \<open>\<open>binary vector ops\<close>\<close>
@@ -235,6 +242,8 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
 | invoke_native:"\<lbrakk>(funcs s!i_cl) = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs) \<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;[Frame m \<lparr> f_locs = vcs@zs, f_inst = j \<rparr> [(Label m [] ($*es))]]\<rparr>"
 | invoke_host_Some:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs (Some (s', vcs'))\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f;($C* vcs')\<rparr>"
 | invoke_host_None:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+  \<comment> \<open>\<open>references\<close>\<close>
+| func_ref: "\<lbrakk>length fi = j; (inst.funcs (f_inst f)) = (fi @ [fa] @ fas)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(Func_ref j)]\<rparr> \<leadsto> \<lparr>s;f;[Ref (ConstRef (fa))]\<rparr>"
   \<comment> \<open>\<open>get_local\<close>\<close>
 | get_local:"\<lbrakk>length vi = j; f_locs f = (vi @ [v] @ vs)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(Get_local j)]\<rparr> \<leadsto> \<lparr>s;f;[$C v]\<rparr>"
   \<comment> \<open>\<open>set_local\<close>\<close>

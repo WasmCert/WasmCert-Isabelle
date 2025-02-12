@@ -1091,7 +1091,9 @@ qed (simp_all add: is_const_def)
 
 lemma is_const1:
   "is_const ($C x)"
-  by (metis (no_types, lifting) b_e.simps(1619) b_e.simps(1620) e.simps(64) e.simps(69) is_const_def v.exhaust v.simps(10) v.simps(11) v.simps(12) v_to_e_def)
+  unfolding is_const_def
+  using v_to_e_def
+  by (simp split: v.splits)
 
 lemma is_const_list1':
   assumes "ves = map (\<lambda> x. $C x) vs"

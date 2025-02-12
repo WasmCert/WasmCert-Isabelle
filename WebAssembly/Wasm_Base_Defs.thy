@@ -324,6 +324,13 @@ definition typeof_ref :: "v_ref \<Rightarrow> t_ref" where
                    | ConstRefExtern _ \<Rightarrow> T_ext_ref
                    | ConstNull t_ref \<Rightarrow> t_ref)"
 
+definition is_null_ref :: "v_ref \<Rightarrow> bool" where
+  "is_null_ref v = (case v of
+                     ConstNull t_ref \<Rightarrow> True
+                   | _ \<Rightarrow> False)"
+
+definition is_not_null_ref :: "v_ref \<Rightarrow> bool" where
+  "is_not_null_ref v = (\<not>is_null_ref v)"
 
 definition typeof :: "v \<Rightarrow> t" where
   "typeof v = (case v of

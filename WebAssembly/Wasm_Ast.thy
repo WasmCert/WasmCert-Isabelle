@@ -394,6 +394,9 @@ datatype \<comment> \<open>basic instructions\<close>
     | Testop t_num testop
     | Relop t_num relop
     | Cvtop t_num cvtop t_num "(sat \<times> sx) option"
+    | Null_ref t_ref
+    | Is_null_ref
+    | Func_ref i
     | Unop_vec unop_vec
     | Binop_vec binop_vec
     | Ternop_vec ternop_vec
