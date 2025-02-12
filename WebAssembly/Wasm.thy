@@ -11,7 +11,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | relop:"relop_t_num_agree op t   \<Longrightarrow> \<C> \<turnstile> [Relop t op] : ([T_num t,T_num t] _> [T_num T_i32])"
   \<comment> \<open>\<open>references\<close>\<close>
 | is_null_ref:"\<C> \<turnstile> [Is_null_ref] :([T_ref t] _> [T_num T_i32])"
-| func_ref:"\<C> \<turnstile> [Func_ref j] :([] _> [T_ref t])"
+| func_ref:"\<C> \<turnstile> [Func_ref j] :([] _> [T_ref T_func_ref])"
   \<comment> \<open>\<open>vector ops\<close>\<close>
 | unop_vec:"\<C> \<turnstile> [Unop_vec op]  : ([T_vec T_v128]   _> [T_vec T_v128])"
 | binop_vec:"\<lbrakk>binop_vec_wf op\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Binop_vec op]  : ([T_vec T_v128, T_vec T_v128]   _> [T_vec T_v128])"
