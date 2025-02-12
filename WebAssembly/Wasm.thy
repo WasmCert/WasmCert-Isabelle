@@ -10,6 +10,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | testop:"is_int_t_num t   \<Longrightarrow> \<C> \<turnstile> [Testop t _]      : ([T_num t]   _> [T_num T_i32])"
 | relop:"relop_t_num_agree op t   \<Longrightarrow> \<C> \<turnstile> [Relop t op] : ([T_num t,T_num t] _> [T_num T_i32])"
   \<comment> \<open>\<open>references\<close>\<close>
+| null_ref:"\<C> \<turnstile> [Null_ref t] :([] _> [T_ref t])"
 | is_null_ref:"\<C> \<turnstile> [Is_null_ref] :([T_ref t] _> [T_num T_i32])"
 | func_ref:"\<C> \<turnstile> [Func_ref j] :([] _> [T_ref T_func_ref])"
   \<comment> \<open>\<open>vector ops\<close>\<close>

@@ -1399,6 +1399,15 @@ next
   case (trap lholed)
   then show ?thesis
     by (simp add: e_typing_l_typing.intros(5))
+next
+  case (null t)
+  then show ?thesis using assms(1, 3) apply simp sorry
+next
+  case (is_null_true v_r)
+  then show ?thesis unfolding is_null_ref_def using assms(1, 3)  apply simp sorry
+next
+  case (is_null_false v_r)
+  then show ?thesis sorry
 qed
 
 lemma types_preserved_b_e:
@@ -1775,6 +1784,9 @@ next
     using e_typing_l_typing.intros(5)
     by blast
 next
+  case (func_ref fi j f fa fas s)
+  then show ?case sorry
+next
   case (get_local vi j s v vs i)
   have "local \<C> = tvs"
     using store_local_label_empty assms(2) get_local
@@ -1981,7 +1993,7 @@ next
   case (init_tab_None f j s t n icls)
   thus ?case
     by (simp add: e_typing_l_typing.intros(5))
-qed
+qed 
 
 lemma types_preserved_e2:
   assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
@@ -2067,6 +2079,15 @@ proof -
           thus ?thesis
             by (simp add: is_const_def)
         qed
+        next
+        case (null t)
+        then show ?case by (fastforce simp add: const_list_cons_last(2) is_const_def const_list_def)
+      next
+        case (is_null_true v_r)
+        then show ?case sorry
+      next
+        case (is_null_false v_r)
+        then show ?case sorry
       qed (fastforce simp add: const_list_cons_last(2) is_const_def const_list_def)+
     next
       case (label s f es s' f' es' k lholed les les')
@@ -2710,6 +2731,15 @@ next
     using progress_relop
     by fastforce
 next
+  case (null_ref \<C> t)
+  then show ?case sorry
+next
+  case (is_null_ref \<C> t)
+  then show ?case sorry
+next
+  case (func_ref \<C> j)
+  then show ?case sorry
+next
   case (unop_vec \<C> op)
   thus ?case
     using progress_unop_vec
@@ -2977,7 +3007,7 @@ next
     using v_def id_take_nth_drop j_def
     by fastforce
   thus ?case
-    using progress_L0[OF reduce.intros(8), OF vj_len] vj_len get_local(6)
+    using progress_L0[OF reduce.intros(9), OF vj_len] vj_len get_local(6)
     by fastforce
 next
   case (set_local j \<C> t)
@@ -2996,7 +3026,7 @@ next
     using v_def id_take_nth_drop j_def
     by fastforce
   thus ?case
-    using reduce.intros(9)[OF vj_len, of s v vj' "f_inst f" v'] cs_def
+    using reduce.intros(10)[OF vj_len, of s v vj' "f_inst f" v'] cs_def
     apply simp
     apply (metis (full_types) f.surjective unit.exhaust)
     done
@@ -3012,7 +3042,7 @@ next
 next
   case (get_global j \<C> t)
   thus ?case
-    using reduce.intros(10)[of s _ j] progress_L0
+    using reduce.intros(11)[of s _ j] progress_L0
     by fastforce
 next
   case (set_global j \<C> t)
@@ -3020,7 +3050,7 @@ next
     using set_global(4) const_of_typed_const_1
     by blast
   thus ?case
-    using reduce.intros(11)[of s _ j v _]
+    using reduce.intros(12)[of s _ j v _]
     by fastforce
 next
   case (load \<C> a tp_sx t off)
@@ -3040,12 +3070,12 @@ next
     proof (cases "load ((mems s)!j) (nat_of_int c) off (t_num_length t)")
       case None
       show ?thesis
-        using reduce.intros(13)[OF mem_some _ None] tp_none load(2)
+        using reduce.intros(14)[OF mem_some _ None] tp_none load(2)
         by fastforce
     next
       case (Some a)
       show ?thesis
-        using reduce.intros(12)[OF mem_some _ Some] tp_none load(2)
+        using reduce.intros(13)[OF mem_some _ Some] tp_none load(2)
         by fastforce
     qed
   next
@@ -3057,12 +3087,12 @@ next
     proof (cases "load_packed sx ((mems s)!j) (nat_of_int c) off (tp_num_length tp) (t_num_length t)")
       case None
       show ?thesis
-        using reduce.intros(15)[OF mem_some _ None] tp_some load(2)
+        using reduce.intros(16)[OF mem_some _ None] tp_some load(2)
         by fastforce
     next
       case (Some a)
       show ?thesis
-        using reduce.intros(14)[OF mem_some _ Some] tp_some load(2)
+        using reduce.intros(15)[OF mem_some _ Some] tp_some load(2)
         by fastforce
     qed
   qed
@@ -3098,12 +3128,12 @@ next
     proof (cases "store (s.mems s ! j) (nat_of_int c) off (bits_num v_num) (t_num_length t)")
       case None
       show ?thesis
-        using reduce.intros(17) mem_some None t_def tp_none store(2) c_def(3)
+        using reduce.intros(18) mem_some None t_def tp_none store(2) c_def(3)
         by blast
     next
       case (Some a)
       show ?thesis
-        using reduce.intros(16)[OF _ mem_some _ Some] t_def tp_none store(2) c_def(3)
+        using reduce.intros(17)[OF _ mem_some _ Some] t_def tp_none store(2) c_def(3)
         by blast
     qed
   next
@@ -3113,12 +3143,12 @@ next
     proof (cases "store_packed (s.mems s ! j) (nat_of_int c) off (bits_num v_num) (tp_num_length a)")
       case None
       show ?thesis
-        using reduce.intros(19) mem_some None t_def tp_some store(2) c_def(3)
+        using reduce.intros(20) mem_some None t_def tp_some store(2) c_def(3)
         by blast
     next
       case (Some a)
       show ?thesis
-        using reduce.intros(18) mem_some Some t_def tp_some store(2) c_def(3)
+        using reduce.intros(19) mem_some Some t_def tp_some store(2) c_def(3)
         by blast
     qed
   qed
@@ -3507,7 +3537,7 @@ proof -
         using 6(3)[OF 1(1) _ 1(3,4) 6(11)] 1(2)
         by fastforce
       show ?thesis
-        using reduce.intros(32)[OF temp1] progress_L0[where ?vs = cs] 6(5)
+        using reduce.intros(33)[OF temp1] progress_L0[where ?vs = cs] 6(5)
         by fastforce
     next
       case 2
