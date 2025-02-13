@@ -649,6 +649,75 @@ proof -
     by fastforce
 qed
 
+
+lemma types_preserved_null_aux:
+  assumes "s\<bullet>\<C> \<turnstile> [$Null_ref t] : tf" "tf = (ts _> ts')"
+  shows "(ts' = ts@[T_ref t])"
+using assms proof(induction "s"  "\<C>" "[$Null_ref t]" "tf" arbitrary: ts ts')
+  case (1 \<C> b_es \<S>)
+  have "b_es = [Null_ref t]"
+    using "1.hyps"(2) by fastforce
+  then have "\<C> \<turnstile> [Null_ref t] : (ts _> ts')"
+    using "1.hyps"(1) "1.prems" by fastforce
+  then have "ts' = ts@[T_ref t]"
+  proof(induction "\<C>" "[Null_ref t]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
+  qed fastforce+
+  then show ?case by simp
+qed auto
+
+lemma types_preserved_null:
+  assumes "\<lparr>[$Null_ref t]\<rparr> \<leadsto> \<lparr>[Ref (ConstNull t)]\<rparr>"
+          "s\<bullet>\<C> \<turnstile> [$Null_ref t] : (ts _> ts')"
+        shows "s\<bullet>\<C> \<turnstile> [Ref (ConstNull t)] : (ts _> ts')"
+proof -
+  have "s\<bullet>\<C> \<turnstile> [$Null_ref t] : (ts _> ts')" using assms by simp
+  then have 1: "ts' = ts@[T_ref t]" using types_preserved_null_aux by simp
+  have "s\<bullet>\<C> \<turnstile> [Ref (ConstNull t)] : ([] _> [T_ref t])"
+    by (metis e_typing_l_typing.intros(4) typeof_ref_def v_ref.simps(10))
+  then have 2: "s\<bullet>\<C> \<turnstile> [Ref (ConstNull t)] : (ts _> ts@[T_ref t])"
+    by (metis append.right_neutral e_typing_l_typing.intros(3))
+  thus ?thesis using 1 2 by simp
+qed
+
+
+lemma types_preserved_is_null:
+  assumes "\<lparr>[$C (V_ref v), $Is_null_ref]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 n)]\<rparr>"
+          "s\<bullet>\<C> \<turnstile> [$C (V_ref v), $Is_null_ref] : (ts _> ts')"
+        shows "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 n)] : (ts _> ts')"
+proof -
+  obtain ts1 where ts1_def: "s\<bullet>\<C> \<turnstile> [$C (V_ref v)] : (ts _> ts1)"
+                            "s\<bullet>\<C> \<turnstile> [$Is_null_ref] : (ts1 _> ts')"
+    by (metis append_Cons append_Nil assms(2) e_type_comp)
+  then have "ts1 = ts@[typeof (V_ref v)]"
+    by (simp add: e_type_const_new)
+  then have "\<C> \<turnstile> [Is_null_ref] : (ts@[typeof (V_ref v)] _> ts')"
+    using ts1_def(2) unlift_b_e by force
+  then have 1: "ts' = ts@[T_num T_i32]"
+    using b_e_type_is_null_ref by auto
+  have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 n)] : (ts _> ts@[T_num T_i32])"
+    by (metis append.right_neutral e_typing_l_typing.intros(3) type_const typeof_def typeof_num_def v.case(1) v_num.case(1) v_to_e_def)
+  then show ?thesis using 1 by simp
+qed
+
+lemma types_preserved_func_ref:
+  assumes
+    "length fi = j"
+    "(inst.funcs (f_inst f)) = (fi @ [fa] @ fas)"
+    "\<lparr>s;f;[$(Func_ref j)]\<rparr> \<leadsto> \<lparr>s;f;[Ref (ConstRef (fa))]\<rparr>"
+    "s\<bullet>\<C> \<turnstile> [$(Func_ref j)] : (ts _> ts')"
+    "store_typing s"
+  shows "s\<bullet>\<C> \<turnstile> [Ref (ConstRef (fa))] : (ts _> ts')"
+proof -
+  have "\<C> \<turnstile> [(Func_ref j)] : (ts _> ts')" using assms
+    by (metis to_e_list_1 unlift_b_e)
+  then have 1: "ts' = ts@[T_ref T_func_ref]" using b_e_type_func_ref by blast
+  have "s\<bullet>\<C> \<turnstile> [Ref (ConstRef (fa))] : (ts _> ts@[T_ref T_func_ref])"
+    using  typeof_ref_def v_to_e_def
+    by (metis append.right_neutral e_typing_l_typing.intros(3,4) v_ref.simps(11))
+  then show ?thesis using 1 by simp
+qed
+
+
 lemma types_preserved_tee_local:
   assumes "\<lparr>[$C v, $Tee_local i]\<rparr> \<leadsto> \<lparr>[$C v, $C v, $Set_local i]\<rparr>"
           "s\<bullet>\<C> \<turnstile> [$C v, $Tee_local i] : (ts _> ts')"
@@ -1401,13 +1470,15 @@ next
     by (simp add: e_typing_l_typing.intros(5))
 next
   case (null t)
-  then show ?thesis using assms(1, 3) apply simp sorry
+  then show ?thesis using assms(1, 3) types_preserved_null by simp
 next
   case (is_null_true v_r)
-  then show ?thesis unfolding is_null_ref_def using assms(1, 3)  apply simp sorry
+  then show ?thesis unfolding is_null_ref_def using assms(1, 3) wasm_bool_def types_preserved_is_null
+    by (simp add: v_to_e_def)
 next
   case (is_null_false v_r)
-  then show ?thesis sorry
+  then show ?thesis using assms(1, 3) wasm_bool_def v_to_e_def
+    by (simp add: types_preserved_is_null)
 qed
 
 lemma types_preserved_b_e:
@@ -1785,7 +1856,8 @@ next
     by blast
 next
   case (func_ref fi j f fa fas s)
-  then show ?case sorry
+  then show ?case using types_preserved_func_ref
+    by (simp add: reduce.func_ref)
 next
   case (get_local vi j s v vs i)
   have "local \<C> = tvs"
@@ -2079,15 +2151,6 @@ proof -
           thus ?thesis
             by (simp add: is_const_def)
         qed
-        next
-        case (null t)
-        then show ?case by (fastforce simp add: const_list_cons_last(2) is_const_def const_list_def)
-      next
-        case (is_null_true v_r)
-        then show ?case sorry
-      next
-        case (is_null_false v_r)
-        then show ?case sorry
       qed (fastforce simp add: const_list_cons_last(2) is_const_def const_list_def)+
     next
       case (label s f es s' f' es' k lholed les les')
@@ -2596,6 +2659,36 @@ proof -
   qed
 qed
 
+
+lemma progress_is_null_ref:
+  assumes "s\<bullet>\<C> \<turnstile> $C*vs : ([] _> [T_ref t])"
+          "e = Is_null_ref"
+        shows "\<exists>a s' f' es'. \<lparr>s;f;($C*vs)@([$e])\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
+proof -
+  obtain vs' v where vs'_v_def: "vs = vs'@[v]" "typeof v = T_ref t"
+    by (metis append.left_neutral assms(1) const_of_typed_const_1)
+  then obtain v_r where v_r_def: "v = V_ref v_r" "typeof_ref v_r = t"
+     using typeof_ref_def typeof_def
+     by (metis t.distinct(3) t.distinct(5) t.inject(3) v.exhaust v.simps(10) v.simps(11) v.simps(12))
+  show ?thesis
+  proof(cases "is_null_ref v_r")
+    case True
+    then have "\<lparr>s;f;($C* vs')@ [$C v] @ [$e]\<rparr>  \<leadsto> \<lparr>s;f;($C* vs')@[$EConstNum (ConstInt32 (wasm_bool True))]\<rparr>"
+      using assms(2) basic is_null_true progress_L0_left v_r_def(1) v_to_e_def by auto
+    then have "\<lparr>s;f;($C* vs) @ [$e]\<rparr>  \<leadsto> \<lparr>s;f;($C* vs')@[$EConstNum (ConstInt32 (wasm_bool True))]\<rparr>"
+      by (simp add: vs'_v_def(1))
+    then show ?thesis by blast
+  next
+    case False
+    then have "\<lparr>s;f;($C* vs')@ [$C v] @ [$e]\<rparr>  \<leadsto> \<lparr>s;f;($C* vs')@[$EConstNum (ConstInt32 (wasm_bool False))]\<rparr>"
+      using assms(2) basic is_null_false progress_L0_left v_r_def(1) v_to_e_def by auto
+    then have "\<lparr>s;f;($C* vs) @ [$e]\<rparr>  \<leadsto> \<lparr>s;f;($C* vs')@[$EConstNum (ConstInt32 (wasm_bool False))]\<rparr>"
+      by (simp add: vs'_v_def(1))
+    then show ?thesis by blast
+  qed
+qed
+
+
 lemma progress_unop_vec:
   assumes "s\<bullet>\<C> \<turnstile> $C*vs : ([] _> [T_vec t])"
           "e = Unop_vec op"
@@ -2698,6 +2791,7 @@ lemma progress_b_e:
           "length (local \<C>) = length (f_locs f)"
           "length (memory \<C>) = length (inst.mems (f_inst f))"
           "(types_t \<C>) = types (f_inst f)"
+          "length (func_t \<C>) = length (inst.funcs (f_inst f))"
   shows "\<exists>a s' f' es'. \<lparr>s;f;($C*vs)@($*b_es)\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
   using assms
 proof (induction b_es "(ts _> ts')" arbitrary: ts ts' vs rule: b_e_typing.induct)
@@ -2732,13 +2826,30 @@ next
     by fastforce
 next
   case (null_ref \<C> t)
-  then show ?case sorry
+  then show ?case
+    by (metis basic null progress_L0_left to_e_list_1)
 next
   case (is_null_ref \<C> t)
-  then show ?case sorry
+  then show ?case
+    using progress_is_null_ref
+    by fastforce
 next
-  case (func_ref \<C> j)
-  then show ?case sorry
+  case (func_ref j \<C>)
+  then have "j < length (inst.funcs (f_inst f))" by simp
+
+  obtain fj fi fj' where f_def:"fi = inst.funcs (f_inst f) ! j" "fj = (take j (inst.funcs (f_inst f)))" "fj' = (drop (j+1) (inst.funcs (f_inst f)))"
+    by blast
+  have j_def:"j < length (inst.funcs (f_inst f))"
+    using func_ref.hyps func_ref.prems(8) by metis
+  hence fj_len:"length fj = j"
+    using f_def(2)
+    by fastforce
+  hence 1: "inst.funcs (f_inst f) = fj @ [fi] @ fj'"
+    by (metis Cons_eq_appendI Suc_eq_plus1 append_eq_conv_conj append_self_conv2 drop_Suc_nth f_def(1) f_def(2) f_def(3) j_def)
+  then have "\<lparr>s;f;[$Func_ref j]\<rparr>  \<leadsto> \<lparr>s;f;[Ref (ConstRef fi)]\<rparr>"
+    using reduce.func_ref[OF fj_len 1] by simp
+  then show ?case
+    by (metis progress_L0_left to_e_list_1)
 next
   case (unop_vec \<C> op)
   thus ?case
@@ -3298,7 +3409,7 @@ next
         by simp
     qed
     thus ?thesis
-      using composition(7,9,10,11) composition(2)[OF composition(5) _ _ 1]
+      using composition(7,9,10,11,12) composition(2)[OF composition(5) _ _ 1]
             progress_L0[of s _ "(($C*vs) @ ($* es))" _ _ _ "[]" "[$e]"]
       unfolding const_list_def
       by fastforce
@@ -3383,6 +3494,7 @@ proof -
        length (local \<C>) = length (f_locs f) \<Longrightarrow>
        length (memory \<C>) = length (inst.mems (f_inst f))  \<Longrightarrow>
        length (table \<C>) = length (inst.tabs (f_inst f))  \<Longrightarrow>
+       length (func_t \<C>) = length (inst.funcs (f_inst f)) \<Longrightarrow>
        types_t \<C> = inst.types (f_inst f) \<Longrightarrow>
          \<exists>a s' f' cs_es'. \<lparr>s;f;cs_es\<rparr> \<leadsto> \<lparr>s';f';cs_es'\<rparr>"
    and prems2:
@@ -3414,7 +3526,7 @@ proof -
         using 2(5,6) True
         by (metis append_assoc e_type_comp_conc1 map_append)
       show ?thesis
-        using 2(4)[OF 2(5) _ t_ts''_is] 2(5-16) t_vcs_is
+        using 2(4)[OF 2(5) _ t_ts''_is] 2(5-17) t_vcs_is
         by auto
     next
       case False
@@ -3499,7 +3611,7 @@ proof -
           using 2(3)[OF _ _ _ _ _ False _ 2(12, 13, 14, 15)] preds 2(5)
                 progress_L0[of s f "(($C*cs) @ es)" _ _ _ "[]" "[e]"]
           apply simp
-          apply (metis "2.prems"(2,3,12) consts_app_ex(2) consts_const_list e_type_const_conv_vs outer_False)
+          apply (metis "2.prems"(2,3,12,13) consts_app_ex(2) consts_const_list e_type_const_conv_vs outer_False)
           done
       qed
     qed
@@ -3779,10 +3891,13 @@ proof -
          "length (memory \<C>) = length (inst.mems (f_inst f))"
          "length (table \<C>) = length (inst.tabs (f_inst f))"
          "types_t \<C> = inst.types (f_inst f)"
+         
       using store_local_label_empty 11(1) store_mem_exists store_tab_exists store_types_exists
       unfolding frame_typing.simps
       by fastforce+
-    thus ?case
+    moreover have "length (func_t \<C>) = length (inst.funcs (f_inst f))"
+      using "11.hyps"(1) frame_typing.simps inst_typing_func_length by force
+    ultimately show ?case
       using 11(3)[OF 11(2) _ _ 11(4) _ 11(6,7,8), of "[]" "[]" f] 11(5)
             e_typing_l_typing.intros(1)[OF b_e_typing.empty[of "\<C>\<lparr>return := rs\<rparr>"]]
       unfolding const_list_def

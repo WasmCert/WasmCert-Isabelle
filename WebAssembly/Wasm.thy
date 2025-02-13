@@ -12,7 +12,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
   \<comment> \<open>\<open>references\<close>\<close>
 | null_ref:"\<C> \<turnstile> [Null_ref t] :([] _> [T_ref t])"
 | is_null_ref:"\<C> \<turnstile> [Is_null_ref] :([T_ref t] _> [T_num T_i32])"
-| func_ref:"\<C> \<turnstile> [Func_ref j] :([] _> [T_ref T_func_ref])"
+| func_ref:"\<lbrakk>j < length (func_t \<C>)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Func_ref j] :([] _> [T_ref T_func_ref])"
   \<comment> \<open>\<open>vector ops\<close>\<close>
 | unop_vec:"\<C> \<turnstile> [Unop_vec op]  : ([T_vec T_v128]   _> [T_vec T_v128])"
 | binop_vec:"\<lbrakk>binop_vec_wf op\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Binop_vec op]  : ([T_vec T_v128, T_vec T_v128]   _> [T_vec T_v128])"
@@ -176,8 +176,8 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
 | reinterpret:"(typeof_num v) = t1 \<Longrightarrow> \<lparr>[$(EConstNum v), $(Cvtop t2 Reinterpret t1 None)]\<rparr> \<leadsto> \<lparr>[$(EConstNum (wasm_reinterpret t2 v))]\<rparr>"
   \<comment> \<open>\<open>references\<close>\<close>
 | null: "\<lparr>[$(Null_ref t)]\<rparr> \<leadsto> \<lparr>[Ref (ConstNull t)]\<rparr>"
-| is_null_true: "is_null_ref v_r \<Longrightarrow> \<lparr>[Ref v_r]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 (wasm_bool True))]\<rparr>"
-| is_null_false: "is_not_null_ref v_r \<Longrightarrow> \<lparr>[Ref v_r]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 (wasm_bool False))]\<rparr>"
+| is_null_true: "is_null_ref v_r \<Longrightarrow> \<lparr>[Ref v_r, $Is_null_ref]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 (wasm_bool True))]\<rparr>"
+| is_null_false: "\<not>is_null_ref v_r \<Longrightarrow> \<lparr>[Ref v_r, $Is_null_ref]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 (wasm_bool False))]\<rparr>"
   \<comment> \<open>\<open>unary vector ops\<close>\<close>
 | unop_vec:"\<lparr>[$EConstVec v, $(Unop_vec op)]\<rparr> \<leadsto> \<lparr>[$EConstVec (app_unop_vec op v)]\<rparr>"
   \<comment> \<open>\<open>binary vector ops\<close>\<close>

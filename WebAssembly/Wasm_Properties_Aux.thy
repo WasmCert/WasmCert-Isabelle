@@ -415,6 +415,18 @@ lemma b_e_type_cvtop:
   unfolding arity_1_result_def
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
+lemma b_e_type_is_null_ref:
+  assumes "\<C> \<turnstile> [Is_null_ref] : (ts _> ts')"
+  shows "\<exists>ts'' t. ts = ts''@[T_ref t] \<and> ts' = ts''@[T_num T_i32]"
+  using assms
+  by (induction"[Is_null_ref]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
+lemma b_e_type_func_ref:
+  assumes "\<C> \<turnstile> [Func_ref i] : (ts _> ts')"
+  shows "ts' = ts@[T_ref T_func_ref]"
+  using assms
+  by (induction"[Func_ref i]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
 lemma b_e_type_unop_vec:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Unop_vec op"

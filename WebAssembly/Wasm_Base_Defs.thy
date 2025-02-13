@@ -329,9 +329,6 @@ definition is_null_ref :: "v_ref \<Rightarrow> bool" where
                      ConstNull t_ref \<Rightarrow> True
                    | _ \<Rightarrow> False)"
 
-definition is_not_null_ref :: "v_ref \<Rightarrow> bool" where
-  "is_not_null_ref v = (\<not>is_null_ref v)"
-
 definition typeof :: "v \<Rightarrow> t" where
   "typeof v = (case v of
                  V_num v_n \<Rightarrow> T_num (typeof_num v_n)
