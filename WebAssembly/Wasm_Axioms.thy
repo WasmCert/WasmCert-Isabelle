@@ -130,8 +130,8 @@ lemma store_tab_max:
   assumes "(store_tab t n icls = Some t')"
   shows "tab_max t = tab_max t'"
   using assms
-  unfolding store_tab_def
-  by (fastforce split: if_splits)
+  unfolding store_tab_def tab_max_def
+  by (metis (mono_tags, lifting) case_prod_conv option.inject option.simps(3) prod.collapse)
 
 lemma wasm_deserialise_num_type:"typeof_num (wasm_deserialise_num bs t) = t"
   unfolding wasm_deserialise_num_def typeof_num_def

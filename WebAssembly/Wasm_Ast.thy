@@ -161,9 +161,13 @@ datatype \<comment> \<open>block types\<close>
 
 datatype tab_t = T_tab limit_t t_ref
 
-definition t_tab_lim :: "tab_t \<Rightarrow> limit_t" where
-"t_tab_lim tt = (case tt of
+definition tab_t_lim :: "tab_t \<Rightarrow> limit_t" where
+"tab_t_lim tt = (case tt of
   T_tab lim _ \<Rightarrow> lim)"
+
+definition tab_t_reftype :: "tab_t \<Rightarrow> t_ref" where
+"tab_t_reftype tt = (case tt of
+  T_tab _ t \<Rightarrow> t)"
 
 
 type_synonym mem_t = \<comment> \<open>memory type\<close>
@@ -370,6 +374,7 @@ datatype \<comment> \<open>basic instructions\<close>
     | Nop
     | Drop
     | Select
+    | Select_typed t
     | Block tb "b_e list"
     | Loop tb "b_e list"
     | If tb "b_e list" "b_e list"
@@ -378,7 +383,7 @@ datatype \<comment> \<open>basic instructions\<close>
     | Br_table "i list" i
     | Return
     | Call i
-    | Call_indirect i
+    | Call_indirect i i
     | Get_local i
     | Set_local i
     | Tee_local i
@@ -466,7 +471,7 @@ datatype e = \<comment> \<open>administrative instruction\<close>
 
   (* only used by instantiation *)
   | Init_mem nat "byte list"
-  | Init_tab nat "v_ref list"
+  | Init_tab i nat "v_ref list"
 
 datatype Lholed =
     \<comment> \<open>L0 = v* [<hole>] e*\<close>

@@ -241,10 +241,43 @@ definition store :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes
 definition store_packed :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes \<Rightarrow> nat \<Rightarrow> mem option" where
   "store_packed = store"
 
-definition store_tab :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref list \<Rightarrow> tabinst option" where
-  "store_tab tab n vrs = (if (tab_size tab \<ge> (n+(length vrs)))
+  (* tables *)
+
+definition store_tab_list :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref list \<Rightarrow> tabinst option" where
+  "store_tab_list tab n vrs = (if (tab_size tab \<ge> (n+(length vrs)))
                           then Some (fst tab, ((take n (snd tab)) @ vrs @ (drop (n + length vrs) (snd tab))))
                           else None)"
+
+definition store_tab1 :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref \<Rightarrow> tabinst option" where
+  "store_tab1 tab n vr = (if (n < tab_size tab)
+                          then Some (fst tab, (take n (snd tab)) @ [vr] @ (drop (n + 1) (snd tab)))
+                          else None)"
+
+
+definition load_tabs :: "tabinst list \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> v_ref option" where
+  "load_tabs tables ti n = 
+    (if (ti < length tables \<and> n < tab_size (tables!ti))
+     then Some ((snd ((tables!ti)))!n)
+     else None)"
+
+
+definition store_tabs :: "tabinst list \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> v_ref \<Rightarrow> (tabinst list) option" where
+  "store_tabs tables ti n vr = 
+    (if (ti < length tables)
+     then (case (store_tab1 (tables!ti) n vr) of
+        Some tab' \<Rightarrow> Some ((take ti tables) @ [tab'] @ (drop (ti+1) tables))
+      | None \<Rightarrow> None)
+     else None)"
+
+
+definition grow_tab :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref \<Rightarrow> tabinst option" where
+  "grow_tab t n vr = (let len = (tab_size t) + n;
+                          old_limits = tab_t_lim (fst t);
+                          limits' = old_limits\<lparr>l_min:= n\<rparr>
+                       in
+                   if (len < 2^32 \<and> pred_option (\<lambda>max. len \<le> max) (tab_max t))
+                    then Some ((T_tab limits' (tab_t_reftype (fst t))), snd t @ (replicate n vr) )
+                    else None)"
 
 consts
   (* host *)
@@ -334,6 +367,16 @@ definition typeof :: "v \<Rightarrow> t" where
                  V_num v_n \<Rightarrow> T_num (typeof_num v_n)
                | V_vec v_v \<Rightarrow> T_vec (typeof_vec v_v)
                | V_ref v_r \<Rightarrow> T_ref (typeof_ref v_r))"
+
+definition is_num_type :: "t \<Rightarrow> bool" where
+  "is_num_type t = (case t of
+                      T_num _ \<Rightarrow> True
+                    | _ \<Rightarrow> False)"
+
+definition is_vec_type :: "t \<Rightarrow> bool" where
+  "is_vec_type t = (case t of
+                      T_vec _ \<Rightarrow> True
+                    | _ \<Rightarrow> False)"
 
 definition vec_lane_t :: "shape_vec \<Rightarrow> t_num" where
   "vec_lane_t sv = (case sv of
@@ -731,11 +774,23 @@ definition is_some_const_ref_func :: "v_ref option \<Rightarrow> bool" where
 definition stab_cl_ind :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> v_ref option" where
   "stab_cl_ind s i j = tab_cl_ind (tabs s) i j"
 
+(* TODO: deprecate this *)
+(*
 definition stab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v_ref option" where
   "stab s i j = (case (inst.tabs i) of (k#_) => stab_cl_ind s k j | [] => None)"
-
+*)
+definition stab:: "s \<Rightarrow> inst \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> v_ref option" where
+  "stab s i ti j = (if ti < length (inst.tabs i) then stab_cl_ind s ti j
+                        else None)"
+(* TODO: deprecate this *)
+(*
 definition stab_ind :: "inst \<Rightarrow> nat option" where
   "stab_ind i = (case (inst.tabs i) of (n#_) \<Rightarrow> Some n | [] \<Rightarrow> None)"
+*)
+definition stab_ind :: "inst \<Rightarrow> i \<Rightarrow> nat option" where
+  "stab_ind i ti = (if ti < length (inst.tabs i) then Some ((inst.tabs i)!ti)
+                        else None)"
+
 
 definition update_glob :: "global list \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v \<Rightarrow> global list" where
   "update_glob gs i j v =  (let k = sglob_ind i j in gs[k:=(gs!k)\<lparr>g_val := v\<rparr>])"
@@ -904,6 +959,7 @@ lemma is_float_t_exists:
 lemma int_float_disjoint: "is_int_t_num t = -(is_float_t_num t)"
   by simp (metis is_float_t_num_def is_int_t_num_def t_num.exhaust t_num.simps(13-16))
 
+(*
 lemma stab_unfold:
   assumes "stab s i j = Some i_cl"
   shows "\<exists>k ks. inst.tabs i = k#ks \<and>
@@ -912,6 +968,7 @@ lemma stab_unfold:
   using assms
   unfolding stab_def stab_cl_ind_def tab_cl_ind_def
   by (simp add: Let_def split: list.splits if_splits option.splits)
+*)
 
 lemma inj_basic: "inj Basic"
   by (meson e.inject(1) injI)

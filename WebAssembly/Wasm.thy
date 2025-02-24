@@ -30,7 +30,8 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | unreachable:"\<C> \<turnstile> [Unreachable] : (ts _> ts')"
 | nop:"\<C> \<turnstile> [Nop] : ([] _> [])"
 | drop:"\<C> \<turnstile> [Drop] : ([t] _> [])"
-| select:"\<C> \<turnstile> [Select] : ([t,t,T_num T_i32] _> [t])"
+| select:"is_num_type t \<or> is_vec_type t \<Longrightarrow> \<C> \<turnstile> [Select] : ([t,t,T_num T_i32] _> [t])"
+| select_typed:"\<C> \<turnstile> [Select_typed t] : ([t,t,T_num T_i32] _> [t])"
   \<comment> \<open>\<open>block\<close>\<close>
 | block:"\<lbrakk>tb_tf_t \<C> tb = Some (tn _> tm); \<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr> \<turnstile> es : (tn _> tm)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Block tb es] : (tn _> tm)"
   \<comment> \<open>\<open>loop\<close>\<close>
@@ -48,7 +49,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
   \<comment> \<open>\<open>call\<close>\<close>
 | call:"\<lbrakk>i < length(func_t \<C>); (func_t \<C>)!i = tf\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call i] : tf"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
-| call_indirect:"\<lbrakk>i < length(types_t \<C>); (types_t \<C>)!i = (t1s _> t2s); length (table \<C>) \<ge> 1; (table \<C>)!i = T_tab _  T_func_ref\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call_indirect i] : (t1s @ [T_num T_i32] _> t2s)"
+| call_indirect:"\<lbrakk>i < length(types_t \<C>); (types_t \<C>)!i = (t1s _> t2s); ti < length (table \<C>); (table \<C>)!ti = T_tab _  T_func_ref\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call_indirect ti i] : (t1s @ [T_num T_i32] _> t2s)"
   \<comment> \<open>\<open>get_local\<close>\<close>
 | get_local:"\<lbrakk>i < length(local \<C>); (local \<C>)!i = t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Get_local i] : ([] _> [t])"
   \<comment> \<open>\<open>set_local\<close>\<close>
@@ -73,6 +74,11 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | current_memory:"length (memory \<C>) \<ge> 1 \<Longrightarrow> \<C> \<turnstile> [Current_memory] : ([] _> [T_num T_i32])"
   \<comment> \<open>\<open>Grow_memory\<close>\<close>
 | grow_memory:"length (memory \<C>) \<ge> 1 \<Longrightarrow> \<C> \<turnstile> [Grow_memory] : ([T_num T_i32] _> [T_num T_i32])"
+
+| table_set: "ti < length (table \<C>) \<Longrightarrow> tab_t_reftype ((table \<C>)!ti) = tr \<Longrightarrow> \<C> \<turnstile> [Table_set ti] : ([T_num T_i32, T_ref tr] _> [])"
+| table_get: "ti < length (table \<C>) \<Longrightarrow> tab_t_reftype ((table \<C>)!ti) = tr \<Longrightarrow> \<C> \<turnstile> [Table_get ti] : ([T_num T_i32] _> [T_ref tr])"
+| table_size: "ti < length (table \<C>) \<Longrightarrow> \<C> \<turnstile> [Table_size ti] : ([] _> [T_num T_i32])"
+| table_grow: "ti < length (table \<C>) \<Longrightarrow> tab_t_reftype ((table \<C>)!ti) = tr  \<Longrightarrow> \<C> \<turnstile> [Table_grow ti] : ([T_ref tr, T_num T_i32] _> [])"
   \<comment> \<open>\<open>empty program\<close>\<close>
 | empty:"\<C> \<turnstile> [] : ([] _> [])"
   \<comment> \<open>\<open>composition\<close>\<close>
@@ -159,7 +165,8 @@ and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> boo
   (* Init_mem (instantiation) *)
 | "\<lbrakk>length (memory \<C>) \<ge> 1\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Init_mem n bs] : ([] _> [])"
   (* Init_tab (instantiation) *)
-| "\<lbrakk>length (table \<C>) \<ge> 1; list_all (\<lambda>ti. \<exists>t. ref_typing \<S> ti t) tis\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Init_tab n tis] : ([] _> [])"
+  (* TODO: review/change this and check that this is correct *)
+| "\<lbrakk>ti < length (table \<C>); list_all (\<lambda>vr. \<exists>t. ref_typing \<S> vr t) vrs\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Init_tab ti n vrs] : ([] _> [])"
 (* section: l_typing *)
 | "\<lbrakk>frame_typing \<S> f \<C>; \<S>\<bullet>\<C>\<lparr>return := rs\<rparr> \<turnstile> es : ([] _> ts)\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile> f;es : ts"
 
@@ -273,8 +280,8 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
   \<comment> \<open>\<open>call\<close>\<close>
 | call:"\<lparr>s;f;[$(Call j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke (sfunc_ind (f_inst f) j)]\<rparr>"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
-| call_indirect_Some:"\<lbrakk>(f_inst f) = i; stab s i (nat_of_int c) = Some (ConstRef i_cl); stypes i j = tf; cl_type (funcs s!i_cl) = tf\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke i_cl]\<rparr>"
-| call_indirect_None:"\<lbrakk>(f_inst f) = i; (stab s i (nat_of_int c) = Some (ConstRef i_cl) \<and> stypes i j \<noteq> cl_type (funcs s!i_cl)) \<or> \<not> is_some_const_ref_func (stab s i (nat_of_int c))\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| call_indirect_Some:"\<lbrakk>(f_inst f) = i; stab s i ti (nat_of_int c) = Some (ConstRef i_cl); stypes i j = tf; cl_type (funcs s!i_cl) = tf\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Call_indirect ti j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke i_cl]\<rparr>"
+| call_indirect_None:"\<lbrakk>(f_inst f) = i; (stab s i ti (nat_of_int c) = Some (ConstRef i_cl) \<and> stypes i j \<noteq> cl_type (funcs s!i_cl)) \<or> \<not> is_some_const_ref_func (stab s i ti (nat_of_int c))\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Call_indirect ti j)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>invoke\<close>\<close>
 | invoke_native:"\<lbrakk>(funcs s!i_cl) = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs) \<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;[Frame m \<lparr> f_locs = vcs@zs, f_inst = j \<rparr> [(Label m [] ($*es))]]\<rparr>"
 | invoke_host_Some:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs (Some (s', vcs'))\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f;($C* vcs')\<rparr>"
@@ -316,6 +323,17 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
 | grow_memory:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Grow_memory)]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[$EConstNum (ConstInt32 (int_of_nat n))]\<rparr>"
   \<comment> \<open>\<open>grow_memory fail\<close>\<close>
 | grow_memory_fail:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c),$(Grow_memory)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 int32_minus_one)]\<rparr>"
+| table_get: "\<lbrakk>stab_ind (f_inst f) ti = Some a; load_tabs (tabs s) a (nat_of_int n) = Some val \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(EConstNum (ConstInt32 n)), $(Table_get ti)]\<rparr> \<leadsto> \<lparr>s;f;[Ref val]\<rparr>"
+| table_get_fail: "\<lbrakk>(stab_ind (f_inst f) ti = None) \<or> (stab_ind (f_inst f) ti = Some a \<and> load_tabs (tabs s) a (nat_of_int n) = None) \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(EConstNum (ConstInt32 n)), $(Table_get ti)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+
+| table_set: "\<lbrakk>stab_ind (f_inst f) ti = Some a; store_tabs (tabs s) a (nat_of_int n) vr = Some tabs'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(EConstNum (ConstInt32 n)), Ref vr, $(Table_set ti)]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:= tabs'\<rparr>;f;[]\<rparr>"
+| table_set_fail: "\<lbrakk>(stab_ind (f_inst f) ti = None) \<or> (stab_ind (f_inst f) ti = Some a \<and> store_tabs (tabs s) a (nat_of_int n) vr = None)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(EConstNum (ConstInt32 n)), Ref vr, $(Table_set ti)]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:= tabs'\<rparr>;f;[]\<rparr>"
+
+| table_size: "\<lbrakk>stab_ind (f_inst f) ti = Some a; a < length (tabs s); (tabs s)!a = t; tab_size t = n\<rbrakk> \<Longrightarrow>  \<lparr>s;f;[ $(Table_size ti)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat n))]\<rparr>"
+| table_grow: "\<lbrakk>stab_ind (f_inst f) ti = Some a; a < length (tabs s); tab = (tabs s)!a; sz = tab_size tab; grow_tab tab (nat_of_int n) vr = Some tab'\<rbrakk> \<Longrightarrow>  \<lparr>s;f;[Ref vr, $EConstNum (ConstInt32 n), $(Table_grow ti)]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:= ((tabs s)[a := tab'])\<rparr>;f;[$EConstNum (ConstInt32 (int_of_nat sz))]\<rparr>"
+| table_grow_fail1: "\<lbrakk>stab_ind (f_inst f) ti = Some a; a < length (tabs s); tab = (tabs s)!a; sz = tab_size tab; grow_tab tab (nat_of_int n) vr = None\<rbrakk> \<Longrightarrow>  \<lparr>s;f;[Ref vr, $EConstNum (ConstInt32 n), $(Table_grow ti)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int32_minus_one))]\<rparr>"
+| table_grow_fail2: "\<lparr>s;f;[Ref vr, $EConstNum (ConstInt32 n), $(Table_grow ti)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int32_minus_one))]\<rparr>"
+
   \<comment> \<open>\<open>block\<close>\<close>
 | block:"\<lbrakk>length vs = n; tb_tf (f_inst f) tb = (t1s _> t2s); length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>s;f;($C* vs) @ [$(Block tb es)]\<rparr> \<leadsto> \<lparr>s;f;[Label m [] (($C* vs) @ ($* es))]\<rparr>"
   \<comment> \<open>\<open>loop\<close>\<close>
@@ -328,8 +346,8 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
   (* instantiation helpers *)
 | init_mem_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; store m n 0 bs (length bs) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_mem n bs]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[]\<rparr>"
 | init_mem_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; store m n 0 bs (length bs) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_mem n bs]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
-| init_tab_Some:"\<lbrakk>stab_ind (f_inst f) = Some j; ((tabs s)!j) = t; store_tab t n icls = Some tab'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_tab n icls]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:= ((tabs s)[j := tab'])\<rparr>;f;[]\<rparr>"
-| init_tab_None:"\<lbrakk>stab_ind (f_inst f) = Some j; ((tabs s)!j) = t; store_tab t n icls = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_tab n icls]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| init_tab_Some:"\<lbrakk>stab_ind (f_inst f) ti = Some j; ((tabs s)!j) = t; store_tab_list t n icls = Some tab'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_tab ti n icls]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:= ((tabs s)[j := tab'])\<rparr>;f;[]\<rparr>"
+| init_tab_None:"\<lbrakk>stab_ind (f_inst f) ti = Some j; ((tabs s)!j) = t; store_tab_list t n icls = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_tab ti n icls]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
 
 definition reduce_trans where
   "reduce_trans \<equiv> (\<lambda>(s,f,es) (s',f',es'). \<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>)^**"
