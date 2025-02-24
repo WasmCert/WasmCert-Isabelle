@@ -241,9 +241,9 @@ definition store :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes
 definition store_packed :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes \<Rightarrow> nat \<Rightarrow> mem option" where
   "store_packed = store"
 
-definition store_tab :: "tabinst \<Rightarrow> nat \<Rightarrow> i list \<Rightarrow> tabinst option" where
-  "store_tab tab n icls = (if (tab_size tab \<ge> (n+(length icls)))
-                          then Some (((take n (fst tab)) @ (map Some icls) @ (drop (n + length icls) (fst tab))), snd tab)
+definition store_tab :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref list \<Rightarrow> tabinst option" where
+  "store_tab tab n vrs = (if (tab_size tab \<ge> (n+(length vrs)))
+                          then Some (fst tab, ((take n (snd tab)) @ vrs @ (drop (n + length vrs) (snd tab))))
                           else None)"
 
 consts
@@ -717,15 +717,21 @@ definition sglob_val :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v"
 definition smem_ind :: "inst \<Rightarrow> nat option" where
   "smem_ind i = (case (inst.mems i) of (n#_) \<Rightarrow> Some n | [] \<Rightarrow> None)"
 
-definition tab_cl_ind :: "tabinst list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> i option" where
-  "tab_cl_ind st i j = (let stabinst = fst (st!i) in
-                       (if ((length stabinst) > j) then (stabinst!j)
+definition tab_cl_ind :: "tabinst list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> v_ref option" where
+  "tab_cl_ind st i j = (let stabinst = snd (st!i) in
+                       (if ((length stabinst) > j) then Some (stabinst!j)
                         else None))"
 
-definition stab_cl_ind :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> i option" where
+definition is_some_const_ref_func :: "v_ref option \<Rightarrow> bool" where
+  "is_some_const_ref_func x = (case x of
+    Some (ConstRef i) \<Rightarrow> True
+  | _ \<Rightarrow> False
+)"
+
+definition stab_cl_ind :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> v_ref option" where
   "stab_cl_ind s i j = tab_cl_ind (tabs s) i j"
 
-definition stab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> i option" where
+definition stab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v_ref option" where
   "stab s i j = (case (inst.tabs i) of (k#_) => stab_cl_ind s k j | [] => None)"
 
 definition stab_ind :: "inst \<Rightarrow> nat option" where

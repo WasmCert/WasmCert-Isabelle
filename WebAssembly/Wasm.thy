@@ -48,7 +48,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
   \<comment> \<open>\<open>call\<close>\<close>
 | call:"\<lbrakk>i < length(func_t \<C>); (func_t \<C>)!i = tf\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call i] : tf"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
-| call_indirect:"\<lbrakk>i < length(types_t \<C>); (types_t \<C>)!i = (t1s _> t2s); length (table \<C>) \<ge> 1\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call_indirect i] : (t1s @ [T_num T_i32] _> t2s)"
+| call_indirect:"\<lbrakk>i < length(types_t \<C>); (types_t \<C>)!i = (t1s _> t2s); length (table \<C>) \<ge> 1; (table \<C>)!i = T_tab _  T_func_ref\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call_indirect i] : (t1s @ [T_num T_i32] _> t2s)"
   \<comment> \<open>\<open>get_local\<close>\<close>
 | get_local:"\<lbrakk>i < length(local \<C>); (local \<C>)!i = t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Get_local i] : ([] _> [t])"
   \<comment> \<open>\<open>set_local\<close>\<close>
@@ -90,7 +90,15 @@ definition "limits_compat lt1 lt2 =
                             Some lt1_the \<Rightarrow> (lt1_the \<le> lt2_the)
                           | None \<Rightarrow> False)) (l_max lt2))"
 
-definition "tab_typing t tt = (limits_compat \<lparr>l_min=(tab_size t),l_max=(tab_max t)\<rparr> tt)"
+(* TODO: do I need to check that every entry in ts has the needed reference type?
+It seems no:
+https://webassembly.github.io/spec/core/appendix/properties.html#valid-moduleinst
+This check seems to be performed as part of store typing:
+https://webassembly.github.io/spec/core/appendix/properties.html#valid-tableinst
+*)
+definition "tab_typing t tt = (case (t, tt) of
+ ((T_tab _ tr', lims'),  T_tab lims tr) \<Rightarrow> (limits_compat \<lparr>l_min=(tab_size t),l_max=(tab_max t)\<rparr> lims) \<and> tr = tr')"
+(*    \<and> list_all (\<lambda> vr. typeof_ref vr = tr) (snd t))"*)
 
 definition "tabi_agree ts n tab_t =
   ((n < length ts) \<and> (tab_typing (ts!n) tab_t))"
@@ -102,6 +110,13 @@ definition "memi_agree ms n mem_t =
 
 definition "funci_agree fs n f = (n < length fs \<and> (cl_type (fs!n)) = f)"
 
+
+(* 'inst' seems to be 'moduleinst' *)
+(* the rule described here is this:
+https://webassembly.github.io/spec/core/appendix/properties.html#valid-moduleinst
+Old one is here:
+https://webassembly.github.io/JS-BigInt-integration/core/appendix/properties.html#module-instances
+*)
 inductive inst_typing :: "[s, inst, t_context] \<Rightarrow> bool" where
   "\<lbrakk>list_all2 (funci_agree (funcs s)) fs tfs;
     list_all2 (globi_agree (globs s)) gs tgs;
@@ -117,6 +132,10 @@ inductive cl_typing :: "[s, cl, tf] \<Rightarrow> bool" where
    "\<lbrakk>inst_typing s i \<C>; tf = (t1s _> t2s); \<C>\<lparr>local := t1s @ ts, label := ([t2s] @ (label \<C>)), return := Some t2s\<rparr> \<turnstile> es : ([] _> t2s)\<rbrakk> \<Longrightarrow> cl_typing s (Func_native i tf ts es) (t1s _> t2s)"
  |  "cl_typing s (Func_host tf h) tf"
 
+inductive ref_typing :: "[s, v_ref, t_ref] => bool" where
+   "ref_typing s (ConstNull t) (t)"
+ | "f < length (funcs s) \<Longrightarrow> ref_typing s (ConstRef f) (T_func_ref)"
+ | "ref_typing s (ConstRefExtern _) (T_ext_ref)"
 
 (* lifting the b_e_typing relation to the administrative operators *)
 inductive e_typing :: "[s, t_context, e list, tf] \<Rightarrow> bool" ("_\<bullet>_ \<turnstile> _ : _" 60)
@@ -128,7 +147,7 @@ and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> boo
 | "\<lbrakk>\<S>\<bullet>\<C> \<turnstile> es : (t1s _> t2s); \<S>\<bullet>\<C> \<turnstile> [e] : (t2s _> t3s)\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> es @ [e] : (t1s _> t3s)"
   (* weakening *)
 | "\<S>\<bullet>\<C> \<turnstile> es : (t1s _> t2s) \<Longrightarrow>\<S>\<bullet>\<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"
-| "\<S>\<bullet>\<C> \<turnstile> [Ref v_r] :([] _> [T_ref (typeof_ref v_r)])"
+| "ref_typing \<S> v_r t \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Ref v_r] :([] _> [T_ref t])"
   (* trap *)
 | "\<S>\<bullet>\<C> \<turnstile> [Trap] : tf"
   (* frame *)
@@ -140,18 +159,35 @@ and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> boo
   (* Init_mem (instantiation) *)
 | "\<lbrakk>length (memory \<C>) \<ge> 1\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Init_mem n bs] : ([] _> [])"
   (* Init_tab (instantiation) *)
-| "\<lbrakk>length (table \<C>) \<ge> 1; list_all (\<lambda>ti. ti < length (funcs \<S>)) tis\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Init_tab n tis] : ([] _> [])"
+| "\<lbrakk>length (table \<C>) \<ge> 1; list_all (\<lambda>ti. \<exists>t. ref_typing \<S> ti t) tis\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Init_tab n tis] : ([] _> [])"
 (* section: l_typing *)
 | "\<lbrakk>frame_typing \<S> f \<C>; \<S>\<bullet>\<C>\<lparr>return := rs\<rparr> \<turnstile> es : ([] _> ts)\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile> f;es : ts"
 
+
+inductive v_typing :: "s \<Rightarrow> v \<Rightarrow> t \<Rightarrow> bool" where
+  "v_typing s (V_num vn) (T_num (typeof_num vn))" |
+  "v_typing s (V_vec vv) (T_vec (typeof_vec vv))" |
+  "ref_typing s vr t \<Longrightarrow> v_typing s (V_ref vr) (T_ref t)"
+
+definition "glob_agree" :: "s \<Rightarrow> global \<Rightarrow> bool" where
+  "glob_agree s glob = (\<exists> t. v_typing s (g_val glob) t)"
+(*
 definition "tab_agree s tab =
   ((list_all (\<lambda>i_opt. (case i_opt of None \<Rightarrow> True | Some i \<Rightarrow> i < length (funcs s))) (fst tab)) \<and>
    pred_option (\<lambda>max. (tab_size tab) \<le> max) (tab_max tab))"
+*)
 
+definition "tab_agree" :: "s \<Rightarrow> tabinst \<Rightarrow> bool" where
+  "tab_agree s tab = (list_all (\<lambda>vr. (ref_typing s vr (tab_reftype tab))) (snd tab)
+  \<and> pred_option (\<lambda>max. (tab_size tab) \<le> max) (tab_max tab))"
+
+(* TODO: should there be more rules here? *)
+(* TODO:  Fix adding this: https://webassembly.github.io/spec/core/appendix/properties.html#valid-tableinst *)
 inductive store_typing :: "s \<Rightarrow> bool" where
   "\<lbrakk>list_all (\<lambda>cl. \<exists>tf. cl_typing s cl tf) (funcs s);
     list_all (tab_agree s) (tabs s);
-    list_all mem_agree (mems s)
+    list_all mem_agree (mems s);
+    list_all (glob_agree s) (globs s)
     \<rbrakk> \<Longrightarrow> store_typing s"
 
 inductive config_typing :: "[s, f, e list, t list] \<Rightarrow> bool" ("\<turnstile> _;_;_ : _" 60) where
@@ -237,8 +273,8 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
   \<comment> \<open>\<open>call\<close>\<close>
 | call:"\<lparr>s;f;[$(Call j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke (sfunc_ind (f_inst f) j)]\<rparr>"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
-| call_indirect_Some:"\<lbrakk>(f_inst f) = i; stab s i (nat_of_int c) = Some i_cl; stypes i j = tf; cl_type (funcs s!i_cl) = tf\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke i_cl]\<rparr>"
-| call_indirect_None:"\<lbrakk>(f_inst f) = i; (stab s i (nat_of_int c) = Some i_cl \<and> stypes i j \<noteq> cl_type (funcs s!i_cl)) \<or> stab s i (nat_of_int c) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| call_indirect_Some:"\<lbrakk>(f_inst f) = i; stab s i (nat_of_int c) = Some (ConstRef i_cl); stypes i j = tf; cl_type (funcs s!i_cl) = tf\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke i_cl]\<rparr>"
+| call_indirect_None:"\<lbrakk>(f_inst f) = i; (stab s i (nat_of_int c) = Some (ConstRef i_cl) \<and> stypes i j \<noteq> cl_type (funcs s!i_cl)) \<or> \<not> is_some_const_ref_func (stab s i (nat_of_int c))\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>invoke\<close>\<close>
 | invoke_native:"\<lbrakk>(funcs s!i_cl) = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs) \<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;[Frame m \<lparr> f_locs = vcs@zs, f_inst = j \<rparr> [(Label m [] ($*es))]]\<rparr>"
 | invoke_host_Some:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs (Some (s', vcs'))\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f;($C* vcs')\<rparr>"

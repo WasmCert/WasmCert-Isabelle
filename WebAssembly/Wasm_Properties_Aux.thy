@@ -153,20 +153,29 @@ next
     by blast
 qed auto
 
-lemma type_const: "\<S>\<bullet>\<C> \<turnstile> [$C v] : ([] _> [typeof v])"
+(*lemma type_const: "\<S>\<bullet>\<C> \<turnstile> [$C v] : ([] _> [typeof v])"*)
+lemma type_const:
+  assumes "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')"
+  shows "ts' = ts@[typeof v]"
+        "(\<exists>f. v = V_ref (ConstRef f) \<longrightarrow> f < length (funcs \<S>))"
+  sorry
+(*
 proof(cases v)
   case (V_num x1)
-  then show ?thesis unfolding typeof_def using V_num
-      const_num e_typing_l_typing.intros(1) v_to_e_def by fastforce
+  then show ?thesis sorry
+    
+    (*unfolding typeof_def using V_num
+      const_num e_typing_l_typing.intros(1) v_to_e_def by fastforce*)
 next
   case (V_vec x2)
-  then show ?thesis unfolding typeof_def
-    using const_vec e_typing_l_typing.intros(1) v_to_e_def by fastforce
+  then show ?thesis sorry
+ (* unfolding typeof_def
+    using const_vec e_typing_l_typing.intros(1) v_to_e_def by fastforce*)
 next
   case (V_ref x3)
-  then show ?thesis
-    by (simp add: e_typing_l_typing.intros(4) typeof_def v_to_e_def)
-qed
+  then show ?thesis sorry
+   (* by (simp add: e_typing_l_typing.intros(4) typeof_def v_to_e_def)*)
+qed*)
 
 lemma stab_some_length:
   assumes "stab s i c = Some i_cl"
@@ -1571,6 +1580,7 @@ next
   have "\<S>\<bullet>\<C> \<turnstile> [e] : (ts _> ts')" by (simp add: assms)
   then have "ts' = ts @ [T_ref (typeof_ref x6)]" using e_type_cref
     by (simp add: Ref)
+  moreover have "ref_typing \<S> x6" sorry
   moreover
   have "\<S>'\<bullet>\<C>' \<turnstile> [e] : ([] _> [T_ref (typeof_ref x6)])"
     by (simp add: Ref e_typing_l_typing.intros(4))
@@ -2294,6 +2304,10 @@ lemma e_typing_l_typing_store_extension_inv:
         "s\<bullet>rs \<tturnstile> f;es : ts \<Longrightarrow> s'\<bullet>rs \<tturnstile> f;es : ts"
   using assms
 proof (induction s \<C> es tf and s rs f es ts rule: e_typing_l_typing.inducts)
+
+  case (4 \<S> v_r \<C>)
+  then show ?case sorry
+next
   case (7 i \<S> tf \<C>)
   have "i < length (s.funcs s')"
     using 7(1,3)

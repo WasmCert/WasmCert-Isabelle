@@ -62,11 +62,6 @@ free_constructors case_limit_t_ext for limit_t_ext
   using limit_t.cases_scheme
   by blast+
 
-type_synonym tab_t = \<comment> \<open>table type\<close>
-  "limit_t"
-
-type_synonym mem_t = \<comment> \<open>memory type\<close>
-  "limit_t"
 
 definition Ki64 :: "nat" where
   "Ki64 = 65536"
@@ -164,6 +159,16 @@ hide_const (open) tf.dom tf.ran
 datatype \<comment> \<open>block types\<close>
   tb = Tbf i | Tbv "t option"
 
+datatype tab_t = T_tab limit_t t_ref
+
+definition t_tab_lim :: "tab_t \<Rightarrow> limit_t" where
+"t_tab_lim tt = (case tt of
+  T_tab lim _ \<Rightarrow> lim)"
+
+
+type_synonym mem_t = \<comment> \<open>memory type\<close>
+  "limit_t"
+
 (* TYPING *)
 record t_context =
   types_t :: "tf list"
@@ -183,7 +188,7 @@ datatype \<comment> \<open>numeric values\<close>
 
 datatype
   v_ref = ConstNull t_ref
-  | ConstRef i
+  | ConstRef i (* TODO: rename this ConstRefFunc *)
   | ConstRefExtern host
 
 datatype \<comment> \<open>vector values\<close>
@@ -379,6 +384,10 @@ datatype \<comment> \<open>basic instructions\<close>
     | Tee_local i
     | Get_global i
     | Set_global i
+    | Table_get i
+    | Table_set i
+    | Table_size i
+    | Table_grow i
     | Load t_num "(tp_num \<times> sx) option" a off
     | Store t_num "tp_num option" a off
     | Load_vec loadop_vec a off
@@ -396,7 +405,7 @@ datatype \<comment> \<open>basic instructions\<close>
     | Cvtop t_num cvtop t_num "(sat \<times> sx) option"
     | Null_ref t_ref
     | Is_null_ref
-    | Func_ref i
+    | Func_ref i (* should be Ref_func *)
     | Unop_vec unop_vec
     | Binop_vec binop_vec
     | Ternop_vec ternop_vec
@@ -421,10 +430,17 @@ datatype cl = \<comment> \<open>function closures\<close>
   Func_native inst tf "t list" "b_e list"
 | Func_host tf host
 
-type_synonym tabinst = "(i option) list \<times> nat option"
+(* type_synonym tabinst = "(i option) list \<times> nat option" *)
+type_synonym tabinst = "tab_t \<times> v_ref list"
 
-abbreviation "tab_size (t::tabinst) \<equiv> length (fst t)"
-abbreviation "tab_max (t::tabinst) \<equiv> snd t"
+abbreviation "tab_size (t::tabinst) \<equiv> length (snd t)"
+definition tab_max :: "tabinst \<Rightarrow> nat option" where
+  "tab_max t \<equiv> (case t of
+    (T_tab limits _, _) \<Rightarrow> l_max limits)"
+
+definition tab_reftype :: "tabinst \<Rightarrow> t_ref" where
+  "tab_reftype t \<equiv> (case (fst t) of
+    T_tab _ tt \<Rightarrow> tt)"
 
 record global =
   g_mut :: mut
@@ -450,7 +466,7 @@ datatype e = \<comment> \<open>administrative instruction\<close>
 
   (* only used by instantiation *)
   | Init_mem nat "byte list"
-  | Init_tab nat "i list"
+  | Init_tab nat "v_ref list"
 
 datatype Lholed =
     \<comment> \<open>L0 = v* [<hole>] e*\<close>
