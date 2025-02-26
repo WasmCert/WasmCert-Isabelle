@@ -243,6 +243,11 @@ definition store_packed :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow
 
   (* tables *)
 
+  (* TODO: think of better convention for these names *)
+  (* currently 'tab' means that a single table instance is taken as argument *)
+  (* currently 'tabs' means that a list of tables is taken as an argument *)
+  (* '1' means a single element is stored/retrieved to/from tables *)
+  (* '_list' means that a list of elements is stored in tables *)
 definition store_tab_list :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref list \<Rightarrow> tabinst option" where
   "store_tab_list tab n vrs = (if (tab_size tab \<ge> (n+(length vrs)))
                           then Some (fst tab, ((take n (snd tab)) @ vrs @ (drop (n + length vrs) (snd tab))))
@@ -254,15 +259,15 @@ definition store_tab1 :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref \<Righta
                           else None)"
 
 
-definition load_tabs :: "tabinst list \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> v_ref option" where
-  "load_tabs tables ti n = 
+definition load_tabs1 :: "tabinst list \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> v_ref option" where
+  "load_tabs1 tables ti n = 
     (if (ti < length tables \<and> n < tab_size (tables!ti))
      then Some ((snd ((tables!ti)))!n)
      else None)"
 
 
-definition store_tabs :: "tabinst list \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> v_ref \<Rightarrow> (tabinst list) option" where
-  "store_tabs tables ti n vr = 
+definition store_tabs1 :: "tabinst list \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> v_ref \<Rightarrow> (tabinst list) option" where
+  "store_tabs1 tables ti n vr = 
     (if (ti < length tables)
      then (case (store_tab1 (tables!ti) n vr) of
         Some tab' \<Rightarrow> Some ((take ti tables) @ [tab'] @ (drop (ti+1) tables))

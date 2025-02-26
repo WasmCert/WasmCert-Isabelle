@@ -119,18 +119,18 @@ lemma store_packed_max:
   unfolding store_packed_def
   by simp
 
-lemma store_tab_size:
-  assumes "(store_tab t n icls = Some t')"
+lemma store_tab_list_size:
+  assumes "(store_tab_list t n icls = Some t')"
   shows "tab_size t = tab_size t'"
   using assms
-  unfolding store_tab_def
+  unfolding store_tab_list_def
   by (fastforce split: if_splits)
 
-lemma store_tab_max:
-  assumes "(store_tab t n icls = Some t')"
+lemma store_tab_list_max:
+  assumes "(store_tab_list t n icls = Some t')"
   shows "tab_max t = tab_max t'"
   using assms
-  unfolding store_tab_def tab_max_def
+  unfolding store_tab_list_def tab_max_def
   by (metis (mono_tags, lifting) case_prod_conv option.inject option.simps(3) prod.collapse)
 
 lemma wasm_deserialise_num_type:"typeof_num (wasm_deserialise_num bs t) = t"
