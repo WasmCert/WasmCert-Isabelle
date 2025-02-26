@@ -785,7 +785,7 @@ definition stab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v_ref o
   "stab s i j = (case (inst.tabs i) of (k#_) => stab_cl_ind s k j | [] => None)"
 *)
 definition stab:: "s \<Rightarrow> inst \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> v_ref option" where
-  "stab s i ti j = (if ti < length (inst.tabs i) then stab_cl_ind s ti j
+  "stab s i ti j = (if ti < length (inst.tabs i) then stab_cl_ind s ((inst.tabs i)!ti) j
                         else None)"
 (* TODO: deprecate this *)
 (*
@@ -964,16 +964,15 @@ lemma is_float_t_exists:
 lemma int_float_disjoint: "is_int_t_num t = -(is_float_t_num t)"
   by simp (metis is_float_t_num_def is_int_t_num_def t_num.exhaust t_num.simps(13-16))
 
-(*
 lemma stab_unfold:
-  assumes "stab s i j = Some i_cl"
-  shows "\<exists>k ks. inst.tabs i = k#ks \<and>
-                     length (fst ((tabs s)!k)) > j \<and>
-                     (fst ((tabs s)!k))!j = Some i_cl"
+  assumes "stab s i ti j = Some (ConstRef i_cl)"
+  shows "\<exists>k. length (inst.tabs i) > ti \<and>
+                     k =(inst.tabs i)!ti \<and>
+                     length (snd ((tabs s)!k)) > j \<and>
+                     (snd ((tabs s)!k))!j = (ConstRef i_cl)"
   using assms
   unfolding stab_def stab_cl_ind_def tab_cl_ind_def
   by (simp add: Let_def split: list.splits if_splits option.splits)
-*)
 
 lemma inj_basic: "inj Basic"
   by (meson e.inject(1) injI)

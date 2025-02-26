@@ -153,58 +153,35 @@ next
     by blast
 qed auto
 
-(*lemma type_const: "\<S>\<bullet>\<C> \<turnstile> [$C v] : ([] _> [typeof v])"*)
-lemma type_const:
-  assumes "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')"
-  shows "ts' = ts@[typeof v]"
-        "(\<exists>f. v = V_ref (ConstRef f) \<longrightarrow> f < length (funcs \<S>))"
-  sorry
-(*
-proof(cases v)
-  case (V_num x1)
-  then show ?thesis sorry
-    
-    (*unfolding typeof_def using V_num
-      const_num e_typing_l_typing.intros(1) v_to_e_def by fastforce*)
-next
-  case (V_vec x2)
-  then show ?thesis sorry
- (* unfolding typeof_def
-    using const_vec e_typing_l_typing.intros(1) v_to_e_def by fastforce*)
-next
-  case (V_ref x3)
-  then show ?thesis sorry
-   (* by (simp add: e_typing_l_typing.intros(4) typeof_def v_to_e_def)*)
-qed*)
-
 lemma stab_some_length:
-  assumes "stab s i c = Some i_cl"
+  assumes "stab s i ti c = Some (ConstRef i_cl)"
           "inst_typing s i \<C>"
           "store_typing s"
         shows "i_cl < length (funcs s)"
 proof -
-  obtain k ks where k_is:
-     "inst.tabs i = k # ks"
+  obtain k where k_is:
+     "length (inst.tabs i) > ti"
+     "k =(inst.tabs i)!ti "
      "c < tab_size (s.tabs s ! k)"
-     "fst (s.tabs s ! k) ! c = Some i_cl"
+     "snd (s.tabs s ! k) ! c = (ConstRef i_cl)"
     using stab_unfold[OF assms(1)]
     by blast
   have "k < length (tabs s)"
-    using assms(2) k_is(1)
+    using assms(2) k_is(1,2,3)
     unfolding inst_typing.simps
-    by (metis inst.select_convs(3) list_all2_Cons1 tabi_agree_def)
+    by (metis inst.select_convs(3) list_all2_nthD tabi_agree_def)
   hence "tab_agree s ((tabs s)!k)"
     using assms(3)
     unfolding store_typing.simps list_all_length
     by blast
+  hence "ref_typing s (snd (s.tabs s ! k)!c) (tab_reftype (s.tabs s ! k))"
+    by (simp add: k_is(3) list_all_length tab_agree_def)
   thus ?thesis
-    using k_is(2,3)
-    unfolding tab_agree_def
-    by (metis list_all_length option.simps(5))
+    by (simp add: k_is(4) ref_typing.simps)
 qed
 
 lemma stab_typed_some_imp_cl_typed:
-  assumes "stab s i c = Some i_cl"
+  assumes "stab s i ti c = Some (ConstRef i_cl)"
           "inst_typing s i \<C>"
           "store_typing s"
   shows "i_cl < length (funcs s) \<and> (\<exists>tf. cl_typing s (funcs s!i_cl) tf)"
@@ -280,14 +257,37 @@ proof(induction  "\<S>" "\<C>" "[$e]" "(ts _> ts')" arbitrary: ts ts')
     using b_e_type_cvec by blast
 qed auto+
 
-
 lemma e_type_cref:
   assumes "\<S>\<bullet>\<C> \<turnstile> [e] : (ts _> ts')"
   shows "e = Ref v_r \<Longrightarrow> ts' = ts @ [T_ref (typeof_ref v_r)]"
   using assms
 proof (induction "\<S>" "\<C>" "[e]" "(ts _> ts')" arbitrary: ts ts')
+  case (4 \<S> v_r t \<C>)
+  then have h1: "ref_typing \<S> v_r t" by simp
+  then have "t = typeof_ref v_r"
+  proof(induction "\<S>" "v_r" "t" rule: ref_typing.induct)
+  qed (fastforce simp add: typeof_ref_def)+
+  then show ?case
+    using "4.hyps"(2) "4.prems" by blast
 qed auto+
 
+lemma e_type_const:
+  assumes "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')"
+  shows "ts' = ts@[typeof v]"
+        "(\<exists>f. v = V_ref (ConstRef f) \<longrightarrow> f < length (funcs \<S>))"
+proof -
+  show "ts' = ts @ [typeof v]"
+    using assms e_type_cnum e_type_cvec e_type_cref typeof_def v_to_e_def by (auto split: v.splits)+
+next
+  have "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')" using assms by simp
+  then show "(\<exists>f. v = V_ref (ConstRef f) \<longrightarrow> f < length (funcs \<S>))"
+    proof (induction "\<S>" "\<C>" "[$C v]" "(ts _> ts')" arbitrary: ts ts')
+  qed auto+
+qed
+
+
+(* TODO: remove, it is a duplicate*)
+(*
 lemma e_type_value:
   assumes "\<S>\<bullet>\<C> \<turnstile> [e] : (ts _> ts')" "e = $C v"
   shows "ts' = ts @ [typeof v]"
@@ -311,7 +311,7 @@ next
   then show ?thesis
     using V_ref assms(1) e_type_cref typeof_def by auto
 qed
-
+*)
 
 lemma b_e_type_load:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
@@ -516,8 +516,8 @@ lemma b_e_type_call:
 
 lemma b_e_type_call_indirect:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = Call_indirect i"
-  shows "i < length (types_t \<C>) \<and> length (table \<C>) \<ge> 1"
+          "e = Call_indirect ti i"
+  shows "i < length (types_t \<C>) \<and> ti < length (table \<C>)"
         "\<exists>ts'' tf1 tf2. ts = ts''@tf1@[T_num T_i32] \<and> ts' = ts''@tf2 \<and> (types_t \<C>)!i = (tf1 _> tf2)"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
@@ -943,7 +943,7 @@ proof -
     using b_e_type_comp assms
     by (meson e_type_comp)
   thus "(s\<bullet>\<C> \<turnstile> es : (ts _> ts'))" "typeof v = t"
-    using e_type_value h(2) by fastforce+
+    using e_type_const h(2) by fastforce+
 qed
 
 
@@ -1025,10 +1025,10 @@ lemma e_type_init_mem:
   done
 
 lemma e_type_init_tab:
-  assumes "s\<bullet>\<C> \<turnstile> [Init_tab n icls] : (ts _> ts')"
-  shows "(ts = ts') \<and> length (table \<C>) \<ge> 1 \<and> (list_all (\<lambda>icl. icl < length (funcs s)) icls) \<and> (s\<bullet>\<C> \<turnstile> [Init_tab n icls] : ([] _> []))"
+  assumes "s\<bullet>\<C> \<turnstile> [Init_tab ti n icls] : (ts _> ts')"
+  shows "(ts = ts') \<and> ti < length (table \<C>) \<and> (list_all (\<lambda>icl. ref_typing s icl (tab_t_reftype (table \<C>!ti))) icls) \<and> (s\<bullet>\<C> \<turnstile> [Init_tab ti n icls] : ([] _> []))"
   using assms
-  apply (induction s \<C> "[Init_tab n icls]" "(ts _> ts')" arbitrary: ts ts')
+  apply (induction s \<C> "[Init_tab ti n icls]" "(ts _> ts')" arbitrary: ts ts')
   apply (auto simp add: e_typing_l_typing.intros(10))
   done
 
@@ -1513,6 +1513,8 @@ proof -
     by fastforce
 qed
 
+(* TODO: remove, it is not used *)
+(*
 lemma e_type_const1:
   assumes "is_const e"
   shows "\<exists>t. (\<S>\<bullet>\<C> \<turnstile> [e] : (ts _> ts@[t]))"
@@ -1541,8 +1543,9 @@ next
   then show ?thesis
     by (metis append_self_conv e_typing_l_typing.intros(3) e_typing_l_typing.intros(4))
 qed (simp_all add: is_const_def)
+*)
 
-
+(* TODO: this is false now *)
 lemma e_type_const:
   assumes "is_const e"
           "\<S>\<bullet>\<C> \<turnstile> [e] : (ts _> ts')"
@@ -1580,7 +1583,7 @@ next
   have "\<S>\<bullet>\<C> \<turnstile> [e] : (ts _> ts')" by (simp add: assms)
   then have "ts' = ts @ [T_ref (typeof_ref x6)]" using e_type_cref
     by (simp add: Ref)
-  moreover have "ref_typing \<S> x6" sorry
+  moreover have "ref_typing \<S> x6 ((typeof_ref x6))" sorry
   moreover
   have "\<S>'\<bullet>\<C>' \<turnstile> [e] : ([] _> [T_ref (typeof_ref x6)])"
     by (simp add: Ref e_typing_l_typing.intros(4))
