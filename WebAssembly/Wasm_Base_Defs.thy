@@ -206,6 +206,13 @@ lift_definition deserialise_i64 :: "bytes \<Rightarrow> i64" is "word_rcat_rev\<
 lift_definition wasm_bool :: "bool \<Rightarrow> i32" is "(\<lambda>b. if b then 1 else 0)" .
 lift_definition  int32_minus_one :: i32 is "max_word" .
 
+  (* limits *)
+definition "limits_compat lt1 lt2 =
+  ((l_min lt1) \<ge> (l_min lt2) \<and>
+  pred_option (\<lambda>lt2_the. (case (l_max lt1) of
+                            Some lt1_the \<Rightarrow> (lt1_the \<le> lt2_the)
+                          | None \<Rightarrow> False)) (l_max lt2))"
+
   (* memory *)
 definition mem_size :: "mem \<Rightarrow> nat" where
   "mem_size m = (mem_length m) div Ki64"
@@ -243,6 +250,12 @@ definition store_packed :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow
 
   (* tables *)
 
+(* t1 \<le> t2 *)
+definition tab_subtyping :: "[tab_t, tab_t] \<Rightarrow> bool" where
+"tab_subtyping t1 t2 = (case (t1, t2) of
+  (T_tab lims1 tr1, T_tab lims2 tr2) \<Rightarrow> limits_compat lims1 lims2 \<and> tr1 = tr2) "
+
+
   (* TODO: think of better convention for these names *)
   (* currently 'tab' means that a single table instance is taken as argument *)
   (* currently 'tabs' means that a list of tables is taken as an argument *)
@@ -278,7 +291,7 @@ definition store_tabs1 :: "tabinst list \<Rightarrow> i \<Rightarrow> nat \<Righ
 definition grow_tab :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref \<Rightarrow> tabinst option" where
   "grow_tab t n vr = (let len = (tab_size t) + n;
                           old_limits = tab_t_lim (fst t);
-                          limits' = old_limits\<lparr>l_min:= n\<rparr>
+                          limits' = old_limits\<lparr>l_min:= len\<rparr>
                        in
                    if (len < 2^32 \<and> pred_option (\<lambda>max. len \<le> max) (tab_max t))
                     then Some ((T_tab limits' (tab_t_reftype (fst t))), snd t @ (replicate n vr) )
@@ -812,9 +825,11 @@ definition is_const :: "e \<Rightarrow> bool" where
 definition const_list :: "e list \<Rightarrow> bool" where
   "const_list xs = list_all is_const xs"
 
+(* TODO: review this *)
 definition tab_extension :: "tabinst \<Rightarrow> tabinst \<Rightarrow> bool" where
   "tab_extension t1 t2 \<equiv> tab_size t1 \<le> tab_size t2 \<and>
-                         (tab_max t1) = (tab_max t2)"
+                         tab_max t1 = tab_max t2 \<and>
+                         tab_subtyping (fst t2) (fst t1)"
 
 definition mem_extension :: "mem \<Rightarrow> mem \<Rightarrow> bool" where
   "mem_extension m1 m2 \<equiv> mem_size m1 \<le> mem_size m2 \<and>

@@ -93,11 +93,11 @@ definition "glob_typing g tg = (tg_mut tg = g_mut g \<and> tg_t tg = typeof (g_v
 
 definition "globi_agree gs n g = (n < length gs \<and> glob_typing (gs!n) g)"
 
-definition "limits_compat lt1 lt2 =
-  ((l_min lt1) \<ge> (l_min lt2) \<and>
-  pred_option (\<lambda>lt2_the. (case (l_max lt1) of
-                            Some lt1_the \<Rightarrow> (lt1_the \<le> lt2_the)
-                          | None \<Rightarrow> False)) (l_max lt2))"
+inductive ref_typing :: "[s, v_ref, t_ref] => bool" where
+   "ref_typing s (ConstNull t) (t)"
+ | "f < length (funcs s) \<Longrightarrow> ref_typing s (ConstRef f) (T_func_ref)"
+ | "ref_typing s (ConstRefExtern _) (T_ext_ref)"
+
 
 (* TODO: do I need to check that every entry in ts has the needed reference type?
 It seems no:
@@ -105,9 +105,16 @@ https://webassembly.github.io/spec/core/appendix/properties.html#valid-moduleins
 This check seems to be performed as part of store typing:
 https://webassembly.github.io/spec/core/appendix/properties.html#valid-tableinst
 *)
-definition "tab_typing t tt = (case (t, tt) of
- ((T_tab _ tr', lims'),  T_tab lims tr) \<Rightarrow> (limits_compat \<lparr>l_min=(tab_size t),l_max=(tab_max t)\<rparr> lims) \<and> tr = tr')"
+
+(*definition tab_typing :: "tabinst \<Rightarrow> tab_t \<Rightarrow> bool" where
+"tab_typing t tt = (case (t, tt) of
+ ((T_tab _ tr', lims'),  T_tab lims tr) \<Rightarrow> (limits_compat \<lparr>l_min=(tab_size t),l_max=(tab_max t)\<rparr> lims) \<and> tr = tr')"*)
 (*    \<and> list_all (\<lambda> vr. typeof_ref vr = tr) (snd t))"*)
+
+definition tab_typing :: "[tabinst, tab_t] \<Rightarrow> bool" where
+"tab_typing t tt = (case (t, tt) of
+ ((T_tab lims' tr', _),  T_tab lims tr) \<Rightarrow> (limits_compat lims' lims) \<and> tr' = tr)"
+
 
 definition "tabi_agree ts n tab_t =
   ((n < length ts) \<and> (tab_typing (ts!n) tab_t))"
@@ -140,11 +147,6 @@ inductive frame_typing :: "[s, f, t_context] \<Rightarrow> bool" where
 inductive cl_typing :: "[s, cl, tf] \<Rightarrow> bool" where
    "\<lbrakk>inst_typing s i \<C>; tf = (t1s _> t2s); \<C>\<lparr>local := t1s @ ts, label := ([t2s] @ (label \<C>)), return := Some t2s\<rparr> \<turnstile> es : ([] _> t2s)\<rbrakk> \<Longrightarrow> cl_typing s (Func_native i tf ts es) (t1s _> t2s)"
  |  "cl_typing s (Func_host tf h) tf"
-
-inductive ref_typing :: "[s, v_ref, t_ref] => bool" where
-   "ref_typing s (ConstNull t) (t)"
- | "f < length (funcs s) \<Longrightarrow> ref_typing s (ConstRef f) (T_func_ref)"
- | "ref_typing s (ConstRefExtern _) (T_ext_ref)"
 
 (* lifting the b_e_typing relation to the administrative operators *)
 inductive e_typing :: "[s, t_context, e list, tf] \<Rightarrow> bool" ("_\<bullet>_ \<turnstile> _ : _" 60)
@@ -187,9 +189,13 @@ definition "tab_agree s tab =
    pred_option (\<lambda>max. (tab_size tab) \<le> max) (tab_max tab))"
 *)
 
-definition "tab_agree" :: "s \<Rightarrow> tabinst \<Rightarrow> bool" where
-  "tab_agree s tab = (list_all (\<lambda>vr. (ref_typing s vr (tab_reftype tab))) (snd tab)
-  \<and> pred_option (\<lambda>max. (tab_size tab) \<le> max) (tab_max tab))"
+definition tab_agree  :: "[s, tabinst] => bool" where
+"tab_agree s t = (case t of
+ ((T_tab lims tr, elems)) \<Rightarrow>
+  l_min lims = (tab_size t) \<and>
+  pred_option (\<lambda> max. tab_size t \<le> max) (tab_max t) \<and>
+  list_all (\<lambda> vr. ref_typing s vr tr) elems)"
+
 
 (* TODO: should there be more rules here? *)
 (* TODO:  Fix adding this: https://webassembly.github.io/spec/core/appendix/properties.html#valid-tableinst *)

@@ -175,7 +175,7 @@ proof -
     unfolding store_typing.simps list_all_length
     by blast
   hence "ref_typing s (snd (s.tabs s ! k)!c) (tab_reftype (s.tabs s ! k))"
-    by (simp add: k_is(3) list_all_length tab_agree_def)
+    by (metis (mono_tags, lifting) tab_agree_def case_prod_unfold k_is(3) list_all_length tab_reftype_def tab_t.case tab_t.exhaust)
   thus ?thesis
     by (simp add: k_is(4) ref_typing.simps)
 qed
@@ -271,7 +271,7 @@ proof (induction "\<S>" "\<C>" "[e]" "(ts _> ts')" arbitrary: ts ts')
     using "4.hyps"(2) "4.prems" by blast
 qed auto+
 
-lemma e_type_const:
+lemma type_const:
   assumes "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')"
   shows "ts' = ts@[typeof v]"
         "(\<exists>f. v = V_ref (ConstRef f) \<longrightarrow> f < length (funcs \<S>))"
@@ -943,7 +943,7 @@ proof -
     using b_e_type_comp assms
     by (meson e_type_comp)
   thus "(s\<bullet>\<C> \<turnstile> es : (ts _> ts'))" "typeof v = t"
-    using e_type_const h(2) by fastforce+
+    using type_const h(2) by fastforce+
 qed
 
 
@@ -1549,6 +1549,7 @@ qed (simp_all add: is_const_def)
 lemma e_type_const:
   assumes "is_const e"
           "\<S>\<bullet>\<C> \<turnstile> [e] : (ts _> ts')"
+          "store_extension \<S> \<S>'"
   shows  "\<exists>t. (ts' = ts@[t]) \<and> (\<S>'\<bullet>\<C>' \<turnstile> [e] : ([] _> [t]))"
   using assms
 proof (cases e)
@@ -1580,15 +1581,36 @@ proof (cases e)
     qed  (simp_all add: is_const_def)
 next
   case (Ref x6)
-  have "\<S>\<bullet>\<C> \<turnstile> [e] : (ts _> ts')" by (simp add: assms)
-  then have "ts' = ts @ [T_ref (typeof_ref x6)]" using e_type_cref
+  have 1: "\<S>\<bullet>\<C> \<turnstile> [e] : (ts _> ts')" by (simp add: assms)
+  then have 2: "ts' = ts @ [T_ref (typeof_ref x6)]" using e_type_cref
     by (simp add: Ref)
-  moreover have "ref_typing \<S> x6 ((typeof_ref x6))" sorry
-  moreover
-  have "\<S>'\<bullet>\<C>' \<turnstile> [e] : ([] _> [T_ref (typeof_ref x6)])"
-    by (simp add: Ref e_typing_l_typing.intros(4))
-  ultimately show ?thesis
-    by blast
+  moreover have 3: "ref_typing \<S> x6 ((typeof_ref x6))"
+    using 1
+  proof(induction "\<S>" "\<C>" "[e]" "(ts _> ts')" arbitrary: ts ts')
+    case (4 \<S> v_r t \<C>)
+    then show ?case
+      using Ref e_type_cref e_typing_l_typing.intros(4) by fastforce
+  qed (fastforce simp add: Ref)+
+  show ?thesis
+  proof(cases x6)
+    case (ConstNull x1)
+    then show ?thesis
+      by (simp add: Ref calculation e_typing_l_typing.intros(4) ref_typing.intros(1) typeof_ref_def)
+  next
+    case (ConstRef x2)
+    obtain f where hf: "x6 = (ConstRef f)" "length (funcs \<S>) > f"
+      using 1 type_const ConstRef 3 ref_typing.simps by auto
+    moreover have "length (funcs \<S>) \<le> length (funcs \<S>')" using assms(3)
+      using store_extension.simps by auto
+    moreover have "ref_typing \<S>' x6 ((typeof_ref x6))"
+      using calculation(3) 3 ref_typing.simps by fastforce
+    then show ?thesis
+      by (simp add: "2" Ref e_typing_l_typing.intros(4))
+  next
+    case (ConstRefExtern x3)
+    then show ?thesis
+      using Ref calculation e_typing_l_typing.intros(4) 3 ref_typing.simps by force
+  qed
 qed (simp_all add: is_const_def)
 
 lemma const_typeof_num:
@@ -1624,6 +1646,7 @@ lemma const_typeof:
 lemma e_type_const_list:
   assumes "const_list vs"
           "\<S>\<bullet>\<C> \<turnstile> vs : (ts _> ts')"
+          "store_extension \<S> \<S>'"
   shows   "\<exists>tvs. ts' = ts @ tvs \<and> length vs = length tvs \<and> (\<S>'\<bullet>\<C>' \<turnstile> vs : ([] _> tvs))"
   using assms
 proof (induction vs arbitrary: ts ts' rule: List.rev_induct)
@@ -1645,10 +1668,10 @@ next
   then obtain ts_b where ts_b_def:"ts'' = ts @ ts_b" "length xs = length ts_b" "\<S>'\<bullet>\<C>' \<turnstile> xs : ([] _> ts_b)"
     using snoc(1) v_lists(1)
     unfolding const_list_def
-    by fastforce
+    using snoc.prems(3) by blast
   then obtain t where t_def:"ts' = ts @ ts_b @ [t]" "\<S>'\<bullet>\<C>' \<turnstile> [x] : ([] _> [t])"
     using e_type_const v_lists(2) ts''_def
-    by fastforce
+    using append_assoc snoc.prems(3) by blast
   moreover
   then have "length (ts_b@[t]) = length (xs@[x])"
     using ts_b_def(2)
@@ -1662,6 +1685,39 @@ next
     by simp
 qed
 
+lemma global_extension_refl:
+  shows "global_extension g g"
+  unfolding global_extension_def
+  by auto
+
+lemma mem_extension_refl:
+  shows "mem_extension m m"
+  unfolding mem_extension_def
+  by auto
+
+lemma limits_compat_refl:
+  shows "limits_compat l l"
+  unfolding limits_compat_def
+  by (metis option.exhaust option.pred_inject(1) option.pred_inject(2) option.simps(5) order_class.order_eq_iff)
+
+lemma tab_subtyping_refl:
+  shows "tab_subtyping t t"
+proof(cases t)
+  case (T_tab x1 x2)
+  then show ?thesis unfolding tab_subtyping_def using limits_compat_refl by simp
+qed
+
+lemma tab_extension_refl:
+  shows "tab_extension t t"
+  unfolding tab_extension_def
+  using limits_compat_def limits_compat_refl tab_subtyping_def tab_subtyping_refl by auto
+
+lemma store_extension_refl:
+  shows "store_extension s s"
+  using global_extension_refl mem_extension_refl tab_extension_refl
+  unfolding store_extension.simps
+  by (metis (mono_tags) append_Nil2 list_all2_conv_all_nth s.cases)
+
 lemma e_type_const_list_snoc:
   assumes "const_list vs"
           "\<S>\<bullet>\<C> \<turnstile> vs : ([] _> ts@[t])"
@@ -1673,7 +1729,7 @@ lemma e_type_const_list_snoc:
   using assms
 proof -
   obtain vs' v where vs_def:"vs = vs'@[v]"
-    using e_type_const_list[OF assms(1,2)]
+    using e_type_const_list[OF assms(1,2)] store_extension_refl
     by (metis append_Nil append_eq_append_conv list.size(3) snoc_eq_iff_butlast)
   hence consts_def:"const_list vs'" "is_const v"
     using assms(1)
@@ -1686,7 +1742,7 @@ proof -
     using e_type_const_unwrap consts_def(2)
     by fastforce
   hence "ts' = ts"
-    using consts_def(2) e_type_const ts'_def(2) by fastforce
+    using consts_def(2) e_type_const ts'_def(2) store_extension_refl by fastforce
   thus ?thesis using ts'_def vs_def consts_def
     by simp
 qed
@@ -1703,7 +1759,7 @@ lemma e_type_const_list_cons:
 proof (induction "ts1@ts2" arbitrary: vs ts1 ts2 rule: List.rev_induct)
   case Nil
   thus ?case
-    using e_type_const_list
+    using e_type_const_list store_extension_refl
     by fastforce
 next
   case (snoc t ts)
@@ -1756,6 +1812,7 @@ qed
 
 lemma e_type_consts:
   assumes "\<S>\<bullet>\<C> \<turnstile> ($C*vs) : (ts _> ts')"
+          "store_extension \<S> \<S>'"
   shows   "ts' = ts @ (map typeof vs) \<and> (\<S>'\<bullet>\<C>' \<turnstile> ($C*vs) : ([] _> (map typeof vs)))"
   using assms
 proof (induction vs arbitrary: ts ts' rule: List.rev_induct)
@@ -1775,11 +1832,11 @@ next
   hence ts_b_def:"ts'' = ts @ (map typeof xs)"
                  "\<S>'\<bullet>\<C>' \<turnstile> ($C*xs) : ([] _> (map typeof xs))"
     using snoc(1)
-    by simp_all
+    using snoc.prems(2) by blast+
   then obtain t where t_def:"ts' = ts @ (map typeof xs) @ [t]" "\<S>'\<bullet>\<C>' \<turnstile> [$C x] : ([] _> [t])"
     using e_type_const[of "$C x"] ts''_def
     unfolding is_const_def
-    by (metis append_eq_appendI e_type_const is_const1)
+    using append_assoc is_const1 is_const_def snoc.prems(2) by blast
   moreover
   have "\<S>'\<bullet>\<C>' \<turnstile> $C*(xs@[x]) : ([] _> (map typeof xs)@[t])"
     using ts_b_def(2) t_def e_typing_l_typing.intros(2,3)
@@ -1792,6 +1849,7 @@ qed
 
 lemma e_type_const_new:
   assumes "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')"
+          "store_extension \<S> \<S>'"
   shows  "(ts' = ts@[typeof v]) \<and> (\<S>'\<bullet>\<C>' \<turnstile> [$C v] : ([] _> [typeof v]))"
   using assms e_type_consts[of \<S> \<C> "[v]" ts ts']
   by fastforce
@@ -1841,27 +1899,6 @@ proof -
     by fastforce
 qed
 
-lemma global_extension_refl:
-  shows "global_extension g g"
-  unfolding global_extension_def
-  by auto
-
-lemma mem_extension_refl:
-  shows "mem_extension m m"
-  unfolding mem_extension_def
-  by auto
-
-lemma tab_extension_refl:
-  shows "tab_extension t t"
-  unfolding tab_extension_def
-  by auto
-
-lemma store_extension_refl:
-  shows "store_extension s s"
-  using global_extension_refl mem_extension_refl tab_extension_refl
-  unfolding store_extension.simps
-  by (metis (mono_tags) append_Nil2 list_all2_conv_all_nth s.cases)
-
 lemma global_extension_trans:
   assumes "global_extension g g''"
           "global_extension g'' g'"
@@ -1878,11 +1915,28 @@ lemma mem_extension_trans:
   unfolding mem_extension_def
   by auto
 
+lemma limits_compat_trans:
+  assumes "limits_compat l l'"
+          "limits_compat l' l''"
+        shows "limits_compat l l''"
+  using assms
+  unfolding limits_compat_def
+  by (auto split:option.splits simp add: pred_option_def)
+
+lemma tab_subtyping_trans:
+  assumes "tab_subtyping t t'"
+          "tab_subtyping t' t''"
+        shows "tab_subtyping t t''"
+  using assms
+  unfolding tab_subtyping_def
+  by (auto simp add: limits_compat_trans split: tab_t.splits)
+
+
 lemma tab_extension_trans:
   assumes "tab_extension t t''"
           "tab_extension t'' t'"
   shows "tab_extension t t'"
-  using assms
+  using assms limits_compat_trans tab_subtyping_trans
   unfolding tab_extension_def
   by auto
 
@@ -1983,15 +2037,13 @@ qed
 
 lemma inst_typing_imp_tabi_agree:
   assumes "inst_typing s i \<C>"
-          "(stab_ind i) = Some k"
-  shows "tabi_agree (tabs s) k (hd (table \<C>))"
+          "(stab_ind i ti) = Some k"
+  shows "tabi_agree (tabs s) k ((table \<C>)!ti)"
 proof -
-  show "tabi_agree (tabs s) k (hd (table \<C>))"
+  show "tabi_agree (tabs s) k ((table \<C>)!ti)"
     using assms
     unfolding inst_typing.simps stab_ind_def
-    apply (simp split: list.splits)
-    apply (metis list.sel(1) list_all2_Cons1)
-    done
+    by (metis inst.select_convs(3) list_all2_nthD option.discI option.inject t_context.select_convs(4))
 qed
 
 lemma store_typing_imp_types_eq:
@@ -2200,6 +2252,63 @@ proof -
     by force
 qed
 
+lemma tab_typing_extension:
+  assumes "tab_extension tabinst tabinst'"
+          "tab_typing tabinst tt"
+  shows   "tab_typing tabinst' tt"
+  using assms
+proof -
+  have h1: "tab_size tabinst \<le> tab_size tabinst'"
+           "tab_max tabinst = tab_max tabinst'"
+           "tab_subtyping (fst tabinst') (fst tabinst)"
+
+    using tab_extension_def assms(1) by auto
+  have h2: "(limits_compat (tab_t_lim (fst tabinst)) (tab_t_lim tt)) \<and> (tab_t_reftype (fst tabinst)) = tab_t_reftype tt"
+    using assms(2) unfolding tab_typing_def tab_t_reftype_def
+    by (auto simp add: tab_t.exhaust tab_t_lim_def split: tab_t.splits)
+  moreover have "tab_t_reftype tt = tab_reftype tabinst'" using h1(3)
+    using h2 tab_reftype_def tab_t_reftype_def tab_subtyping_def
+    by (metis (mono_tags, lifting) case_prodD tab_t.case tab_t.exhaust)
+  moreover have "limits_compat (tab_t_lim (fst tabinst')) (tab_t_lim (fst tabinst))"
+    using h1(3) unfolding tab_subtyping_def using tab_t_lim_def
+    by (metis (no_types, lifting) case_prodD tab_t.case tab_t.exhaust)
+  moreover have "(limits_compat (tab_t_lim (fst tabinst')) (tab_t_lim tt))"
+    using h2 limits_compat_trans h1(3) calculation(3) unfolding tab_subtyping_def
+    by blast
+  ultimately show ?thesis
+    by (metis (mono_tags, lifting) case_prod_beta' old.prod.case tab_reftype_def tab_t.case tab_t.exhaust tab_t_lim_def tab_t_reftype_def tab_typing_def)
+qed
+
+
+lemma tabi_agree_store_extension1:
+  assumes "list_all2 (tabi_agree (tabs s)) (inst.tabs i) (table \<C>)"
+          "store_extension s s'"
+          "ti < length (inst.tabs i)"
+          "inst.tabs i ! ti < length (s.tabs s)"
+        shows   " tabi_agree (tabs s') (inst.tabs i ! ti) (table \<C>! ti)"
+proof -
+  let ?tabinst = "((tabs s)!(inst.tabs i ! ti))"
+  let ?tabinst' = "((tabs s')!(inst.tabs i ! ti))"
+  have h0: "tabi_agree (tabs s) ((inst.tabs i)!ti) (table \<C>! ti)"
+    using assms(1) assms(3) list_all2_nthD by blast
+  have h1: "tab_extension ?tabinst ?tabinst'"
+    using assms(2) unfolding store_extension.simps
+    by (metis assms(4) list_all2_lengthD list_all2_nthD nth_append s.select_convs(2))
+  have h2: "tab_typing ?tabinst (table \<C>!ti)"
+    by (meson assms(1) assms(3) list_all2_conv_all_nth tabi_agree_def)
+  have h3: "tab_typing ?tabinst' (table \<C>!ti)" using h1 h2 tab_typing_extension by simp
+  obtain clss' clss'' where 1:"list_all2 tab_extension (tabs s) clss'"
+                            "(tabs s') = clss'@clss''"
+    using assms(2) store_extension.simps by auto
+  then have "length (tabs s) \<le> length (tabs s')"
+    by (simp add: list_all2_lengthD)
+  moreover have "((inst.tabs i)!ti) < length (tabs s)" using h0 tabi_agree_def by simp
+  moreover have h4: "((inst.tabs i)!ti) < length (tabs s')"
+    using calculation(1) calculation(2) by fastforce
+  show ?thesis using h4 h3 tabi_agree_def[of "s.tabs s'" "(inst.tabs i ! ti)" "table \<C>!ti"]
+    by simp
+qed
+
 lemma tabi_agree_store_extension:
   assumes "list_all2 (tabi_agree (tabs s)) (inst.tabs i) (table \<C>)"
           "store_extension s s'"
@@ -2210,11 +2319,25 @@ proof -
     using assms(2)
     unfolding store_extension.simps
     by auto
-  have "list_all2 (tabi_agree clss') (inst.tabs i) (table \<C>)"
-    using assms 1(1)
-    unfolding store_extension.simps list_all2_conv_all_nth tab_extension_def tabi_agree_def
-              tab_typing_def limits_compat_def
-    by fastforce
+  have "list_all2 (tabi_agree (tabs s)) (inst.tabs i) (table \<C>)"
+    using assms 1 by simp
+  have h1: "\<And> ti. ti < length (inst.tabs i) \<Longrightarrow> inst.tabs i ! ti < length (s.tabs s)"
+    by (meson assms(1) list_all2_conv_all_nth tabi_agree_def)
+  have h2: "\<And> idx. idx < length (s.tabs s) \<Longrightarrow>
+    tab_extension  ((tabs s)!idx) (clss'!idx) "
+    using "1"(1) list_all2_nthD by blast
+  then have "\<And> ti. ti < length (inst.tabs i) \<Longrightarrow> tabi_agree clss' (inst.tabs i ! ti) (table \<C>! ti)"
+  proof -
+    fix ti
+    assume hti: "ti < length (inst.tabs i)"
+    then have "inst.tabs i ! ti < length (s.tabs s)"
+      using h1 by blast
+    then show "tabi_agree clss' (inst.tabs i ! ti) (table \<C>! ti)"
+      using tabi_agree_store_extension1[OF assms(1) assms(2) hti]
+      by (metis "1"(1) "1"(2) list_all2_lengthD nth_append tabi_agree_def)
+  qed
+  then have "list_all2 (tabi_agree clss') (inst.tabs i) (table \<C>)"
+    by (meson assms(1) list_all2_conv_all_nth)
   thus ?thesis
     using 1(2) nth_append[of clss' clss'']
     unfolding list_all2_conv_all_nth tabi_agree_def
@@ -2300,6 +2423,13 @@ next
     by auto
 qed
 
+lemma ref_typing_store_extension_inv:
+  assumes "store_extension s s'"
+          "ref_typing s vr \<C>"
+        shows "ref_typing s' vr \<C>"
+  using assms ref_typing.simps store_extension.simps by fastforce
+
+
 
 lemma e_typing_l_typing_store_extension_inv:
   assumes"store_extension s s'"
@@ -2309,7 +2439,8 @@ lemma e_typing_l_typing_store_extension_inv:
 proof (induction s \<C> es tf and s rs f es ts rule: e_typing_l_typing.inducts)
 
   case (4 \<S> v_r \<C>)
-  then show ?case sorry
+  then show ?case
+    using ref_typing_store_extension_inv e_typing_l_typing.intros(4) by auto
 next
   case (7 i \<S> tf \<C>)
   have "i < length (s.funcs s')"
@@ -2332,19 +2463,12 @@ next
     unfolding store_extension.simps
     by (auto simp add: list_all2_lengthD)
 next
-  case (10 \<C> \<S> tis n)
-  hence 1:"length (s.funcs \<S>) \<le> length (s.funcs s')"
-    unfolding store_extension.simps
-    by (auto simp add: list_all2_lengthD)
-  hence "list_all (\<lambda>ti. ti < length (s.funcs s')) tis"
-    using list.pred_mono[of "(\<lambda>ti. ti < length (s.funcs \<S>))"
-                            "(\<lambda>ti. ti < length (s.funcs s'))"]
-          10(2)
-          dual_order.strict_trans le_eq_less_or_eq
-    by auto
-  thus ?case
-    using e_typing_l_typing.intros(9)[of _ s'] 10(1)
-    using e_typing_l_typing.intros(10) by blast
+  case (10 ti \<C> tt \<S> vrs n)
+  have "list_all (\<lambda>vr. ref_typing s' vr tt) vrs"
+    using ref_typing_store_extension_inv
+    by (metis "10.hyps"(3) "10.prems" list_all_length)
+  then show ?case
+    by (simp add: "10.hyps"(1) "10.hyps"(2) e_typing_l_typing.intros(10))
 next
   case (11 \<S> f \<C> rs es ts)
   thus ?case
@@ -2356,10 +2480,34 @@ qed (auto simp add: e_typing_l_typing.intros)
 lemma tab_agree_store_extension_inv:
   assumes "store_extension s s'"
           "tab_agree s t"
-  shows "tab_agree s' t"
+        shows "tab_agree s' t"
   using assms
-  unfolding tab_agree_def list_all_length store_extension.simps
-  by (fastforce split: option.splits)
+proof -
+  obtain lims tr elems where t_def: "t = (T_tab lims tr, elems)"
+    by (metis old.prod.exhaust tab_t.exhaust)
+  then have "l_min lims = (tab_size t) \<and>
+              pred_option (\<lambda> max. tab_size t \<le> max) (tab_max t) \<and>
+              list_all (\<lambda> vr. ref_typing s vr tr) elems" using assms(2) tab_agree_def by simp
+  then have "l_min lims = (tab_size t) \<and>
+            pred_option (\<lambda> max. tab_size t \<le> max) (tab_max t) \<and>
+            list_all (\<lambda> vr. ref_typing s' vr tr) elems" using ref_typing_store_extension_inv
+    by (meson assms(1) list_all_length)
+  then show ?thesis using t_def tab_agree_def by auto
+qed
+
+
+lemma glob_agree_store_extension_inv:
+  assumes "store_extension s s'"
+          "glob_agree s g"
+        shows "glob_agree s' g"
+proof -
+  obtain t where t_def: "(v_typing s (g_val g) t)" using assms(2) glob_agree_def by auto
+  then have "v_typing s' (g_val g) t"
+    using assms(1) ref_typing_store_extension_inv v_typing.simps by auto
+  then show ?thesis
+    using glob_agree_def by blast
+qed
+
 
 lemma store_typing_in_mem_agree:
   assumes "store_typing s"
@@ -2416,6 +2564,10 @@ proof -
   moreover
   have "list_all (tab_agree s') (s.tabs s')"
     by (metis (no_types, lifting) "0"(2) assms(1) list.pred_mono_strong s'_def sh1 store_typing.cases tab_agree_store_extension_inv)
+  moreover
+  have "list_all (glob_agree s') (s.globs s')"
+    using glob_agree_store_extension_inv[OF sh1]
+    by (metis "0"(3) assms(1) list_all_length s'_def store_typing.cases)
   ultimately
   show "store_typing (s\<lparr>s.mems := (s.mems s)[j := m']\<rparr>)"
     using store_typing.simps tab_agree_store_extension_inv[OF sh1]
@@ -2425,12 +2577,17 @@ proof -
     done
 qed
 
+(*tab_max t1 = tab_max t2 \<and>
+                         tab_reftype t1 = tab_reftype t2 \<and>
+                          limits_compat (tab_t_lim (fst t2)) (tab_t_lim (fst t1))"*)
+
 lemma store_extension_tab_leq:
   assumes "store_typing s"
           "s.tabs s ! j = t"
           "tab_size t \<le> tab_size t'"
           "tab_agree s t'"
           "tab_max t = tab_max t'"
+          "tab_subtyping (fst t') (fst t)"
   shows "store_extension s (s\<lparr>s.tabs := (s.tabs s)[j := t']\<rparr>)"
         "store_typing (s\<lparr>s.tabs := (s.tabs s)[j := t']\<rparr>)"
 proof -
@@ -2442,12 +2599,12 @@ proof -
     using s'_def
     by simp_all
   have "tab_extension t t'"
-    using assms(3,5)
+    using assms(3,5,6)
     unfolding tab_extension_def
     by simp
   hence "list_all2 tab_extension (tabs s) (tabs s')"
     using assms(2) s'_def
-    by (simp, metis eq_iff list.rel_refl list_all2_update_cong list_update_id tab_extension_def)
+    by (simp, metis list.rel_refl list_all2_update_cong list_update_id tab_extension_refl)
   thus sh1:"store_extension s (s\<lparr>s.tabs := (s.tabs s)[j := t']\<rparr>)"
     using store_extension.intros[OF _
                                     _
@@ -2465,10 +2622,14 @@ proof -
   have "list_all mem_agree (s.mems s')"
     using 0(2) assms(1) store_typing.cases
     by fastforce
+  moreover
+  have "list_all (glob_agree s') (s.globs s')"
+    using glob_agree_store_extension_inv[OF sh1]
+    by (metis "0"(3) assms(1) list_all_length s'_def store_typing.cases)
   ultimately
   show "store_typing (s\<lparr>s.tabs := (s.tabs s)[j := t']\<rparr>)"
     using store_typing.simps tab_agree_store_extension_inv[OF sh1]
-    unfolding s'_def list_all_length
+    unfolding s'_def list_all_length store_extension_refl
     apply (simp add: store_typing.simps)
     apply (metis (no_types, lifting) assms(1,4) nth_list_update nth_list_update_neq store_typing.cases)
     done
@@ -2479,7 +2640,8 @@ lemma update_glob_store_extension:
           "supdate_glob s i j v = s'"
           "(globs s)!sglob_ind i j = g"
           "g_mut g = T_mut"
-          "typeof (g_val g) = typeof v"
+          (* "typeof (g_val g) = typeof v" *)
+          "v_typing s v (typeof (g_val g))"
   shows "store_extension s s'"
         "store_typing s'"
 proof -
@@ -2494,8 +2656,21 @@ proof -
          "(mems s) = (mems s')"
     using s'_def mem_extension_refl list_all2_refl
     by auto
-
-  have "global_extension ((globs s)!k) ((globs s')!k)"
+  have "typeof (g_val g) = typeof v"
+  proof(cases v)
+    case (V_num x1)
+    then show ?thesis using assms(5)
+      by (simp add: typeof_def v_typing.simps)
+  next
+    case (V_vec x2)
+    then show ?thesis using assms(5)
+      by (simp add: typeof_def v_typing.simps)
+  next
+    case (V_ref x3)
+    then show ?thesis
+      by (metis assms(5) const_typeof e_typing_l_typing.intros(4) v.simps(12) v.simps(7) v.simps(9) v_to_e_def v_typing.simps)
+  qed
+  then have "global_extension ((globs s)!k) ((globs s')!k)"
     using global_extension_update assms(3,4,5) s'_def
     by (simp, metis global.surjective global.update_convs(2) k_def length_list_update nth_equalityI nth_list_update nth_list_update_neq)
   hence "list_all2 global_extension (globs s) (globs s')"
@@ -2517,20 +2692,54 @@ proof -
   moreover
   have "list_all (tab_agree s') (s.tabs s')"
     by (metis (no_types, lifting) 1(2) assms(1) list.pred_mono_strong sh1 store_typing.cases tab_agree_store_extension_inv)
+  moreover
+  have "list_all (glob_agree s') (s.globs s')"
+  (* TODO: simplify this *)
+  proof -
+    have "\<And> n. n < length (s.globs s') \<Longrightarrow> glob_agree s' (s.globs s'!n)"
+    proof -
+      fix n
+      assume hn: " n < length (s.globs s')"
+      then show "glob_agree s' (s.globs s'!n)"
+      proof(cases "n=k")
+        case True
+        then show ?thesis
+          by (metis (no_types, lifting) assms(5) glob_agree_def glob_agree_store_extension_inv global.select_convs(2) global.surjective global.update_convs(2) hn length_list_update nth_list_update_eq s'_def s.select_convs(4) s.surjective s.update_convs(4) sh1)
+      next
+        case False
+        then show ?thesis
+          by (metis hn assms(1) glob_agree_store_extension_inv length_list_update list_all_length nth_list_update_neq s'_def s.select_convs(4) s.surjective s.update_convs(4) sh1 store_typing.cases)
+      qed
+    qed
+    then show ?thesis using list_all_length by auto
+  qed
   ultimately
   show "store_typing s'"
     using 1(3) assms(1) store_typing.simps
     by auto
 qed
 
+
 lemma types_agree_imp_e_typing:
-  assumes "typeof v = t"
+  assumes "v_typing \<S> v t"
   shows "\<S>\<bullet>\<C> \<turnstile> [$C v] : ([] _> [t])"
-  using assms e_typing_l_typing.intros(1)[OF b_e_typing.intros(1)]
-  using type_const by blast
+  using assms
+proof(induction)
+  case (1 s vn)
+  then show ?case
+    using const_num e_typing_l_typing.intros(1) v_to_e_def by fastforce
+next
+  case (2 s vv)
+  then show ?case
+    by (metis const_vec e_typing_l_typing.intros(1) to_e_list_1 v.simps(11) v_to_e_def)
+next
+  case (3 s vr t)
+  then show ?case
+    by (simp add: e_typing_l_typing.intros(4) v_to_e_def)
+qed
 
 lemma list_types_agree_imp_e_typing:
-  assumes "list_all2 (\<lambda>t v. typeof v = t) ts vs"
+  assumes "list_all2 (\<lambda>t v. v_typing \<S> v t) ts vs"
   shows "\<S>\<bullet>\<C> \<turnstile> $C* vs : ([] _> ts)"
   using assms
 proof (induction rule: list_all2_induct)
@@ -2561,14 +2770,14 @@ proof (induction "(map (\<lambda>v. EConstNum v) vs)" "(ts' _> ts'@ts)" arbitrar
     using es_e_def(1) is_const_list1_num
     by auto
   then obtain tvs1 where "t2s = t1s@tvs1"
-    using e_type_const_list e_typing_l_typing.intros(1)[OF composition(1)]
+    using e_type_const_list e_typing_l_typing.intros(1)[OF composition(1)] store_extension_refl
     by fastforce
   moreover
   have "const_list ($*[e])"
     using es_e_def(2) is_const_list1_num
     by auto
   then obtain tvs2 where "t1s @ ts = t2s @ tvs2"
-    using e_type_const_list e_typing_l_typing.intros(1)[OF composition(3)]
+    using e_type_const_list e_typing_l_typing.intros(1)[OF composition(3)] store_extension_refl
     by fastforce
   ultimately
   show ?case
@@ -2589,15 +2798,13 @@ proof (induction "(map (\<lambda>v. EConstVec v) vs)" "(ts' _> ts'@ts)" arbitrar
     using es_e_def(1) is_const_list1_vec
     by auto
   then obtain tvs1 where "t2s = t1s@tvs1"
-    using e_type_const_list e_typing_l_typing.intros(1)[OF composition(1)]
-    by fastforce
+    using e_type_const_list e_typing_l_typing.intros(1)[OF composition(1)] store_extension_refl by blast
   moreover
   have "const_list ($*[e])"
     using es_e_def(2) is_const_list1_vec
     by auto
   then obtain tvs2 where "t1s @ ts = t2s @ tvs2"
-    using e_type_const_list e_typing_l_typing.intros(1)[OF composition(3)]
-    by fastforce
+    using e_type_const_list e_typing_l_typing.intros(1)[OF composition(3)] store_extension_refl by blast
   ultimately
   show ?case
     using composition(2,4,5) es_e_def
@@ -2609,7 +2816,7 @@ lemma e_typing_imp_list_types_agree:
   assumes "\<S>\<bullet>\<C> \<turnstile> ($C* vs) : (ts' _> ts'@ts)"
   shows "list_all2 (\<lambda>t v. typeof v = t) ts vs"
 proof -
-  show ?thesis using e_type_consts[of "\<S>" "\<C>" "vs" "ts'" "ts'@ts" "\<S>" "\<C>"]
+  show ?thesis using store_extension_refl e_type_consts[of "\<S>" "\<C>" "vs" "ts'" "ts'@ts" "\<S>" "\<C>"]
     by (simp add: assms list.rel_map(1) list.rel_refl)
 qed
 
@@ -2641,7 +2848,7 @@ proof -
     using e_type_comp assms
     by (metis append_butlast_last_id butlast.simps(2) last.simps list.distinct(1))
   hence "ts'' = ts@[typeof v]"
-    using e_type_const_new by auto
+    using e_type_const_new store_extension_refl by blast
   hence "ts = ts'" "tg_t (global \<C> ! j) = typeof v" "tg_mut (global \<C> ! j) = T_mut"  "j < length(global \<C>)"
     using b_e_type_set_global ts''_def(2) unlift_b_e[of s \<C> "[Set_global j]"]
     by fastforce+

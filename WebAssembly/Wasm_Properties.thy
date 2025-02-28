@@ -35,7 +35,7 @@ proof (induction arbitrary: \<C>i \<C> ts ts' arb_label arb_return rule: reduce.
     by fastforce
   hence "s\<bullet>\<C> \<turnstile> ves : ([] _> t1s)"
     using ts'''_def invoke_host_Some(2,3,4)
-          e_type_const_list[OF is_const_list[OF invoke_host_Some(2)] ts''_def(1)]
+          e_type_const_list[OF is_const_list[OF invoke_host_Some(2)] ts''_def(1)] store_extension_refl
     by fastforce
   thus ?case
     using host_apply_preserve_store[OF invoke_host_Some(6)] invoke_host_Some(2,7)
