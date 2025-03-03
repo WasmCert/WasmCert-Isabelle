@@ -2886,6 +2886,56 @@ proof -
 qed
 
 
+lemma b_e_type_table_set:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Table_set ti"
+  shows
+    "\<exists>tr. ts = ts'@[T_num T_i32, T_ref tr] \<and> tr = tab_t_reftype (table \<C>!ti)"
+    "ti < length (table \<C>)"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct) auto
+
+
+lemma types_preserved_table_set_aux:
+  assumes "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 n), Ref vr, $Table_set ti] : (ts _> ts')"
+  shows "s'\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
+        "tab_t_reftype (table \<C> ! ti) = typeof_ref vr"
+        "ti < length (table \<C>)"
+        "ref_typing s vr (typeof_ref vr)"
+proof -
+  obtain ts1 ts2 where ts_def:"s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 n)] : (ts _> ts1)" 
+                                   "s\<bullet>\<C> \<turnstile> [Ref vr] : (ts1 _> ts2)"
+                             "s\<bullet>\<C> \<turnstile> [$Table_set ti] : (ts2 _> ts')"
+    by (metis (no_types, opaque_lifting) append_Cons assms e_type_comp_conc2 self_append_conv2)
+  hence "ts1 = ts@[T_num T_i32]"
+    by (metis e_type_cnum typeof_num_def v_num.case(1))
+  hence "ts2 = ts1@[T_ref (typeof_ref vr)]"
+    using e_type_cref ts_def(2) by blast
+  hence "ts2=ts@[T_num T_i32, T_ref (typeof_ref vr)]"
+    by (simp add: \<open>ts1 = ts @ [T_num T_i32]\<close>)
+  have "s\<bullet>\<C> \<turnstile> [$C (V_ref vr)] : (ts1 _> ts2)"
+    by (simp add: ts_def(2) v_to_e_def)
+  have "ref_typing s vr (typeof_ref vr)"
+    by (metis \<open>s\<bullet>\<C> \<turnstile> [$C V_ref vr] : ts1 _> ts2\<close> \<open>ts2 = ts1 @ [T_ref (typeof_ref vr)]\<close> last_snoc t.distinct(3) t.distinct(5) t.inject(3) type_const_v_typing(1) type_const_v_typing(2) v.inject(3) v_typing.simps)
+  have "\<C> \<turnstile> [Table_set ti] : (ts2 _> ts')"
+    using ts_def(3) unlift_b_e by force
+  then have "ts = ts'" using b_e_type_table_set
+    using \<open>ts1 = ts @ [T_num T_i32]\<close> \<open>ts2 = ts1 @ [T_ref (typeof_ref vr)]\<close> by fastforce
+  then show "s'\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
+        "tab_t_reftype (table \<C> ! ti) = typeof_ref vr"
+        "ti < length (table \<C>)"
+        "ref_typing s vr (typeof_ref vr)"
+    using e_type_empty apply force
+    using \<open>\<C> \<turnstile> [Table_set ti] : ts2 _> ts'\<close> \<open>ts2 = ts @ [T_num T_i32, T_ref (typeof_ref vr)]\<close> b_e_type_table_set(1) apply fastforce
+    using \<open>\<C> \<turnstile> [Table_set ti] : ts2 _> ts'\<close> b_e_type_table_set(2) apply blast
+    using ts_def(2) e_type_cref[of s \<C> "Ref vr" ts1 ts2 vr]
+    using \<open>ref_typing s vr (typeof_ref vr)\<close> by blast
+qed
+
+
+
+
+
 lemma list_all2_snoc1:
   assumes "list_all2 f (es@[e]) es'"
   shows "\<exists>es'1 e'. es' = es'1@[e'] \<and> list_all2 f es es'1 \<and> f e e'"
