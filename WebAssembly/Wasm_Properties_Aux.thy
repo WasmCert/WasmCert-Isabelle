@@ -281,9 +281,37 @@ proof -
 next
   have "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')" using assms by simp
   then show "(\<exists>f. v = V_ref (ConstRef f) \<longrightarrow> f < length (funcs \<S>))"
-    proof (induction "\<S>" "\<C>" "[$C v]" "(ts _> ts')" arbitrary: ts ts')
+  proof (induction "\<S>" "\<C>" "[$C v]" "(ts _> ts')" arbitrary: ts ts')
   qed auto+
 qed
+
+
+
+lemma type_const_v_typing:
+  assumes "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')"
+  shows
+    "ts' = ts@[typeof v]"
+    "v_typing \<S> v (typeof v)"
+  using assms
+proof -
+  show "ts' = ts@[typeof v]" using type_const(1) assms by simp
+next
+  have "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts@[typeof v])"
+    using assms type_const(1) by auto
+  then show "v_typing \<S> v (typeof v)"
+  proof(induction "\<S>" "\<C>" "[$C v]" "(ts _> ts@[typeof v])"  arbitrary: ts)
+    case (1 \<C> b_es \<S>)
+    then show ?case using v_to_e_def
+      apply(auto split: v.splits)
+      using b_e_type_cnum b_e_type_cvec  v_typing.simps by fastforce+
+  next
+    case (4 \<S> v_r t \<C>)
+    then show ?case using v_to_e_def
+      apply(auto split: v.splits)
+      by (metis v_typing.simps)
+  qed (auto simp add: v_to_e_def  split: v.splits)+
+qed
+
 
 
 (* TODO: remove, it is a duplicate*)
@@ -2856,6 +2884,7 @@ proof -
     using b_e_type_empty[of \<C> "ts" "ts'"] e_typing_l_typing.intros(1)
     by fastforce+
 qed
+
 
 lemma list_all2_snoc1:
   assumes "list_all2 f (es@[e]) es'"
