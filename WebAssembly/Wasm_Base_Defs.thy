@@ -294,7 +294,7 @@ definition grow_tab :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref \<Rightarr
                           limits' = old_limits\<lparr>l_min:= len\<rparr>
                        in
                    if (len < 2^32 \<and> pred_option (\<lambda>max. len \<le> max) (tab_max t))
-                    then Some ((T_tab limits' (tab_t_reftype (fst t))), snd t @ (replicate n vr) )
+                    then Some ((T_tab limits' (tab_t_reftype (fst t))), snd t @ (replicate n vr))
                     else None)"
 
 consts

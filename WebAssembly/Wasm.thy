@@ -81,7 +81,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 \<comment> \<open>\<open>table_size\<close>\<close>
 | table_size: "ti < length (table \<C>) \<Longrightarrow> \<C> \<turnstile> [Table_size ti] : ([] _> [T_num T_i32])"
 \<comment> \<open>\<open>table_grow\<close>\<close>
-| table_grow: "\<lbrakk>ti < length (table \<C>); tab_t_reftype ((table \<C>)!ti) = tr\<rbrakk>  \<Longrightarrow> \<C> \<turnstile> [Table_grow ti] : ([T_ref tr, T_num T_i32] _> [])"
+| table_grow: "\<lbrakk>ti < length (table \<C>); tab_t_reftype ((table \<C>)!ti) = tr\<rbrakk>  \<Longrightarrow> \<C> \<turnstile> [Table_grow ti] : ([T_ref tr, T_num T_i32] _> [T_num T_i32])"
   \<comment> \<open>\<open>empty program\<close>\<close>
 | empty:"\<C> \<turnstile> [] : ([] _> [])"
   \<comment> \<open>\<open>composition\<close>\<close>

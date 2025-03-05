@@ -2609,6 +2609,27 @@ qed
                          tab_reftype t1 = tab_reftype t2 \<and>
                           limits_compat (tab_t_lim (fst t2)) (tab_t_lim (fst t1))"*)
 
+lemma ref_typing_update_store:
+  assumes "ref_typing s vr tr"
+          "funcs s = funcs s'"
+  shows "ref_typing s' vr tr"
+  using assms
+  by (simp add: ref_typing.simps)
+
+lemma tab_agree_update_store:
+  assumes "tab_agree s t"
+          "funcs s = funcs s'"
+        shows "tab_agree s' t"
+proof(cases t)
+  case (Pair a b)
+  then show ?thesis
+  proof(cases a)
+    case (T_tab x1 x2)
+    then show ?thesis using assms Pair unfolding tab_agree_def using ref_typing_update_store[of s _ _ s']
+      by (simp add: list_all_length)
+  qed  
+qed
+
 lemma store_extension_tab_leq:
   assumes "store_typing s"
           "s.tabs s ! j = t"
@@ -2895,6 +2916,119 @@ lemma b_e_type_table_set:
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct) auto
 
+lemma b_e_type_table_grow:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Table_grow ti"
+  shows
+    "\<exists>tr ts''. ts = ts''@[T_ref tr, T_num T_i32] \<and> ts' = ts''@[T_num T_i32]  \<and> tr = tab_t_reftype (table \<C>!ti)"
+    "ti < length (table \<C>)"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct) auto
+
+lemma store_tabs1_store_extension:
+    assumes "store_tabs1 (s.tabs s) a k vr = Some tabs'"
+            "store_typing s"
+            "ref_typing s vr (tab_reftype (tabs s!a))"
+    shows
+          "store_typing (s\<lparr>s.tabs := tabs'\<rparr>)"
+          "store_extension s (s\<lparr>s.tabs := tabs'\<rparr>)"
+  using assms
+proof -
+  let ?tab = "tabs s ! a"
+  obtain tab' where tab'_def:
+    "Some tab' = (store_tab1 ((tabs s)!a) k vr)" 
+    "tabs' = (take a (tabs s)) @ [tab'] @ (drop (a+1) (tabs s))"
+      using assms(1) unfolding store_tabs1_def
+      apply (simp split: option.splits)
+      by (metis Suc_eq_plus1 append_Cons append_Nil handy_if_lemma)
+    have 0: "tab_agree s (tabs s!a)"
+      by (metis assms(1) assms(2) option.simps(3) store_tabs1_def store_typing_in_tab_agree)
+    have 1: "snd tab' = (snd (tabs s!a))[k := vr]"
+      by (metis Suc_eq_plus1 append_Cons append_Nil option.inject option.simps(3) snd_conv store_tab1_def tab'_def(1) upd_conv_take_nth_drop)
+    have 2: "fst tab' = fst (tabs s!a)"
+      by (metis fst_conv option.inject option.simps(3) store_tab1_def tab'_def(1))
+    have 3: "tab_agree s ((tabs s)!a)"
+      by (simp add: \<open>tab_agree s (s.tabs s ! a)\<close>)
+    obtain lims tr elems lims' tr' elems' where defs:
+      "(tabs s)!a= (T_tab lims tr, elems)"
+      "tab'= (T_tab lims' tr', elems')"
+      by (metis prod.collapse tab_t.exhaust)
+    then have defs_props: "lims' = lims" "tr' = tr" "elems' = elems[k := vr]"
+      using "1" "2" defs by fastforce+
+    have a: "l_min lims' = tab_size tab'"
+    proof -
+      have "tab_size tab' = tab_size ?tab"
+        by (simp add: "1")
+      moreover have "tab_size ?tab = l_min lims" using 0 defs(1) unfolding tab_agree_def
+        by auto
+      moreover have "l_min lims' = l_min lims" using defs_props by simp
+      ultimately show ?thesis by simp
+    qed
+    have b: "pred_option ((\<le>) (tab_size tab')) (tab_max tab')"
+    proof -
+      have "tab_max tab' = tab_max ?tab"
+        by (simp add: "2" split_beta tab_max_def)
+      moreover have "(tab_size tab') = (tab_size (tabs s ! a))"
+        using "1" by auto
+      moreover have "pred_option ((\<le>) (tab_size ?tab)) (tab_max ?tab)"
+        using 0 unfolding tab_agree_def
+        by (metis (mono_tags, lifting) case_prod_beta tab_t.case tab_t.exhaust)
+      ultimately show ?thesis by simp
+    qed
+    have c: "list_all (\<lambda>vr. ref_typing s vr tr') elems'"
+    proof -
+      have "list_all (\<lambda>vr. ref_typing s vr tr) elems" using 0 unfolding tab_agree_def
+        using defs(1) by fastforce 
+      moreover have "ref_typing s vr tr"
+      proof -
+        have "tr = tab_reftype (tabs s!a)" using defs(1) tab_reftype_def by simp
+        then show ?thesis using assms(3) by simp
+      qed
+      moreover have "list_all (\<lambda>vr. ref_typing s vr tr) elems'"
+        by (metis calculation(1) calculation(2) defs_props(3) length_list_update list_all_length nth_list_update_eq nth_list_update_neq)
+      then show ?thesis using defs_props(2) by simp
+    qed
+    have "list_all2 tab_extension (tabs s) tabs'"
+    proof -
+      have "tab_extension (?tab) tab'"
+        by (simp add: "1" "2" case_prod_beta' tab_extension_def tab_max_def tab_subtyping_refl)
+      then show "list_all2 tab_extension (tabs s) tabs'"
+        by (metis (no_types, opaque_lifting) Suc_eq_plus1 append_Cons append_Nil assms(1) list_all2_refl list_all2_update_cong list_update_id not_None_eq store_tabs1_def tab'_def(2) tab_extension_refl upd_conv_take_nth_drop)
+    qed
+    then have "store_extension s (s\<lparr>s.tabs := tabs'\<rparr>)"
+    proof - 
+      let ?s = "s\<lparr>s.tabs := tabs'\<rparr>"
+      have s1: "funcs s = funcs ?s" by simp
+      have s2: "list_all2 tab_extension (tabs s) (tabs ?s)"
+        using \<open>list_all2 tab_extension (s.tabs s) tabs'\<close> by auto
+      have s3: "list_all2 mem_extension (mems s) (mems ?s)" using mem_extension_refl
+        by (simp add: list.rel_refl)
+
+      have s4: "list_all2 global_extension (globs s) (globs ?s)"
+        by (simp add: global_extension_refl list.rel_refl)
+      then show ?thesis
+        using store_extension.intros[OF s1 s2 s3 s4, of "[]" "[]" "[]" "[]"]
+        apply simp
+        by (metis old.unit.exhaust s.surjective s.update_convs(2))
+    qed
+
+    have t1: "tab_agree s tab'" unfolding tab_agree_def using a b c defs(2) by fastforce
+    have t2: "tab_subtyping (fst tab') (fst (s.tabs s ! a))"
+      by (simp add: "2" tab_subtyping_refl)
+    have t3: "tab_size (s.tabs s ! a) \<le> tab_size tab'"
+      by (simp add: "1")
+    have t4: "tab_max (s.tabs s ! a) = tab_max tab'"
+      by (simp add: "2" case_prod_beta' tab_max_def)
+    then have "tab_agree (s\<lparr>s.tabs := tabs'\<rparr>) tab'" using t1 tab_agree_update_store by auto
+    then have "list_all (tab_agree (s\<lparr>s.tabs := tabs'\<rparr>)) tabs'"
+      by (metis (mono_tags, lifting) assms(2) atd_lem list.pred_inject(2) list_all_append list_all_length list_all_simps(2) s.select_convs(1) s.surjective s.update_convs(2) store_typing.cases tab'_def(2) tab_agree_update_store)
+    show "store_typing (s\<lparr>s.tabs := tabs'\<rparr>)"
+         "store_extension s (s\<lparr>s.tabs := tabs'\<rparr>)"
+      using store_extension_tab_leq[OF assms(2) _ t3 t1 t4 t2, of a]
+      apply (metis Suc_eq_plus1 append.simps(1) append.simps(2) assms(1) option.simps(3) store_tabs1_def tab'_def(2) upd_conv_take_nth_drop)
+      by (simp add: \<open>store_extension s (s\<lparr>s.tabs := tabs'\<rparr>)\<close>)
+qed
+
 
 lemma types_preserved_table_set_aux:
   assumes "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 n), Ref vr, $Table_set ti] : (ts _> ts')"
@@ -2933,7 +3067,46 @@ proof -
 qed
 
 
-
+lemma types_preserved_table_grow_aux:
+  assumes "s\<bullet>\<C> \<turnstile> [Ref vr, $EConstNum (ConstInt32 n), $Table_grow ti] : ts _> ts'"
+  shows "s'\<bullet>\<C> \<turnstile> [] : (ts@[T_num T_i32] _> ts')"
+        "tab_t_reftype (table \<C> ! ti) = typeof_ref vr"
+        "ti < length (table \<C>)"
+        "ref_typing s vr (typeof_ref vr)"
+proof -
+  obtain ts1 ts2 where ts_def:"s\<bullet>\<C> \<turnstile> [Ref vr] : (ts _> ts1)" 
+                                   "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 n)] : (ts1 _> ts2)"
+                             "s\<bullet>\<C> \<turnstile> [$Table_grow ti] : (ts2 _> ts')"
+    by (metis (no_types, opaque_lifting) append_Cons assms e_type_comp_conc2 self_append_conv2)
+  hence "ts1 = ts@[T_ref (typeof_ref vr)]"
+    by (metis e_type_cref typeof_num_def v_num.case(1))
+  hence "ts2 = ts1@[T_num T_i32]"
+    using e_type_cnum ts_def(2)
+    by (metis typeof_num_def v_num.case(1))
+  hence "ts2=ts@[T_ref (typeof_ref vr), T_num T_i32]"
+    by (simp add: \<open>ts1 = ts @ [T_ref (typeof_ref vr)]\<close>)
+  have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 n)] : (ts1 _> ts2)"
+    by (simp add: ts_def(2) v_to_e_def)
+  have "ref_typing s vr (typeof_ref vr)"
+    by (metis \<open>ts1 = ts @ [T_ref (typeof_ref vr)]\<close> nth_append_length t.distinct(3) t.inject(3) t.simps(9) ts_def(1) type_const_v_typing(1) type_const_v_typing(2) v.inject(3) v.simps(12) v_to_e_def v_typing.simps)
+  have "\<C> \<turnstile> [Table_grow ti] : (ts2 _> ts')"
+    using ts_def(3) unlift_b_e by force
+  then have "ts@[T_num T_i32] = ts'"
+    using b_e_type_table_grow
+    using \<open>ts1 = ts @ [T_ref (typeof_ref vr)]\<close> \<open>ts2 = ts1 @ [T_num T_i32]\<close>
+    by fastforce
+  then show "s'\<bullet>\<C> \<turnstile> [] : (ts@[T_num T_i32] _> ts')"
+        "tab_t_reftype (table \<C> ! ti) = typeof_ref vr"
+        "ti < length (table \<C>)"
+        "ref_typing s vr (typeof_ref vr)"
+    using e_type_empty apply force
+    using \<open>\<C> \<turnstile> [Table_grow ti] : ts2 _> ts'\<close>
+        \<open>ts2 = ts @ [T_ref (typeof_ref vr), T_num T_i32]\<close>
+        b_e_type_table_grow(1) apply fastforce
+    using \<open>\<C> \<turnstile> [Table_grow ti] : ts2 _> ts'\<close> b_e_type_table_grow(2) apply blast
+    using ts_def(2) e_type_cref[of s \<C> "Ref vr" ts1 ts2 vr]
+    using \<open>ref_typing s vr (typeof_ref vr)\<close> by blast
+qed
 
 
 lemma list_all2_snoc1:
