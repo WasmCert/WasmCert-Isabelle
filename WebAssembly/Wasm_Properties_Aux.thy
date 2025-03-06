@@ -530,7 +530,7 @@ by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, aut
 lemma b_e_type_select:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Select"
-  shows "\<exists>ts'' t. ts = ts''@[t,t,T_num T_i32] \<and> ts' = ts''@[t]"
+  shows "\<exists>ts'' t. ts = ts''@[t,t,T_num T_i32] \<and> ts' = ts''@[t] \<and> (is_num_type t \<or> is_vec_type t)"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
