@@ -285,7 +285,12 @@ next
   qed auto+
 qed
 
-
+lemma v_typing_typeof:
+  assumes "v_typing s v t"
+  shows "typeof v = t"
+  using assms
+  apply(simp add: typeof_def v_typing.simps split: v.splits t.splits)
+  using ref_typing.simps typeof_ref_def by fastforce
 
 lemma type_const_v_typing:
   assumes "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')"
@@ -311,8 +316,6 @@ next
       by (metis v_typing.simps)
   qed (auto simp add: v_to_e_def  split: v.splits)+
 qed
-
-
 
 (* TODO: remove, it is a duplicate*)
 (*
@@ -461,6 +464,7 @@ lemma b_e_type_is_null_ref:
 lemma b_e_type_func_ref:
   assumes "\<C> \<turnstile> [Func_ref i] : (ts _> ts')"
   shows "ts' = ts@[T_ref T_func_ref]"
+        "i < length (func_t \<C>)"
   using assms
   by (induction"[Func_ref i]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
@@ -2867,6 +2871,26 @@ lemma e_typing_imp_list_types_agree:
 proof -
   show ?thesis using store_extension_refl e_type_consts[of "\<S>" "\<C>" "vs" "ts'" "ts'@ts" "\<S>" "\<C>"]
     by (simp add: assms list.rel_map(1) list.rel_refl)
+qed
+
+lemma e_typing_imp_list_v_typing:
+  assumes "\<S>\<bullet>\<C> \<turnstile> $C* vs : (ts _> ts')"
+  shows
+    "list_all (\<lambda> v. v_typing \<S> v (typeof v)) vs"
+  using assms
+proof(induction vs arbitrary: ts ts' rule: rev_induct)
+  case Nil
+  then show ?case by auto
+next
+  case (snoc x xs)
+  have "\<S>\<bullet>\<C> \<turnstile> $C* xs @ [x] : ts _> ts'" using snoc by simp
+  then have "\<S>\<bullet>\<C> \<turnstile> ($C* xs) @ [$C x] : ts _> ts'" by simp
+  then obtain ts'' where
+     "\<S>\<bullet>\<C> \<turnstile> ($C* xs) : ts _> ts''"
+     "\<S>\<bullet>\<C> \<turnstile> [$C x] : ts'' _> ts'"
+    using e_type_comp by blast
+  then show ?case
+    by (simp add: snoc.IH type_const_v_typing(2))
 qed
 
 lemma lfilled_deterministic:

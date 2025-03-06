@@ -140,7 +140,7 @@ lemma wasm_deserialise_num_type:"typeof_num (wasm_deserialise_num bs t) = t"
 axiomatization where
     host_apply_preserve_store1:"host_apply s (t1s _> t2s) f vs hs (Some (s', vs')) \<Longrightarrow> store_extension s s'"
 and host_apply_preserve_store2:"host_apply s (t1s _> t2s) f vs hs (Some (s', vs')) \<Longrightarrow> store_typing s \<Longrightarrow> store_typing s'"
-and host_apply_respect_type:"list_all2 (\<lambda>t v. typeof v = t) t1s vs \<Longrightarrow> host_apply s (t1s _> t2s) f vs hs (Some (s', vs')) \<Longrightarrow> list_all2 (\<lambda>t v. typeof v = t) t2s vs'"
+and host_apply_respect_type:"list_all2 (\<lambda>t v. v_typing s v t) t1s vs \<Longrightarrow> host_apply s (t1s _> t2s) f vs hs (Some (s', vs')) \<Longrightarrow> list_all2 (\<lambda>t v. v_typing s v t) t2s vs'"
 
 lemma host_apply_preserve_store:
   assumes "host_apply s (t1s _> t2s) f vs hs (Some (s', vs'))"
