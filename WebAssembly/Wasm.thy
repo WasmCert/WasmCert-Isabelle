@@ -258,6 +258,8 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
   \<comment> \<open>\<open>select\<close>\<close>
 | select_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$C v1, $C v2, $EConstNum (ConstInt32 n), ($ Select)]\<rparr> \<leadsto> \<lparr>[$C v2]\<rparr>"
 | select_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$C v1, $C v2, $EConstNum (ConstInt32 n), ($ Select)]\<rparr> \<leadsto> \<lparr>[$C v1]\<rparr>"
+| select_typed_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$C v1, $C v2, $EConstNum (ConstInt32 n), ($ Select_typed t)]\<rparr> \<leadsto> \<lparr>[$C v2]\<rparr>"
+| select_typed_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$C v1, $C v2, $EConstNum (ConstInt32 n), ($ Select_typed t)]\<rparr> \<leadsto> \<lparr>[$C v1]\<rparr>"
   \<comment> \<open>\<open>if\<close>\<close>
 | if_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$EConstNum (ConstInt32 n), $(If tb e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tb e2s)]\<rparr>"
 | if_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$EConstNum (ConstInt32 n), $(If tb e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tb e1s)]\<rparr>"
