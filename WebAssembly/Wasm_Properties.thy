@@ -299,6 +299,7 @@ proof -
     by fastforce
 qed
 
+
 lemma typeof_unop_testop:
   assumes "s\<bullet>\<C> \<turnstile> [$EConstNum v, $e] : (ts _> ts')"
           "(e = (Unop t uop)) \<or> (e = (Testop t top'))"
@@ -1166,6 +1167,8 @@ proof -
                                 "s\<bullet>\<C> \<turnstile> ves : ([] _> tvs)"
     using ts''_def(1) e_type_const_list[of ves s \<C> ts ts''] assms store_extension_refl
     by fastforce
+  then have vs_tvs: "list_all2 (\<lambda> v t. v_typing s v t) vs tvs"
+    by (metis (no_types, lifting) assms(3) assms(4) assms(6) e_typing_imp_list_v_typing list_all2_all_nthI list_all_length nth_map typing_map_typeof)
   have 1:"cl_typing s (Func_native i (t1s _> t2s) tfs es) (t1s _> t2s)"
     using store_typing_imp_cl_typing[OF assms(9)] e_type_invoke[OF ts''_def(2)]
           assms(2)
@@ -1193,14 +1196,19 @@ proof -
   have 1:"tfs = map typeof zs"
     using n_zeros_typeof assms(8)
     by fast
+  have zs_tfs: "list_all2 (\<lambda> v t. v_typing s v t) zs tfs"
+    using n_zeroes_v_typing
+    using assms(8) by blast
   have "t1s = map typeof vs"
     using typing_map_typeof assms(3) tvs_def t_eqs
     by fastforce
   hence "(t1s @ tfs) = map typeof (vs @ zs)"
     using 1
     by simp
+  hence "list_all2 (\<lambda> v t. v_typing s v t) (vs @ zs) (t1s @ tfs)"
+    using list_all2_appendI t_eqs(2) vs_tvs zs_tfs by blast
   hence "frame_typing s \<lparr>f_locs = (vs @ zs), f_inst = i\<rparr> (\<C>'\<lparr>local := t1s @ tfs\<rparr>)"
-    by (simp add: frame_typing.intros ts_c_def(3))
+    using frame_typing.intros ts_c_def(3) by fastforce
   ultimately
   have "s\<bullet>Some t2s \<tturnstile> \<lparr> f_locs=(vs @ zs), f_inst=i \<rparr>;([Label m [] ($*es)]) : t2s"
     using e_typing_l_typing.intros(11) c''_def
@@ -1651,7 +1659,7 @@ lemma types_preserved_b_e:
           "s\<bullet>None \<tturnstile> f;es : ts"
   shows "s\<bullet>None \<tturnstile> f;es' : ts"
 proof -
-  obtain tvs \<C> \<C>i where defs:"tvs = map typeof (f_locs f)"
+  obtain tvs \<C> \<C>i where defs:"list_all2 (\<lambda> v t. v_typing s v t) (f_locs f) tvs"
                              "inst_typing s (f_inst f) \<C>i"
                              "\<C> = \<C>i\<lparr>local := (tvs), return := None\<rparr>"
                              "s\<bullet>\<C> \<turnstile> es : ([] _> ts)"
@@ -1885,6 +1893,61 @@ proof -
     by fastforce
 qed
 
+lemma types_preserved_set_local':
+  assumes "s\<bullet>\<C> \<turnstile> [$C v', $Set_local i] : (ts _> ts')"
+          "length vi = i"
+          "(local \<C>) = map typeof (vi @ [v] @ vs)"
+          "list_all2 (v_typing s) (vi @ [v] @ vs) (local \<C>)"
+  shows "(s'\<bullet>\<C> \<turnstile> [] : (ts _> ts')) \<and> map typeof (vi @ [v] @ vs) = map typeof (vi @ [v'] @ vs) \<and> list_all2 (v_typing s) (vi @ [v'] @ vs) (local \<C>)"
+proof -
+  have v_type:"(local \<C>)!i = typeof v"
+    using assms(2,3)
+    by (metis (no_types) append_Cons length_map list.simps(9) map_append nth_append_length)
+  obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> [$C v'] : (ts _> ts'')" 
+                             "s\<bullet>\<C> \<turnstile> [$Set_local i] : (ts'' _> ts')"
+    using e_type_comp assms
+    by (metis append_butlast_last_id butlast.simps(2) last.simps list.distinct(1))
+  hence "ts'' = ts@[typeof v']"
+    using e_type_const_new store_extension_refl by blast
+  hence v'_typeof: "typeof v = typeof v'" "ts' = ts"
+    using v_type b_e_type_set_local[of \<C> "Set_local i" ts'' ts'] ts''_def(2) unlift_b_e[of s \<C> "[Set_local i]"]
+    by fastforce+
+  have "v_typing s v' (typeof v')"
+    using ts''_def(1) type_const_v_typing(2) by fastforce
+  then have "v_typing s v' (local \<C>!i)"
+    by (simp add: v'_typeof(1) v_type)
+  then have "list_all2 (v_typing s) (vi @ [v'] @ vs) (local \<C>)"
+  proof -
+    assume v'_typing: "v_typing s v' (local \<C> ! i)"
+    have a: "\<And> n. n < length (vi @ [v'] @ vs) \<Longrightarrow> v_typing s ((vi @ [v'] @ vs)!n) (local \<C>!n)"
+    proof -
+      fix n
+      assume n_length: "n < length (vi @ [v'] @ vs)"
+      then show "v_typing s ((vi @ [v'] @ vs)!n) (local \<C>!n)"
+      proof(cases "n =i")
+        case True
+        then show ?thesis using v'_typing assms(2) by fastforce
+      next
+        case False
+        then have "((vi @ [v'] @ vs) ! n) = ((vi @ [v] @ vs) ! n)"
+          using assms(2) n_length
+          by (metis Cons_eq_appendI diffs0_imp_equal not_gr_zero nth_Cons_pos nth_append zero_less_diff)
+        then have "v_typing s ((vi @ [v'] @ vs) ! n) = v_typing s ((vi @ [v] @ vs) ! n) "
+          by metis
+        then show ?thesis
+          using assms(4) list_all2_nthD n_length by fastforce
+      qed
+    qed
+    have b: "length (vi @ [v'] @ vs) = length (local \<C>)"
+      by (simp add: assms(3))
+    then show ?thesis
+      using list_all2_all_nthI a b by metis
+  qed
+  thus ?thesis
+    using b_e_type_empty[of \<C> "ts" "ts'"] e_typing_l_typing.intros(1)
+    by (simp add: e_type_empty v'_typeof(1) v'_typeof(2))
+qed
+
 (*TODO: fix this*)
 lemma types_preserved_get_global:
   assumes "typeof (sglob_val s i j) = tg_t (global \<C> ! j)"
@@ -1968,6 +2031,102 @@ next
     by blast
 qed
 
+lemma reduce_locs_type_preserved:
+  assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
+          "store_typing s"
+          "inst_typing s (f_inst f) \<C>i"
+          "s\<bullet>\<C> \<turnstile> es : (ts _> ts')"
+          "\<C> = \<C>i\<lparr>local := (map typeof (f_locs f)), label := arb_label, return := arb_return\<rparr>"
+          "list_all2 (v_typing s) (f_locs f) (map typeof (f_locs f))"
+  shows "list_all2 (v_typing s') (f_locs f') (map typeof (f_locs f'))"
+  using assms
+proof(induction arbitrary: \<C>i \<C> ts ts' arb_label arb_return rule: reduce.induct)
+  case (invoke_host_Some s i_cl t1s t2s h ves vcs n m hs s' vcs' f)
+  then show ?case
+    using host_apply_preserve_store1 v_typing_list_store_extension_inv by blast 
+next
+  case (set_local vi j s v vs i v')
+  thm types_preserved_set_local[OF set_local(4,1)]
+  have local_\<C>: "local \<C> = map typeof (vi @ [v] @ vs)"
+    using set_local(5) by simp  
+  then have v_typing_\<C>: "list_all2 (v_typing s) (vi @ [v] @ vs) (local \<C>)"
+    using set_local(6) by simp
+  show ?case
+    using types_preserved_set_local'[OF set_local(4,1) local_\<C> v_typing_\<C>] local_\<C> by fastforce
+next
+  case (set_global s f j v s')
+  then have "store_extension s s'"
+    using reduce.set_global reduce_store_extension by blast
+  then show ?case using set_global(6)
+    using v_typing_list_store_extension_inv by blast 
+next
+  case (store_Some v t f j s m k off mem' a)
+  have "funcs (s\<lparr>s.mems := (s.mems s)[j := mem']\<rparr>) = funcs s"
+    by simp
+  then show ?case using v_typing_funcs_inv
+    by (metis (mono_tags, lifting) list_all2_mono store_Some.prems(5))
+next
+  case (store_packed_Some v t f j s m k off tp mem' a)
+  have "funcs (s\<lparr>s.mems := (s.mems s)[j := mem']\<rparr>) = funcs s"
+    by simp
+  then show ?case using v_typing_funcs_inv
+    by (metis (mono_tags, lifting) list_all2_mono store_packed_Some.prems(5))
+next
+  case (store_vec_Some f j s m sv v bs k off mem' a)
+  have "funcs (s\<lparr>s.mems := (s.mems s)[j := mem']\<rparr>) = funcs s"
+    by simp
+  then show ?case using v_typing_funcs_inv
+    by (metis (mono_tags, lifting) list_all2_mono store_vec_Some.prems(5))
+next
+  case (grow_memory f j s m n c mem')
+  have "funcs (s\<lparr>s.mems := (s.mems s)[j := mem']\<rparr>) = funcs s"
+    by simp
+  then show ?case using v_typing_funcs_inv
+    by (metis (mono_tags, lifting) list_all2_mono grow_memory.prems(5))
+next
+  case (table_set f ti a s n vr tabs')
+  have "funcs (s\<lparr>s.tabs := tabs'\<rparr>) = funcs s" by simp
+  then show ?case using v_typing_funcs_inv
+    by (metis (mono_tags, lifting) list_all2_mono table_set.prems(5))
+next
+  case (table_grow f ti a s tab sz n vr tab')
+  have "funcs (s\<lparr>s.tabs := (s.tabs s)[a := tab']\<rparr>) = funcs s" by simp
+  then show ?case using v_typing_funcs_inv
+    by (metis (mono_tags, lifting) list_all2_mono table_grow.prems(5))
+next
+  case (label s f es s' f' es' k lholed les les')
+  then obtain t1s t2s arb_label' \<C>' where \<C>'_def: "s\<bullet>\<C>' \<turnstile> es : t1s _> t2s" "\<C>' = \<C>\<lparr>label := arb_label' @ label \<C>\<rparr>"
+    using types_exist_lfilled by metis
+  then have "\<C>' = \<C>i\<lparr>local := map typeof (f_locs f), label := arb_label' @ label \<C>, return := arb_return\<rparr>"
+    using label(8) by fastforce
+  then show ?case using  \<C>'_def label(4)[OF label(5,6)] label.prems(4) label.prems(5) by blast
+next
+  case (local s f es s' f' es' f0 n)
+  thm e_type_local[OF local(5)]
+  obtain tls \<C>i' \<C>' where \<C>i'_def:
+    "inst_typing s (f_inst f) \<C>i'"
+    "length tls = n"
+    "s\<bullet>\<C>' \<turnstile> es : [] _> tls"
+    "ts' = ts @ tls"
+    "list_all2 (v_typing s) (f_locs f) (map typeof (f_locs f))"
+    "\<C>'=\<C>i'\<lparr>local := map typeof (f_locs f), return := Some tls\<rparr>"
+    using e_type_local[OF local(5)] by blast
+  then show ?case
+    using e_type_local_shallow local.hyps local.prems(1,3,5) store_preserved v_typing_list_store_extension_inv by blast
+next
+  case (init_mem_Some f j s m n bs mem')
+  have "funcs (s\<lparr>s.mems := (s.mems s)[j := mem']\<rparr>) = funcs s"
+    by simp
+  then show ?case using v_typing_funcs_inv
+    by (metis (mono_tags, lifting) init_mem_Some.prems(5) list_all2_mono)
+next
+  case (init_tab_Some f ti j s t n icls tab')
+  have "funcs (s\<lparr>s.tabs := (s.tabs s)[j := tab']\<rparr>) = funcs s"
+    by simp
+  then show ?case using v_typing_funcs_inv
+    by (metis (mono_tags, lifting) init_tab_Some.prems(5) list_all2_mono)
+qed blast+
+
 lemma types_preserved_e1:
   assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
           "store_typing s"
@@ -1975,6 +2134,8 @@ lemma types_preserved_e1:
           "tvs = map typeof (f_locs f)"
           "\<C> = \<C>i\<lparr>local := tvs, label := arb_labs, return := arb_return\<rparr>"
           "s\<bullet>\<C> \<turnstile> es : (ts _> ts')"
+          (* TODO: perhaps a simpler version is sufficient *)
+          "list_all2 (\<lambda> v t. v_typing s v t) (f_locs f) tvs"
   shows "(s'\<bullet>\<C> \<turnstile> es' : (ts _> ts')) \<and> (tvs = map typeof (f_locs f'))"
   using assms
 proof (induction arbitrary: tvs \<C> \<C>i ts ts' arb_labs arb_return rule: reduce.induct)
@@ -2041,11 +2202,13 @@ next
       by fastforce
 next
   case (get_local vi j i v vs s)
-  have "local \<C> = tvs"
+  have 1: "local \<C> = tvs"
     using store_local_label_empty assms(2) get_local
     by fastforce
+  have 2: "v_typing s v (typeof v)"
+    by (metis get_local.hyps(2) get_local.prems(6) list_all2_Cons1 list_all2_append1 type_const_v_typing(2) types_agree_imp_e_typing)
   then show ?case
-    using types_preserved_get_local[OF] get_local
+    using types_preserved_get_local[OF get_local(7) get_local(1) _ 2 store_extension_refl ] get_local
     by fastforce
 next
   case (set_local vi j s v vs v' i)
@@ -2057,7 +2220,7 @@ next
     by simp
 next
   case (get_global s f j)
-  have "length (global \<C>) > j"
+  have 0: "length (global \<C>) > j"
     using b_e_type_get_global get_global(5) unlift_b_e[of _ _ "[Get_global j]" "(ts _> ts')"]
     by fastforce
   hence "glob_typing (sglob s (f_inst f) j) ((global \<C>)!j)"
@@ -2066,10 +2229,30 @@ next
   hence "typeof (g_val (sglob s (f_inst f) j)) = tg_t (global \<C> ! j)"
     unfolding glob_typing_def
     by simp
+  hence 1: "typeof (sglob_val s (f_inst f) j) = tg_t (global \<C> ! j)"
+    unfolding sglob_val_def
+    by simp
+  have 2: "v_typing s (sglob_val s (f_inst f) j) (typeof (sglob_val s (f_inst f) j))"
+  proof -
+    have j_length: "((inst.globs(f_inst f)) ! j) < length (globs s)"
+    proof -
+      have j_\<C>i: "j < length (global \<C>i)" using 0 get_global(4) by simp
+      have "inst_typing s (f_inst f) \<C>i" using get_global by simp
+      then have "list_all2 (globi_agree (globs s)) (inst.globs (f_inst f)) (global \<C>i)"
+        using inst_typing.simps by auto
+      then show ?thesis using j_\<C>i
+        using get_global.prems(2) sglob_ind_def store_typing_imp_glob_agree(1) by auto
+    qed
+    have "list_all (glob_agree s) (globs s)" using get_global(1) store_typing.simps by simp
+    then have "glob_agree s ((globs s)!((inst.globs(f_inst f)) ! j))" using j_length
+      by (simp add: list_all_length)
+    then show ?thesis unfolding glob_agree_def sglob_val_def
+      using sglob_def sglob_ind_def v_typing_typeof by fastforce
+  qed
   thus ?case
-    using get_global(3,5) types_preserved_get_global
-    unfolding glob_typing_def sglob_val_def
-    by fastforce
+    using get_global(3,5) types_preserved_get_global[OF 1 _ 2 store_extension_refl]
+    by blast
+    (*by fastforce*)
 next
   case (set_global s i j v s' vs)
   then show ?case
@@ -2187,7 +2370,7 @@ next
     hence "(s\<bullet>\<C>' \<turnstile> es : (ts _> ts')) \<Longrightarrow>
              ((s'\<bullet>\<C>' \<turnstile> es' : (ts _> ts')) \<and> map typeof (f_locs f) = map typeof (f_locs f') \<and> store_extension s s')"
       using label(4)[OF label(5,6,7,8)] label(4,5,6,7,8)
-            reduce_store_extension[OF label(1,5,6), of \<C>' _ _ "return \<C>'" "label \<C>'"]
+            reduce_store_extension[OF label(1,5,6), of \<C>' _ _ "return \<C>'" "label \<C>'"] label(10)
       by fastforce
     hence "(s\<bullet>\<C>\<lparr>label := arb_labs'@(label \<C>)\<rparr> \<turnstile> es : (ts _> ts'))
                \<Longrightarrow> (s'\<bullet>\<C>\<lparr>label := arb_labs'@(label \<C>)\<rparr> \<turnstile> es' : (ts _> ts')) \<and>
@@ -2211,16 +2394,23 @@ next
                           "\<C>' =  \<C>i'\<lparr>local := map typeof (f_locs f), label := label  \<C>i', return := Some tls\<rparr>"
                           "s\<bullet>\<C>' \<turnstile> es : ([] _> tls)"
                           "ts' = ts @ tls"
+                          "list_all2 (v_typing s) (f_locs f) (map typeof (f_locs f))"
     using e_type_local[OF local(7)]
     by fastforce
+  have a: "list_all2 (v_typing s) (f_locs f) (map typeof (f_locs f))"
+    using v_typing_typeof_list
+    by (metis e_type_local_shallow frame_typing.simps l_typing.simps local.prems(5))
   hence 0:"s'\<bullet>\<C>' \<turnstile> es' : ([] _> tls)" "map typeof (f_locs f) = map typeof (f_locs f')"
-    using local(2,3)
+    using local(2)[OF local(3) es_def(1) _ es_def(3) es_def(4) ]
     by blast+
+  then have 1: "list_all2 (v_typing s) (f_locs f) (map typeof (f_locs f))"
+    using a by simp
   have "inst_typing s' (f_inst f) \<C>i'"
     using inst_typing_store_extension_inv[OF es_def(1)] reduce_store_extension[OF local(1,3) es_def(1,4,3)]
     by blast
   hence "frame_typing s' f' (\<C>i'\<lparr>local := map typeof (f_locs f)\<rparr>)"
-    using 0(2) frame_typing.intros local.hyps reduce_inst_is
+    using 0(2) es_def(6) frame_typing.intros local.hyps reduce_inst_is
+      reduce_locs_type_preserved[OF local.hyps local(3) es_def(1) es_def(4) es_def(3)]
     by auto
   hence 1:"s'\<bullet>(Some tls) \<tturnstile> f';es' : tls"
     using 0 e_typing_l_typing.intros(11) es_def(1,3) reduce_inst_is[OF local(1)]
@@ -2246,6 +2436,27 @@ next
   case (init_tab_None f j s t n icls)
   thus ?case
     by (simp add: e_typing_l_typing.intros(5))
+next
+  case (table_get f ti a s n val)
+  then show ?case sorry
+next
+  case (table_get_fail f ti a s n)
+  then show ?case sorry
+next
+  case (table_set f ti a s n vr tabs')
+  then show ?case sorry
+next
+  case (table_set_fail f ti a s n vr)
+  then show ?case sorry
+next
+  case (table_size f ti a s t n)
+  then show ?case sorry
+next
+  case (table_grow f ti a s tab sz n vr tab')
+  then show ?case sorry
+next
+  case (table_grow_fail s f vr n ti)
+  then show ?case sorry
 qed 
 
 lemma types_preserved_e2:

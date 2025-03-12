@@ -292,6 +292,21 @@ lemma v_typing_typeof:
   apply(simp add: typeof_def v_typing.simps split: v.splits t.splits)
   using ref_typing.simps typeof_ref_def by fastforce
 
+lemma v_typing_typeof_list:
+  assumes "list_all2 (\<lambda> v t. v_typing s v t) vs ts"
+  shows "map typeof vs = ts"
+  using assms
+proof(induction vs arbitrary: ts)
+  case Nil
+  then show ?case
+    by fastforce
+next
+  case (Cons a vs)
+  then show ?case
+    by (metis list.simps(9) list_all2_Cons1 v_typing_typeof)
+qed
+
+
 lemma type_const_v_typing:
   assumes "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')"
   shows
@@ -1082,17 +1097,32 @@ lemma cl_typing_host:
 lemma s_type_unfold:
   assumes "s\<bullet>rs \<tturnstile> f;es : ts"
   shows "\<exists>\<C>i. inst_typing s (f_inst f) \<C>i
-              \<and> (s\<bullet>\<C>i\<lparr>local := (map typeof (f_locs f)), return := rs\<rparr> \<turnstile> es : ([] _> ts))"
-  using assms
-  unfolding l_typing.simps frame_typing.simps
-  by auto
+              \<and> (s\<bullet>\<C>i\<lparr>local := (map typeof (f_locs f)), return := rs\<rparr> \<turnstile> es : ([] _> ts))
+              \<and> list_all2 (\<lambda> v t. v_typing s v t) (f_locs f) (map typeof (f_locs f))"
+proof -
+  obtain \<C> where C_def: "frame_typing s f \<C>"
+                            "s\<bullet>\<C>\<lparr>return := rs\<rparr> \<turnstile> es : ([] _> ts)"            
+    using assms l_typing.cases
+    by metis
+  then obtain \<C>' tvs where C'_def: 
+      "list_all2 (\<lambda> v t. v_typing s v t) (f_locs f) tvs"
+      "inst_typing s (f_inst f) \<C>'"
+      "\<C>'\<lparr>local := tvs\<rparr> = \<C>"
+    by (metis frame_typing.simps)
+
+  have "tvs = map typeof (f_locs f)" using C'_def(1) v_typing_typeof_list
+    by fastforce
+  then show ?thesis
+    using C'_def(1,2,3) C'_def(3) C_def(2) by blast
+qed
 
 lemma e_type_local:
   assumes "s\<bullet>\<C> \<turnstile> [Frame n f es] : (ts _> ts')"
   shows "\<exists>tls \<C>i. inst_typing s (f_inst f) \<C>i
                 \<and> length tls = n
                 \<and> (s\<bullet>\<C>i\<lparr>local := (map typeof (f_locs f)), return := Some tls\<rparr> \<turnstile> es : ([] _> tls))
-                \<and> ts' = ts @ tls"
+                \<and> ts' = ts @ tls
+                \<and> list_all2 (v_typing s) (f_locs f) (map typeof (f_locs f))"
   using assms
 proof (induction "s" "\<C>" "[Frame n f es]" "(ts _> ts')" arbitrary: ts ts')
   case (2 \<S> \<C> es' t1s t2s e t3s)
@@ -1102,7 +1132,7 @@ proof (induction "s" "\<C>" "[Frame n f es]" "(ts _> ts')" arbitrary: ts ts')
   thus ?case
     using 2
     by simp
-qed (auto simp add: unlift_b_e frame_typing.simps l_typing.simps)
+qed (auto simp add: unlift_b_e frame_typing.simps l_typing.simps s_type_unfold)
 
 lemma e_type_local_shallow:
   assumes "\<S>\<bullet>\<C> \<turnstile> [Frame n f es] : (ts _> ts')"
@@ -2429,11 +2459,80 @@ proof -
     by auto
 qed
 
+lemma v_typing_store_extension_inv:
+  assumes "v_typing s v t"
+          "store_extension s s'"
+        shows "v_typing s' v t"
+  using assms
+proof(cases v)
+  case (V_num x1)
+  then show ?thesis using v_typing.simps
+    using assms(1) by fastforce
+next
+  case (V_vec x2)
+  then show ?thesis using v_typing.simps
+    using assms(1) by fastforce
+next
+  case (V_ref x3)
+  then show ?thesis
+  proof(cases x3)
+    case (ConstNull x1)
+    then show ?thesis 
+      using V_ref assms(1) ref_typing.simps v_typing.simps by fastforce
+  next
+    case (ConstRef x2)
+    then have "ref_typing s (ConstRef x2) T_func_ref"
+      using V_ref assms(1) ref_typing.simps v_typing.simps by auto
+   then have "ref_typing s' (ConstRef x2) T_func_ref"
+     using assms(2) ref_typing.simps store_extension.simps by fastforce
+    then show ?thesis
+      by (metis ConstRef V_ref assms(1) v_typing.intros(3) v_typing_typeof)
+  next
+    case (ConstRefExtern x3)
+    then show ?thesis
+      by (metis V_ref assms(1) ref_typing.intros(3) v_typing.intros(3) v_typing_typeof)
+  qed
+qed
+
+lemma v_typing_funcs_inv:
+  assumes "v_typing s v t"
+          "funcs s = funcs s'"
+        shows "v_typing s' v t"
+proof(cases v)
+  case (V_num x1)
+  then show ?thesis
+    using assms(1) v_typing.simps by auto
+next
+  case (V_vec x2)
+  then show ?thesis
+    using assms(1) v_typing.simps by auto
+next
+  case (V_ref x3)
+  then show ?thesis
+    using assms ref_typing.simps v_typing.simps
+    by (auto split: v_ref.splits)
+qed
+
+lemma v_typing_list_store_extension_inv:
+  assumes "list_all2 (\<lambda> v t. v_typing s v t) vs ts"
+          "store_extension s s'"
+        shows "list_all2 (\<lambda> v t. v_typing s' v t) vs ts"
+  using assms
+proof(induction vs arbitrary: ts)
+  case Nil
+  then show ?case
+    by fastforce
+next
+  case (Cons a vs)
+  then show ?case
+    by (metis list_all2_mono v_typing_store_extension_inv)
+qed
+
 lemma frame_typing_store_extension_inv:
   assumes "frame_typing s f \<C>"
           "store_extension s s'" 
     shows "frame_typing s' f \<C>"
-  using assms inst_typing_store_extension_inv
+  using assms inst_typing_store_extension_inv v_typing_list_store_extension_inv
   unfolding frame_typing.simps
   by fastforce
 
@@ -2453,6 +2552,35 @@ next
     using assms
     unfolding cl_typing.simps
     by auto
+qed
+
+lemma bitzero_v_typing:
+  "v_typing s (bitzero t) t"
+proof(cases t)
+  case (T_num x1)
+  then show ?thesis unfolding bitzero_def
+    by (metis append1_eq_conv bitzero_def list.simps(9) n_zeros_def n_zeros_typeof t.simps(10) typeof_def v.simps(10) v_typing.simps)
+next
+  case (T_vec x2)
+  then show ?thesis unfolding bitzero_def
+     by (metis t.simps(11) t_vec.exhaust v_typing.simps)
+next
+  case (T_ref x3)
+  then show ?thesis unfolding bitzero_def
+    by (metis (mono_tags, lifting) bitzero_ref_def ref_typing.intros(1) t.simps(12) t_ref.exhaust t_ref.simps(3) t_ref.simps(4) v_typing.intros(3))
+qed
+
+
+lemma n_zeroes_v_typing:
+  "list_all2 (\<lambda> v t. v_typing s v t) (n_zeros ts) ts"
+proof(induction ts)
+  case Nil
+  then show ?case
+    by (simp add: n_zeros_def)
+next
+  case (Cons a ts)
+  then show ?case
+    by (simp add: bitzero_v_typing n_zeros_def)
 qed
 
 lemma ref_typing_store_extension_inv:

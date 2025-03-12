@@ -126,6 +126,10 @@ definition "memi_agree ms n mem_t =
 
 definition "funci_agree fs n f = (n < length fs \<and> (cl_type (fs!n)) = f)"
 
+inductive v_typing :: "s \<Rightarrow> v \<Rightarrow> t \<Rightarrow> bool" where
+  "v_typing s (V_num vn) (T_num (typeof_num vn))" |
+  "v_typing s (V_vec vv) (T_vec (typeof_vec vv))" |
+  "ref_typing s vr t \<Longrightarrow> v_typing s (V_ref vr) (T_ref t)"
 
 (* 'inst' seems to be 'moduleinst' *)
 (* the rule described here is this:
@@ -142,7 +146,7 @@ inductive inst_typing :: "[s, inst, t_context] \<Rightarrow> bool" where
                         \<lparr>types_t = ts, func_t = tfs, global = tgs, table = tabs_t, memory = mems_t, local = [], label = [], return = None\<rparr>"
 
 inductive frame_typing :: "[s, f, t_context] \<Rightarrow> bool" where
-"\<lbrakk>tvs = map typeof (f_locs f); inst_typing s (f_inst f) \<C>\<rbrakk> \<Longrightarrow> frame_typing s f (\<C>\<lparr>local := tvs\<rparr>)"
+"\<lbrakk>list_all2 (\<lambda> v t. v_typing s v t) (f_locs f) tvs; inst_typing s (f_inst f) \<C>\<rbrakk> \<Longrightarrow> frame_typing s f (\<C>\<lparr>local := tvs\<rparr>)"
 
 inductive cl_typing :: "[s, cl, tf] \<Rightarrow> bool" where
    "\<lbrakk>inst_typing s i \<C>; tf = (t1s _> t2s); \<C>\<lparr>local := t1s @ ts, label := ([t2s] @ (label \<C>)), return := Some t2s\<rparr> \<turnstile> es : ([] _> t2s)\<rbrakk> \<Longrightarrow> cl_typing s (Func_native i tf ts es) (t1s _> t2s)"
@@ -176,10 +180,6 @@ and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> boo
 | "\<lbrakk>frame_typing \<S> f \<C>; \<S>\<bullet>\<C>\<lparr>return := rs\<rparr> \<turnstile> es : ([] _> ts)\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile> f;es : ts"
 
 
-inductive v_typing :: "s \<Rightarrow> v \<Rightarrow> t \<Rightarrow> bool" where
-  "v_typing s (V_num vn) (T_num (typeof_num vn))" |
-  "v_typing s (V_vec vv) (T_vec (typeof_vec vv))" |
-  "ref_typing s vr t \<Longrightarrow> v_typing s (V_ref vr) (T_ref t)"
 
 definition "glob_agree" :: "s \<Rightarrow> global \<Rightarrow> bool" where
   "glob_agree s glob = (\<exists> t. v_typing s (g_val glob) t)"
