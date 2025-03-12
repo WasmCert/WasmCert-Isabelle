@@ -3360,6 +3360,7 @@ lemma progress_b_e:
           "\<not> const_list ($* b_es)"
           "length (local \<C>) = length (f_locs f)"
           "length (memory \<C>) = length (inst.mems (f_inst f))"
+          "length (table \<C>) = length (inst.tabs (f_inst f))"
           "(types_t \<C>) = types (f_inst f)"
           "length (func_t \<C>) = length (inst.funcs (f_inst f))"
   shows "\<exists>a s' f' es'. \<lparr>s;f;($C*vs)@($*b_es)\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
@@ -3410,7 +3411,7 @@ next
   obtain fj fi fj' where f_def:"fi = inst.funcs (f_inst f) ! j" "fj = (take j (inst.funcs (f_inst f)))" "fj' = (drop (j+1) (inst.funcs (f_inst f)))"
     by blast
   have j_def:"j < length (inst.funcs (f_inst f))"
-    using func_ref.hyps func_ref.prems(8) by metis
+    using func_ref.hyps func_ref.prems(9) by metis
   hence fj_len:"length fj = j"
     using f_def(2)
     by fastforce
@@ -3556,7 +3557,7 @@ next
 next
   case (block \<C> tb tn tm es)
   have "tb_tf (f_inst f) tb = (tn _> tm)"
-    using block(1,10)
+    using block(1,11)
     by (simp add: tb_tf_def tb_tf_t_def Let_def split: if_splits option.splits tb.splits)
   thus ?case
     using reduce.block e_type_consts[OF block(4)] store_extension_refl
@@ -3564,7 +3565,7 @@ next
 next
   case (loop \<C> tb tn tm es)
   have "tb_tf (f_inst f) tb = (tn _> tm)"
-    using loop(1,10)
+    using loop(1,11)
     by (simp add: tb_tf_def tb_tf_t_def Let_def split: if_splits option.splits tb.splits)
   thus ?case
     using reduce.loop e_type_consts[OF loop(4)] store_extension_refl
@@ -3963,12 +3964,62 @@ next
     by fastforce
 next
   case (table_set ti \<C> tr)
-  then show ?case sorry
+  obtain n vr where c_def:"vs = [V_num (ConstInt32 n), V_ref vr]"
+    by (metis (no_types, lifting) const_list_split_2 const_of_typed_const_2 list.inject local.table_set(3) t.distinct(5) t.simps(1) t.simps(5) t.simps(7) type_const_v_typing(2) typeof_num_i32 v_typing.simps)
+  then show ?case
+  proof(cases "stab_ind (f_inst f) ti")
+    case None
+    then show ?thesis using reduce.table_set_fail
+      using stab_ind_def table_set.hyps(1) table_set.prems(7) by fastforce
+  next
+    case (Some a)
+    then have h1: "stab_ind (f_inst f) ti = Some a" by simp
+    then show ?thesis
+    proof(cases " store_tabs1 (tabs s) a (nat_of_int n) vr")
+      case None
+      then have "stab_ind (f_inst f) ti = Some a \<and> store_tabs1 (s.tabs s) a (nat_of_int n) vr = None"
+        using h1 by simp
+      then have "\<lparr>s;f;[$EConstNum (ConstInt32 n), Ref vr, $Table_set ti]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+        using reduce.table_set_fail by blast
+      then show ?thesis using c_def v_to_e_def by auto
+    next
+      case (Some tabs')
+      then have "\<lparr>s;f;[$EConstNum (ConstInt32 n), Ref vr, $Table_set ti]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:= tabs'\<rparr>;f;[]\<rparr>"
+        using reduce.table_set h1 by blast
+      then show ?thesis using c_def v_to_e_def by auto
+    qed
+  qed
 next
   case (table_get ti \<C> tr)
-  then show ?case sorry
+  obtain n where n_def:"vs = [V_num (ConstInt32 n)]"
+    using const_of_i32 table_get.prems(1) by blast
+  then show ?case
+  proof(cases "stab_ind (f_inst f) ti")
+    case None
+    then show ?thesis using table_get_fail
+      using stab_ind_def table_get.hyps(1) table_get.prems(7) by fastforce
+  next
+    case (Some a)
+    then have h1: "stab_ind (f_inst f) ti = Some a" by blast
+    then show ?thesis
+    proof(cases "load_tabs1 (tabs s) a (nat_of_int n)")
+      case None
+      then show ?thesis using table_get_fail h1
+        using n_def v_to_e_def by fastforce
+    next
+      case (Some val)
+      then show ?thesis using reduce.table_get h1
+        using n_def v_to_e_def by fastforce
+    qed
+  qed
 next
   case (table_size ti \<C>)
+  \<comment> \<open>\<open>table size\<close>\<close>
+(*| table_size: "\<lbrakk>stab_ind (f_inst f) ti = Some a; a < length (tabs s); (tabs s)!a = t; tab_size t = n\<rbrakk> \<Longrightarrow>  \<lparr>s;f;[ $(Table_size ti)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat n))]\<rparr>"
+*)
+  obtain a where a_def: "stab_ind (f_inst f) ti = Some a"
+    using stab_ind_def table_size.hyps table_size.prems(7) by auto
+  then have  "a < length (tabs s)" sorry
   then show ?case sorry
 next
   case (table_grow ti \<C> tr)
@@ -4017,7 +4068,7 @@ next
         by simp
     qed
     thus ?thesis
-      using composition(7,9,10,11,12) composition(2)[OF composition(5) _ _ 1]
+      using composition(7,9,10,11,12,13) composition(2)[OF composition(5) _ _ 1]
             progress_L0[of s _ "(($C*vs) @ ($* es))" _ _ _ "[]" "[$e]"]
       unfolding const_list_def
       by fastforce
