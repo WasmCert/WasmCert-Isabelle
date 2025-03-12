@@ -415,6 +415,13 @@ lemma b_e_type_grow_memory:
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct) auto
 
+lemma b_e_type_table_get:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Table_get ti"
+  shows "\<exists>ts'' tr. ts = ts''@[T_num T_i32] \<and> ts' = ts''@[T_ref tr] \<and>(tab_t_reftype ((table \<C>)!ti)) = tr" "ti < length(table \<C>)"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
 lemma b_e_type_nop:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Nop"
@@ -3073,6 +3080,15 @@ lemma b_e_type_table_grow:
           "e = Table_grow ti"
   shows
     "\<exists>tr ts''. ts = ts''@[T_ref tr, T_num T_i32] \<and> ts' = ts''@[T_num T_i32]  \<and> tr = tab_t_reftype (table \<C>!ti)"
+    "ti < length (table \<C>)"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct) auto
+
+lemma b_e_type_table_size:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Table_size ti"
+  shows
+    "ts' = ts@[T_num T_i32]"
     "ti < length (table \<C>)"
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct) auto
