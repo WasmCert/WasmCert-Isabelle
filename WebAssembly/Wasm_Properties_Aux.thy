@@ -2123,7 +2123,21 @@ proof -
     by (metis inst.select_convs(3) list_all2_nthD option.discI option.inject t_context.select_convs(4))
 qed
 
-lemma store_typing_imp_types_eq:
+lemma inst_typing_store_typing_imp_tab_agree:
+  assumes "inst_typing s i \<C>"
+          "store_typing s"
+          "(stab_ind i ti) = Some k"
+  shows "tab_agree s (tabs s!k)"
+proof -
+  have "tabi_agree (tabs s) k ((table \<C>)!ti)"
+    using assms inst_typing_imp_tabi_agree by simp
+  then have "k < length (tabs s)"
+    using tabi_agree_def by blast
+  then show "tab_agree s (tabs s!k)" using assms(2) store_typing.simps
+    by (simp add: list_all_length)
+qed
+
+lemma inst_typing_imp_types_eq:
   assumes "inst_typing s i \<C>"
           "j < length (types_t \<C>)"
   shows "(types_t \<C>)!j = (types i)!j"

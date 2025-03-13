@@ -342,9 +342,9 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
   \<comment> \<open>\<open>table set fail\<close>\<close>
 | table_set_fail: "\<lbrakk>(stab_ind (f_inst f) ti = None) \<or> (stab_ind (f_inst f) ti = Some a \<and> store_tabs1 (tabs s) a (nat_of_int n) vr = None)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(EConstNum (ConstInt32 n)), Ref vr, $(Table_set ti)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>table size\<close>\<close>
-| table_size: "\<lbrakk>stab_ind (f_inst f) ti = Some a; a < length (tabs s); (tabs s)!a = t; tab_size t = n\<rbrakk> \<Longrightarrow>  \<lparr>s;f;[ $(Table_size ti)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat n))]\<rparr>"
+| table_size: "\<lbrakk>stab_ind (f_inst f) ti = Some a; (tabs s)!a = t; tab_size t = n\<rbrakk> \<Longrightarrow>  \<lparr>s;f;[ $(Table_size ti)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat n))]\<rparr>"
   \<comment> \<open>\<open>table grow\<close>\<close>
-| table_grow: "\<lbrakk>stab_ind (f_inst f) ti = Some a; a < length (tabs s); tab = (tabs s)!a; sz = tab_size tab; grow_tab tab (nat_of_int n) vr = Some tab'\<rbrakk> \<Longrightarrow>  \<lparr>s;f;[Ref vr, $EConstNum (ConstInt32 n), $(Table_grow ti)]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:= ((tabs s)[a := tab'])\<rparr>;f;[$EConstNum (ConstInt32 (int_of_nat sz))]\<rparr>"
+| table_grow: "\<lbrakk>stab_ind (f_inst f) ti = Some a; (tabs s)!a = tab; sz = tab_size tab; grow_tab tab (nat_of_int n) vr = Some tab'\<rbrakk> \<Longrightarrow>  \<lparr>s;f;[Ref vr, $EConstNum (ConstInt32 n), $(Table_grow ti)]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:= ((tabs s)[a := tab'])\<rparr>;f;[$EConstNum (ConstInt32 (int_of_nat sz))]\<rparr>"
   \<comment> \<open>\<open>table grow fail\<close>\<close>
 | table_grow_fail: "\<lparr>s;f;[Ref vr, $EConstNum (ConstInt32 n), $(Table_grow ti)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int32_minus_one))]\<rparr>"
   \<comment> \<open>\<open>block\<close>\<close>
