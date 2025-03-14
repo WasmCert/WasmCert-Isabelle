@@ -54,35 +54,46 @@ next
     by (metis "1" glob_typing_def set_global.prems(2) sglob_def store_typing_imp_glob_agree(2))
 next
   case (store_Some t v s i j m k off mem' vs a)
-  show ?case
+  have "mem_subtyping (fst mem') (fst m)"
+    by (metis fst_conv limits_compat_refl mem_subtyping_def option.inject option.simps(3) store_Some.hyps(4) store_def write_bytes_def)
+  then show ?case
     using store_size[OF store_Some(4)] store_max[OF store_Some(4)]
+          store_mem_agree[OF store_Some(4)]
           store_typing_in_mem_agree store_Some(2,3,5,6)
           store_extension_mem_leq[OF store_Some(5,3), of mem']
+        inst_typing_imp_memi_agree memi_agree_def order_refl
     by (metis inst_typing_imp_memi_agree memi_agree_def order_refl)
 next
   case (store_packed_Some t v s i j m k off tp mem' vs a)
-  show ?case
+  have "mem_subtyping (fst mem') (fst m)"
+    by (metis fst_conv limits_compat_refl mem_subtyping_def option.sel option.simps(3) store_def store_packed_Some.hyps(4) store_packed_def write_bytes_def)
+  then show ?case
     using store_packed_size[OF store_packed_Some(4)] store_packed_max[OF store_packed_Some(4)]
           store_typing_in_mem_agree store_packed_Some(2,3,5,6)
           store_extension_mem_leq[OF store_packed_Some(5,3), of mem']
+          store_packed_mem_agree[OF store_packed_Some(4)]
     unfolding store_packed_def
-    by (metis inst_typing_imp_memi_agree memi_agree_def order_refl)
+    by (metis inst_typing_imp_memi_agree memi_agree_def order_refl)            
 next
   case (store_vec_Some f j s m sv v bs k off mem' a)
-  show ?case
+  have "mem_subtyping (fst mem') (fst m)"
+    by (metis fst_conv limits_compat_refl mem_subtyping_def option.sel option.simps(3) store_def store_vec_Some.hyps(4) write_bytes_def)
+  then show ?case
     using store_size[OF store_vec_Some(4)] store_max[OF store_vec_Some(4)]
           store_typing_in_mem_agree store_vec_Some(1,2,5,6)
           store_extension_mem_leq[OF store_vec_Some(5,2), of mem']
+          store_mem_agree[OF store_vec_Some(4)]
     by (metis inst_typing_imp_memi_agree memi_agree_def order_refl)
 next
   case (grow_memory s i j m n c mem' vs)
-  have "mem_agree m"
-    using inst_typing_imp_memi_agree[OF grow_memory(6,1)]
-    unfolding memi_agree_def
-    by (metis grow_memory.hyps(2) grow_memory.prems(1) list_all_length store_typing.simps)
+  then have 1: "mem_agree mem'"
+    using store_grow_mem_agree[OF grow_memory(4)]
+    by (metis inst_typing_imp_memi_agree memi_agree_def store_typing_in_mem_agree)
+  then have 2: "mem_subtyping (fst mem') (fst m)"
+    by (metis Ki64_def grow_memory.hyps(1) grow_memory.hyps(2) grow_memory.hyps(4) grow_memory.prems(1) grow_memory.prems(2) inst_typing_imp_memi_agree le_add1 limits_compat_def limits_compat_refl mem_grow_max1 mem_grow_size mem_max_def mem_size_def mem_subtyping_def memi_agree_def nonzero_mult_div_cancel_right store_typing_in_mem_agree zero_neq_numeral)
   thus ?case
     using store_extension_mem_leq[OF grow_memory(5,2) _ _ mem_grow_max1[OF grow_memory(4)]]
-          mem_grow_size[OF grow_memory(4)] mem_grow_max2[OF grow_memory(4)]
+          mem_grow_size[OF grow_memory(4)] mem_grow_max2[OF grow_memory(4)] 1 2
     by auto
 next
   case (label s vs es i s' vs' es' k lholed les les')
@@ -103,13 +114,18 @@ next
     by force
 next
   case (init_mem_Some f j s m n bs mem')
-  show ?case
+  have "mem_subtyping (fst mem') (fst m)"
+    by (metis fst_conv init_mem_Some.hyps(3) limits_compat_refl mem_subtyping_def option.sel option.simps(3) store_def write_bytes_def)
+  then show ?case
     using store_size[OF init_mem_Some(3)] store_max[OF init_mem_Some(3)]
           store_typing_in_mem_agree init_mem_Some
           store_extension_mem_leq[OF init_mem_Some(4,2), of mem']
+          store_mem_agree[OF init_mem_Some(3)]
     by (metis inst_typing_imp_memi_agree memi_agree_def order_refl)
 next
   case (init_tab_Some f ti j s t n icls tab')
+  have "tab_subtyping (fst tab') (fst t)"
+    by (metis fst_conv init_tab_Some.hyps(3) option.inject option.simps(3) store_tab_list_def tab_subtyping_refl)
   have "tab_size t \<le> tab_size tab'"
     using store_tab_list_size[OF init_tab_Some(3)]
     by simp

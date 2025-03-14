@@ -100,7 +100,7 @@ definition write_bytes :: "mem \<Rightarrow> nat \<Rightarrow> bytes \<Rightarro
 
 lift_definition mem_rep_append :: "mem_rep \<Rightarrow> nat \<Rightarrow> byte \<Rightarrow> mem_rep" is "(\<lambda>m n b. (append m (replicate n b))::byte list)" .
 definition mem_append :: "mem \<Rightarrow> nat \<Rightarrow> byte \<Rightarrow> mem" where
-  "mem_append m n b = ((fst m)\<lparr>l_min := l_min (fst m) + n\<rparr>, mem_rep_append (snd m) n b)"
+  "mem_append m n b = ((fst m)\<lparr>l_min := l_min (fst m) + (n div Ki64)\<rparr>, mem_rep_append (snd m) n b)"
 
 lemma take_drop_map:
   assumes "ind+n \<le> length bs"

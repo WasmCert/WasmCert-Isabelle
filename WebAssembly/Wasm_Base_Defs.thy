@@ -255,6 +255,8 @@ definition tab_subtyping :: "[tab_t, tab_t] \<Rightarrow> bool" where
 "tab_subtyping t1 t2 = (case (t1, t2) of
   (T_tab lims1 tr1, T_tab lims2 tr2) \<Rightarrow> limits_compat lims1 lims2 \<and> tr1 = tr2) "
 
+definition mem_subtyping :: "[mem_t, mem_t] \<Rightarrow> bool" where
+"mem_subtyping t1 t2 = limits_compat t1 t2"
 
   (* TODO: think of better convention for these names *)
   (* currently 'tab' means that a single table instance is taken as argument *)
@@ -833,7 +835,8 @@ definition tab_extension :: "tabinst \<Rightarrow> tabinst \<Rightarrow> bool" w
 
 definition mem_extension :: "mem \<Rightarrow> mem \<Rightarrow> bool" where
   "mem_extension m1 m2 \<equiv> mem_size m1 \<le> mem_size m2 \<and>
-                         (mem_max m1) = (mem_max m2)"
+                         (mem_max m1) = (mem_max m2) \<and>
+                         mem_subtyping (fst m2) (fst m1)"
 
 definition global_extension :: "global \<Rightarrow> global \<Rightarrow> bool" where
   "global_extension g1 g2 \<equiv> (g_mut g1 = g_mut g2) \<and> (typeof (g_val g1) = typeof (g_val g2)) \<and> (g_mut g1 = T_immut \<longrightarrow> g_val g1 = g_val g2)"

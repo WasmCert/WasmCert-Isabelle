@@ -99,6 +99,23 @@ lemma store_length:
   apply(auto simp add: old_mem_size_def mem_length_def split: prod.splits)
   done
 
+lemma store_mem_agree:
+  assumes "(store m n off v l = Some m')"
+          "mem_agree m"
+  shows "mem_agree m'"
+proof(cases "n + off + l \<le> mem_length m ")
+  case True
+  then have "fst (m) = fst (m')"
+    using assms(1) store_def write_bytes_def by auto
+  moreover have "mem_length m' = mem_length m"
+    using assms(1) store_length by simp
+  ultimately show ?thesis
+    using  assms store_max store_size by auto
+next
+  case False
+  then show ?thesis using assms unfolding store_def by simp
+qed
+
 lemma store_packed_size1:
   "(store_packed m n off v l = None) = (mem_length m < (off + n + l))"
   using store_size1
@@ -118,6 +135,51 @@ lemma store_packed_max:
   using assms store_max
   unfolding store_packed_def
   by simp
+
+lemma store_packed_length:
+  assumes "(store_packed m n off v l = Some m')"
+  shows "mem_length m = mem_length m'"
+  using assms Abs_mem_rep_inverse mem_rep_length.rep_eq
+  unfolding store_def mem_rep_write_bytes_def write_bytes_def store_packed_def
+            bytes_takefill_def
+  apply (cases "n + off + l \<le> mem_length m") 
+  apply(auto simp add: old_mem_size_def mem_length_def split: prod.splits)
+  done
+
+lemma store_packed_mem_agree:
+  assumes "(store_packed m n off v l = Some m')"
+          "mem_agree m"
+  shows "mem_agree m'"
+proof(cases "n + off + l \<le> mem_length m ")
+  case True
+  then have "fst (m) = fst (m')"
+    using assms(1) store_packed_def store_def write_bytes_def by auto
+  moreover have "mem_length m' = mem_length m"
+    using assms(1) store_packed_length by simp
+  ultimately show ?thesis
+    using  assms store_packed_max store_packed_size by auto
+next
+  case False
+  then show ?thesis using assms unfolding store_packed_def store_def by simp
+qed
+
+lemma store_grow_mem_agree:
+  assumes "(mem_grow m n = Some m')"
+          "mem_agree m"
+        shows "mem_agree m'"
+proof -
+  have 0: "m' = (mem_append m (n * Ki64) zero_byte)" "pred_option (\<lambda>max. (mem_size m) + n \<le> max) (mem_max m)"
+    using assms  unfolding mem_grow_def apply (simp add:   handy_if_lemma Let_def)
+    using assms(1) mem_grow_max1 mem_grow_max2 mem_grow_size by metis
+  then have 1: "l_min (fst m') = l_min (fst m) + n" unfolding mem_append_def by (simp add: Ki64_def)
+  then have 2: "l_min (fst m) * Ki64 = mem_length m" using assms(2) by simp
+  have 3: "l_min (fst m') * Ki64 = mem_length m'" using 0 1 2 assms(2)
+    by (simp add: assms(1) distrib_right mem_grow_length)
+  have "mem_size m' = mem_size m + n" using 0
+    by (simp add: assms(1) mem_grow_size)
+  then show ?thesis using 0 3
+    using assms(1) mem_grow_max2 by blast
+qed
 
 lemma store_tab_list_size:
   assumes "(store_tab_list t n icls = Some t')"

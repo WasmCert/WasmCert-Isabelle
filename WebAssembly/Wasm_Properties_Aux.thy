@@ -1767,15 +1767,16 @@ lemma global_extension_refl:
   unfolding global_extension_def
   by auto
 
-lemma mem_extension_refl:
-  shows "mem_extension m m"
-  unfolding mem_extension_def
-  by auto
-
 lemma limits_compat_refl:
   shows "limits_compat l l"
   unfolding limits_compat_def
   by (metis option.exhaust option.pred_inject(1) option.pred_inject(2) option.simps(5) order_class.order_eq_iff)
+
+lemma mem_extension_refl:
+  shows "mem_extension m m"
+  unfolding mem_extension_def mem_subtyping_def
+  using limits_compat_refl
+  by auto
 
 lemma tab_subtyping_refl:
   shows "tab_subtyping t t"
@@ -1984,14 +1985,6 @@ lemma global_extension_trans:
   unfolding global_extension_def
   by auto
 
-lemma mem_extension_trans:
-  assumes "mem_extension m m''"
-          "mem_extension m'' m'"
-  shows "mem_extension m m'"
-  using assms
-  unfolding mem_extension_def
-  by auto
-
 lemma limits_compat_trans:
   assumes "limits_compat l l'"
           "limits_compat l' l''"
@@ -1999,6 +1992,15 @@ lemma limits_compat_trans:
   using assms
   unfolding limits_compat_def
   by (auto split:option.splits simp add: pred_option_def)
+
+lemma mem_extension_trans:
+  assumes "mem_extension m m''"
+          "mem_extension m'' m'"
+  shows "mem_extension m m'"
+  using assms
+  unfolding mem_extension_def mem_subtyping_def
+  using limits_compat_trans
+  by auto
 
 lemma tab_subtyping_trans:
   assumes "tab_subtyping t t'"
@@ -2435,6 +2437,30 @@ proof -
     by auto
 qed
 
+lemma mem_extension_typing:
+  assumes "mem_typing m mt"
+          "mem_extension m m'"
+        shows "mem_typing m' mt"
+proof -
+  obtain lims rep lmin lmax lims' rep' lmin' lmax'
+    where defs: "m = (lims , rep)"
+                "m' = (lims', rep')"
+                "lmin = l_min lims"
+                "lmax = l_max lims"
+                "lmin' = l_min lims'"
+                "lmax' = l_max lims'"
+    by fastforce
+  then have "(mem_max m) = (mem_max m')"
+    using assms(2)
+    using mem_extension_def by blast
+  then have "mem_size m \<le> mem_size m'"
+    using assms(2) mem_extension_def by blast
+  
+  moreover have "limits_compat lims mt" using assms(1) defs(1) unfolding mem_typing_def by simp
+  moreover have "limits_compat lims' lims" using defs assms(2) unfolding mem_extension_def mem_subtyping_def by simp
+  ultimately show ?thesis unfolding mem_typing_def using defs limits_compat_trans by auto
+qed
+
 lemma memi_agree_store_extension:
   assumes "list_all2 (memi_agree (mems s)) (inst.mems i) (memory \<C>)"
           "store_extension s s'"
@@ -2446,10 +2472,12 @@ proof -
     unfolding store_extension.simps
     by auto
   have "list_all2 (memi_agree mss') (inst.mems i) (memory \<C>)"
-    using assms 1(1)
+    using assms 1(1) mem_extension_typing
     unfolding store_extension.simps list_all2_conv_all_nth mem_extension_def memi_agree_def
               mem_typing_def limits_compat_def
-    by fastforce
+    
+    by (smt (verit, ccfv_threshold) option.pred_set)
+    (*by fastforce*)
   thus ?thesis
     using 1(2) nth_append[of mss' mss'']
     unfolding list_all2_conv_all_nth memi_agree_def
@@ -2720,6 +2748,7 @@ lemma store_extension_mem_leq:
           "mem_size m \<le> mem_size m'"
           "mem_agree m'"
           "mem_max m = mem_max m'"
+          "mem_subtyping (fst m') (fst m)"
   shows "store_extension s (s\<lparr>s.mems := (s.mems s)[j := m']\<rparr>)"
         "store_typing (s\<lparr>s.mems := (s.mems s)[j := m']\<rparr>)"
 proof -
@@ -2730,13 +2759,13 @@ proof -
          "globs s = globs s'"
     using s'_def
     by simp_all
-  have "mem_extension m m'"
-    using assms(3,5)
-    unfolding mem_extension_def
+  then have "mem_extension m m'"
+    using assms(3,5,6)
+    unfolding mem_extension_def mem_subtyping_def
     by simp
   hence "list_all2 mem_extension (mems s) (mems s')"
     using assms(2) s'_def
-    by (simp, metis eq_iff list.rel_refl list_all2_update_cong list_update_id mem_extension_def)
+    by (simp, metis list.rel_refl list_all2_update_cong list_update_id mem_extension_refl)
   thus sh1:"store_extension s (s\<lparr>s.mems := (s.mems s)[j := m']\<rparr>)"
     using store_extension.intros[OF _
                                     list_all2_refl[OF tab_extension_refl]
