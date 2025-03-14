@@ -217,7 +217,7 @@ definition "limits_compat lt1 lt2 =
 definition mem_size :: "mem \<Rightarrow> nat" where
   "mem_size m = (mem_length m) div Ki64"
 
-abbreviation "mem_agree m \<equiv> pred_option ((\<le>) (mem_size m)) (mem_max m)"
+abbreviation "mem_agree m \<equiv> l_min (fst m) * Ki64 = mem_length m \<and> pred_option ((\<le>) (mem_size m)) (mem_max m)"
 
 definition mem_grow :: "mem \<Rightarrow> nat \<Rightarrow> mem option" where
   "mem_grow m n = (let len = (mem_size m) + n in

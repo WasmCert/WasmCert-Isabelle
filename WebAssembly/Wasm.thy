@@ -119,7 +119,7 @@ definition tab_typing :: "[tabinst, tab_t] \<Rightarrow> bool" where
 definition "tabi_agree ts n tab_t =
   ((n < length ts) \<and> (tab_typing (ts!n) tab_t))"
 
-definition "mem_typing m mt = (limits_compat \<lparr>l_min=(mem_size m),l_max=(mem_max m)\<rparr> mt)"
+definition "mem_typing m mt = (limits_compat (fst m) mt)"
 
 definition "memi_agree ms n mem_t =
   ((n < length ms) \<and> mem_typing (ms!n) mem_t)"

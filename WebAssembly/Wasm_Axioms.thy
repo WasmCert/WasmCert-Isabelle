@@ -3,7 +3,7 @@ section \<open>Host Properties\<close>
 theory Wasm_Axioms imports Wasm begin
 
 lemma old_mem_size_def:
-  shows "mem_size m = length (Rep_mem_rep (fst m)) div Ki64"
+  shows "mem_size m = length (Rep_mem_rep (snd m)) div Ki64"
   unfolding mem_size_def mem_rep_length_def mem_length_def
   by (simp split: prod.splits)
 

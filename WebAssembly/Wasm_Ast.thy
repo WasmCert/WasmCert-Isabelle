@@ -70,34 +70,37 @@ typedef mem_rep = "UNIV :: (byte list) set" ..
 setup_lifting type_definition_mem_rep
 declare Quotient_mem_rep[transfer_rule]
 
-type_synonym mem = "(mem_rep \<times> nat option)"
+type_synonym mem_t = \<comment> \<open>memory type\<close>
+  "limit_t"
+
+type_synonym mem = "(mem_t \<times> mem_rep)"
 
 lift_definition mem_rep_mk :: "nat \<Rightarrow> mem_rep" is "(\<lambda>n. (bytes_replicate (n * Ki64) zero_byte))" .
 definition mem_mk :: "limit_t \<Rightarrow> mem" where
-  "mem_mk lim = (mem_rep_mk (l_min lim), l_max lim)"
+  "mem_mk lim = (lim, mem_rep_mk (l_min lim))"
 
 lift_definition mem_rep_byte_at :: "mem_rep \<Rightarrow> nat \<Rightarrow> byte" is "(\<lambda>m n. m!n)::(byte list) \<Rightarrow> nat \<Rightarrow> byte" .
 definition byte_at :: "mem \<Rightarrow> nat \<Rightarrow> byte" where
-  "byte_at m n = mem_rep_byte_at (fst m) n"
+  "byte_at m n = mem_rep_byte_at (snd m) n"
 
 lift_definition mem_rep_length :: "mem_rep \<Rightarrow> nat" is "(\<lambda>m. length m)" .
 definition mem_length :: "mem \<Rightarrow> nat" where
-  "mem_length m = mem_rep_length (fst m)"
+  "mem_length m = mem_rep_length (snd m)"
 
 definition mem_max :: "mem \<Rightarrow> nat option" where
-  "mem_max m = snd m"
+  "mem_max m = l_max (fst m)"
 
 lift_definition mem_rep_read_bytes :: "mem_rep \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes" is "(\<lambda>m n l. (take l (drop n m))::(byte list))" .
 definition read_bytes :: "mem \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes" where
-  "read_bytes m n l = mem_rep_read_bytes (fst m) n l"
+  "read_bytes m n l = mem_rep_read_bytes (snd m) n l"
 
 lift_definition mem_rep_write_bytes :: "mem_rep \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> mem_rep" is "(\<lambda>m n bs. ((take n m) @ bs @ (drop (n + length bs) m)) :: byte list)" .
 definition write_bytes :: "mem \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> mem" where
-  "write_bytes m n bs = (mem_rep_write_bytes (fst m) n bs, snd m)"
+  "write_bytes m n bs = (fst m, mem_rep_write_bytes (snd m) n bs)"
 
 lift_definition mem_rep_append :: "mem_rep \<Rightarrow> nat \<Rightarrow> byte \<Rightarrow> mem_rep" is "(\<lambda>m n b. (append m (replicate n b))::byte list)" .
 definition mem_append :: "mem \<Rightarrow> nat \<Rightarrow> byte \<Rightarrow> mem" where
-  "mem_append m n b = (mem_rep_append (fst m) n b, snd m)"
+  "mem_append m n b = ((fst m)\<lparr>l_min := l_min (fst m) + n\<rparr>, mem_rep_append (snd m) n b)"
 
 lemma take_drop_map:
   assumes "ind+n \<le> length bs"
@@ -168,10 +171,6 @@ definition tab_t_lim :: "tab_t \<Rightarrow> limit_t" where
 definition tab_t_reftype :: "tab_t \<Rightarrow> t_ref" where
 "tab_t_reftype tt = (case tt of
   T_tab _ t \<Rightarrow> t)"
-
-
-type_synonym mem_t = \<comment> \<open>memory type\<close>
-  "limit_t"
 
 (* TYPING *)
 record t_context =
