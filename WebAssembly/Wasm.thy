@@ -89,61 +89,48 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
   \<comment> \<open>\<open>weakening\<close>\<close>
 | weakening:"\<C> \<turnstile> es : (t1s _> t2s) \<Longrightarrow> \<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"
 
-definition "glob_typing g tg = (tg_mut tg = g_mut g \<and> tg_t tg = typeof (g_val g))"
-
-definition "globi_agree gs n g = (n < length gs \<and> glob_typing (gs!n) g)"
-
 inductive ref_typing :: "[s, v_ref, t_ref] => bool" where
    "ref_typing s (ConstNull t) (t)"
  | "f < length (funcs s) \<Longrightarrow> ref_typing s (ConstRef f) (T_func_ref)"
  | "ref_typing s (ConstRefExtern _) (T_ext_ref)"
-
-
-(* TODO: do I need to check that every entry in ts has the needed reference type?
-It seems no:
-https://webassembly.github.io/spec/core/appendix/properties.html#valid-moduleinst
-This check seems to be performed as part of store typing:
-https://webassembly.github.io/spec/core/appendix/properties.html#valid-tableinst
-*)
-
-(*definition tab_typing :: "tabinst \<Rightarrow> tab_t \<Rightarrow> bool" where
-"tab_typing t tt = (case (t, tt) of
- ((T_tab _ tr', lims'),  T_tab lims tr) \<Rightarrow> (limits_compat \<lparr>l_min=(tab_size t),l_max=(tab_max t)\<rparr> lims) \<and> tr = tr')"*)
-(*    \<and> list_all (\<lambda> vr. typeof_ref vr = tr) (snd t))"*)
-
-definition tab_typing :: "[tabinst, tab_t] \<Rightarrow> bool" where
-"tab_typing t tt = (case (t, tt) of
- ((T_tab lims' tr', _),  T_tab lims tr) \<Rightarrow> (limits_compat lims' lims) \<and> tr' = tr)"
-
-
-definition "tabi_agree ts n tab_t =
-  ((n < length ts) \<and> (tab_typing (ts!n) tab_t))"
-
-definition "mem_typing m mt = (limits_compat (fst m) mt)"
-
-definition "memi_agree ms n mem_t =
-  ((n < length ms) \<and> mem_typing (ms!n) mem_t)"
-
-definition "funci_agree fs n f = (n < length fs \<and> (cl_type (fs!n)) = f)"
 
 inductive v_typing :: "s \<Rightarrow> v \<Rightarrow> t \<Rightarrow> bool" where
   "v_typing s (V_num vn) (T_num (typeof_num vn))" |
   "v_typing s (V_vec vv) (T_vec (typeof_vec vv))" |
   "ref_typing s vr t \<Longrightarrow> v_typing s (V_ref vr) (T_ref t)"
 
-(* 'inst' seems to be 'moduleinst' *)
-(* the rule described here is this:
-https://webassembly.github.io/spec/core/appendix/properties.html#valid-moduleinst
-Old one is here:
-https://webassembly.github.io/JS-BigInt-integration/core/appendix/properties.html#module-instances
-*)
+definition "glob_typing g tg = (tg_mut tg = g_mut g \<and> tg_t tg = typeof (g_val g))"
+
+definition "globi_agree gs n g = (n < length gs \<and> glob_typing (gs!n) g)"
+
+definition "tabi_agree ts n tab_t =
+  (n < length ts \<and> tab_subtyping (fst(ts!n)) tab_t)"
+
+definition "memi_agree ms n mem_t =
+  (n < length ms \<and> mem_subtyping (fst(ms!n)) mem_t)"
+
+definition "funci_agree fs n f = (n < length fs \<and> (cl_type (fs!n)) = f)"
+
+definition data_typing :: "datainst \<Rightarrow> data_t \<Rightarrow> bool "where
+  "data_typing d dt = True"
+
+definition datai_agree :: "datainst list \<Rightarrow> nat \<Rightarrow> data_t \<Rightarrow> bool" where
+  "datai_agree ds n dt = (n < length ds \<and> data_typing (ds!n) dt)"
+
+definition "elem_typing" :: "s \<Rightarrow> eleminst \<Rightarrow> elem_t \<Rightarrow> bool" where
+  "elem_typing s ei et = (fst ei = et \<and> list_all (\<lambda> vr. ref_typing s vr et) (snd ei))"
+
+definition "elemi_agree s es n et = (n < length es \<and> elem_typing s (es!n) et)"
+
 inductive inst_typing :: "[s, inst, t_context] \<Rightarrow> bool" where
   "\<lbrakk>list_all2 (funci_agree (funcs s)) fs tfs;
     list_all2 (globi_agree (globs s)) gs tgs;
     list_all2 (tabi_agree (tabs s)) tbs tabs_t;
-    list_all2 (memi_agree (mems s)) ms mems_t\<rbrakk>
-      \<Longrightarrow> inst_typing s \<lparr>types = ts, funcs = fs, tabs = tbs, mems = ms, globs = gs\<rparr>
-                        \<lparr>types_t = ts, func_t = tfs, global = tgs, table = tabs_t, memory = mems_t, local = [], label = [], return = None\<rparr>"
+    list_all2 (memi_agree (mems s)) ms mems_t;
+    list_all2 (elemi_agree s (elems s)) es elems_t;
+    list_all2 (datai_agree (datas s)) ds datas_t\<rbrakk>
+      \<Longrightarrow> inst_typing s \<lparr>types = ts, funcs = fs, tabs = tbs, mems = ms, globs = gs, elems = es, datas = ds\<rparr>
+                        \<lparr>types_t = ts, func_t = tfs, global = tgs, elem = elems_t, data = datas_t, table = tabs_t, memory = mems_t, local = [], label = [], return = None, refs = [0..<length fs]\<rparr>"
 
 inductive frame_typing :: "[s, f, t_context] \<Rightarrow> bool" where
 "\<lbrakk>list_all2 (\<lambda> v t. v_typing s v t) (f_locs f) tvs; inst_typing s (f_inst f) \<C>\<rbrakk> \<Longrightarrow> frame_typing s f (\<C>\<lparr>local := tvs\<rparr>)"
@@ -191,10 +178,16 @@ definition "tab_agree s tab =
 
 definition tab_agree  :: "[s, tabinst] => bool" where
 "tab_agree s t = (case t of
- ((T_tab lims tr, elems)) \<Rightarrow>
+ ((T_tab lims tr, tab_elems)) \<Rightarrow>
   l_min lims = (tab_size t) \<and>
   pred_option (\<lambda> max. tab_size t \<le> max) (tab_max t) \<and>
-  list_all (\<lambda> vr. ref_typing s vr tr) elems)"
+  list_all (\<lambda> vr. ref_typing s vr tr) tab_elems)"
+
+definition elem_agree :: "[s, eleminst] \<Rightarrow> bool" where
+  "elem_agree s ei = (list_all (\<lambda> vr. ref_typing s vr (fst ei)) (snd ei))"
+
+definition data_agree :: "[s, datainst] \<Rightarrow> bool" where
+  "data_agree s di = True"
 
 
 (* TODO: should there be more rules here? *)
@@ -203,7 +196,9 @@ inductive store_typing :: "s \<Rightarrow> bool" where
   "\<lbrakk>list_all (\<lambda>cl. \<exists>tf. cl_typing s cl tf) (funcs s);
     list_all (tab_agree s) (tabs s);
     list_all mem_agree (mems s);
-    list_all (glob_agree s) (globs s)
+    list_all (glob_agree s) (globs s);
+    list_all (elem_agree s) (elems s);
+    list_all (data_agree s) (datas s)
     \<rbrakk> \<Longrightarrow> store_typing s"
 
 inductive config_typing :: "[s, f, e list, t list] \<Rightarrow> bool" ("\<turnstile> _;_;_ : _" 60) where
@@ -377,12 +372,11 @@ type_synonym v_stack = "v list"
 abbreviation v_stack_to_es :: " v_stack \<Rightarrow> e list"
   where "v_stack_to_es v \<equiv> $C* (rev v)"
 
-
 definition "computes cfg s' vs \<equiv> \<exists>f'. reduce_trans cfg (s', f', v_stack_to_es vs)"
   
 definition "traps cfg s' \<equiv> \<exists>f'. reduce_trans cfg (s',f',[Trap])"
 
-definition "empty_frame \<equiv> \<lparr>f_locs = [],f_inst = \<lparr> types = [], funcs = [], tabs = [], mems = [], globs = []\<rparr>\<rparr>"
+definition "empty_frame \<equiv> \<lparr>f_locs = [],f_inst = \<lparr> types = [], funcs = [], tabs = [], mems = [], globs = [], elems = [], datas = []\<rparr>\<rparr>"
 
 definition "invoke_config s vargs i \<equiv> (s, empty_frame, ($C* vargs) @ [Invoke i])"
 

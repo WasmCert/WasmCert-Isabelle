@@ -841,10 +841,16 @@ definition mem_extension :: "mem \<Rightarrow> mem \<Rightarrow> bool" where
 definition global_extension :: "global \<Rightarrow> global \<Rightarrow> bool" where
   "global_extension g1 g2 \<equiv> (g_mut g1 = g_mut g2) \<and> (typeof (g_val g1) = typeof (g_val g2)) \<and> (g_mut g1 = T_immut \<longrightarrow> g_val g1 = g_val g2)"
 
+definition elem_extension :: "eleminst \<Rightarrow> eleminst \<Rightarrow> bool" where
+  "elem_extension e1 e2 \<equiv> (e1 = e2 \<or> length (snd e2) = 0)"
+
+definition data_extension :: "datainst \<Rightarrow> datainst \<Rightarrow> bool" where
+  "data_extension d1 d2 \<equiv> (d1 = d2 \<or> length d2 = 0)"
+
 inductive store_extension :: "s \<Rightarrow> s \<Rightarrow> bool" where
-"\<lbrakk>fs = fs'; list_all2 tab_extension tclss tclss'; list_all2 mem_extension bss bss'; list_all2 global_extension gs gs'\<rbrakk>
-  \<Longrightarrow> store_extension \<lparr>s.funcs = fs, s.tabs = tclss, s.mems = bss, s.globs = gs\<rparr>
-                       \<lparr>s.funcs = fs'@fs'', s.tabs = tclss'@tclss'', s.mems = bss'@bss'', s.globs = gs'@gs''\<rparr>"
+"\<lbrakk>fs = fs'; list_all2 tab_extension tclss tclss'; list_all2 mem_extension bss bss'; list_all2 global_extension gs gs'; list_all2 elem_extension es es'; list_all2 data_extension ds ds'\<rbrakk>
+  \<Longrightarrow> store_extension \<lparr>s.funcs = fs, s.tabs = tclss, s.mems = bss, s.globs = gs, s.elems = es, s.datas = ds\<rparr>
+                       \<lparr>s.funcs = fs'@fs'', s.tabs = tclss'@tclss'', s.mems = bss'@bss'', s.globs = gs'@gs'', s.elems = es'@es'', s.datas = ds'@dss''\<rparr>"
 
 abbreviation to_e_list :: "b_e list \<Rightarrow> e list" ("$* _" 60) where
   "to_e_list b_es \<equiv> map Basic b_es"

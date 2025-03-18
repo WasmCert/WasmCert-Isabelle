@@ -1790,11 +1790,27 @@ lemma tab_extension_refl:
   unfolding tab_extension_def
   using limits_compat_def limits_compat_refl tab_subtyping_def tab_subtyping_refl by auto
 
+lemma elem_extension_refl:
+  shows "elem_extension el el"
+  unfolding elem_extension_def by simp
+
+lemma data_extension_refl:
+  shows "data_extension d d"
+  unfolding data_extension_def by simp
+
 lemma store_extension_refl:
   shows "store_extension s s"
-  using global_extension_refl mem_extension_refl tab_extension_refl
-  unfolding store_extension.simps
-  by (metis (mono_tags) append_Nil2 list_all2_conv_all_nth s.cases)
+  using global_extension_refl mem_extension_refl tab_extension_refl elem_extension_refl data_extension_refl
+  store_extension.intros[of
+    "funcs s" "funcs s"
+    "tabs s" "tabs s"
+    "mems s" "mems s"
+    "globs s" "globs s"
+    "elems s" "elems s"
+    "datas s" "datas s"
+    "[]" "[]" "[]" "[]" "[]" "[]"]
+  apply (simp)
+  by (metis list_all2_refl old.unit.exhaust s.surjective)
 
 lemma e_type_const_list_snoc:
   assumes "const_list vs"
@@ -2019,39 +2035,62 @@ lemma tab_extension_trans:
   unfolding tab_extension_def
   by auto
 
+lemma elem_extension_trans:
+  assumes "elem_extension es es''"
+          "elem_extension es'' es'"
+  shows "elem_extension es es'"
+  using assms unfolding elem_extension_def by auto
+
+
+lemma data_extension_trans:
+  assumes "data_extension es es''"
+          "data_extension es'' es'"
+  shows "data_extension es es'"
+  using assms unfolding data_extension_def by auto
+
 lemma store_extension_trans:
   assumes "store_extension s s''"
           "store_extension s'' s'"
         shows "store_extension s s'"
 proof -
-  obtain cls ts ms gs ts'' ms'' gs'' cls''_rest ts''_rest ms''_rest gs''_rest where s_is:
-    "s = \<lparr>s.funcs = cls, s.tabs = ts, s.mems = ms, s.globs = gs\<rparr>"
-    "s'' = \<lparr>s.funcs = cls@cls''_rest, s.tabs = ts''@ts''_rest, s.mems = ms''@ms''_rest, s.globs = gs''@gs''_rest\<rparr>"
+  obtain cls ts ms gs es ds ts'' ms'' gs'' es'' ds'' cls''_rest ts''_rest ms''_rest gs''_rest es''_rest ds''_rest where s_is:
+    "s = \<lparr>s.funcs = cls, s.tabs = ts, s.mems = ms, s.globs = gs, s.elems = es, s.datas = ds\<rparr>"
+    "s'' = \<lparr>s.funcs = cls@cls''_rest, s.tabs = ts''@ts''_rest, s.mems = ms''@ms''_rest, s.globs = gs''@gs''_rest, s.elems = es''@es''_rest, s.datas = ds''@ds''_rest\<rparr>"
     "list_all2 tab_extension ts ts''"
     "list_all2 mem_extension ms ms''"
     "list_all2 global_extension gs gs''"
+    "list_all2 elem_extension es es''"
+    "list_all2 data_extension ds ds''"
     using assms(1)
     by (cases rule: store_extension.cases) blast
-  obtain cls'_rest ts' ts'_rest ms' ms'_rest gs' gs'_rest where s'_is:
-    "s' = \<lparr>s.funcs = cls@cls''_rest@cls'_rest, s.tabs = ts'@ts'_rest, s.mems = ms'@ms'_rest, s.globs = gs'@gs'_rest\<rparr>"
+  obtain cls'_rest ts' ts'_rest ms' ms'_rest gs' gs'_rest es' es'_rest ds' ds'_rest where s'_is:
+    "s' = \<lparr>s.funcs = cls@cls''_rest@cls'_rest, s.tabs = ts'@ts'_rest, s.mems = ms'@ms'_rest, s.globs = gs'@gs'_rest, s.elems = es'@es'_rest, s.datas = ds'@ds'_rest\<rparr>"
     "list_all2 tab_extension (ts''@ts''_rest) ts'"
     "list_all2 mem_extension (ms''@ms''_rest) ms'"
     "list_all2 global_extension (gs''@gs''_rest) gs'"
+    "list_all2 elem_extension (es''@es''_rest) es'"
+    "list_all2 data_extension (ds''@ds''_rest) ds'"
     using assms(2) s_is(2)
     apply (cases rule: store_extension.cases)
     apply (metis (no_types, lifting) append.assoc s.ext_inject)
     done
-  obtain ts'_' ts'_rest_' ms'_' ms'_rest_' gs'_' gs'_rest'_' where s'_is_alt:
+  obtain ts'_' ts'_rest_' ms'_' ms'_rest_' gs'_' gs'_rest'_' es'_' es'_rest'_' ds'_' ds'_rest'_' where s'_is_alt:
     "ts' = ts'_'@ts'_rest_'"
     "ms' = ms'_'@ms'_rest_'"
     "gs' = gs'_'@gs'_rest'_'"
+    "es' = es'_'@es'_rest'_'"
+    "ds' = ds'_'@ds'_rest'_'"
     "list_all2 tab_extension ts'' ts'_'"
     "list_all2 mem_extension ms'' ms'_'"
     "list_all2 global_extension gs'' gs'_'"
+    "list_all2 elem_extension es'' es'_'"
+    "list_all2 data_extension ds'' ds'_'"
     using s'_is
           list_all2_append1[of tab_extension "ts''" "ts''_rest" ts']
           list_all2_append1[of mem_extension "ms''" "ms''_rest" ms']
           list_all2_append1[of global_extension "gs''" "gs''_rest" gs']
+          list_all2_append1[of elem_extension "es''" "es''_rest" es']
+          list_all2_append1[of data_extension "ds''" "ds''_rest" ds']
     apply simp
     apply (metis (no_types, lifting))
     done
@@ -2059,7 +2098,9 @@ proof -
     "list_all2 tab_extension ts ts'_'"
     "list_all2 mem_extension ms ms'_'"
     "list_all2 global_extension gs gs'_'"
-    using s_is(3,4,5) s'_is_alt list_all2_trans tab_extension_trans mem_extension_trans global_extension_trans
+    "list_all2 elem_extension es es'_'"
+    "list_all2 data_extension ds ds'_'"
+    using s_is(3,4,5,6,7) s'_is_alt list_all2_trans tab_extension_trans mem_extension_trans global_extension_trans elem_extension_trans data_extension_trans
     by blast+
   thus ?thesis
     using s'_is s'_is_alt
@@ -2122,7 +2163,7 @@ proof -
   show "tabi_agree (tabs s) k ((table \<C>)!ti)"
     using assms
     unfolding inst_typing.simps stab_ind_def
-    by (metis inst.select_convs(3) list_all2_nthD option.discI option.inject t_context.select_convs(4))
+    by (metis handy_if_lemma inst.select_convs(3) list_all2_lengthD list_all2_nthD2 t_context.select_convs(6))
 qed
 
 lemma inst_typing_store_typing_imp_tab_agree:
@@ -2347,8 +2388,8 @@ qed
 
 lemma tab_typing_extension:
   assumes "tab_extension tabinst tabinst'"
-          "tab_typing tabinst tt"
-  shows   "tab_typing tabinst' tt"
+          "tab_subtyping (fst tabinst) tt"
+  shows   "tab_subtyping (fst tabinst') tt"
   using assms
 proof -
   have h1: "tab_size tabinst \<le> tab_size tabinst'"
@@ -2357,7 +2398,7 @@ proof -
 
     using tab_extension_def assms(1) by auto
   have h2: "(limits_compat (tab_t_lim (fst tabinst)) (tab_t_lim tt)) \<and> (tab_t_reftype (fst tabinst)) = tab_t_reftype tt"
-    using assms(2) unfolding tab_typing_def tab_t_reftype_def
+    using assms(2) unfolding tab_subtyping_def tab_t_reftype_def
     by (auto simp add: tab_t.exhaust tab_t_lim_def split: tab_t.splits)
   moreover have "tab_t_reftype tt = tab_reftype tabinst'" using h1(3)
     using h2 tab_reftype_def tab_t_reftype_def tab_subtyping_def
@@ -2369,7 +2410,7 @@ proof -
     using h2 limits_compat_trans h1(3) calculation(3) unfolding tab_subtyping_def
     by blast
   ultimately show ?thesis
-    by (metis (mono_tags, lifting) case_prod_beta' old.prod.case tab_reftype_def tab_t.case tab_t.exhaust tab_t_lim_def tab_t_reftype_def tab_typing_def)
+    by (metis (mono_tags, lifting) old.prod.case tab_reftype_def tab_t.case tab_t.exhaust tab_t_lim_def tab_t_reftype_def tab_subtyping_def)
 qed
 
 
@@ -2387,15 +2428,16 @@ proof -
   have h1: "tab_extension ?tabinst ?tabinst'"
     using assms(2) unfolding store_extension.simps
     by (metis assms(4) list_all2_lengthD list_all2_nthD nth_append s.select_convs(2))
-  have h2: "tab_typing ?tabinst (table \<C>!ti)"
+  have h2: "tab_subtyping (fst ?tabinst) (table \<C>!ti)"
     by (meson assms(1) assms(3) list_all2_conv_all_nth tabi_agree_def)
-  have h3: "tab_typing ?tabinst' (table \<C>!ti)" using h1 h2 tab_typing_extension by simp
+  have h3: "tab_subtyping (fst ?tabinst') (table \<C>!ti)" using h1 h2 tab_typing_extension by simp
   obtain clss' clss'' where 1:"list_all2 tab_extension (tabs s) clss'"
                             "(tabs s') = clss'@clss''"
     using assms(2) store_extension.simps by auto
   then have "length (tabs s) \<le> length (tabs s')"
     by (simp add: list_all2_lengthD)
-  moreover have "((inst.tabs i)!ti) < length (tabs s)" using h0 tabi_agree_def by simp
+  moreover have "((inst.tabs i)!ti) < length (tabs s)" using h0 tabi_agree_def
+    by auto
   moreover have h4: "((inst.tabs i)!ti) < length (tabs s')"
     using calculation(1) calculation(2) by fastforce
   show ?thesis using h4 h3 tabi_agree_def[of "s.tabs s'" "(inst.tabs i ! ti)" "table \<C>!ti"]
@@ -2438,9 +2480,9 @@ proof -
 qed
 
 lemma mem_extension_typing:
-  assumes "mem_typing m mt"
+  assumes "mem_subtyping (fst m) mt"
           "mem_extension m m'"
-        shows "mem_typing m' mt"
+        shows "mem_subtyping (fst m') mt"
 proof -
   obtain lims rep lmin lmax lims' rep' lmin' lmax'
     where defs: "m = (lims , rep)"
@@ -2456,9 +2498,9 @@ proof -
   then have "mem_size m \<le> mem_size m'"
     using assms(2) mem_extension_def by blast
   
-  moreover have "limits_compat lims mt" using assms(1) defs(1) unfolding mem_typing_def by simp
+  moreover have "limits_compat lims mt" using assms(1) defs(1) unfolding mem_subtyping_def by simp
   moreover have "limits_compat lims' lims" using defs assms(2) unfolding mem_extension_def mem_subtyping_def by simp
-  ultimately show ?thesis unfolding mem_typing_def using defs limits_compat_trans by auto
+  ultimately show ?thesis unfolding mem_subtyping_def using defs limits_compat_trans by auto
 qed
 
 lemma memi_agree_store_extension:
@@ -2474,15 +2516,25 @@ proof -
   have "list_all2 (memi_agree mss') (inst.mems i) (memory \<C>)"
     using assms 1(1) mem_extension_typing
     unfolding store_extension.simps list_all2_conv_all_nth mem_extension_def memi_agree_def
-              mem_typing_def limits_compat_def
-    
-    by (smt (verit, ccfv_threshold) option.pred_set)
-    (*by fastforce*)
+              mem_subtyping_def limits_compat_def
+    by (metis dual_order.trans mem_max_def)
   thus ?thesis
     using 1(2) nth_append[of mss' mss'']
     unfolding list_all2_conv_all_nth memi_agree_def
     by auto
 qed
+
+lemma elemi_agree_store_extension:
+  assumes "list_all2 (elemi_agree s (elems s)) (inst.elems i) (elem \<C>)"
+          "store_extension s s'"
+  shows "list_all2 (elemi_agree s' (elems s')) (inst.elems i) (elem \<C>)"
+  sorry
+
+lemma datai_agree_store_extension:
+  assumes "list_all2 (datai_agree (datas s)) (inst.datas i) (data \<C>)"
+          "store_extension s s'"
+  shows "list_all2 (datai_agree (datas s')) (inst.datas i) (data \<C>)"
+  sorry
 
 lemma inst_typing_store_extension_inv:
   assumes "inst_typing s i \<C>"
@@ -2494,6 +2546,8 @@ proof -
          "list_all2 (globi_agree (globs s)) (inst.globs i) (global \<C>)"
          "list_all2 (tabi_agree (tabs s)) (inst.tabs i) (table \<C>)"
          "list_all2 (memi_agree (mems s)) (inst.mems i) (memory \<C>)"
+         "list_all2 (elemi_agree s (elems s)) (inst.elems i) (elem \<C>)"
+         "list_all2 (datai_agree (datas s)) (inst.datas i) (data \<C>)"
          "(local \<C>) = []" "(label \<C>) = []" "(return \<C>) = None"
     using assms(1)
     unfolding inst_typing.simps
@@ -2511,8 +2565,14 @@ proof -
   have 4:"list_all2 (memi_agree (mems s')) (inst.mems i) (memory \<C>)"
     using memi_agree_store_extension 0(5) assms(2)
     by blast
+  have 5:"list_all2 (elemi_agree s' (elems s')) (inst.elems i) (elem \<C>)"
+    using elemi_agree_store_extension 0(6) assms(2)
+    by blast
+  have 6:"list_all2 (datai_agree (datas s')) (inst.datas i) (data \<C>)"
+    using datai_agree_store_extension 0(7) assms(2)
+    by blast
   show ?thesis
-    using 1 2 3 4 assms(1) inst_typing.simps
+    using 1 2 3 4 5 6 assms(1) inst_typing.simps
     by auto
 qed
 
@@ -2757,22 +2817,26 @@ proof -
   have 0:"funcs s = funcs s'"
          "tabs s = tabs s'"
          "globs s = globs s'"
+         "elems s = elems s'"
+         "datas s = datas s'"
     using s'_def
     by simp_all
   then have "mem_extension m m'"
     using assms(3,5,6)
     unfolding mem_extension_def mem_subtyping_def
     by simp
-  hence "list_all2 mem_extension (mems s) (mems s')"
+  hence h_mems: "list_all2 mem_extension (mems s) (mems s')"
     using assms(2) s'_def
     by (simp, metis list.rel_refl list_all2_update_cong list_update_id mem_extension_refl)
   thus sh1:"store_extension s (s\<lparr>s.mems := (s.mems s)[j := m']\<rparr>)"
     using store_extension.intros[OF _
                                     list_all2_refl[OF tab_extension_refl]
                                     _
-                                    list_all2_refl[OF global_extension_refl],
-                                 of _ _ _ _ _ _ "[]" "[]" "[]" "[]"]
-          s'_def
+                                    list_all2_refl[OF global_extension_refl]
+                                    list_all2_refl[OF elem_extension_refl]
+                                    list_all2_refl[OF data_extension_refl],
+                                 of _ _ _ _ _ _  _ _ "[]" "[]" "[]" "[]" "[]"]
+          s'_def 0
     by (metis (full_types) 0 append_Nil2 unit.exhaust s.surjective)
 
   have "list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) (s.funcs s')"
@@ -2786,18 +2850,20 @@ proof -
   have "list_all (glob_agree s') (s.globs s')"
     using glob_agree_store_extension_inv[OF sh1]
     by (metis "0"(3) assms(1) list_all_length s'_def store_typing.cases)
+  moreover
+  have "list_all (elem_agree s') (s.elems s')"
+    using ref_typing_store_extension_inv elem_agree_def
+     by (metis (no_types, lifting) "0"(4) assms(1) list_all_length s'_def sh1 store_typing.cases)
+  moreover
+  have "list_all (data_agree s') (s.datas s')"
+    by (simp add: data_agree_def list_all_length)
   ultimately
   show "store_typing (s\<lparr>s.mems := (s.mems s)[j := m']\<rparr>)"
     using store_typing.simps tab_agree_store_extension_inv[OF sh1]
     unfolding s'_def list_all_length
     apply (simp add: store_typing.simps)
-    apply (metis (no_types, lifting) assms(1,4) nth_list_update nth_list_update_neq store_typing.cases)
-    done
+    by (metis assms(1) assms(4) nth_list_update_eq nth_list_update_neq store_typing_in_mem_agree)
 qed
-
-(*tab_max t1 = tab_max t2 \<and>
-                         tab_reftype t1 = tab_reftype t2 \<and>
-                          limits_compat (tab_t_lim (fst t2)) (tab_t_lim (fst t1))"*)
 
 lemma ref_typing_update_store:
   assumes "ref_typing s vr tr"
@@ -2835,6 +2901,8 @@ proof -
   have 0:"funcs s = funcs s'"
          "mems s = mems s'"
          "globs s = globs s'"
+         "elems s = elems s'"
+         "datas s = datas s'"
     using s'_def
     by simp_all
   have "tab_extension t t'"
@@ -2848,8 +2916,10 @@ proof -
     using store_extension.intros[OF _
                                     _
                                     list_all2_refl[OF mem_extension_refl]
-                                    list_all2_refl[OF global_extension_refl],
-                                 of _ _ _ _ _ _ "[]" "[]" "[]" "[]"]
+                                    list_all2_refl[OF global_extension_refl]
+                                    list_all2_refl[OF elem_extension_refl]
+                                    list_all2_refl[OF data_extension_refl],
+                                 of _ _ _ _ _ _ _ _ "[]" "[]" "[]" "[]" "[]" "[]"]
           s'_def
     by (metis (full_types) 0 append_Nil2 unit.exhaust s.surjective)
 
@@ -2865,13 +2935,19 @@ proof -
   have "list_all (glob_agree s') (s.globs s')"
     using glob_agree_store_extension_inv[OF sh1]
     by (metis "0"(3) assms(1) list_all_length s'_def store_typing.cases)
+  moreover
+  have "list_all (elem_agree s') (s.elems s')"
+    using ref_typing_store_extension_inv elem_agree_def
+     by (metis (no_types, lifting) "0"(4) assms(1) list_all_length s'_def sh1 store_typing.cases)
+  moreover
+  have "list_all (data_agree s') (s.datas s')"
+    by (simp add: data_agree_def list_all_length)
   ultimately
   show "store_typing (s\<lparr>s.tabs := (s.tabs s)[j := t']\<rparr>)"
     using store_typing.simps tab_agree_store_extension_inv[OF sh1]
     unfolding s'_def list_all_length store_extension_refl
     apply (simp add: store_typing.simps)
-    apply (metis (no_types, lifting) assms(1,4) nth_list_update nth_list_update_neq store_typing.cases)
-    done
+    by (metis assms(1) assms(4) nth_list_update_eq nth_list_update_neq store_typing_in_tab_agree)
 qed
 
 lemma update_glob_store_extension:
@@ -2893,6 +2969,8 @@ proof -
   have 1:"(funcs s) = (funcs s')"
          "(tabs s) = (tabs s')"
          "(mems s) = (mems s')"
+         "elems s = elems s'"
+         "datas s = datas s'"
     using s'_def mem_extension_refl list_all2_refl
     by auto
   have "typeof (g_val g) = typeof v"
@@ -2919,11 +2997,12 @@ proof -
     using store_extension.intros[OF _
                                     list_all2_refl[OF tab_extension_refl]
                                     list_all2_refl[OF mem_extension_refl]
-                                    _,
-                                 of _ _ _ _ _ _ "[]" "[]" "[]" "[]"]
+                                    _
+                                    list_all2_refl[OF elem_extension_refl]
+                                    list_all2_refl[OF data_extension_refl],
+                                 of _ _ _ _ _ _ _ _ _ "[]" "[]" "[]" "[]" "[]"]
           s'_def
-    by (metis (full_types) 1(1,2,3) append_Nil2 unit.exhaust s.surjective)
-
+    by (metis (full_types) 1 append_Nil2 unit.exhaust s.surjective)
   have "list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) (s.funcs s')"
     using assms(1) cl_typing_store_extension_inv[OF sh1] 1(1)
     unfolding store_typing.simps list_all_length
@@ -2952,6 +3031,13 @@ proof -
     qed
     then show ?thesis using list_all_length by auto
   qed
+  moreover
+  have "list_all (elem_agree s') (s.elems s')"
+    using ref_typing_store_extension_inv elem_agree_def
+    by (metis (no_types, lifting) "1"(4) assms(1) list_all_length sh1 store_typing.cases)
+  moreover
+  have "list_all (data_agree s') (s.datas s')"
+    by (simp add: data_agree_def list_all_length)
   ultimately
   show "store_typing s'"
     using 1(3) assms(1) store_typing.simps
@@ -3225,8 +3311,12 @@ proof -
 
       have s4: "list_all2 global_extension (globs s) (globs ?s)"
         by (simp add: global_extension_refl list.rel_refl)
+      have s5: "list_all2 elem_extension (s.elems s) (s.elems ?s)"
+        by (simp add: elem_extension_refl list.rel_refl)
+      have s6: "list_all2 data_extension (s.datas s) (s.datas ?s)"
+        by (simp add: data_extension_refl list.rel_refl)
       then show ?thesis
-        using store_extension.intros[OF s1 s2 s3 s4, of "[]" "[]" "[]" "[]"]
+        using store_extension.intros[OF s1 s2 s3 s4 s5 s6, of "[]" "[]" "[]" "[]" "[]" "[]"]
         apply simp
         by (metis old.unit.exhaust s.surjective s.update_convs(2))
     qed

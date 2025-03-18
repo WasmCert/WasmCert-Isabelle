@@ -172,16 +172,22 @@ definition tab_t_reftype :: "tab_t \<Rightarrow> t_ref" where
 "tab_t_reftype tt = (case tt of
   T_tab _ t \<Rightarrow> t)"
 
+type_synonym data_t = "unit"
+type_synonym elem_t = "t_ref"
+
 (* TYPING *)
 record t_context =
   types_t :: "tf list"
   func_t :: "tf list"
   global :: "tg list"
+  elem :: "elem_t list"
+  data :: "data_t list"
   table :: "tab_t list"
   memory :: "mem_t list"
   local :: "t list"
   label :: "(t list) list"
   return :: "(t list) option"
+  refs :: "i list"
 
 datatype \<comment> \<open>numeric values\<close>
   v_num = ConstInt32 i32
@@ -429,13 +435,16 @@ record inst = \<comment> \<open>instances\<close>
   tabs :: "i list"
   mems :: "i list"
   globs :: "i list"
+  elems :: "i list"
+  datas :: "i list"
 
 datatype cl = \<comment> \<open>function closures\<close>
   Func_native inst tf "t list" "b_e list"
 | Func_host tf host
 
-(* type_synonym tabinst = "(i option) list \<times> nat option" *)
 type_synonym tabinst = "tab_t \<times> v_ref list"
+type_synonym eleminst = "elem_t \<times> v_ref list"
+type_synonym datainst =  "bytes"
 
 abbreviation "tab_size (t::tabinst) \<equiv> length (snd t)"
 definition tab_max :: "tabinst \<Rightarrow> nat option" where
@@ -455,6 +464,8 @@ record s = \<comment> \<open>store\<close>
   tabs :: "tabinst list"
   mems :: "mem list"
   globs :: "global list"
+  elems :: "eleminst list"
+  datas :: "datainst list"
 
 record f = \<comment> \<open>frame\<close>
   f_locs :: "v list"

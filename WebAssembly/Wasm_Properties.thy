@@ -149,7 +149,7 @@ next
         by (simp add: init_tab_Some.prems(2))
       then have "list_all2 (tabi_agree (tabs s)) (inst.tabs (f_inst f)) (table \<C>i)"
         using inst_typing.simps by fastforce
-      show ?thesis by (metis (mono_tags, lifting) case_prod_conv init_tab_Some.hyps(1) init_tab_Some.hyps(2) init_tab_Some.prems(2) inst_typing_imp_tabi_agree split_def tab_t.case tab_t.exhaust tab_t_reftype_def tab_typing_def tabi_agree_def)
+      show ?thesis by (metis (mono_tags, lifting) case_prod_conv init_tab_Some.hyps(1) init_tab_Some.hyps(2) init_tab_Some.prems(2) inst_typing_imp_tabi_agree split_def tab_t.case tab_t.exhaust tab_t_reftype_def tab_subtyping_def tabi_agree_def)
     qed
 
     have e: "tab' = (fst t, ((take n (snd t)) @ icls @ (drop (n + length icls) (snd t))))"
@@ -209,12 +209,13 @@ next
       using inst_typing.simps table_set.prems(2) by auto
     then have "tabi_agree (tabs s) (inst.tabs (f_inst f)!ti) (table \<C>! ti)" 
       by (metis h_table list_all2_nthD option.simps(3) stab_ind_def table_set.hyps(1))
-    then have "tab_typing ((tabs s)!a) (table \<C>!ti)"
-      using table_set.prems(4) inst_typing_imp_tabi_agree tabi_agree_def table_set.hyps(1) table_set.prems(2) by auto
+    then have "tab_subtyping (fst ((tabs s)!a)) (table \<C>!ti)"
+      using table_set.prems(4) inst_typing_imp_tabi_agree tabi_agree_def table_set.hyps(1) table_set.prems(2)
+      by fastforce
     
     then have t1: "tab_reftype (tabs s!a) = tab_t_reftype (table \<C>!ti)"
-      using tab_typing_def apply simp
-      by (metis (mono_tags, lifting) case_prod_beta' tab_reftype_def tab_t.case tab_t.exhaust tab_t_reftype_def)
+      using tab_subtyping_def apply simp
+      by (metis (mono_tags, lifting) tab_reftype_def tab_t.case tab_t.exhaust tab_t_reftype_def)
     have "ref_typing s vr (typeof_ref vr)"
       using table_set(5) types_preserved_table_set_aux(4) by blast
     then show "ref_typing s vr (tab_reftype (s.tabs s ! a))"
@@ -267,19 +268,19 @@ next
 
     have "list_all2 (tabi_agree (tabs s)) (inst.tabs (f_inst f)) (table \<C>i)"
       using table_grow(6) using inst_typing.simps by auto
-   then have "tab_typing ((tabs s)!a) (table \<C>!ti)"
-     using inst_typing_imp_tabi_agree tabi_agree_def table_grow.hyps(1) table_grow.prems(2) table_grow.prems(4) by force
+   then have "tab_subtyping (fst ((tabs s)!a)) (table \<C>!ti)"
+     using inst_typing_imp_tabi_agree tabi_agree_def table_grow.hyps(1) table_grow.prems(2) table_grow.prems(4) by fastforce
    
    then have "ref_typing s vr (tab_reftype (s.tabs s ! a))"
      using types_preserved_table_grow_aux(2)[OF table_grow(7)] using tab_reftype_def
      apply (simp add: typeof_ref_def split: v_ref.splits tab_t.splits)
-       apply (metis (mono_tags, lifting) case_prodD case_prod_unfold ref_typing.intros(1) tab_t.case tab_t.exhaust tab_t_reftype_def tab_typing_def)
-  
-      apply (metis (mono_tags, lifting) "1" old.prod.case split_beta tab_t.case tab_t.exhaust tab_t_reftype_def tab_typing_def)
-     by (metis (mono_tags, lifting) case_prod_conv ref_typing.intros(3) split_beta tab_t.case tab_t.exhaust tab_t_reftype_def tab_typing_def)
+       apply (metis (mono_tags, lifting) case_prodD ref_typing.intros(1) tab_t.case tab_t.exhaust tab_t_reftype_def tab_subtyping_def)
+ 
+      apply (metis (mono_tags, lifting) "1" old.prod.case  tab_t.case tab_t.exhaust tab_t_reftype_def tab_subtyping_def)
+     by (metis (mono_tags, lifting) case_prod_conv ref_typing.intros(3)  tab_t.case tab_t.exhaust tab_t_reftype_def tab_subtyping_def)
     then have t1: "tab_reftype (tabs s!a) = tab_t_reftype (table \<C>!ti)"
-      using tab_typing_def tab_reftype_def tab_t_reftype_def apply (simp split: tab_t.splits prod.splits)
-      using \<open>tab_typing (s.tabs s ! a) (table \<C> ! ti)\<close> by auto
+      using tab_subtyping_def tab_reftype_def tab_t_reftype_def apply (simp split: tab_t.splits prod.splits)
+      using \<open>tab_subtyping (fst (s.tabs s ! a)) (table \<C> ! ti)\<close> by auto
     have "list_all (\<lambda>vr. ref_typing s vr (tab_t_reftype (fst tab))) (replicate (nat_of_int n) vr)"
       using "1" list_all_length t1 tab_reftype_def tab_t_reftype_def table_grow.hyps(2) by fastforce
     have "list_all (\<lambda>vr. ref_typing s vr (tab_t_reftype (fst tab))) (snd tab')"
@@ -2058,7 +2059,7 @@ proof -
   then have "tabi_agree (tabs s) ((inst.tabs (f_inst f))!ti) (table \<C>i!ti)"
     by (metis assms(2) list_all2_nthD option.simps(3) stab_ind_def)
   then have "tab_t_reftype (fst ((s.tabs s)!a)) = tab_t_reftype (table \<C>i!ti)"
-    by (metis (mono_tags, lifting) assms(2) assms(5) case_prod_unfold inst_typing_imp_tabi_agree split_pairs tab_t.case tab_t.exhaust tab_t_reftype_def tab_typing_def tabi_agree_def)
+    by (metis (mono_tags, lifting) assms(2) assms(5) case_prod_unfold inst_typing_imp_tabi_agree split_pairs tab_t.case tab_t.exhaust tab_t_reftype_def tab_subtyping_def tabi_agree_def)
   have "tab_agree s ((s.tabs s)!a)"
   proof -
     have "list_all (tab_agree s) (tabs s)"
