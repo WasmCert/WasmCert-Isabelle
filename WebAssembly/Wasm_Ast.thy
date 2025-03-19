@@ -405,6 +405,14 @@ datatype \<comment> \<open>basic instructions\<close>
     | Store_vec storeop_vec a off
     | Current_memory
     | Grow_memory
+    | Memory_init i
+    | Memory_fill
+    | Memory_copy
+    | Table_init i i
+    | Table_copy i i
+    | Table_fill i
+    | Elem_drop i
+    | Data_drop i
     (*| EConst v ("C _" 60) *)
     | EConstNum v_num
     | EConstVec v_vec
