@@ -292,6 +292,72 @@ next
       by (simp add: 0 split: prod.splits tab_t.splits)
   qed
   show ?case using store_extension_tab_leq[OF table_grow.prems(1) 6 1 7 2 3]by blast
+next
+  case (memory_init_trap f ma s m x da dat src n dest)
+  then show ?case sorry
+next
+  case (memory_init_done f ma s m x da dat src dest)
+  then show ?case sorry
+next
+  case (memory_init f ma s m x da dat src n dest b d)
+  then show ?case sorry
+next
+  case (memory_copy_trap f ma s m src n dest)
+  then show ?case sorry
+next
+  case (memory_copy_done f ma s m src dest)
+  then show ?case sorry
+next
+  case (memory_copy_1 f ma s m src n dest sz)
+  then show ?case sorry
+next
+  case (memory_copy_2 f ma s m src n dest sz)
+  then show ?case sorry
+next
+  case (memory_fill_trap f ma s m dest n val)
+  then show ?case sorry
+next
+  case (memory_fill_done f ma s m dest val)
+  then show ?case sorry
+next
+  case (memory_fill f ma s m dest n val)
+  then show ?case sorry
+next
+  case (table_init_trap f x ta s tab da y ea el src n dest)
+  then show ?case sorry
+next
+  case (table_init_done f x ta s tab da y ea el src dest)
+  then show ?case sorry
+next
+  case (table_init f x ta s tab da y ea el src n dest val)
+  then show ?case sorry
+next
+  case (table_fill_trap f x ta s tab i n vr)
+  then show ?case sorry
+next
+  case (table_fill_done f x ta s tab i vr)
+  then show ?case sorry
+next
+  case (table_fill f x ta s tab i n vr val)
+  then show ?case sorry
+next
+  case (table_copy_trap f x tax s tabx y tay ty taby src n dest)
+  then show ?case sorry
+next
+  case (table_copy_done f x tax s tabx y tay ty taby src dest)
+  then show ?case sorry
+next
+  case (table_copy_1 f x tax s tabx y tay ty taby src n dest)
+  then show ?case sorry
+next
+  case (table_copy_2 f x tax s tabx y tay ty taby src n dest)
+  then show ?case sorry
+next
+  case (elem_drop x f a s)
+  then show ?case sorry
+next
+  case (data_drop x f a s)
+  then show ?case sorry
 qed (auto simp add: store_extension_refl store_extension.intros)+
 
 lemma store_preserved:
@@ -2281,6 +2347,72 @@ next
     by simp
   then show ?case using v_typing_funcs_inv
     by (metis (mono_tags, lifting) init_tab_Some.prems(5) list_all2_mono)
+next
+  case (memory_init_trap f ma s m x da dat src n dest)
+  then show ?case sorry
+next
+  case (memory_init_done f ma s m x da dat src dest)
+  then show ?case sorry
+next
+  case (memory_init f ma s m x da dat src n dest b d)
+  then show ?case sorry
+next
+  case (memory_copy_trap f ma s m src n dest)
+  then show ?case sorry
+next
+  case (memory_copy_done f ma s m src dest)
+  then show ?case sorry
+next
+  case (memory_copy_1 f ma s m src n dest sz)
+  then show ?case sorry
+next
+  case (memory_copy_2 f ma s m src n dest sz)
+  then show ?case sorry
+next
+  case (memory_fill_trap f ma s m dest n val)
+  then show ?case sorry
+next
+  case (memory_fill_done f ma s m dest val)
+  then show ?case sorry
+next
+  case (memory_fill f ma s m dest n val)
+  then show ?case sorry
+next
+  case (table_init_trap f x ta s tab da y ea el src n dest)
+  then show ?case sorry
+next
+  case (table_init_done f x ta s tab da y ea el src dest)
+  then show ?case sorry
+next
+  case (table_init f x ta s tab da y ea el src n dest val)
+  then show ?case sorry
+next
+  case (table_fill_trap f x ta s tab i n vr)
+  then show ?case sorry
+next
+  case (table_fill_done f x ta s tab i vr)
+  then show ?case sorry
+next
+  case (table_fill f x ta s tab i n vr val)
+  then show ?case sorry
+next
+  case (table_copy_trap f x tax s tabx y tay ty taby src n dest)
+  then show ?case sorry
+next
+  case (table_copy_done f x tax s tabx y tay ty taby src dest)
+  then show ?case sorry
+next
+  case (table_copy_1 f x tax s tabx y tay ty taby src n dest)
+  then show ?case sorry
+next
+  case (table_copy_2 f x tax s tabx y tay ty taby src n dest)
+  then show ?case sorry
+next
+  case (elem_drop x f a s)
+  then show ?case sorry
+next
+  case (data_drop x f a s)
+  then show ?case sorry
 qed blast+
 
 lemma types_preserved_e1:
@@ -2630,6 +2762,72 @@ next
   case (table_grow_fail s f vr n ti)
     then show ?case using types_preserved_table_grow[OF table_grow_fail(5)]
       by simp
+next
+  case (memory_init_trap f ma s m x da dat src n dest)
+  then show ?case sorry
+next
+  case (memory_init_done f ma s m x da dat src dest)
+  then show ?case sorry
+next
+  case (memory_init f ma s m x da dat src n dest b d)
+  then show ?case sorry
+next
+  case (memory_copy_trap f ma s m src n dest)
+  then show ?case sorry
+next
+  case (memory_copy_done f ma s m src dest)
+  then show ?case sorry
+next
+  case (memory_copy_1 f ma s m src n dest sz)
+  then show ?case sorry
+next
+  case (memory_copy_2 f ma s m src n dest sz)
+  then show ?case sorry
+next
+  case (memory_fill_trap f ma s m dest n val)
+  then show ?case sorry
+next
+  case (memory_fill_done f ma s m dest val)
+  then show ?case sorry
+next
+  case (memory_fill f ma s m dest n val)
+  then show ?case sorry
+next
+  case (table_init_trap f x ta s tab da y ea el src n dest)
+  then show ?case sorry
+next
+  case (table_init_done f x ta s tab da y ea el src dest)
+  then show ?case sorry
+next
+  case (table_init f x ta s tab da y ea el src n dest val)
+  then show ?case sorry
+next
+  case (table_fill_trap f x ta s tab i n vr)
+  then show ?case sorry
+next
+  case (table_fill_done f x ta s tab i vr)
+  then show ?case sorry
+next
+  case (table_fill f x ta s tab i n vr val)
+  then show ?case sorry
+next
+  case (table_copy_trap f x tax s tabx y tay ty taby src n dest)
+  then show ?case sorry
+next
+  case (table_copy_done f x tax s tabx y tay ty taby src dest)
+  then show ?case sorry
+next
+  case (table_copy_1 f x tax s tabx y tay ty taby src n dest)
+  then show ?case sorry
+next
+  case (table_copy_2 f x tax s tabx y tay ty taby src n dest)
+  then show ?case sorry
+next
+  case (elem_drop x f a s)
+  then show ?case sorry
+next
+  case (data_drop x f a s)
+  then show ?case sorry
 qed 
 
 lemma types_preserved_e2:
@@ -4147,6 +4345,30 @@ next
   thus ?case
     using progress_L0[of s f "($C* cs2) @ ($* es)" _ _ _ "cs1" "[]"] cs_def(3)
     by fastforce
+next
+  case (memory_init \<C> i)
+  then show ?case sorry
+next
+  case (memory_copy \<C>)
+  then show ?case sorry
+next
+  case (memory_fill \<C>)
+  then show ?case sorry
+next
+  case (table_init x \<C> y tr)
+  then show ?case sorry
+next
+  case (table_copy x \<C> tr y)
+  then show ?case sorry
+next
+  case (table_fill x \<C> tr)
+  then show ?case sorry
+next
+  case (elem_drop x \<C>)
+  then show ?case sorry
+next
+  case (data_drop x \<C>)
+  then show ?case sorry
 qed
 
 lemma progress_e:
@@ -4874,6 +5096,72 @@ next
   case (table_grow_fail s f vr n ti)
   then show ?case
     by (metis const_list_no_progress consts_const_list reduce.table_grow_fail)
+next
+  case (memory_init_trap f ma s m x da dat src n dest)
+  then show ?case sorry
+next
+  case (memory_init_done f ma s m x da dat src dest)
+  then show ?case sorry
+next
+  case (memory_init f ma s m x da dat src n dest b d)
+  then show ?case sorry
+next
+  case (memory_copy_trap f ma s m src n dest)
+  then show ?case sorry
+next
+  case (memory_copy_done f ma s m src dest)
+  then show ?case sorry
+next
+  case (memory_copy_1 f ma s m src n dest sz)
+  then show ?case sorry
+next
+  case (memory_copy_2 f ma s m src n dest sz)
+  then show ?case sorry
+next
+  case (memory_fill_trap f ma s m dest n val)
+  then show ?case sorry
+next
+  case (memory_fill_done f ma s m dest val)
+  then show ?case sorry
+next
+  case (memory_fill f ma s m dest n val)
+  then show ?case sorry
+next
+  case (table_init_trap f x ta s tab da y ea el src n dest)
+  then show ?case sorry
+next
+  case (table_init_done f x ta s tab da y ea el src dest)
+  then show ?case sorry
+next
+  case (table_init f x ta s tab da y ea el src n dest val)
+  then show ?case sorry
+next
+  case (table_fill_trap f x ta s tab i n vr)
+  then show ?case sorry
+next
+  case (table_fill_done f x ta s tab i vr)
+  then show ?case sorry
+next
+  case (table_fill f x ta s tab i n vr val)
+  then show ?case sorry
+next
+  case (table_copy_trap f x tax s tabx y tay ty taby src n dest)
+  then show ?case sorry
+next
+  case (table_copy_done f x tax s tabx y tay ty taby src dest)
+  then show ?case sorry
+next
+  case (table_copy_1 f x tax s tabx y tay ty taby src n dest)
+  then show ?case sorry
+next
+  case (table_copy_2 f x tax s tabx y tay ty taby src n dest)
+  then show ?case sorry
+next
+  case (elem_drop x f a s)
+  then show ?case sorry
+next
+  case (data_drop x f a s)
+  then show ?case sorry
 qed (metis const_list_no_progress consts_const_list  reduce.intros)+
 
 lemma reduce_simple_not_nil:
