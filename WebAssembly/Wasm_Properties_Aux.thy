@@ -422,6 +422,13 @@ lemma b_e_type_table_get:
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
+lemma b_e_type_table_init:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Table_init x y"
+  shows "\<exists>ts''. ts = ts''@[T_num T_i32, T_num T_i32, T_num T_i32] \<and> ts' = ts''" "x < length (table \<C>)" "y < length (elem \<C>)" "tab_t_reftype (table \<C>!x) = (elem \<C>!y)"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
 lemma b_e_type_nop:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Nop"
@@ -1093,6 +1100,26 @@ lemma e_type_init_tab:
   apply (induction s \<C> "[Init_tab ti n icls]" "(ts _> ts')" arbitrary: ts ts')
   apply (auto simp add: e_typing_l_typing.intros(10))
   done
+
+lemma e_type_table_init:
+  assumes "s\<bullet>\<C> \<turnstile> [$Table_init x y] : (ts _> ts')"
+  shows "ts = ts'@[T_num T_i32, T_num T_i32, T_num T_i32] \<and> x < length (table \<C>) \<and> y < length (elem \<C>) \<and> tab_t_reftype (table \<C>!x) = (elem \<C>!y)"
+  using assms
+proof (induction s \<C> "[$Table_init x y]" "(ts _> ts')" arbitrary: ts ts')
+  case (1 \<C> b_es \<S>)
+  then show ?case using b_e_type_table_init
+    by fastforce
+next
+  case (2 \<S> \<C> es t1s t2s e t3s)
+  then show ?case by auto
+next
+  case (3 \<S> \<C> t1s t2s ts)
+  then show ?case by auto
+next
+  case (11 \<S> f \<C> rs es ts)
+  then show ?thesis
+    by (metis assms b_e_type_table_init to_e_list_1 unlift_b_e)
+qed
 
 lemma cl_typing_native:
   assumes "cl_typing s (Func_native i tf ts es) tf'"
@@ -2524,6 +2551,7 @@ proof -
     by auto
 qed
 
+
 lemma elemi_agree_store_extension:
   assumes "list_all2 (elemi_agree s (elems s)) (inst.elems i) (elem \<C>)"
           "store_extension s s'"
@@ -2800,6 +2828,14 @@ lemma store_typing_in_tab_agree:
           "j < length (s.tabs s)"
           "s.tabs s ! j = t"
   shows "tab_agree s t"
+  using assms
+  by (auto simp add: store_typing.simps list_all_length)
+
+lemma store_typing_in_elem_agree:
+  assumes "store_typing s"
+          "j < length (elems s)"
+          "s.elems s ! j = el"
+  shows "elem_agree s el"
   using assms
   by (auto simp add: store_typing.simps list_all_length)
 
@@ -3252,20 +3288,35 @@ lemma e_typing_imp_list_v_typing:
   assumes "\<S>\<bullet>\<C> \<turnstile> $C* vs : (ts _> ts')"
   shows
     "list_all (\<lambda> v. v_typing \<S> v (typeof v)) vs"
+    "ts' = ts@(map typeof vs)"
   using assms
 proof(induction vs arbitrary: ts ts' rule: rev_induct)
   case Nil
-  then show ?case by auto
+  {
+    case 1
+    then show ?case by auto
+  next
+    case 2
+    then show ?case by auto
+  }
 next
   case (snoc x xs)
-  have "\<S>\<bullet>\<C> \<turnstile> $C* xs @ [x] : ts _> ts'" using snoc by simp
-  then have "\<S>\<bullet>\<C> \<turnstile> ($C* xs) @ [$C x] : ts _> ts'" by simp
-  then obtain ts'' where
-     "\<S>\<bullet>\<C> \<turnstile> ($C* xs) : ts _> ts''"
-     "\<S>\<bullet>\<C> \<turnstile> [$C x] : ts'' _> ts'"
-    using e_type_comp by blast
-  then show ?case
-    by (simp add: snoc.IH type_const_v_typing(2))
+  {
+    case 1
+      have "\<S>\<bullet>\<C> \<turnstile> $C* xs @ [x] : ts _> ts'"
+        using "1" by auto
+      then have "\<S>\<bullet>\<C> \<turnstile> ($C* xs) @ [$C x] : ts _> ts'" by simp
+      then obtain ts'' where
+         "\<S>\<bullet>\<C> \<turnstile> ($C* xs) : ts _> ts''"
+         "\<S>\<bullet>\<C> \<turnstile> [$C x] : ts'' _> ts'"
+        using e_type_comp by blast
+      then show ?case
+        by (simp add: snoc.IH type_const_v_typing(2))
+  next
+    case 2
+    then show ?case
+      using e_type_consts store_extension_refl by blast
+  }
 qed
 
 lemma lfilled_deterministic:
