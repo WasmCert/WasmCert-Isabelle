@@ -2786,6 +2786,7 @@ proof -
 qed
 
 
+
 lemma store_typing_in_mem_agree:
   assumes "store_typing s"
           "j < length (s.mems s)"
@@ -3044,6 +3045,108 @@ proof -
     by auto
 qed
 
+lemma elem_drop_store_extension:
+  assumes "a < length (elems s)"
+          "store_typing s"
+          "s' = s\<lparr>s.elems := (s.elems s)[a := (fst (s.elems s ! a), [])]\<rparr>"
+  shows "store_extension s s'"
+        "store_typing s'"
+proof -
+  have 0: "(funcs s) = (funcs s')"
+          "(tabs s) = (tabs s')"
+          "(mems s) = (mems s')"
+          "(globs s) = (globs s')"
+          "datas s = datas s'"
+    using assms(3)
+    by fastforce+
+  have 1: "list_all2 elem_extension (elems s) (elems s')" unfolding elem_extension_def
+    apply (simp add: assms(3))
+    by (metis (mono_tags, lifting) list.rel_refl list_all2_update_cong list_update_id snd_conv)
+  then show sh1: "store_extension s s'"
+    using store_extension.intros[OF 0(1) list_all2_refl[OF tab_extension_refl]
+                                      list_all2_refl[OF mem_extension_refl]
+                                      list_all2_refl[OF global_extension_refl]
+                                      1 
+                                      list_all2_refl[OF data_extension_refl]
+                                      , of "tabs s" "mems s" "globs s" "datas s" "[]" "[]" "[]" "[]" "[]" "[]"]
+    apply simp
+    using 0
+    by (metis (full_types) old.unit.exhaust s.surjective)
+  have "list_all (elem_agree s) (elems s)" using assms(2) unfolding store_typing.simps by simp
+  then have "list_all (elem_agree s') (elems s')"
+    
+    using ref_typing_store_extension_inv[OF sh1] unfolding elem_agree_def assms(3) using assms(1) snd_conv
+    nth_list_update_eq[OF assms(1)] apply simp
+    by (metis (no_types, lifting) length_list_update list_all_length list_all_simps(2) nth_list_update_eq nth_list_update_neq snd_conv)
+  moreover
+  have "list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) (s.funcs s')"
+    using cl_typing_store_extension_inv[OF sh1] 0(1)
+    unfolding store_typing.simps list_all_length
+    by (metis assms(2) store_typing_imp_cl_typing)
+  moreover
+  have "list_all mem_agree (s.mems s')" 
+    using "0"(3) assms(2) store_typing.simps by fastforce
+  moreover
+  have "list_all (glob_agree s') (s.globs s')"
+    by (metis "0"(4) assms(2) glob_agree_store_extension_inv list_all_length sh1 store_typing.cases)
+  moreover
+  have "list_all (data_agree s') (s.datas s')"
+    by (simp add: data_agree_def list_all_length)
+  ultimately
+  show"store_typing s'"
+     using assms(2) 0 unfolding store_typing.simps
+     by (metis (no_types, lifting) list.pred_mono_strong tab_agree_update_store)
+qed
+
+lemma data_drop_store_extension:
+  assumes "a < length (datas s)"
+          "store_typing s"
+          "s' = s\<lparr>s.datas := (s.datas s)[a := []]\<rparr>"
+  shows "store_extension s s'"
+        "store_typing s'"
+proof -
+  have 0: "(funcs s) = (funcs s')"
+          "(tabs s) = (tabs s')"
+          "(mems s) = (mems s')"
+          "(globs s) = (globs s')"
+          "elems s = elems s'"
+    using assms(3)
+    by fastforce+
+  have 1: "list_all2 data_extension (datas s) (datas s')" unfolding elem_extension_def
+    unfolding assms(3) using data_extension_def apply simp
+    by (metis list_all2_refl list_all2_update_cong list_update_id)
+  then show sh1: "store_extension s s'"
+    using store_extension.intros[OF 0(1) list_all2_refl[OF tab_extension_refl]
+                                      list_all2_refl[OF mem_extension_refl]
+                                      list_all2_refl[OF global_extension_refl]
+                                      list_all2_refl[OF elem_extension_refl] 
+                                      1
+                                      , of "tabs s" "mems s" "globs s" "elems s" "[]" "[]" "[]" "[]" "[]" "[]"]
+    apply simp
+    using 0
+    by (metis (full_types) old.unit.exhaust s.surjective)
+  have "list_all (elem_agree s) (elems s)" using assms(2) unfolding store_typing.simps by simp
+  then have "list_all (elem_agree s') (elems s')"
+    by (metis "0"(5) elem_agree_def list.pred_mono_strong ref_typing_store_extension_inv sh1)
+  moreover
+  have "list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) (s.funcs s')"
+    using cl_typing_store_extension_inv[OF sh1] 0(1)
+    unfolding store_typing.simps list_all_length
+    by (metis assms(2) store_typing_imp_cl_typing)
+  moreover
+  have "list_all mem_agree (s.mems s')" 
+    using "0"(3) assms(2) store_typing.simps by fastforce
+  moreover
+  have "list_all (glob_agree s') (s.globs s')"
+    by (metis "0"(4) assms(2) glob_agree_store_extension_inv list_all_length sh1 store_typing.cases)
+  moreover
+  have "list_all (data_agree s') (s.datas s')"
+    by (simp add: data_agree_def list_all_length)
+  ultimately
+  show"store_typing s'"
+     using assms(2) 0 unfolding store_typing.simps
+     by (metis (no_types, lifting) list.pred_mono_strong tab_agree_update_store)
+qed
 
 lemma types_agree_imp_e_typing:
   assumes "v_typing \<S> v t"

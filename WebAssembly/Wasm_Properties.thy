@@ -293,71 +293,21 @@ next
   qed
   show ?case using store_extension_tab_leq[OF table_grow.prems(1) 6 1 7 2 3]by blast
 next
-  case (memory_init_trap f ma s m x da dat src n dest)
-  then show ?case sorry
-next
-  case (memory_init_done f ma s m x da dat src dest)
-  then show ?case sorry
-next
-  case (memory_init f ma s m x da dat src n dest b d)
-  then show ?case sorry
-next
-  case (memory_copy_trap f ma s m src n dest)
-  then show ?case sorry
-next
-  case (memory_copy_done f ma s m src dest)
-  then show ?case sorry
-next
-  case (memory_copy_1 f ma s m src n dest sz)
-  then show ?case sorry
-next
-  case (memory_copy_2 f ma s m src n dest sz)
-  then show ?case sorry
-next
-  case (memory_fill_trap f ma s m dest n val)
-  then show ?case sorry
-next
-  case (memory_fill_done f ma s m dest val)
-  then show ?case sorry
-next
-  case (memory_fill f ma s m dest n val)
-  then show ?case sorry
-next
-  case (table_init_trap f x ta s tab da y ea el src n dest)
-  then show ?case sorry
-next
-  case (table_init_done f x ta s tab da y ea el src dest)
-  then show ?case sorry
-next
-  case (table_init f x ta s tab da y ea el src n dest val)
-  then show ?case sorry
-next
-  case (table_fill_trap f x ta s tab i n vr)
-  then show ?case sorry
-next
-  case (table_fill_done f x ta s tab i vr)
-  then show ?case sorry
-next
-  case (table_fill f x ta s tab i n vr val)
-  then show ?case sorry
-next
-  case (table_copy_trap f x tax s tabx y tay ty taby src n dest)
-  then show ?case sorry
-next
-  case (table_copy_done f x tax s tabx y tay ty taby src dest)
-  then show ?case sorry
-next
-  case (table_copy_1 f x tax s tabx y tay ty taby src n dest)
-  then show ?case sorry
-next
-  case (table_copy_2 f x tax s tabx y tay ty taby src n dest)
-  then show ?case sorry
-next
   case (elem_drop x f a s)
-  then show ?case sorry
+  have "list_all2 (elemi_agree s (elems s)) (inst.elems (f_inst f)) (elem \<C>i)"
+    using elem_drop(4) unfolding inst_typing.simps
+    by fastforce
+  then have "a < length (elems s)" using elem_drop(1) elemi_agree_def
+    by (simp add: elem_drop.hyps(2) list_all2_conv_all_nth)
+  then show ?case using elem_drop_store_extension[OF _ elem_drop(3)] by simp
 next
   case (data_drop x f a s)
-  then show ?case sorry
+  have "list_all2 (datai_agree (datas s)) (inst.datas (f_inst f)) (data \<C>i)"
+    using data_drop(4) unfolding inst_typing.simps
+    by fastforce
+  then have "a < length (datas s)" using data_drop(1) datai_agree_def
+    by (simp add: data_drop.hyps(2) list_all2_conv_all_nth)
+  then show ?case using data_drop_store_extension[OF _ data_drop(3)] by simp
 qed (auto simp add: store_extension_refl store_extension.intros)+
 
 lemma store_preserved:
@@ -2348,71 +2298,17 @@ next
   then show ?case using v_typing_funcs_inv
     by (metis (mono_tags, lifting) init_tab_Some.prems(5) list_all2_mono)
 next
-  case (memory_init_trap f ma s m x da dat src n dest)
-  then show ?case sorry
-next
-  case (memory_init_done f ma s m x da dat src dest)
-  then show ?case sorry
-next
-  case (memory_init f ma s m x da dat src n dest b d)
-  then show ?case sorry
-next
-  case (memory_copy_trap f ma s m src n dest)
-  then show ?case sorry
-next
-  case (memory_copy_done f ma s m src dest)
-  then show ?case sorry
-next
-  case (memory_copy_1 f ma s m src n dest sz)
-  then show ?case sorry
-next
-  case (memory_copy_2 f ma s m src n dest sz)
-  then show ?case sorry
-next
-  case (memory_fill_trap f ma s m dest n val)
-  then show ?case sorry
-next
-  case (memory_fill_done f ma s m dest val)
-  then show ?case sorry
-next
-  case (memory_fill f ma s m dest n val)
-  then show ?case sorry
-next
-  case (table_init_trap f x ta s tab da y ea el src n dest)
-  then show ?case sorry
-next
-  case (table_init_done f x ta s tab da y ea el src dest)
-  then show ?case sorry
-next
-  case (table_init f x ta s tab da y ea el src n dest val)
-  then show ?case sorry
-next
-  case (table_fill_trap f x ta s tab i n vr)
-  then show ?case sorry
-next
-  case (table_fill_done f x ta s tab i vr)
-  then show ?case sorry
-next
-  case (table_fill f x ta s tab i n vr val)
-  then show ?case sorry
-next
-  case (table_copy_trap f x tax s tabx y tay ty taby src n dest)
-  then show ?case sorry
-next
-  case (table_copy_done f x tax s tabx y tay ty taby src dest)
-  then show ?case sorry
-next
-  case (table_copy_1 f x tax s tabx y tay ty taby src n dest)
-  then show ?case sorry
-next
-  case (table_copy_2 f x tax s tabx y tay ty taby src n dest)
-  then show ?case sorry
-next
   case (elem_drop x f a s)
-  then show ?case sorry
+  have "funcs (s\<lparr>s.elems := (s.elems s)[a := (fst (s.elems s ! a), [])]\<rparr>) = funcs s"
+    by simp
+  then show ?case using v_typing_funcs_inv
+    by (metis (mono_tags, lifting) elem_drop.prems(5) list_all2_mono)
 next
   case (data_drop x f a s)
-  then show ?case sorry
+ have "funcs (s\<lparr>s.datas := (s.datas s)[a := []]\<rparr>) = funcs s"
+    by simp
+  then show ?case using v_typing_funcs_inv
+    by (metis (mono_tags, lifting) data_drop.prems(5) list_all2_mono)
 qed blast+
 
 lemma types_preserved_e1:
