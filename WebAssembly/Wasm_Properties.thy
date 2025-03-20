@@ -2694,10 +2694,10 @@ next
 next
   case (table_init_done f x ta s tab y ea el ndest dest nsrc src nn n)
   have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n)] @
-          [$Table_init x y] : ts _> ts'" using table_init_done(16) by auto
-  obtain ts'' args vs where ts''_def:
-    "vs = [V_num ( (ConstInt32  dest)), V_num ( (ConstInt32 ( src))), V_num (ConstInt32 n)]"
-    "$C*vs = [$EConstNum (ConstInt32 ( dest)), $EConstNum (ConstInt32 ( src)), $EConstNum (ConstInt32 n)]"
+          [$Table_init x y] : (ts _> ts')" using table_init_done(16) by auto
+  obtain ts'' vs where ts''_def:
+    "vs = [V_num (ConstInt32 dest), V_num (ConstInt32 src), V_num (ConstInt32 n)]"
+    "($C* vs) = [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n)]"
     "s\<bullet>\<C> \<turnstile> $C*vs : (ts _> ts'')"
     "s\<bullet>\<C> \<turnstile> [$Table_init x y] : (ts'' _> ts')"
     using  e_type_comp_conc1[OF 1] v_to_e_def by auto
@@ -2708,11 +2708,11 @@ next
     using e_type_empty table_init_done.prems(3) table_init_done.prems(6) by auto
 next
   case (table_init f x ta s tab y ea el ndest dest nsrc src nn n n' val)
-  have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (dest)), $EConstNum (ConstInt32 ( src)), $EConstNum (ConstInt32 (n))] @
-          [$Table_init x y] : ts _> ts'" using table_init(17) by auto
-  obtain ts'' args vs where ts''_def:
-    "vs = [V_num ( (ConstInt32 ( dest))), V_num ( (ConstInt32 ( src))), V_num (ConstInt32 (n))]"
-    "$C*vs = [$EConstNum (ConstInt32 ( dest)), $EConstNum (ConstInt32 ( src)), $EConstNum (ConstInt32 ((n)))]"
+  have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n)] @
+          [$Table_init x y] : (ts _> ts')" using table_init(17) by auto
+  obtain ts'' vs where ts''_def:
+    "vs = [V_num (ConstInt32 dest), V_num (ConstInt32 src), V_num (ConstInt32 n)]"
+    "($C* vs) = [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n)]"
     "s\<bullet>\<C> \<turnstile> $C*vs : (ts _> ts'')"
     "s\<bullet>\<C> \<turnstile> [$Table_init x y] : (ts'' _> ts')"
     using  e_type_comp_conc1[OF 1] v_to_e_def by auto
@@ -2726,84 +2726,141 @@ next
     using e_type_table_init[OF ts''_def(4)] by simp_all
   have 4: "ts' = ts"
     using "2" "3" by blast
-  have 5: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 ( dest)), $C V_ref val, $Table_set x] : ts _> ts"
+  have 5: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $C V_ref val, $Table_set x] : (ts _> ts)"
   proof -
     have "ea < length (elems s)"
     proof -
-      have "inst_typing s (f_inst f) \<C>i"
-        by (simp add: table_init.prems(2))
-      then have "list_all2 (elemi_agree s (s.elems s)) (inst.elems (f_inst f)) (elem \<C>i)"
-        using inst_typing.simps by fastforce
-      then show ?thesis unfolding elemi_agree_def
-        using list_all2_nthD table_init.hyps(3) table_init.hyps(4) by blast
+      have "list_all2 (elemi_agree s (s.elems s)) (inst.elems (f_inst f)) (elem \<C>i)"
+        using table_init.prems(2) inst_typing.simps by fastforce
+      then show ?thesis using elemi_agree_def list_all2_nthD table_init.hyps(3,4)
+        by fastforce
     qed
     then have el_agree: "elem_agree s el" using store_typing_in_elem_agree[OF table_init(13)]
       using table_init.hyps(5) by blast
-    then have "fst el = (elem \<C> ! y)"
+    then have h_y: "fst el = (elem \<C> ! y)"
     proof -
-      have "inst_typing s (f_inst f) \<C>i"
-        by (simp add: table_init.prems(2))
-      then have "list_all2 (elemi_agree s (s.elems s)) (inst.elems (f_inst f)) (elem \<C>i)"
-        using inst_typing.simps by fastforce
-      then have "elemi_agree s (s.elems s) ((inst.elems (f_inst f))!y) (elem \<C>i!y)"
-        using list_all2_nthD table_init.hyps(3) by blast
-      then have "fst el = (elem \<C>i ! y)"
-        by (simp add: elem_typing_def elemi_agree_def table_init.hyps(4) table_init.hyps(5))
-      then show ?thesis using table_init(16) by fastforce
+      have "elemi_agree s (s.elems s) ((inst.elems (f_inst f))!y) (elem \<C>i!y)"
+        using table_init.prems(2) inst_typing.simps list_all2_nthD table_init.hyps(3) by fastforce
+      then show ?thesis
+        using table_init.prems(2) inst_typing.simps list_all2_nthD table_init.hyps(3,4,5) table_init(16) elem_typing_def elemi_agree_def
+        by fastforce
     qed
     have "nsrc < length (snd el)"
       using table_init.hyps(11,9) by auto
     then have h_ref: "ref_typing s val (fst el)"
       by (metis el_agree elem_agree_def list_all_length table_init.hyps(12))
-    then have set1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (dest))] : ts _> ts@[T_num T_i32]"
+    have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (dest))] : (ts _> ts@[T_num T_i32])"
       by (metis append.right_neutral const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1))
-    then have set2: "s\<bullet>\<C> \<turnstile> [$C V_ref val] : ts@[T_num T_i32] _> ts@[T_num T_i32, T_ref (fst el)]"
-      using h_ref
-      by (metis append.left_neutral append_Cons e_typing_l_typing.intros(3) types_agree_imp_e_typing v_typing.intros(3))
-    then have set3: "s\<bullet>\<C> \<turnstile> [$Table_set x] : ts@[T_num T_i32, T_ref (fst el)] _> ts"
-    proof -
-      have "\<C> \<turnstile> [Table_set x] : ts@[T_num T_i32, T_ref (fst el)] _> ts"
-        using b_e_typing.table_set[OF 3(2) 3(4)]
-        using \<open>fst el = elem \<C> ! y\<close> weakening by fastforce
-      then show ?thesis
-        using e_typing_l_typing.intros(1) to_e_list_1 by metis
-    qed
-    show ?thesis using set1 set2 set3
+    moreover
+    have "s\<bullet>\<C> \<turnstile> [$C V_ref val] : (ts@[T_num T_i32] _> ts@[T_num T_i32, T_ref (fst el)])"
+      using h_ref append_Cons e_typing_l_typing.intros(3) types_agree_imp_e_typing v_typing.intros(3)
+      by (metis append_Nil)
+    moreover
+    have "s\<bullet>\<C> \<turnstile> [$Table_set x] : (ts@[T_num T_i32, T_ref (fst el)] _> ts)"
+      using b_e_typing.table_set[OF 3(2) 3(4)] h_y weakening e_typing_l_typing.intros(1) to_e_list_1 by fastforce
+    ultimately
+    show ?thesis
       by (metis append.left_neutral append_Cons e_type_comp_conc)
   qed
-  have 6: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ndest + 1))), $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))), $EConstNum (ConstInt32 (int_of_nat n')), $Table_init x y] : ts _> ts"
+  have 6: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ndest + 1))), $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))), $EConstNum (ConstInt32 (int_of_nat n')), $Table_init x y] : (ts _> ts)"
   proof -
-    have init1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ndest + 1)))] : (ts _> ts@[T_num T_i32])"
+    have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ndest + 1)))] : (ts _> ts@[T_num T_i32])"
       by (metis append.right_neutral const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1))
-    have init2:  "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (nsrc + 1)))] : (ts@[T_num T_i32] _> ts@[T_num T_i32, T_num T_i32])"
+    moreover
+    have  "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (nsrc + 1)))] : (ts@[T_num T_i32] _> ts@[T_num T_i32, T_num T_i32])"
       using const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1)
       by (metis append.left_neutral append_Cons)
-    have init3:  "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (n')))] : (ts@[T_num T_i32, T_num T_i32] _> ts@[T_num T_i32, T_num T_i32, T_num T_i32])"
+    moreover
+    have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (n')))] : (ts@[T_num T_i32, T_num T_i32] _> ts@[T_num T_i32, T_num T_i32, T_num T_i32])"
       using const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1)
       by (metis append.left_neutral append_Cons)
-    have init4: "s\<bullet>\<C> \<turnstile> [$Table_init x y] : (ts@[T_num T_i32, T_num T_i32, T_num T_i32] _> ts)"
-    proof -
-      have "\<C> \<turnstile> [Table_init x y] : (ts@[T_num T_i32, T_num T_i32, T_num T_i32] _> ts)"
-        using b_e_typing.table_init[OF 3(2,3)]
-        using "3"(4) weakening by fastforce
-      then show ?thesis
-        using "2" "4" ts''_def(4) by fastforce
-    qed
-    then show ?thesis using init1 init2 init3
+    moreover
+    have "s\<bullet>\<C> \<turnstile> [$Table_init x y] : (ts@[T_num T_i32, T_num T_i32, T_num T_i32] _> ts)"
+      using b_e_typing.table_init[OF 3(2,3)] 3 3(4) 4 weakening ts''_def(4) by fastforce
+    ultimately show ?thesis
       by (metis append_Cons append_Nil e_type_comp_conc)
   qed
-  have 7: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (dest)), $C V_ref val, $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ndest + 1))), $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))), $EConstNum (ConstInt32 (int_of_nat n')), $Table_init x y] : (ts _> ts')"
-    using 4 5 6 e_type_comp_conc by fastforce
-  then show ?case using 4 7 table_init.prems(3) table_init.prems(6) by blast
+  show ?case using 4 5 6 e_type_comp_conc table_init.prems(3) table_init.prems(6) by fastforce
 next
-  case (table_fill_trap f x ta s tab i n vr)
+  case (table_fill_trap f x ta s tab ni i nn n vr)
   then show ?case using e_typing_l_typing.intros(5) by blast
 next
-  case (table_fill_done f x ta s tab i vr)
-  then show ?case sorry
+  case (table_fill_done f x ta s tab ni i nn n vr)
+  then have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32 n)] @
+          [$Table_fill x] : (ts _> ts')" by auto
+  obtain ts'' vs where ts''_def:
+    "vs = [V_num (ConstInt32 i), V_ref vr, V_num (ConstInt32 n)]"
+    "($C* vs) = [$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32 n)]"
+    "s\<bullet>\<C> \<turnstile> $C*vs : (ts _> ts'')"
+    "s\<bullet>\<C> \<turnstile> [$Table_fill x] : (ts'' _> ts')"
+    using  e_type_comp_conc1[OF 1] v_to_e_def by auto
+  have "ts'' = ts@[T_num T_i32, T_ref (typeof_ref vr), T_num T_i32]"
+    using e_typing_imp_list_v_typing(2)[OF ts''_def(3)] unfolding ts''_def(1) by(simp add: typeof_def typeof_num_def)
+  moreover have "ts'' = ts'@[T_num T_i32, T_ref (tab_t_reftype (table \<C>!x)), T_num T_i32]" using e_type_table_fill
+    using ts''_def(4) by blast
+  ultimately show ?case
+    using e_type_empty table_fill_done.prems(3) table_fill_done.prems(6) by auto
 next
-  case (table_fill f x ta s tab i n vr val)
-  then show ?case sorry
+  case (table_fill f x ta s tab ni i nn n nn_pred vr n_pred)
+  then have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32 n)] @
+          [$Table_fill x] : (ts _> ts')" by auto
+  obtain ts'' vs where ts''_def:
+    "vs = [V_num (ConstInt32 i), V_ref vr, V_num (ConstInt32 n)]"
+    "($C* vs) = [$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32 n)]"
+    "s\<bullet>\<C> \<turnstile> $C*vs : (ts _> ts'')"
+    "s\<bullet>\<C> \<turnstile> [$Table_fill x] : (ts'' _> ts')"
+    using  e_type_comp_conc1[OF 1] const_list_split_3 v_to_e_def
+    by auto
+  have 2: "ts'' = ts@[T_num T_i32, T_ref (typeof_ref vr), T_num T_i32]"
+    using e_typing_imp_list_v_typing(2)[OF ts''_def(3)] unfolding ts''_def(1)
+    using typeof_def typeof_num_def const_list_split_3
+   
+    by simp
+  have 3: "ts'' = ts'@[T_num T_i32, T_ref (tab_t_reftype (table \<C>!x)), T_num T_i32]" using e_type_table_fill
+    using ts''_def(4) by blast
+  have 4: "ts = ts'" using 2 3 by auto
+  have 5: "tab_t_reftype (table \<C>!x) = typeof_ref vr"
+    using "2" "3" by fastforce
+  have 6: "ref_typing s vr (typeof_ref vr)" "s\<bullet>\<C> \<turnstile> [$C (V_ref vr)] : ([] _> [T_ref (typeof_ref vr)])"
+  proof -
+    have "s\<bullet>\<C> \<turnstile> $C* vs : ([] _> [T_num T_i32, T_ref (typeof_ref vr), T_num T_i32])"
+      using "2" e_type_consts store_extension_refl ts''_def(3) by fastforce
+    then show "s\<bullet>\<C> \<turnstile> [$C (V_ref vr)] : ([] _> [T_ref (typeof_ref vr)])"
+      using const_list_split_3
+      using ts''_def(1) by blast
+    then show "ref_typing s vr (typeof_ref vr)"
+      using const_typeof type_const_v_typing(2) v_typing.simps by fastforce
+  qed
+  have 7: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i), $C V_ref vr, $Table_set x] : (ts _> ts)"
+  proof -
+    have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i)] : [] _> [T_num T_i32]"
+      by (metis const_num e_typing_l_typing.intros(1) to_e_list_1 typeof_num_def v_num.case(1))
+    then have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i), $C V_ref vr] : [] _> [T_num T_i32, T_ref (typeof_ref vr)]"
+      using 6 e_type_comp_conc e_typing_l_typing.intros(3) self_append_conv2 by fastforce
+    then have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i), $C V_ref vr] : ts _> ts@[T_num T_i32, T_ref (typeof_ref vr)]"
+      using e_typing_l_typing.intros(3) by fastforce
+    moreover have "s\<bullet>\<C> \<turnstile> [$Table_set x] : (ts@[T_num T_i32, T_ref (typeof_ref vr)] _> ts)"
+      by (metis "5" append.right_neutral b_e_typing.table_set e_type_table_fill e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 ts''_def(4))
+    ultimately show ?thesis
+      by (metis append_Cons append_Nil e_type_comp_conc)
+  qed
+  have 8: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ni + 1))), $C V_ref vr,
+           $EConstNum (ConstInt32 (int_of_nat n_pred)), $Table_fill x] : (ts _> ts)"
+  proof -
+    have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ni + 1)))] : [] _> [T_num T_i32]"
+      by (metis const_num e_typing_l_typing.intros(1) to_e_list_1 typeof_num_def v_num.case(1))
+    then have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ni + 1))), $C V_ref vr] : [] _> [T_num T_i32, T_ref (typeof_ref vr)]"
+      using 6 e_type_comp_conc e_typing_l_typing.intros(3) self_append_conv2 by fastforce
+    then have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ni + 1))), $C V_ref vr, $EConstNum (ConstInt32 (int_of_nat n_pred))] : [] _> [T_num T_i32, T_ref (typeof_ref vr), T_num T_i32]"
+      by (metis append_Cons const_num e_type_comp_conc e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) eq_Nil_appendI to_e_list_1 typeof_num_def v_num.case(1))
+    then have a: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ni + 1))), $C V_ref vr, $EConstNum (ConstInt32 (int_of_nat n_pred))] : ts _> ts@[T_num T_i32, T_ref (typeof_ref vr), T_num T_i32]"
+      using e_typing_l_typing.intros(3) by fastforce
+    moreover have b: "s\<bullet>\<C> \<turnstile> [$Table_fill x] : (ts@[T_num T_i32, T_ref (typeof_ref vr), T_num T_i32] _> ts)"
+      using "2" "4" ts''_def(4) by blast
+    show ?thesis using e_type_comp_conc[OF a b] by simp
+  qed
+  show ?case using 7 8
+    using "4" e_type_comp_conc table_fill.prems(3) table_fill.prems(6) by fastforce
 next
   case (table_copy_trap f x tax s tabx y tay ty taby src n dest)
   then show ?case using e_typing_l_typing.intros(5) by blast
@@ -3321,7 +3378,6 @@ proof -
     using v_def(1) by auto
 qed
 
-
 lemma progress_unop:
   assumes "s\<bullet>\<C> \<turnstile> $C*vs : ([] _> [T_num t])"
           "e = Unop t iop"
@@ -3331,71 +3387,6 @@ lemma progress_unop:
       v_to_e_def
   unfolding typeof_def
   by (fastforce split: v.splits)
-
-
-lemma const_list_split_2:
-  assumes "s\<bullet>\<C> \<turnstile> ($C*vs) : ([] _> [t1, t2])"
-  shows "\<exists>c1 c2. (s\<bullet>\<C> \<turnstile> [$C c1] : ([] _> [t1]))
-                 \<and> (s\<bullet>\<C> \<turnstile> [$C c2] : ([] _> [t2]))
-                 \<and> vs = [c1, c2]"
-proof -
-  have "map typeof vs = [t1, t2]"
-    using e_type_consts[OF assms] store_extension_refl[of s]
-    by simp
-  hence l_cs:"length vs = 2"
-    using length_map[of typeof vs]
-    by simp
-  then obtain c1 c2 where "vs!0 = c1" "vs!1 = c2"
-    by fastforce
-  hence "vs = [c1, c2]"
-    using l_cs
-    (* TODO: can this be simplified? All Isabelle needs here is just to count to 2. *)
-    by (metis One_nat_def Suc_1 less_2_cases_iff less_one list_exhaust_size_eq0 list_exhaust_size_gt0 nth_Cons_0 nth_Cons_Suc size_Cons_lem_eq)
-  thus ?thesis
-    using assms e_type_comp[of s \<C> "[$C c1]" "$C c2", of "[]" "[t1, t2]"]
-          e_type_const_new store_extension_refl
-    by fastforce
-qed
-
-lemma const_list_split_3:
-  assumes "s\<bullet>\<C> \<turnstile> $C*vs : ([] _> [t1, t2, t3])"
-  shows "\<exists>c1 c2 c3. (s\<bullet>\<C> \<turnstile> [$C c1] : ([] _> [t1]))
-                    \<and> (s\<bullet>\<C> \<turnstile> [$C c2] : ([] _> [t2]))
-                    \<and> (s\<bullet>\<C> \<turnstile> [$C c3] : ([] _> [t3]))
-                    \<and> vs = [c1, c2, c3]"
-proof -
-  have "map typeof vs = [t1, t2, t3]"
-    using e_type_consts[OF assms] store_extension_refl[of s]
-    by simp
-  hence l_cs:"length vs = 3"
-    using length_map[of typeof vs]
-    by simp
-  then obtain c1 c2 c3 where "vs!0 = c1" "vs!1 = c2" "vs!2 = c3"
-    by fastforce
-  hence "vs = [c1, c2, c3]"
-    using l_cs
-    (* TODO: can this be simplified? All Isabelle needs here is just to count to 3. *)
-    by (metis Suc_length_conv Suc_neq_Zero eval_nat_numeral(3) nat.inject neq_Nil_conv nth_Cons' nth_Cons_Suc numeral_1_eq_Suc_0 numeral_2_eq_2 numeral_One numeral_eq_Suc)
-  thus ?thesis
-    using assms e_type_comp_conc2[of s \<C> "[$C c1]" "[$C c2]" "[$C c3]" "[]" "[t1,t2,t3]"]
-          e_type_const_new[of _ _ c1] e_type_const_new[of _ _ c2] e_type_const_new[of _ _ c3]
-          store_extension_refl
-    by fastforce
-qed
-
-lemma const_of_typed_const_2:
-  assumes "s\<bullet>\<C> \<turnstile> $C*vs : ([] _> [t1,t2])"
-  shows "\<exists>v1 v2. vs = [v1, v2] \<and> typeof v1 = t1 \<and> typeof v2 = t2"
-  using const_list_split_2[OF assms] const_list_def e_type_const_unwrap
-        const_typeof
-  by auto
-
-lemma const_of_typed_const_3:
-  assumes "s\<bullet>\<C> \<turnstile> $C*vs : ([] _> [t,t,t])"
-  shows "\<exists>v1 v2 v3. vs = [v1, v2, v3] \<and> typeof v1 = t \<and> typeof v2 = t \<and> typeof v3 = t"
-  using const_list_split_3[OF assms] const_list_def e_type_const_unwrap
-        const_typeof
-  by auto
 
 lemma progress_relop:
   assumes "s\<bullet>\<C> \<turnstile> $C*vs : ([] _> [T_num t, T_num t])"
@@ -4434,7 +4425,51 @@ next
   then show ?case sorry
 next
   case (table_fill x \<C> tr)
-  then show ?case sorry
+  obtain vi vvr vn where
+    "s\<bullet>\<C> \<turnstile> $C* [vi] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [vvr] : ([] _> [T_ref tr])"
+    "s\<bullet>\<C> \<turnstile> $C* [vn] : ([] _> [T_num T_i32])"
+    "vs = [vi, vvr, vn]"
+    using const_list_split_3[OF table_fill(3)]
+    by fastforce
+  then obtain i vr n where v_defs:
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 i)] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [V_ref vr] : ([] _> [T_ref tr])"
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 n)] : ([] _> [T_num T_i32])"
+    "vi = V_num (ConstInt32 i)"
+    "vvr = V_ref vr"
+    "vn = V_num (ConstInt32 n)"
+    "vs = [V_num (ConstInt32 i), V_ref vr, V_num (ConstInt32 n)]"
+    by (metis (no_types, lifting) const_list_split_3 const_of_i32 const_of_typed_const_1 list.inject t.distinct(5) t.simps(7) table_fill.prems(1) type_const_v_typing(2) v_typing.simps)
+  obtain ni nn where n_defs:
+    "ni = nat_of_int i"
+    "nn = nat_of_int n"
+    by fastforce
+  obtain ta tab where tab_defs:
+    "stab_ind (f_inst f) x = Some ta"
+    "s.tabs s ! ta = tab"
+    using stab_ind_def table_fill.hyps(1) table_fill.prems(7) by fastforce
+  then show ?case
+  proof(cases "tab_size tab < ni + nn")
+    case True
+    then show ?thesis
+      using reduce.table_fill_trap[OF tab_defs n_defs True] v_to_e_def v_defs(7)
+      by fastforce
+  next
+    case False
+    then have h_bounds: "ni + nn \<le> tab_size tab"
+      using le_def by blast
+    then show ?thesis
+    proof(cases nn)
+      case 0
+      then show ?thesis using reduce.table_fill_done[OF tab_defs n_defs h_bounds] v_to_e_def v_defs(7)
+        by fastforce
+    next
+      case (Suc nat)
+      then show ?thesis using reduce.table_fill[OF tab_defs n_defs h_bounds] v_to_e_def v_defs(7)
+        by fastforce
+    qed
+  qed
 next
   case (elem_drop x \<C>)
   then show ?case sorry

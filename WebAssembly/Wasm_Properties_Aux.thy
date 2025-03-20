@@ -429,6 +429,14 @@ lemma b_e_type_table_init:
   using assms
   by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
+lemma b_e_type_table_fill:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Table_fill x"
+  shows "\<exists>ts'' tr. ts = ts''@[T_num T_i32, T_ref tr, T_num T_i32] \<and> ts' = ts'' \<and> x < length (table \<C>) \<and> tab_t_reftype (table \<C>!x) = tr"
+  using assms
+  by (induction \<C> "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+
+
 lemma b_e_type_nop:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Nop"
@@ -1119,6 +1127,26 @@ next
   case (11 \<S> f \<C> rs es ts)
   then show ?thesis
     by (metis assms b_e_type_table_init to_e_list_1 unlift_b_e)
+qed
+
+lemma e_type_table_fill:
+  assumes "s\<bullet>\<C> \<turnstile> [$Table_fill x] : (ts _> ts')"
+  shows "\<exists> tr. ts = ts'@[T_num T_i32, T_ref tr, T_num T_i32] \<and> x < length (table \<C>) \<and> tab_t_reftype (table \<C>!x) = tr"
+  using assms
+proof (induction s \<C> "[$Table_fill x]" "(ts _> ts')" arbitrary: ts ts')
+  case (1 \<C> b_es \<S>)
+  then show ?case using b_e_type_table_fill
+    by fastforce
+next
+  case (2 \<S> \<C> es t1s t2s e t3s)
+  then show ?case by auto
+next
+  case (3 \<S> \<C> t1s t2s ts)
+  then show ?case by auto
+next
+  case (11 \<S> f \<C> rs es ts)
+  then show ?thesis
+    by (metis assms b_e_type_table_fill to_e_list_1 unlift_b_e)
 qed
 
 lemma cl_typing_native:
@@ -3715,5 +3743,69 @@ next
     using Lfilled.simps[of "(k+1)" "LRec vs n les' l les''" es' "(($C*vs) @ [Label n les' lfilledk] @ les'')", simplified]
     by auto
 qed
+
+lemma const_list_split_2:
+  assumes "s\<bullet>\<C> \<turnstile> ($C*vs) : ([] _> [t1, t2])"
+  shows "\<exists>c1 c2. (s\<bullet>\<C> \<turnstile> [$C c1] : ([] _> [t1]))
+                 \<and> (s\<bullet>\<C> \<turnstile> [$C c2] : ([] _> [t2]))
+                 \<and> vs = [c1, c2]"
+proof -
+  have "map typeof vs = [t1, t2]"
+    using e_type_consts[OF assms] store_extension_refl[of s]
+    by simp
+  hence l_cs:"length vs = 2"
+    using length_map[of typeof vs]
+    by simp
+  then obtain c1 c2 where "vs!0 = c1" "vs!1 = c2"
+    by fastforce
+  hence "vs = [c1, c2]"
+    using l_cs
+    (* TODO: can this be simplified? All Isabelle needs here is just to count to 2. *)
+    by (metis One_nat_def Suc_1 less_2_cases_iff less_one list_exhaust_size_eq0 list_exhaust_size_gt0 nth_Cons_0 nth_Cons_Suc size_Cons_lem_eq)
+  thus ?thesis
+    using assms e_type_comp[of s \<C> "[$C c1]" "$C c2", of "[]" "[t1, t2]"]
+          e_type_const_new store_extension_refl
+    by fastforce
+qed
+
+lemma const_list_split_3:
+  assumes "s\<bullet>\<C> \<turnstile> $C*vs : ([] _> [t1, t2, t3])"
+  shows "\<exists>c1 c2 c3. (s\<bullet>\<C> \<turnstile> [$C c1] : ([] _> [t1]))
+                    \<and> (s\<bullet>\<C> \<turnstile> [$C c2] : ([] _> [t2]))
+                    \<and> (s\<bullet>\<C> \<turnstile> [$C c3] : ([] _> [t3]))
+                    \<and> vs = [c1, c2, c3]"
+proof -
+  have "map typeof vs = [t1, t2, t3]"
+    using e_type_consts[OF assms] store_extension_refl[of s]
+    by simp
+  hence l_cs:"length vs = 3"
+    using length_map[of typeof vs]
+    by simp
+  then obtain c1 c2 c3 where "vs!0 = c1" "vs!1 = c2" "vs!2 = c3"
+    by fastforce
+  hence "vs = [c1, c2, c3]"
+    using l_cs
+    (* TODO: can this be simplified? All Isabelle needs here is just to count to 3. *)
+    by (metis Suc_length_conv Suc_neq_Zero eval_nat_numeral(3) nat.inject neq_Nil_conv nth_Cons' nth_Cons_Suc numeral_1_eq_Suc_0 numeral_2_eq_2 numeral_One numeral_eq_Suc)
+  thus ?thesis
+    using assms e_type_comp_conc2[of s \<C> "[$C c1]" "[$C c2]" "[$C c3]" "[]" "[t1,t2,t3]"]
+          e_type_const_new[of _ _ c1] e_type_const_new[of _ _ c2] e_type_const_new[of _ _ c3]
+          store_extension_refl
+    by fastforce
+qed
+
+lemma const_of_typed_const_2:
+  assumes "s\<bullet>\<C> \<turnstile> $C*vs : ([] _> [t1,t2])"
+  shows "\<exists>v1 v2. vs = [v1, v2] \<and> typeof v1 = t1 \<and> typeof v2 = t2"
+  using const_list_split_2[OF assms] const_list_def e_type_const_unwrap
+        const_typeof
+  by auto
+
+lemma const_of_typed_const_3:
+  assumes "s\<bullet>\<C> \<turnstile> $C*vs : ([] _> [t,t,t])"
+  shows "\<exists>v1 v2 v3. vs = [v1, v2, v3] \<and> typeof v1 = t \<and> typeof v2 = t \<and> typeof v3 = t"
+  using const_list_split_3[OF assms] const_list_def e_type_const_unwrap
+        const_typeof
+  by auto
 
 end
