@@ -5093,70 +5093,114 @@ next
     by (metis const_list_no_progress consts_const_list reduce.table_grow_fail)
 next
   case (memory_init_trap f ma s m x da dat src n dest)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.memory_init_trap)
 next
   case (memory_init_done f ma s m x da dat src dest)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.memory_init_done)
 next
   case (memory_init f ma s m x da dat src n dest b d)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.memory_init)
 next
   case (memory_copy_trap f ma s m src n dest)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.memory_copy_trap)
 next
   case (memory_copy_done f ma s m src dest)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.memory_copy_done)
 next
   case (memory_copy_1 f ma s m src n dest sz)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.memory_copy_1)
 next
   case (memory_copy_2 f ma s m src n dest sz)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.memory_copy_2)
 next
   case (memory_fill_trap f ma s m dest n val)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.memory_fill_trap)
 next
   case (memory_fill_done f ma s m dest val)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.memory_fill_done)
 next
   case (memory_fill f ma s m dest n val)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.memory_fill)
 next
   case (table_init_trap f x ta s tab da y ea el src n dest)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.table_init_trap)
 next
   case (table_init_done f x ta s tab da y ea el src dest)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.table_init_done)
 next
   case (table_init f x ta s tab da y ea el src n dest val)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.table_init)
 next
   case (table_fill_trap f x ta s tab i n vr)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.table_fill_trap)
 next
   case (table_fill_done f x ta s tab i vr)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.table_fill_done)
 next
   case (table_fill f x ta s tab i n vr val)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.table_fill)
 next
   case (table_copy_trap f x tax s tabx y tay ty taby src n dest)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.table_copy_trap)
 next
   case (table_copy_done f x tax s tabx y tay ty taby src dest)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.table_copy_done)
 next
   case (table_copy_1 f x tax s tabx y tay ty taby src n dest)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.table_copy_1)
 next
   case (table_copy_2 f x tax s tabx y tay ty taby src n dest)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.table_copy_2)
 next
   case (elem_drop x f a s)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.elem_drop)
 next
   case (data_drop x f a s)
-  then show ?case sorry
+  then show ?case
+    using const_list_no_progress consts_const_list
+    by (metis reduce.data_drop)
 qed (metis const_list_no_progress consts_const_list  reduce.intros)+
 
 lemma reduce_simple_not_nil:

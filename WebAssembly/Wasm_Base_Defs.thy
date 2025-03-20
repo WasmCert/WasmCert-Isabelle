@@ -842,7 +842,7 @@ definition global_extension :: "global \<Rightarrow> global \<Rightarrow> bool" 
   "global_extension g1 g2 \<equiv> (g_mut g1 = g_mut g2) \<and> (typeof (g_val g1) = typeof (g_val g2)) \<and> (g_mut g1 = T_immut \<longrightarrow> g_val g1 = g_val g2)"
 
 definition elem_extension :: "eleminst \<Rightarrow> eleminst \<Rightarrow> bool" where
-  "elem_extension e1 e2 \<equiv> (e1 = e2 \<or> length (snd e2) = 0)"
+  "elem_extension e1 e2 \<equiv> (fst e1 = fst e2 \<and> (snd e1 = snd e2 \<or> length (snd e2) = 0))"
 
 definition data_extension :: "datainst \<Rightarrow> datainst \<Rightarrow> bool" where
   "data_extension d1 d2 \<equiv> (d1 = d2 \<or> length d2 = 0)"

@@ -2551,18 +2551,74 @@ proof -
     by auto
 qed
 
+lemma ref_typing_store_extension_inv:
+  assumes "store_extension s s'"
+          "ref_typing s vr \<C>"
+        shows "ref_typing s' vr \<C>"
+  using assms ref_typing.simps store_extension.simps by fastforce
 
 lemma elemi_agree_store_extension:
   assumes "list_all2 (elemi_agree s (elems s)) (inst.elems i) (elem \<C>)"
           "store_extension s s'"
   shows "list_all2 (elemi_agree s' (elems s')) (inst.elems i) (elem \<C>)"
-  sorry
+proof -
+  obtain ess' ess'' where 1: "list_all2 elem_extension (elems s) ess'"
+                             "elems s' = ess'@ess''"
+    using assms(2)
+    unfolding store_extension.simps by auto
+  have "\<And> n. n < length (inst.elems i) \<Longrightarrow> (elemi_agree s' (elems s')) (inst.elems i!n) (elem \<C>!n)"
+  proof -
+    fix n
+    assume n_len: "n < length (inst.elems i)"
+    then have "(elemi_agree s (elems s)) (inst.elems i!n) (elem \<C>!n)"
+      using assms list_all2_nthD by blast
+    then have 2: "((inst.elems i!n) < length (elems s) \<and> elem_typing s ((elems s)!(inst.elems i!n)) (elem \<C>!n))"
+      unfolding elemi_agree_def by simp
+    then have 3: "(inst.elems i!n) < length (elems s')"
+      using 1 list_all2_lengthD by fastforce
+    have 4: "((elems s')!(inst.elems i!n)) = ess'!(inst.elems i!n)"
+      by (metis 1 2 list_all2_lengthD nth_append)
+    then have 5: "elem_extension (elems s!(inst.elems i!n)) (ess'!(inst.elems i!n))"
+      by (simp add: 1 2 list_all2_nthD)
+    then have "elem_typing s' ((elems s')!(inst.elems i!n)) (elem \<C>!n)"
+    proof -
+      have 6: "fst (ess' ! (inst.elems i ! n)) = elem \<C> ! n" using 2 4 5 unfolding elem_extension_def
+        by (simp add: elem_typing_def)
+      have 7: "(snd (s.elems s' ! (inst.elems i ! n))) = [] \<or> (snd (s.elems s' ! (inst.elems i ! n))) = (snd (s.elems s ! (inst.elems i ! n)))"
+        using "4" "5" elem_extension_def by auto
+      then have "list_all (\<lambda> vr. ref_typing s vr (elem \<C> ! n)) (snd (s.elems s' ! (inst.elems i ! n)))"
+        
+        using "2" elem_typing_def by auto
+      then have "list_all (\<lambda> vr. ref_typing s' vr (elem \<C> ! n)) (snd (s.elems s' ! (inst.elems i ! n)))"
+        using assms(2)
+        by (simp add: list_all_length ref_typing_store_extension_inv)
+      then show ?thesis using 4 6 7 unfolding elem_typing_def
+         by metis
+     qed
+    then show "(elemi_agree s' (elems s')) (inst.elems i!n) (elem \<C>!n)"
+      using "3" elemi_agree_def by blast
+  qed
+  then show ?thesis using assms
+    by (simp add: list_all2_conv_all_nth)
+qed
+
 
 lemma datai_agree_store_extension:
   assumes "list_all2 (datai_agree (datas s)) (inst.datas i) (data \<C>)"
           "store_extension s s'"
   shows "list_all2 (datai_agree (datas s')) (inst.datas i) (data \<C>)"
-  sorry
+proof -
+  obtain dss' dss'' where 1: "list_all2 data_extension (datas s) dss'"
+                             "datas s' = dss'@dss''"
+    using assms(2)
+    unfolding store_extension.simps by auto
+  then have "length (datas s)  = length (dss')"
+    using list_all2_conv_all_nth by blast
+  then have "length (datas s) \<le> length (datas s')"
+    by (simp add: "1"(2))
+  then show ?thesis
+    by (metis assms(1) data_typing_def datai_agree_def list_all2_mono order_less_le_trans)
+qed
 
 lemma inst_typing_store_extension_inv:
   assumes "inst_typing s i \<C>"
@@ -2727,14 +2783,6 @@ next
   then show ?case
     by (simp add: bitzero_v_typing n_zeros_def)
 qed
-
-lemma ref_typing_store_extension_inv:
-  assumes "store_extension s s'"
-          "ref_typing s vr \<C>"
-        shows "ref_typing s' vr \<C>"
-  using assms ref_typing.simps store_extension.simps by fastforce
-
-
 
 lemma e_typing_l_typing_store_extension_inv:
   assumes"store_extension s s'"
@@ -3097,7 +3145,7 @@ proof -
     by fastforce+
   have 1: "list_all2 elem_extension (elems s) (elems s')" unfolding elem_extension_def
     apply (simp add: assms(3))
-    by (metis (mono_tags, lifting) list.rel_refl list_all2_update_cong list_update_id snd_conv)
+    by (metis (mono_tags, lifting) list.rel_refl list_all2_update_cong list_update_id fst_conv snd_conv)
   then show sh1: "store_extension s s'"
     using store_extension.intros[OF 0(1) list_all2_refl[OF tab_extension_refl]
                                       list_all2_refl[OF mem_extension_refl]
