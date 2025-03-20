@@ -2392,6 +2392,20 @@ lemma store_types_exists:
   unfolding inst_typing.simps
   by fastforce
 
+lemma store_elem_exists:
+  assumes "inst_typing s i \<C>"
+  shows "length (elem \<C>) = length (inst.elems i)"
+  using assms list_all2_lengthD
+  unfolding inst_typing.simps
+  by fastforce
+
+lemma store_data_exists:
+  assumes "inst_typing s i \<C>"
+  shows "length (data \<C>) = length (inst.datas i)"
+  using assms list_all2_lengthD
+  unfolding inst_typing.simps
+  by fastforce
+
 lemma globi_agree_store_extension:
   assumes "list_all2 (globi_agree (globs s)) (inst.globs i) (global \<C>)"
           "store_extension s s'"

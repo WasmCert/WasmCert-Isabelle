@@ -2692,28 +2692,27 @@ next
   then show ?case
     using e_typing_l_typing.intros(5) by blast
 next
-  case (table_init_done f x ta s tab y ea el src dest)
-  have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat dest)), $EConstNum (ConstInt32 (int_of_nat src)), $EConstNum (ConstInt32 0)] @
-          [$Table_init x y] : ts _> ts'" using table_init_done(12) by auto
+  case (table_init_done f x ta s tab y ea el ndest dest nsrc src nn n)
+  have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n)] @
+          [$Table_init x y] : ts _> ts'" using table_init_done(16) by auto
   obtain ts'' args vs where ts''_def:
-    "vs = [V_num ( (ConstInt32 (int_of_nat dest))), V_num ( (ConstInt32 (int_of_nat src))), V_num (ConstInt32 0)]"
-    "$C*vs = [$EConstNum (ConstInt32 (int_of_nat dest)), $EConstNum (ConstInt32 (int_of_nat src)), $EConstNum (ConstInt32 0)]"
+    "vs = [V_num ( (ConstInt32  dest)), V_num ( (ConstInt32 ( src))), V_num (ConstInt32 n)]"
+    "$C*vs = [$EConstNum (ConstInt32 ( dest)), $EConstNum (ConstInt32 ( src)), $EConstNum (ConstInt32 n)]"
     "s\<bullet>\<C> \<turnstile> $C*vs : (ts _> ts'')"
     "s\<bullet>\<C> \<turnstile> [$Table_init x y] : (ts'' _> ts')"
     using  e_type_comp_conc1[OF 1] v_to_e_def by auto
-
   have "ts'' = ts@[T_num T_i32, T_num T_i32, T_num T_i32]"
     using e_typing_imp_list_v_typing(2)[OF ts''_def(3)] unfolding ts''_def(1) by(simp add: typeof_def typeof_num_def)
   moreover have "ts'' = ts'@[T_num T_i32, T_num T_i32, T_num T_i32]" using e_type_table_init[OF ts''_def(4)] by simp
   ultimately show ?case
     using e_type_empty table_init_done.prems(3) table_init_done.prems(6) by auto
 next
-  case (table_init f x ta s tab y ea el src n dest val)
-  have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat dest)), $EConstNum (ConstInt32 (int_of_nat src)), $EConstNum (ConstInt32 (int_of_nat (n+1)))] @
-          [$Table_init x y] : ts _> ts'" using table_init(13) by auto
+  case (table_init f x ta s tab y ea el ndest dest nsrc src nn n n' val)
+  have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (dest)), $EConstNum (ConstInt32 ( src)), $EConstNum (ConstInt32 (n))] @
+          [$Table_init x y] : ts _> ts'" using table_init(17) by auto
   obtain ts'' args vs where ts''_def:
-    "vs = [V_num ( (ConstInt32 (int_of_nat dest))), V_num ( (ConstInt32 (int_of_nat src))), V_num (ConstInt32 (int_of_nat (n+1)))]"
-    "$C*vs = [$EConstNum (ConstInt32 (int_of_nat dest)), $EConstNum (ConstInt32 (int_of_nat src)), $EConstNum (ConstInt32 (int_of_nat (n+1)))]"
+    "vs = [V_num ( (ConstInt32 ( dest))), V_num ( (ConstInt32 ( src))), V_num (ConstInt32 (n))]"
+    "$C*vs = [$EConstNum (ConstInt32 ( dest)), $EConstNum (ConstInt32 ( src)), $EConstNum (ConstInt32 ((n)))]"
     "s\<bullet>\<C> \<turnstile> $C*vs : (ts _> ts'')"
     "s\<bullet>\<C> \<turnstile> [$Table_init x y] : (ts'' _> ts')"
     using  e_type_comp_conc1[OF 1] v_to_e_def by auto
@@ -2727,7 +2726,7 @@ next
     using e_type_table_init[OF ts''_def(4)] by simp_all
   have 4: "ts' = ts"
     using "2" "3" by blast
-  have 5: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat dest)), $C V_ref val, $Table_set x] : ts _> ts"
+  have 5: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 ( dest)), $C V_ref val, $Table_set x] : ts _> ts"
   proof -
     have "ea < length (elems s)"
     proof -
@@ -2738,7 +2737,7 @@ next
       then show ?thesis unfolding elemi_agree_def
         using list_all2_nthD table_init.hyps(3) table_init.hyps(4) by blast
     qed
-    then have el_agree: "elem_agree s el" using store_typing_in_elem_agree[OF table_init(9)]
+    then have el_agree: "elem_agree s el" using store_typing_in_elem_agree[OF table_init(13)]
       using table_init.hyps(5) by blast
     then have "fst el = (elem \<C> ! y)"
     proof -
@@ -2750,13 +2749,13 @@ next
         using list_all2_nthD table_init.hyps(3) by blast
       then have "fst el = (elem \<C>i ! y)"
         by (simp add: elem_typing_def elemi_agree_def table_init.hyps(4) table_init.hyps(5))
-      then show ?thesis using table_init(12) by fastforce
+      then show ?thesis using table_init(16) by fastforce
     qed
-    have "src < length (snd el)"
-      using table_init.hyps(6) by auto
+    have "nsrc < length (snd el)"
+      using table_init.hyps(11,9) by auto
     then have h_ref: "ref_typing s val (fst el)"
-      by (metis el_agree elem_agree_def list_all_length table_init.hyps(8))
-    then have set1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat dest))] : ts _> ts@[T_num T_i32]"
+      by (metis el_agree elem_agree_def list_all_length table_init.hyps(12))
+    then have set1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (dest))] : ts _> ts@[T_num T_i32]"
       by (metis append.right_neutral const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1))
     then have set2: "s\<bullet>\<C> \<turnstile> [$C V_ref val] : ts@[T_num T_i32] _> ts@[T_num T_i32, T_ref (fst el)]"
       using h_ref
@@ -2772,14 +2771,14 @@ next
     show ?thesis using set1 set2 set3
       by (metis append.left_neutral append_Cons e_type_comp_conc)
   qed
-  have 6: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (dest + 1))), $EConstNum (ConstInt32 (int_of_nat (src + 1))), $EConstNum (ConstInt32 (int_of_nat n)), $Table_init x y] : ts _> ts"
+  have 6: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ndest + 1))), $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))), $EConstNum (ConstInt32 (int_of_nat n')), $Table_init x y] : ts _> ts"
   proof -
-    have init1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (dest + 1)))] : (ts _> ts@[T_num T_i32])"
+    have init1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ndest + 1)))] : (ts _> ts@[T_num T_i32])"
       by (metis append.right_neutral const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1))
-    have init2:  "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (src + 1)))] : (ts@[T_num T_i32] _> ts@[T_num T_i32, T_num T_i32])"
+    have init2:  "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (nsrc + 1)))] : (ts@[T_num T_i32] _> ts@[T_num T_i32, T_num T_i32])"
       using const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1)
       by (metis append.left_neutral append_Cons)
-    have init3:  "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (n)))] : (ts@[T_num T_i32, T_num T_i32] _> ts@[T_num T_i32, T_num T_i32, T_num T_i32])"
+    have init3:  "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (n')))] : (ts@[T_num T_i32, T_num T_i32] _> ts@[T_num T_i32, T_num T_i32, T_num T_i32])"
       using const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1)
       by (metis append.left_neutral append_Cons)
     have init4: "s\<bullet>\<C> \<turnstile> [$Table_init x y] : (ts@[T_num T_i32, T_num T_i32, T_num T_i32] _> ts)"
@@ -2793,7 +2792,7 @@ next
     then show ?thesis using init1 init2 init3
       by (metis append_Cons append_Nil e_type_comp_conc)
   qed
-  have 7: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat dest)), $C V_ref val, $Table_set x, $EConstNum (ConstInt32 (int_of_nat (dest + 1))), $EConstNum (ConstInt32 (int_of_nat (src + 1))), $EConstNum (ConstInt32 (int_of_nat n)), $Table_init x y] : (ts _> ts')"
+  have 7: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (dest)), $C V_ref val, $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ndest + 1))), $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))), $EConstNum (ConstInt32 (int_of_nat n')), $Table_init x y] : (ts _> ts')"
     using 4 5 6 e_type_comp_conc by fastforce
   then show ?case using 4 7 table_init.prems(3) table_init.prems(6) by blast
 next
@@ -3566,6 +3565,8 @@ lemma progress_b_e:
           "length (table \<C>) = length (inst.tabs (f_inst f))"
           "(types_t \<C>) = types (f_inst f)"
           "length (func_t \<C>) = length (inst.funcs (f_inst f))"
+          "length (elem \<C>) = length (inst.elems (f_inst f))"
+          "length (data \<C>) = length (inst.datas (f_inst f))"
   shows "\<exists>a s' f' es'. \<lparr>s;f;($C*vs)@($*b_es)\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
   using assms
 proof (induction b_es "(ts _> ts')" arbitrary: ts ts' vs rule: b_e_typing.induct)
@@ -4280,7 +4281,7 @@ next
         by simp
     qed
     thus ?thesis
-      using composition(7,9,10,11,12,13) composition(2)[OF composition(5) _ _ 1]
+      using composition(9,10,11,12,13,14,15) composition(2)[OF composition(5) _ _ 1]
             progress_L0[of s _ "(($C*vs) @ ($* es))" _ _ _ "[]" "[$e]"]
       unfolding const_list_def
       by fastforce
@@ -4351,7 +4352,83 @@ next
   then show ?case sorry
 next
   case (table_init x \<C> y tr)
-  then show ?case sorry
+  obtain vdest vsrc vn where
+    "s\<bullet>\<C> \<turnstile> $C* [vdest] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [vsrc] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [vn] : ([] _> [T_num T_i32])"
+    "vs = [vdest, vsrc, vn]"
+    using const_list_split_3[OF table_init(5)]
+    by fastforce
+  then obtain dest src n where v_defs:
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 dest)] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 src)] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 n)] : ([] _> [T_num T_i32])"
+    "vdest = V_num (ConstInt32 dest)"
+    "vsrc = V_num (ConstInt32 src)"
+    "vn = V_num (ConstInt32 n)"
+    "vs = [V_num (ConstInt32 dest), V_num (ConstInt32 src), V_num (ConstInt32 n)]"
+    using const_of_i32 list.inject
+    by metis
+  obtain ndest nsrc nn where n_defs:
+    "ndest = nat_of_int dest"
+    "nsrc = nat_of_int src"
+    "nn = nat_of_int n"
+    by fastforce
+  obtain ta tab where tab_defs:
+    "stab_ind (f_inst f) x = Some ta"
+    "s.tabs s ! ta = tab"
+    using stab_ind_def table_init.hyps(1) table_init.prems(7) by auto
+  obtain ea el where el_defs:
+    "ea = inst.elems (f_inst f) ! y"
+    "el = s.elems s ! ea"
+    using stab_ind_def table_init.hyps(1) table_init.prems(7) by auto
+  show ?case
+  proof(cases "length (snd el) < nsrc + nn \<or> length (snd tab) < ndest + nn")
+    case True
+    then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
+        $Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+      using reduce.table_init_trap[OF tab_defs _ el_defs n_defs True] table_init.hyps(2) table_init.prems(10)
+      by metis
+    then have "\<lparr>s;f;($C* vs) @ [$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+      using v_defs
+      by (simp add: v_to_e_def)
+    then show ?thesis
+      by (metis to_e_list_1)
+  next
+    case False
+    then have h_bounds:"nsrc + nn \<le> length (snd el)" "ndest + nn \<le> tab_size tab"
+      by auto
+    then show ?thesis
+    proof(cases nn)
+      case 0
+      then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
+        $Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+        using reduce.table_init_done[OF tab_defs _ el_defs n_defs h_bounds 0] table_init.hyps(2) table_init.prems(10)
+        by metis
+      then have "\<lparr>s;f;($C* vs) @ [$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+        using v_defs
+        by (simp add: v_to_e_def)
+      then show ?thesis
+        by (metis to_e_list_1)
+    next
+      case (Suc n')
+      obtain val where val_def: "val = snd el ! nsrc" by simp
+      then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
+          $Table_init x
+            y]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $C V_ref val, $Table_set x,
+                         $EConstNum (ConstInt32 (int_of_nat (ndest + 1))), $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))),
+                         $EConstNum (ConstInt32 (int_of_nat n')), $Table_init x y]\<rparr>"
+        using reduce.table_init[OF tab_defs _ el_defs n_defs h_bounds _ val_def] Suc
+        by (metis Suc_eq_plus1 table_init.hyps(2) table_init.prems(10))
+      then have "\<lparr>s;f;($C* vs) @ [$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $C V_ref val, $Table_set x,
+                         $EConstNum (ConstInt32 (int_of_nat (ndest + 1))), $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))),
+                         $EConstNum (ConstInt32 (int_of_nat n')), $Table_init x y]\<rparr>"
+        using v_defs
+        by (simp add: v_to_e_def)
+      then show ?thesis
+          by (metis to_e_list_1)
+    qed
+  qed  
 next
   case (table_copy x \<C> tr y)
   then show ?case sorry
@@ -4390,6 +4467,8 @@ proof -
        length (memory \<C>) = length (inst.mems (f_inst f))  \<Longrightarrow>
        length (table \<C>) = length (inst.tabs (f_inst f))  \<Longrightarrow>
        length (func_t \<C>) = length (inst.funcs (f_inst f)) \<Longrightarrow>
+       length (elem \<C>) = length (inst.elems (f_inst f)) \<Longrightarrow>
+       length (data \<C>) = length (inst.datas (f_inst f)) \<Longrightarrow>
        types_t \<C> = inst.types (f_inst f) \<Longrightarrow>
          \<exists>a s' f' cs_es'. \<lparr>s;f;cs_es\<rparr> \<leadsto> \<lparr>s';f';cs_es'\<rparr>"
    and prems2:
@@ -4421,7 +4500,7 @@ proof -
         using 2(5,6) True
         by (metis append_assoc e_type_comp_conc1 map_append)
       show ?thesis
-        using 2(4)[OF 2(5) _ t_ts''_is] 2(5-17) t_vcs_is
+        using 2(4)[OF 2(5) _ t_ts''_is] 2(5-19) t_vcs_is
         by auto
     next
       case False
@@ -4506,7 +4585,7 @@ proof -
           using 2(3)[OF _ _ _ _ _ False _ 2(12, 13, 14, 15)] preds 2(5)
                 progress_L0[of s f "(($C*cs) @ es)" _ _ _ "[]" "[e]"]
           apply simp
-          apply (metis "2.prems"(2,3,12,13) consts_app_ex(2) consts_const_list e_type_const_conv_vs outer_False)
+          apply (metis "2.prems"(2,3,12,13,14,15) consts_app_ex(2) consts_const_list e_type_const_conv_vs outer_False)
           done
       qed
     qed
@@ -4786,8 +4865,9 @@ proof -
          "length (memory \<C>) = length (inst.mems (f_inst f))"
          "length (table \<C>) = length (inst.tabs (f_inst f))"
          "types_t \<C> = inst.types (f_inst f)"
-         
-      using store_local_label_empty 11(1) store_mem_exists store_tab_exists store_types_exists
+         "length (elem \<C>) = length (inst.elems (f_inst f))"
+         "length (data \<C>) = length (inst.datas (f_inst f))"
+      using store_local_label_empty 11(1) store_data_exists store_elem_exists store_mem_exists store_tab_exists store_types_exists
       unfolding frame_typing.simps
       using list_all2_lengthD by fastforce+
     moreover have "length (func_t \<C>) = length (inst.funcs (f_inst f))"
