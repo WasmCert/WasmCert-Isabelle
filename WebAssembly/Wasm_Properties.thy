@@ -4514,7 +4514,65 @@ next
   qed  
 next
   case (table_copy x \<C> tr y)
-  then show ?case sorry
+  obtain vdest vsrc vn where
+    "s\<bullet>\<C> \<turnstile> $C* [vdest] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [vsrc] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [vn] : ([] _> [T_num T_i32])"
+    "vs = [vdest, vsrc, vn]"
+    using const_list_split_3[OF table_copy(5)]
+    by fastforce
+  then obtain dest src n where v_defs:
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 dest)] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 src)] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 n)] : ([] _> [T_num T_i32])"
+    "vdest = V_num (ConstInt32 dest)"
+    "vsrc = V_num (ConstInt32 src)"
+    "vn = V_num (ConstInt32 n)"
+    "vs = [V_num (ConstInt32 dest), V_num (ConstInt32 src), V_num (ConstInt32 n)]"
+    using const_of_i32 list.inject
+    by metis
+  obtain ndest nsrc nn where n_defs:
+    "ndest = nat_of_int dest"
+    "nsrc = nat_of_int src"
+    "nn = nat_of_int n"
+    by fastforce
+  obtain tax tabx where tabx_defs:
+    "stab_ind (f_inst f) x = Some tax"
+    "s.tabs s ! tax = tabx"
+    using stab_ind_def
+    using table_copy.hyps(1) table_copy.prems(7) by fastforce
+  obtain tay taby where taby_defs:
+    "stab_ind (f_inst f) y = Some tay"
+    "s.tabs s ! tay = taby"
+    using stab_ind_def
+    using table_copy.hyps(3) table_copy.prems(7) by fastforce
+  then show ?case
+  proof(cases "tab_size tabx < nsrc + nn \<or> tab_size taby < ndest + nn")
+    case True
+    then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
+          $Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>" using table_copy_trap[OF tabx_defs taby_defs n_defs True] by simp
+    then have "\<lparr>s;f;($C*vs)@[$Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+      using v_defs by (simp add: v_to_e_def)
+    then show ?thesis
+      by (metis to_e_list_1)
+  next
+    case False
+    then have h_bounds: "nsrc + nn \<le> tab_size tabx" "ndest + nn \<le> tab_size taby"
+      by auto
+    then show ?thesis
+    proof(cases nn)
+      case 0
+      then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
+          $Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>" using table_copy_done[OF tabx_defs taby_defs n_defs h_bounds] by simp
+    then have "\<lparr>s;f;($C*vs)@[$Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+      using v_defs by (simp add: v_to_e_def)
+    then show ?thesis
+      by (metis to_e_list_1)
+    next
+      case (Suc nn_pred)
+      then show ?thesis sorry
+    qed
+  qed
 next
   case (table_fill x \<C> tr)
   obtain vi vvr vn where
