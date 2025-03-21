@@ -732,7 +732,7 @@ proof -
   then have "v_typing s v3 t"
     using t2s_def is_num_type_def  is_vec_type_def h_v3
     apply (auto simp add: v_typing.simps )
-    by (metis h_v3 t.simps(12) typeof_def v.exhaust v.simps(10) v.simps(11) v.simps(12))+
+    by (metis h_v3 t.simps(18) typeof_def v.exhaust v.simps(10) v.simps(11) v.simps(12))+
   hence "s\<bullet>\<C> \<turnstile> [$C v3] : (ts _> ts')" using h_v3 types_agree_imp_e_typing
     by (metis append.right_neutral e_typing_l_typing.intros(3) t2s_def(2) v1_t_def(1))
   thus ?thesis
@@ -1220,7 +1220,7 @@ lemma types_preserved_invoke_native:
           "length tfs = k"
           "length t1s = n"
           "length t2s = m"
-          "n_zeros tfs = zs"
+          "n_zeros tfs = Some zs"
           "store_typing s"
   shows "s\<bullet>\<C> \<turnstile> [Frame m \<lparr>f_locs = (vs @ zs), f_inst = i\<rparr> [Label m [] ($*es)]] : (ts _> ts')"
 proof -
@@ -1900,7 +1900,7 @@ proof -
     by fastforce+
   moreover
   have "v_typing s' v (T_vec T_v128)" using v_typing.simps assms(2)
-    by (metis t.distinct(5) t_vec.exhaust typeof_def v.exhaust v.simps(10) v.simps(12))
+    by (metis t.distinct(7) t_vec.exhaust typeof_def v.exhaust v.simps(10) v.simps(12))
   hence "s'\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts@[T_vec T_v128])"
     by (metis append.right_neutral e_typing_l_typing.intros(3) types_agree_imp_e_typing)
   ultimately
@@ -3524,7 +3524,7 @@ proof -
     by (metis append.left_neutral assms(1) const_of_typed_const_1)
   then obtain v_r where v_r_def: "v = V_ref v_r" "typeof_ref v_r = t"
      using typeof_ref_def typeof_def
-     by (metis t.distinct(3) t.distinct(5) t.inject(3) v.exhaust v.simps(10) v.simps(11) v.simps(12))
+     by (metis t.distinct(3) t.distinct(7) t.inject(3) v.exhaust v.simps(10) v.simps(11) v.simps(12))
   show ?thesis
   proof(cases "is_null_ref v_r")
     case True
@@ -3563,7 +3563,7 @@ proof -
   obtain v1 v2 where v1_v2_def: "vs = [v1, v2]" "typeof v1 = T_vec t \<and> typeof v2 = T_vec t"
     using const_of_typed_const_2[OF assms(1)] by fastforce
   then obtain v1_v v2_v where v1_v_v2_v_def: "v1 = V_vec v1_v" "v2 = V_vec v2_v"
-    by (metis t.distinct(5) t.simps(5) typeof_def v.exhaust v.simps(10,12))
+    by (metis t.distinct(7) t.simps(5) typeof_def v.exhaust v.simps(10,12))
   then show ?thesis
   proof(cases "app_binop_vec op (v1_v) (v2_v)")
     case None
@@ -4252,7 +4252,7 @@ next
 next
   case (table_set ti \<C> tr)
   obtain n vr where c_def:"vs = [V_num (ConstInt32 n), V_ref vr]"
-    by (metis (no_types, lifting) const_list_split_2 const_of_typed_const_2 list.inject local.table_set(3) t.distinct(5) t.simps(1) t.simps(5) t.simps(7) type_const_v_typing(2) typeof_num_i32 v_typing.simps)
+    by (metis (no_types, lifting) const_list_split_2 const_of_typed_const_2 list.inject local.table_set(3) t.simps(1,5,7,10) type_const_v_typing(2) typeof_num_i32 v_typing.simps)
   then show ?case
   proof(cases "stab_ind (f_inst f) ti")
     case None
@@ -4317,7 +4317,7 @@ next
     using const_list_split_2[OF table_grow(3)] e_type_const_unwrap
     by blast
   then obtain vr n where "vs = [V_ref vr, V_num (ConstInt32 n)]"
-    by (metis const_typeof t.distinct(5) t.inject(1) t.simps(5,7) type_const_v_typing(2) typeof_num_i32 v_typing.simps)
+    by (metis const_typeof t.distinct(7) t.inject(1) t.simps(5,7) type_const_v_typing(2) typeof_num_i32 v_typing.simps)
   then show ?case using reduce.table_grow_fail[of s f vr n ti]
     using v_to_e_def by fastforce
 next
@@ -4590,7 +4590,7 @@ next
     "vvr = V_ref vr"
     "vn = V_num (ConstInt32 n)"
     "vs = [V_num (ConstInt32 i), V_ref vr, V_num (ConstInt32 n)]"
-    by (metis (no_types, lifting) const_list_split_3 const_of_i32 const_of_typed_const_1 list.inject t.distinct(5) t.simps(7) table_fill.prems(1) type_const_v_typing(2) v_typing.simps)
+    by (metis (no_types, lifting) const_list_split_3 const_of_i32 const_of_typed_const_1 list.inject t.distinct(7) t.simps(7) table_fill.prems(1) type_const_v_typing(2) v_typing.simps)
   obtain ni nn where n_defs:
     "ni = nat_of_int i"
     "nn = nat_of_int n"
@@ -4889,7 +4889,15 @@ proof -
         using cl_def(3)
         unfolding cl_type_def
         by simp
-      have "\<exists>a a'. \<lparr>s;f;($C*vs2) @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;a\<rparr>"
+      have "n_zeros x13 \<noteq> None"
+      proof -
+        obtain tf where "(cl_typing s (funcs s!i_cl)) tf"
+          using 7(10) unfolding store_typing.simps
+          using "7.hyps"(1) "7.prems"(8) store_typing_imp_cl_typing by blast
+        then show ?thesis unfolding cl_typing.simps
+          using Func_native by fastforce
+      qed
+      then have "\<exists>a a'. \<lparr>s;f;($C*vs2) @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;a\<rparr>"
         using reduce.intros(5)[OF func_native_def] e_type_const_conv_vs l
         unfolding n_zeros_def
         by blast

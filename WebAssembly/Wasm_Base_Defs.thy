@@ -352,14 +352,23 @@ definition bitzero_ref :: "t_ref \<Rightarrow> v_ref" where
 )"
 
 
-definition bitzero :: "t \<Rightarrow> v" where
+definition bitzero :: "t \<Rightarrow> v option" where
   "bitzero t = (case t of
-                 T_num t_n \<Rightarrow> V_num (bitzero_num t_n)
-               | T_vec t_v \<Rightarrow> V_vec (bitzero_vec t_v)
-               | T_ref t_r \<Rightarrow> V_ref (bitzero_ref t_r))"
+                 T_num t_n \<Rightarrow> Some (V_num (bitzero_num t_n))
+               | T_vec t_v \<Rightarrow> Some (V_vec (bitzero_vec t_v))
+               | T_ref t_r \<Rightarrow> Some (V_ref (bitzero_ref t_r))
+               | T_bot \<Rightarrow> None)"
 
-definition n_zeros :: "t list \<Rightarrow> v list" where
-  "n_zeros ts = (map (\<lambda>t. bitzero t) ts)"
+
+fun list_option_map :: "('a \<Rightarrow> 'b option) \<Rightarrow> ('a list) => (('b list) option)" where
+"list_option_map f [] = Some []" |
+"list_option_map f (x#xs) = (case (f x, list_option_map f xs) of
+      (Some y', Some ys') \<Rightarrow> Some (y'#ys')
+    | _ \<Rightarrow> None)"
+
+
+definition n_zeros :: "t list \<Rightarrow> (v list) option" where
+  "n_zeros ts = (list_option_map (\<lambda>t. bitzero t) ts)"
 
 definition typeof_num :: "v_num \<Rightarrow> t_num" where
   "typeof_num v = (case v of
@@ -1082,8 +1091,29 @@ lemma Lfilled_imp_exists_Lfilled_exact:
   using assms Lfilled_exact.intros
   by (induction rule: Lfilled.induct) fastforce+
 
+lemma bitzero_typeof:
+  assumes "bitzero t = Some v"
+  shows "typeof v = t"
+proof(cases t)
+  case (T_num x1)
+  then show ?thesis using assms unfolding bitzero_def
+    by (metis (mono_tags, lifting) bitzero_num_def option.sel t.simps(16) t_num.case(1) t_num.case(2) t_num.case(3) t_num.case(4) t_num.exhaust typeof_def typeof_num_def v.simps(10) v_num.case(2) v_num.case(3) v_num.case(4) v_num.simps(17))
+next
+  case (T_vec x2)
+  then show ?thesis using assms unfolding bitzero_def typeof_def
+    using typeof_vec_def bitzero_vec_def
+    by (metis (mono_tags, lifting) option.sel t.simps(17) t_vec.exhaust v.simps(11))
+next
+  case (T_ref x3)
+  then show ?thesis using bitzero_def assms
+    by (metis (mono_tags, lifting) bitzero_ref_def option.sel t.simps(18) t_ref.exhaust t_ref.simps(3) t_ref.simps(4) typeof_def typeof_ref_def v.simps(12) v_ref.simps(10))
+next
+  case T_bot
+  then show ?thesis using bitzero_def assms by fastforce
+qed
+
 lemma n_zeros_typeof:
-  "n_zeros ts = vs \<Longrightarrow> (ts = map typeof vs)"
+  "n_zeros ts = Some vs  \<Longrightarrow> (ts = map typeof vs)"
 proof (induction ts arbitrary: vs)
   case Nil
   thus ?case
@@ -1091,14 +1121,13 @@ proof (induction ts arbitrary: vs)
     by simp
 next
   case (Cons t ts)
-  obtain vs' where "n_zeros ts = vs'"
-    using n_zeros_def
-    by blast
+  then obtain vs' where "n_zeros ts = Some vs'"
+    using n_zeros_def list_option_map.simps
+    by (simp split: option.splits)
   moreover
-  have "typeof (bitzero t) = t"
-    unfolding typeof_def bitzero_def typeof_num_def typeof_vec_def typeof_ref_def bitzero_ref_def bitzero_vec_def bitzero_num_def
-    apply (simp split: t.splits t_num.splits t_vec.splits t_ref.splits)
-    done
+  obtain v' where "bitzero t = Some v'" "typeof v' = t"
+    using Cons n_zeros_def list_option_map.simps bitzero_def bitzero_typeof
+    by (simp split: option.splits t.splits)   
   ultimately
   show ?case
     using Cons

@@ -1091,7 +1091,7 @@ next
     by fastforce
 next
   case (3 \<S> \<C> t1s t2s ts)
-    thus ?case
+  thus ?case
     by fastforce
 next
   case (7 \<S> \<C>)
@@ -2824,31 +2824,42 @@ next
 qed
 
 lemma bitzero_v_typing:
-  "v_typing s (bitzero t) t"
+  assumes "bitzero t = Some v"
+  shows "v_typing s v t"
 proof(cases t)
   case (T_num x1)
-  then show ?thesis unfolding bitzero_def
-    by (metis append1_eq_conv bitzero_def list.simps(9) n_zeros_def n_zeros_typeof t.simps(10) typeof_def v.simps(10) v_typing.simps)
+  then show ?thesis using assms unfolding bitzero_def
+    by (metis bitzero_def bitzero_typeof option.inject t.simps(16) v_typing.intros(1) v_typing_typeof)
 next
   case (T_vec x2)
-  then show ?thesis unfolding bitzero_def
-     by (metis t.simps(11) t_vec.exhaust v_typing.simps)
+  then show ?thesis using assms unfolding bitzero_def
+    using assms bitzero_typeof typeof_def v_typing.simps by fastforce
 next
   case (T_ref x3)
-  then show ?thesis unfolding bitzero_def
-    by (metis (mono_tags, lifting) bitzero_ref_def ref_typing.intros(1) t.simps(12) t_ref.exhaust t_ref.simps(3) t_ref.simps(4) v_typing.intros(3))
+  then show ?thesis using assms unfolding bitzero_def
+    by (metis (mono_tags, lifting) bitzero_ref_def option.sel ref_typing.intros(1) t.simps(18) t_ref.exhaust t_ref.simps(3) t_ref.simps(4) v_typing.intros(3))
+next
+  case T_bot
+  then show ?thesis using assms bitzero_def by fastforce
 qed
 
-
 lemma n_zeroes_v_typing:
-  "list_all2 (\<lambda> v t. v_typing s v t) (n_zeros ts) ts"
-proof(induction ts)
+  "(n_zeros ts) = Some vs \<Longrightarrow> list_all2 (\<lambda> v t. v_typing s v t) vs ts"
+proof(induction ts arbitrary: vs)
   case Nil
   then show ?case
     by (simp add: n_zeros_def)
 next
-  case (Cons a ts)
+  case (Cons t ts)
+  then obtain v vs' where v_defs:
+    "bitzero t = Some v"
+    "list_option_map bitzero ts = Some vs'"
+    "vs = v#vs'"
+    unfolding n_zeros_def using list_option_map.simps(2)[of bitzero t ts]
+    by (simp split: prod.splits option.splits)
+  then have "n_zeros ts = Some vs'" using n_zeros_def by simp
   then show ?case
+    using Cons bitzero_v_typing[OF v_defs(1)] v_defs
     by (simp add: bitzero_v_typing n_zeros_def)
 qed
 
@@ -3627,7 +3638,7 @@ proof -
   have "s\<bullet>\<C> \<turnstile> [$C (V_ref vr)] : (ts1 _> ts2)"
     by (simp add: ts_def(2) v_to_e_def)
   have "ref_typing s vr (typeof_ref vr)"
-    by (metis \<open>s\<bullet>\<C> \<turnstile> [$C V_ref vr] : ts1 _> ts2\<close> \<open>ts2 = ts1 @ [T_ref (typeof_ref vr)]\<close> last_snoc t.distinct(3) t.distinct(5) t.inject(3) type_const_v_typing(1) type_const_v_typing(2) v.inject(3) v_typing.simps)
+    by (metis \<open>s\<bullet>\<C> \<turnstile> [$C V_ref vr] : ts1 _> ts2\<close> \<open>ts2 = ts1 @ [T_ref (typeof_ref vr)]\<close> last_snoc t.distinct(3) t.distinct(7) t.inject(3) type_const_v_typing(1) type_const_v_typing(2) v.inject(3) v_typing.simps)
   have "\<C> \<turnstile> [Table_set ti] : (ts2 _> ts')"
     using ts_def(3) unlift_b_e by force
   then have "ts = ts'" using b_e_type_table_set
@@ -3665,7 +3676,7 @@ proof -
   have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 n)] : (ts1 _> ts2)"
     by (simp add: ts_def(2) v_to_e_def)
   have "ref_typing s vr (typeof_ref vr)"
-    by (metis \<open>ts1 = ts @ [T_ref (typeof_ref vr)]\<close> nth_append_length t.distinct(3) t.inject(3) t.simps(9) ts_def(1) type_const_v_typing(1) type_const_v_typing(2) v.inject(3) v.simps(12) v_to_e_def v_typing.simps)
+    by (metis \<open>ts1 = ts @ [T_ref (typeof_ref vr)]\<close> nth_append_length t.distinct(3) t.inject(3) t.simps(10) ts_def(1) type_const_v_typing(1) type_const_v_typing(2) v.inject(3) v.simps(12) v_to_e_def v_typing.simps)
   have "\<C> \<turnstile> [Table_grow ti] : (ts2 _> ts')"
     using ts_def(3) unlift_b_e by force
   then have "ts@[T_num T_i32] = ts'"

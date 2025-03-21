@@ -136,7 +136,7 @@ datatype
   t_ref = T_func_ref | T_ext_ref
 
 datatype \<comment> \<open>value types\<close>
-  t = T_num t_num | T_vec t_vec | T_ref t_ref
+  t = T_num t_num | T_vec t_vec | T_ref t_ref | T_bot
 
 datatype \<comment> \<open>packed numeric types\<close>
   tp_num = Tp_i8 | Tp_i16 | Tp_i32
