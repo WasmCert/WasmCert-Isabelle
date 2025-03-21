@@ -2123,10 +2123,101 @@ proof -
   then show ?thesis using 1 2 3 ts_defs
     using assms(1) types_preserved_table_set_aux(1) by metis
 qed
+(*
+   stab_ind (f_inst f) x = Some tax
+    s.tabs s ! tax = tabx
+    stab_ind (f_inst f) y = Some tay
+    s.tabs s ! ty = taby
+    ndest = nat_of_int dest
+    nrsc = nat_of_int src
+    nn = nat_of_int n
+    nsrc + nn \<le> tab_size tabx
+    ndest + nn \<le> tab_size taby
+    nn = 0
+    store_typing s
+    inst_typing s (f_inst f) \<C>i
+    tvs = map typeof (f_locs f)
+    \<C> = \<C>i\<lparr>local := tvs, label := arb_labs, return := arb_return\<rparr>
+    s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src),
+           $EConstNum (ConstInt32 n), $Table_copy x y] : ts _> ts'
+    list_all2 (v_typing s) (f_locs f) tvs
+*)
+lemma types_preserved_table_copy:
+  assumes "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n), $Table_copy x y] : (ts _> ts')"
+          "stab_ind (f_inst f) x = Some tax"
+          "s.tabs s ! tax = tabx"
+          "stab_ind (f_inst f) y = Some tay"
+          "s.tabs s ! ty = taby"
+          "store_typing s"
+          "inst_typing s (f_inst f) \<C>i"
+          " \<C> = \<C>i\<lparr>local := tvs, label := arb_labs, return := arb_return\<rparr>"
+  shows "s\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
+        "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2), $Table_get y, $Table_set x,
+           $EConstNum (ConstInt32 i3), $EConstNum (ConstInt32 i4),
+           $EConstNum (ConstInt32 i5), $Table_copy x y] : (ts _> ts')"
+proof -
+
+  have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n)] @
+          [$Table_copy x y] : (ts _> ts')" using assms(1) by auto
+  obtain ts'' vs where ts''_def:
+    "vs = [V_num (ConstInt32 dest), V_num (ConstInt32 src), V_num (ConstInt32 n)]"
+    "($C* vs) = [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n)]"
+    "s\<bullet>\<C> \<turnstile> $C*vs : (ts _> ts'')"
+    "s\<bullet>\<C> \<turnstile> [$Table_copy x y] : (ts'' _> ts')"
+    using  e_type_comp_conc1[OF 1] v_to_e_def by auto
+  have 2: "ts'' = ts@[T_num T_i32, T_num T_i32, T_num T_i32]"
+    using e_typing_imp_list_v_typing(2)[OF ts''_def(3)] unfolding ts''_def(1) by(simp add: typeof_def typeof_num_def)
+  moreover have 3: "ts'' = ts'@[T_num T_i32, T_num T_i32, T_num T_i32]"
+                   "tab_t_reftype (table \<C>!x) = tab_t_reftype (table \<C>!y)"
+    using e_type_table_copy[OF ts''_def(4)] by simp_all
+  ultimately show "s\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
+    using e_type_empty by auto
+  then have ts_eq: "ts = ts'"
+    by blast
+  have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2), $Table_get y, $Table_set x] : (ts _> ts)"
+  proof -
+    have a: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1)] : ([] _> [T_num T_i32])"
+      by (metis typeof_num_def types_agree_imp_e_typing v.case(1) v_num.case(1) v_to_e_def v_typing.intros(1))
+    have b: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i2)] : ([T_num T_i32] _> [T_num T_i32,T_num T_i32])"
+      by (metis append_Cons append_Nil const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1))
+    have "\<C> \<turnstile> [Table_get y] : ([T_num T_i32,T_num T_i32] _> [T_num T_i32, T_ref (tab_t_reftype (table \<C>!y))])"
+      using b_e_typing.table_get e_type_table_copy ts''_def(4)
+      by (metis append_Cons append_Nil weakening)
+    then have c: "s\<bullet>\<C> \<turnstile> [$Table_get y] : ([T_num T_i32,T_num T_i32] _> [T_num T_i32, T_ref (tab_t_reftype (table \<C>!y))])"
+      using e_typing_l_typing.intros(1) to_e_list_1 by metis
+    have "\<C> \<turnstile> [Table_set x] : ([T_num T_i32, T_ref (tab_t_reftype (table \<C>!y))] _> [])"
+      using b_e_typing.table_set e_type_table_copy ts''_def(4) by blast
+    then have d: "s\<bullet>\<C> \<turnstile> [$Table_set x] : ([T_num T_i32, T_ref (tab_t_reftype (table \<C>!y))] _> [])"
+      using e_typing_l_typing.intros(1) to_e_list_1 by metis
+    have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2), $Table_get y, $Table_set x] : ([] _> [])"
+      using a b c d
+      by (metis append.left_neutral append_Cons e_type_comp_conc)
+    then show ?thesis
+      by (metis append.right_neutral e_typing_l_typing.intros(3))
+  qed
+  moreover have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i3), $EConstNum (ConstInt32 i4), $EConstNum (ConstInt32 i5), $Table_copy x y] : (ts _> ts)"
+  proof -
+    have a: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i3)] : ([] _> [T_num T_i32])"
+         "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i4)] : ([T_num T_i32] _> [T_num T_i32, T_num T_i32])"
+         "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i5)] : ([T_num T_i32, T_num T_i32] _> [T_num T_i32, T_num T_i32,T_num T_i32])"
+      by (metis append_Cons append_Nil const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1))+
+
+    then have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i3), $EConstNum (ConstInt32 i4), $EConstNum (ConstInt32 i5)] : ([] _> [T_num T_i32, T_num T_i32, T_num T_i32])"
+      using e_type_comp_conc[OF e_type_comp_conc[OF a(1,2)] a(3)] by simp
+    moreover have "s\<bullet>\<C> \<turnstile> [$Table_copy x y] : ts@[T_num T_i32, T_num T_i32, T_num T_i32] _> ts"
+      using "3"(1) ts''_def(4) ts_eq by blast
+    ultimately show ?thesis
+      by (metis append_Cons append_Nil append_Nil2 e_type_comp_conc e_typing_l_typing.intros(3))
+  qed
+  ultimately show "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2), $Table_get y, $Table_set x,
+           $EConstNum (ConstInt32 i3), $EConstNum (ConstInt32 i4),
+           $EConstNum (ConstInt32 i5), $Table_copy x y] : (ts _> ts')"
+    using e_type_comp_conc ts_eq by fastforce
+qed
 
 lemma types_preserved_table_grow:
-  assumes "s\<bullet>\<C> \<turnstile> [Ref vr, $EConstNum (ConstInt32 n), $Table_grow ti] : ts _> ts'"
-  shows "s'\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 sz)] : ts _> ts'"
+  assumes "s\<bullet>\<C> \<turnstile> [Ref vr, $EConstNum (ConstInt32 n), $Table_grow ti] : (ts _> ts')"
+  shows "s'\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 sz)] : (ts _> ts')"
 proof -
   have "ts' = ts@[T_num T_i32]" using types_preserved_table_grow_aux(1)[OF assms]
     by blast
@@ -2411,10 +2502,10 @@ next
     by fastforce
   hence "typeof (g_val (sglob s (f_inst f) j)) = tg_t (global \<C> ! j)"
     unfolding glob_typing_def
-    by simp
+    by fastforce
   hence 1: "typeof (sglob_val s (f_inst f) j) = tg_t (global \<C> ! j)"
     unfolding sglob_val_def
-    by simp
+    by fastforce
   have 2: "v_typing s (sglob_val s (f_inst f) j) (typeof (sglob_val s (f_inst f) j))"
   proof -
     have j_length: "((inst.globs(f_inst f)) ! j) < length (globs s)"
@@ -2661,6 +2752,7 @@ next
   case (memory_init_trap f ma s m x da dat src n dest)
   then show ?case using e_typing_l_typing.intros(5) by blast
 next
+
   case (memory_init_done f ma s m x da dat src dest)
   then show ?case sorry
 next
@@ -2865,14 +2957,14 @@ next
   case (table_copy_trap f x tax s tabx y tay ty taby src n dest)
   then show ?case using e_typing_l_typing.intros(5) by blast
 next
-  case (table_copy_done f x tax s tabx y tay ty taby src dest)
-  then show ?case sorry
+  case (table_copy_done f x tax s tabx y tay ty taby ndest dest nrsc src nn n nsrc)
+  then show ?case using types_preserved_table_copy by blast
 next
-  case (table_copy_1 f x tax s tabx y tay ty taby src n dest)
-  then show ?case sorry
+  case (table_copy_1 f x tax s tabx y tay ty taby ndest dest nrsc src nn n nsrc nn_pred)
+  then show ?case using types_preserved_table_copy by metis
 next
-  case (table_copy_2 f x tax s tabx y tay ty taby src n dest)
-  then show ?case sorry
+  case (table_copy_2 f x tax s tabx y tay ty taby ndest dest nrsc src nn n nsrc nn_pred)
+  then show ?case using types_preserved_table_copy by metis
 next
   case (elem_drop x f a s)
   then show ?case sorry

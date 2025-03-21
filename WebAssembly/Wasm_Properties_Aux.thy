@@ -436,6 +436,12 @@ lemma b_e_type_table_fill:
   using assms
   by (induction \<C> "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
+lemma b_e_type_table_copy:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Table_copy x y"
+  shows "\<exists>ts''. ts = ts''@[T_num T_i32, T_num T_i32, T_num T_i32] \<and> ts' = ts''" "x < length (table \<C>)" "y < length (table \<C>)" "tab_t_reftype (table \<C>!x) = tab_t_reftype (table \<C>!y)"
+  using assms
+  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
 
 lemma b_e_type_nop:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
@@ -1147,6 +1153,26 @@ next
   case (11 \<S> f \<C> rs es ts)
   then show ?thesis
     by (metis assms b_e_type_table_fill to_e_list_1 unlift_b_e)
+qed
+
+lemma e_type_table_copy:
+  assumes "s\<bullet>\<C> \<turnstile> [$Table_copy x y] : (ts _> ts')"
+  shows "ts = ts'@[T_num T_i32, T_num T_i32, T_num T_i32] \<and> x < length (table \<C>) \<and> y < length (table \<C>) \<and> tab_t_reftype (table \<C>!x) = tab_t_reftype (table \<C>!y)"
+  using assms
+proof (induction s \<C> "[$Table_copy x y]" "(ts _> ts')" arbitrary: ts ts')
+  case (1 \<C> b_es \<S>)
+  then show ?case using b_e_type_table_copy
+    by fastforce
+next
+  case (2 \<S> \<C> es t1s t2s e t3s)
+  then show ?case by auto
+next
+  case (3 \<S> \<C> t1s t2s ts)
+  then show ?case by auto
+next
+  case (11 \<S> f \<C> rs es ts)
+  then show ?thesis
+    by (metis assms b_e_type_table_copy to_e_list_1 unlift_b_e)
 qed
 
 lemma cl_typing_native:
@@ -2902,8 +2928,6 @@ proof -
   then show ?thesis
     using glob_agree_def by blast
 qed
-
-
 
 lemma store_typing_in_mem_agree:
   assumes "store_typing s"
