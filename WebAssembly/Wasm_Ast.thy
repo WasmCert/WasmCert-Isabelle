@@ -155,6 +155,7 @@ free_constructors case_tg_ext for tg_ext
   using tg.cases_scheme
   by blast+
 
+
 datatype \<comment> \<open>function types\<close>
   tf = Tf (dom: "t list") (ran: "t list") ("_ '_> _" 60)
 hide_const (open) tf.dom tf.ran

@@ -2,6 +2,49 @@ section \<open>Auxiliary Type System Properties\<close>
 
 theory Wasm_Properties_Aux imports Wasm_Axioms begin
 
+lemma t_subtyping_refl:
+  shows "t_subtyping t t"
+  unfolding t_subtyping_def by blast
+
+lemma t_subtyping_trans:
+  assumes "t_subtyping t1 t2" "t_subtyping t2 t3"
+  shows "t_subtyping t1 t3"
+  using assms unfolding t_subtyping_def by blast
+
+lemma t_list_subtyping_refl:
+  shows "t_list_subtyping ts ts"
+  unfolding t_list_subtyping_def using t_subtyping_refl
+  using list.rel_refl by blast
+
+lemma t_list_subtyping_trans:
+  assumes "t_list_subtyping ts1 ts2" "t_list_subtyping ts2 ts3"
+  shows "t_list_subtyping ts1 ts3"
+  using assms unfolding t_list_subtyping_def using t_subtyping_trans
+  using list_all2_trans by blast
+
+lemma instr_subtyping_refl:
+  shows "instr_subtyping e e"
+  unfolding instr_subtyping_def using t_list_subtyping_refl
+  by blast
+
+lemma instr_subtyping_trans:
+  assumes "instr_subtyping e1 e2" "instr_subtyping e2 e3"
+  shows "instr_subtyping e1 e3"
+  unfolding instr_subtyping_def using t_list_subtyping_trans
+  sorry
+
+
+lemma b_e_weakening:
+  assumes "\<C> \<turnstile> es : (t1s _> t2s)"
+  shows "\<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"
+proof -
+  have "instr_subtyping (t1s _> t2s) (ts @ t1s _> ts @ t2s)"
+    unfolding instr_subtyping_def using t_list_subtyping_refl
+    by (metis tf.sel(1) tf.sel(2))
+  then show ?thesis
+    using assms subsumption by blast
+qed
+
 lemma typeof_num_i32:
   assumes "typeof_num v = T_i32"
   shows "\<exists>c. v = ConstInt32 c"
@@ -147,9 +190,9 @@ next
     using b_e_typing.composition
     by fastforce
 next                            
-  case (3 \<S> \<C> t1s t2s ts)
+  case (3 \<S> \<C> tf tf')
   then show ?case
-    using b_e_typing.weakening
+    using b_e_typing.subsumption
     by blast
 qed auto
 
@@ -189,44 +232,77 @@ lemma stab_typed_some_imp_cl_typed:
   unfolding store_typing.simps
   by (simp add: list_all_length)
 
-lemma b_e_type_empty1[dest]: assumes "\<C> \<turnstile> [] : (ts _> ts')" shows "ts = ts'"
+lemma b_e_type_empty1[dest]: assumes "\<C> \<turnstile> [] : (ts _> ts')" shows "t_list_subtyping ts ts'"
   using assms
-  by (induction "[]::(b_e list)" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, simp_all)
+proof(induction "[]::(b_e list)" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
+  case (subsumption \<C> tf)
+  then obtain ts2 ts2' where ts2_def: "tf = (ts2 _> ts2')" "t_list_subtyping ts2 ts2'"
+    by (metis tf.collapse)
+  then have a: "instr_subtyping (ts2 _> ts2') (ts _> ts')"
+    using subsumption.hyps(3) by fastforce
+  thm instr_subtyping_def
+  then obtain ts_2 ts'_2 tf1_dom_sub_2 tf1_ran_sub_2 where defs:
+    "ts =ts_2 @ tf1_dom_sub_2"
+    "ts' =ts'_2 @ tf1_ran_sub_2"
+    "t_list_subtyping ts_2 ts'_2"
+    "t_list_subtyping tf1_dom_sub_2 ts2"
+    "t_list_subtyping (ts2') tf1_ran_sub_2"
+    unfolding instr_subtyping_def
+    by auto
+  then show ?case
+    by (meson list_all2_appendI t_list_subtyping_def t_list_subtyping_trans ts2_def(2))
+qed (auto simp add: t_list_subtyping_refl)+
 
-lemma b_e_type_empty: "(\<C> \<turnstile> [] : (ts _> ts')) = (ts = ts')"
+lemma b_e_type_empty: "(\<C> \<turnstile> [] : (ts _> ts')) = (t_list_subtyping ts ts')"
 proof (safe)
   assume "\<C> \<turnstile> [] : (ts _> ts')"
-  thus "ts = ts'"
+  thus "t_list_subtyping ts ts'"
     by blast
 next
-  assume "ts = ts'"
-  thus "\<C> \<turnstile> [] : (ts' _> ts')"
-    using b_e_typing.empty b_e_typing.weakening
-    by fastforce
+  assume "t_list_subtyping ts ts'"
+  thus "\<C> \<turnstile> [] : (ts _> ts')"
+    using b_e_typing.empty b_e_typing.subsumption
+    by (metis append.right_neutral b_e_type_empty1 instr_subtyping_def tf.sel(1) tf.sel(2))
 qed
 
-lemma e_type_empty1[dest]: assumes "\<S>\<bullet>\<C> \<turnstile> [] : (ts _> ts')" shows "ts = ts'"
+lemma e_type_empty1[dest]: assumes "\<S>\<bullet>\<C> \<turnstile> [] : (ts _> ts')" shows "t_list_subtyping ts ts'"
   using assms
-  by (induction "[]::(e list)" "(ts _> ts')" arbitrary: ts ts', auto)
+proof (induction "[]::(e list)" "(ts _> ts')" arbitrary: ts ts')
 
-lemma e_type_empty: "(\<S>\<bullet>\<C> \<turnstile> [] : (ts _> ts')) = (ts = ts')"
+  case (3 \<S> \<C> tf)
+  then show ?case
+    by (metis b_e_type_empty subsumption tf.exhaust)
+qed auto
+
+lemma e_type_empty: "(\<S>\<bullet>\<C> \<turnstile> [] : (ts _> ts')) = (t_list_subtyping ts ts')"
 proof (safe)
   assume "\<S>\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
-  thus "ts = ts'"
+  thus "t_list_subtyping ts ts'"
     by blast
 next
-  assume "ts = ts'"
-  thus "\<S>\<bullet>\<C> \<turnstile> [] : (ts' _> ts')"
-    using b_e_typing.empty e_typing_l_typing.intros(1)[OF b_e_typing.weakening]
-    by fastforce
+  assume "t_list_subtyping ts ts'"
+  thus "\<S>\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
+    using b_e_typing.empty e_typing_l_typing.intros(1)[OF b_e_typing.subsumption]
+    by (metis b_e_type_empty e_typing_l_typing.intros(1) list.map_disc_iff)
 qed
 
 lemma b_e_type_cnum:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = EConstNum v_n"
-  shows "ts' = ts @ [T_num (typeof_num v_n)]"
+  shows "t_list_subtyping (ts @ [T_num (typeof_num v_n)]) ts'"
   using assms
-  by (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct, auto)
+proof (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
+  case (const_num \<C> v)
+  then show ?case
+    by (simp add: t_list_subtyping_refl)
+next
+  case (composition \<C> es t1s t2s e t3s)
+  then show ?case sorry
+next
+  case (subsumption \<C> tf)
+  then show ?case sorry
+
+qed auto+
 
 lemma e_type_cnum:
   assumes "\<S>\<bullet>\<C> \<turnstile> [$e] : (ts _> ts')"

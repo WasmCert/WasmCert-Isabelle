@@ -248,15 +248,34 @@ definition store :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes
 definition store_packed :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes \<Rightarrow> nat \<Rightarrow> mem option" where
   "store_packed = store"
 
+definition t_subtyping :: "[t, t] \<Rightarrow> bool" where
+  "t_subtyping t1 t2 = (t1 = T_bot \<or> t1 = t2)"
+
+definition t_list_subtyping :: "[t list, t list] \<Rightarrow> bool" where
+  "t_list_subtyping t1s t2s = list_all2 t_subtyping t1s t2s"
+
+definition tf_subtyping :: "[tf, tf] \<Rightarrow> bool" where
+  "tf_subtyping tf1 tf2 =
+    (t_list_subtyping (tf.dom tf2) (tf.dom tf1) \<and> t_list_subtyping (tf.ran tf1) (tf.ran tf2))"
+
+
+definition instr_subtyping :: "[tf, tf] \<Rightarrow> bool" where
+  "instr_subtyping tf1 tf2 \<equiv> \<exists> ts ts' tf1_dom_sub tf1_ran_sub.
+    (tf.dom tf2) = ts@tf1_dom_sub
+  \<and> (tf.ran tf2) = ts'@tf1_ran_sub
+  \<and> t_list_subtyping ts ts'
+  \<and> t_list_subtyping tf1_dom_sub (tf.dom tf1)
+  \<and> t_list_subtyping (tf.ran tf1)(tf1_ran_sub)"
+
+definition mem_subtyping :: "[mem_t, mem_t] \<Rightarrow> bool" where
+"mem_subtyping t1 t2 = limits_compat t1 t2"
+
   (* tables *)
 
 (* t1 \<le> t2 *)
 definition tab_subtyping :: "[tab_t, tab_t] \<Rightarrow> bool" where
 "tab_subtyping t1 t2 = (case (t1, t2) of
   (T_tab lims1 tr1, T_tab lims2 tr2) \<Rightarrow> limits_compat lims1 lims2 \<and> tr1 = tr2) "
-
-definition mem_subtyping :: "[mem_t, mem_t] \<Rightarrow> bool" where
-"mem_subtyping t1 t2 = limits_compat t1 t2"
 
   (* TODO: think of better convention for these names *)
   (* currently 'tab' means that a single table instance is taken as argument *)
