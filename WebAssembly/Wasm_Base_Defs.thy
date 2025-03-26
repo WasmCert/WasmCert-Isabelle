@@ -380,14 +380,15 @@ definition bitzero :: "t \<Rightarrow> v option" where
 
 
 fun list_option_map :: "('a \<Rightarrow> 'b option) \<Rightarrow> ('a list) => (('b list) option)" where
-"list_option_map f [] = Some []" |
+"list_option_map f xs = those (map f xs)"
+(*"list_option_map f [] = Some []" |
 "list_option_map f (x#xs) = (case (f x, list_option_map f xs) of
       (Some y', Some ys') \<Rightarrow> Some (y'#ys')
-    | _ \<Rightarrow> None)"
+    | _ \<Rightarrow> None)"*)
 
 
 definition n_zeros :: "t list \<Rightarrow> (v list) option" where
-  "n_zeros ts = (list_option_map (\<lambda>t. bitzero t) ts)"
+  "n_zeros ts = those (map bitzero ts)"
 
 definition typeof_num :: "v_num \<Rightarrow> t_num" where
   "typeof_num v = (case v of
@@ -1141,8 +1142,8 @@ proof (induction ts arbitrary: vs)
 next
   case (Cons t ts)
   then obtain vs' where "n_zeros ts = Some vs'"
-    using n_zeros_def list_option_map.simps
-    by (simp split: option.splits)
+    using n_zeros_def those.simps bitzero_def
+    by auto (simp split: option.splits t.splits)
   moreover
   obtain v' where "bitzero t = Some v'" "typeof v' = t"
     using Cons n_zeros_def list_option_map.simps bitzero_def bitzero_typeof

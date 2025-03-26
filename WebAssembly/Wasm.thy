@@ -89,7 +89,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 (*  \<comment> \<open>\<open>weakening\<close>\<close>
 | weakening:"\<C> \<turnstile> es : (t1s _> t2s) \<Longrightarrow> \<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"*)
   \<comment> \<open>\<open>subtyping\<close>\<close>
-| subsumption:"\<lbrakk>\<C> \<turnstile> es : tf; instr_subtyping tf tf'\<rbrakk> \<Longrightarrow> \<C> \<turnstile> es : tf'"
+| subsumption:"\<lbrakk>\<C> \<turnstile> es : (tf1 _> tf2); instr_subtyping (tf1 _> tf2) (tf1' _> tf2')\<rbrakk> \<Longrightarrow> \<C> \<turnstile> es : (tf1' _> tf2')"
 
 | memory_init: "\<lbrakk>length (memory \<C>) \<ge> 1; i < length (data \<C>)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Memory_init i] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
 | memory_copy: "\<lbrakk>length (memory \<C>) \<ge> 1\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Memory_copy] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
@@ -167,7 +167,7 @@ and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> boo
 (*  (* weakening *)
 | "\<S>\<bullet>\<C> \<turnstile> es : (t1s _> t2s) \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"*)
   (* subsumption *)
-| "\<lbrakk>\<S>\<bullet>\<C> \<turnstile> es : tf; instr_subtyping tf tf'\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> es : tf'"
+| "\<lbrakk>\<S>\<bullet>\<C> \<turnstile> es : (tf1 _> tf2); instr_subtyping (tf1 _> tf2) (tf1' _> tf2')\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> es : (tf1' _> tf2')"
 
 | "ref_typing \<S> v_r t \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Ref v_r] :([] _> [T_ref t])"
   (* trap *)
