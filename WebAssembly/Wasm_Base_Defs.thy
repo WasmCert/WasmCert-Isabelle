@@ -259,7 +259,7 @@ definition tf_subtyping :: "[tf, tf] \<Rightarrow> bool" where
     (t_list_subtyping (tf.dom tf2) (tf.dom tf1) \<and> t_list_subtyping (tf.ran tf1) (tf.ran tf2))"
 
 
-definition instr_subtyping :: "[tf, tf] \<Rightarrow> bool" where
+definition instr_subtyping :: "[tf, tf] \<Rightarrow> bool" ("_ '<ti: _" 60) where
   "instr_subtyping tf1 tf2 \<equiv> \<exists> ts ts' tf1_dom_sub tf1_ran_sub.
     (tf.dom tf2) = ts@tf1_dom_sub
   \<and> (tf.ran tf2) = ts'@tf1_ran_sub
