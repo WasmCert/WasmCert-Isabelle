@@ -65,12 +65,37 @@ lemma t_list_subtyping_replace2:
   using assms unfolding t_list_subtyping_def
   by (meson t_list_subtyping_prepend t_list_subtyping_def t_list_subtyping_trans)
 
+lemma t_list_subtyping_not_bot_eq:
+  assumes "t_list_subtyping ts ts'"
+          "list_all (\<lambda> t. t \<noteq> T_bot) ts"
+  shows "ts = ts'"
+proof -
+  have "list_all2 (\<lambda>t1 t2. t1 = t2) ts ts'"
+    using assms
+    unfolding t_list_subtyping_def t_subtyping_def
+    by (auto simp add: list_all2_conv_all_nth list_all_length)
+  then show ?thesis
+    by (simp add: list.rel_eq)
+qed
+
+lemma t_list_subtyping_append_type:
+  assumes "t_list_subtyping (ts1@ts) ts2"
+          "list_all (\<lambda>t. t\<noteq>T_bot) ts"
+        shows "\<exists> ts2'. t_list_subtyping ts1 ts2' \<and> ts2=ts2'@ts"
+proof -
+  obtain ts2' ts' where ts2'_def: "t_list_subtyping ts1 ts2'" "t_list_subtyping ts ts'" "ts2 = ts2'@ts'"
+    using assms(1) t_list_subtyping_split1 by metis
+  have "ts' = ts"
+    using assms(2) ts2'_def(2) t_list_subtyping_not_bot_eq by auto
+  then show ?thesis
+    using ts2'_def(1) ts2'_def(3) by auto
+qed
+
 lemma t_list_subtyping_snoc_left1:
   assumes "t_list_subtyping (ts@[t]) ts'"
           "t \<noteq> T_bot"
         shows "\<exists> ts''. t_list_subtyping ts ts'' \<and> ts' = ts''@[t]"
-  using assms
-  by (metis (full_types) list_all2_Cons1 list_all2_Nil t_list_subtyping_def t_list_subtyping_split1 t_subtyping_def)
+  using assms t_list_subtyping_append_type by fastforce
 
 lemma t_list_subtyping_snoc_right1:
   assumes "t_list_subtyping ts' (ts@[t])"
@@ -327,6 +352,70 @@ lemma instr_subtyping_split_empty2:
   using assms unfolding instr_subtyping_def
   using t_list_subtyping_def
   by auto
+
+lemma instr_subtyping_append1_type_eq:
+  assumes "(ts1 _> ts2@[t1]) <ti: (ts1' _> ts2')"
+          "(ts3@[t2] _> ts4) <ti: (ts2' _> ts3')"
+          "t1 \<noteq> T_bot"
+          "t2 \<noteq> T_bot"
+        shows "t1 = t2"
+proof -
+  have "(ts1 _> ts2@[t1]) <ti: (ts1' _> ts2')" using assms(1) by blast
+
+  obtain ts2a ts3_dom where  "ts2' = ts2a@ts3_dom" "t_list_subtyping ts3_dom (ts3@[t2])"
+    using assms(2) unfolding instr_subtyping_def by auto
+  then obtain ts2''' t2' where ts'''_def: "ts2' = ts2'''@[t2']" "t_subtyping t2' t2" 
+    using t_list_subtyping_snoc_right1
+    by (metis append_assoc)
+  obtain ts2'' where ts''_def: "ts2' = ts2''@[t1]"
+    using instr_subtyping_split assms(1)
+    by (meson assms(3) subtyping_append t_list_subtyping_refl t_list_subtyping_snoc_left1)
+  show "t1 = t2" using ts''_def ts'''_def assms(3) t_subtyping_def by blast
+qed
+
+lemma instr_subtyping_append2_type_eq:
+  assumes "(ts1 _> ts2@[t1,t2]) <ti: (ts1' _> ts2')"
+          "(ts3@[t3,t4] _> ts4) <ti: (ts2' _> ts3')"
+          "t1 \<noteq> T_bot"
+          "t2 \<noteq> T_bot"
+          "t3 \<noteq> T_bot"
+          "t4 \<noteq> T_bot"
+        shows "[t1, t2] = [t3, t4]"
+proof -
+  obtain ts2a ts3_dom where  "ts2' = ts2a@ts3_dom" "t_list_subtyping ts3_dom (ts3@[t3,t4])"
+    using assms(2) unfolding instr_subtyping_def by auto
+  then obtain ts2''' t34' where ts'''_def: "ts2' = ts2'''@t34'" "t_list_subtyping t34' [t3, t4]" 
+    by (metis append.assoc t_list_subtyping_split2)
+  obtain ts2'' ts2''_last where ts''_def: "ts2' = ts2''@[t1,t2]"
+    using instr_subtyping_split assms(1)
+    by (meson assms(3) assms(4) subtyping_append t_list_subtyping_refl t_list_subtyping_snoc_left2)
+  then have "t_list_subtyping [t1,t2] [t3, t4]" using ts''_def ts'''_def
+    by (simp add: list_all2_lengthD t_list_subtyping_def)
+  then show "[t1, t2] = [t3, t4]" using assms(3,4,5,6) t_subtyping_def unfolding t_list_subtyping_def
+    by fastforce
+qed
+
+
+lemma instr_subtyping_append_type_eq:
+  assumes "(ts1 _> ts2@ts) <ti: (ts1' _> ts2')"
+          "(ts3@ts' _> ts4) <ti: (ts2' _> ts3')"
+          "list_all (\<lambda> t. t\<noteq>T_bot) ts"
+          "list_all (\<lambda> t. t\<noteq>T_bot) ts'"
+          "length ts = length ts'"
+        shows "ts=ts'"
+proof -
+  obtain ts2a ts3_dom where  "ts2' = ts2a@ts3_dom" "t_list_subtyping ts3_dom (ts3@ts')"
+    using assms(2) unfolding instr_subtyping_def by auto
+  then obtain ts2''' t34' where ts'''_def: "ts2' = ts2'''@t34'" "t_list_subtyping t34' ts'" 
+    by (metis append.assoc t_list_subtyping_split2)
+  obtain ts2'' where ts''_def: "ts2' = ts2''@ts"
+    by (meson assms(1) assms(3) instr_subtyping_split subtyping_append t_list_subtyping_append_type t_list_subtyping_refl)
+  then have "t_list_subtyping ts ts'" using ts''_def ts'''_def assms(5)
+    by (simp add: list_all2_lengthD t_list_subtyping_def)
+  then show "ts = ts'" using assms(3,4,5) t_subtyping_def
+    by (metis append_eq_append_conv t_list_subtyping_append_type t_list_subtyping_prepend)
+qed
+
 
 (*
 definition b_e_principal_type :: "b_e \<Rightarrow> tf" where
