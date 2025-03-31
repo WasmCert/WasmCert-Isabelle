@@ -65,28 +65,40 @@ lemma t_list_subtyping_replace2:
   using assms unfolding t_list_subtyping_def
   by (meson t_list_subtyping_prepend t_list_subtyping_def t_list_subtyping_trans)
 
-lemma t_list_subtyping_snoc1:
+lemma t_list_subtyping_snoc_left1:
   assumes "t_list_subtyping (ts@[t]) ts'"
           "t \<noteq> T_bot"
         shows "\<exists> ts''. t_list_subtyping ts ts'' \<and> ts' = ts''@[t]"
   using assms
   by (metis (full_types) list_all2_Cons1 list_all2_Nil t_list_subtyping_def t_list_subtyping_split1 t_subtyping_def)
 
-lemma t_list_subtyping_snoc2:
+lemma t_list_subtyping_snoc_right1:
+  assumes "t_list_subtyping ts' (ts@[t])"
+        shows "\<exists> ts'' t'. t_list_subtyping ts'' ts \<and> t_subtyping t' t \<and> ts' = ts''@[t']"
+  using assms t_list_subtyping_split2[OF assms(1)] t_list_subtyping_def t_subtyping_def
+  by (metis list_all2_Cons2 list_all2_Nil2)
+
+lemma t_list_subtyping_snoc_left2:
   assumes "t_list_subtyping (ts@[t1,t2]) ts'"
           "t1 \<noteq> T_bot"
           "t2 \<noteq> T_bot"
   shows "\<exists> ts''. t_list_subtyping ts ts'' \<and> ts' = ts''@[t1,t2]"
-  using assms t_list_subtyping_snoc1[of "ts@[t1]" t2 ts'] t_list_subtyping_snoc1[of "ts" t1]
+  using assms t_list_subtyping_snoc_left1[of "ts@[t1]" t2 ts'] t_list_subtyping_snoc_left1[of "ts" t1]
   by fastforce
 
-lemma t_list_subtyping_snoc3:
+lemma t_list_subtyping_snoc_right2:
+  assumes "t_list_subtyping ts' (ts@[t1,t2])"
+        shows "\<exists> ts'' t1' t2'. t_list_subtyping ts'' ts \<and> t_list_subtyping [t1', t2'] [t1, t2] \<and> ts' = ts''@[t1', t2'] "
+  using assms t_list_subtyping_split2[OF assms(1)] t_list_subtyping_def t_subtyping_def
+  by (smt (verit, del_insts) list_all2_Cons2 list_all2_Nil2)
+
+lemma t_list_subtyping_snoc_left3:
   assumes "t_list_subtyping (ts@[t1,t2,t3]) ts'"
           "t1 \<noteq> T_bot"
           "t2 \<noteq> T_bot"
           "t3 \<noteq> T_bot"
   shows "\<exists> ts''. t_list_subtyping ts ts'' \<and> ts' = ts''@[t1,t2,t3]"
-  using assms t_list_subtyping_snoc1[of "ts@[t1,t2]" t3 ts' ] t_list_subtyping_snoc2[of "ts" t1 t2]
+  using assms t_list_subtyping_snoc_left1[of "ts@[t1,t2]" t3 ts' ] t_list_subtyping_snoc_left2[of "ts" t1 t2]
   by fastforce
 
 lemma instr_subtyping_refl:
@@ -1662,7 +1674,7 @@ qed blast
 
 lemma e_type_invoke:
   assumes "s\<bullet>\<C> \<turnstile> [Invoke i_cl] : (t1s' _> t2s')"
-  shows "\<exists>t1s t2s ts_c \<C>i. instr_subtyping (t1s _> t2s) (t1s' _> t2s')
+  shows "\<exists>t1s t2s. instr_subtyping (t1s _> t2s) (t1s' _> t2s')
                          \<and> cl_type ((funcs s)!i_cl) = (t1s _> t2s)
                          \<and> i_cl < length (funcs s)"
   using assms
@@ -2653,7 +2665,7 @@ next
   have 2: "([] _> [typeof x] <ti: (ts' _> ts))"
     using ts'_def type_const_v_typing(1) by metis
   obtain ts'' where ts''_def: "ts=ts''@[typeof x]" "t_list_subtyping ts' ts''"
-    by (metis "2" append_Nil subtyping_append t_list_subtyping_refl t_list_subtyping_snoc1 typeof_not_bot)
+    by (metis "2" append_Nil subtyping_append t_list_subtyping_refl t_list_subtyping_snoc_left1 typeof_not_bot)
   have "ts' = ts''" using 1 ts''_def(2) unfolding t_list_subtyping_def
     using e_type_value_list(1) e_typing_l_typing.intros(2) snoc.IH snoc.prems(2) ts''_def(1) ts'_def(1) ts'_def(2) by blast
   then have "ts = ts'@[typeof x]"
@@ -4126,7 +4138,7 @@ proof -
   proof -
     obtain ts''' where ts'''_def: "ts'' = ts'''@[typeof v]"
       using 1
-      by (metis append_eq_Cons_conv subtyping_append t_list_subtyping_refl t_list_subtyping_snoc1 typeof_not_bot)
+      by (metis append_eq_Cons_conv subtyping_append t_list_subtyping_refl t_list_subtyping_snoc_left1 typeof_not_bot)
     then have "[t] _> []  <ti: ts'''@[typeof v] _> ts'"
       using 1
       using t_def(1) by blast
@@ -4307,7 +4319,7 @@ proof -
   hence 3: "([] _> [T_num T_i32, T_ref (typeof_ref vr)]) <ti: (ts _> ts2)"
     using "1" instr_subtyping_concat by fastforce
   then obtain ts2' where ts2'_def: "ts2 = ts2'@[T_num T_i32, T_ref (typeof_ref vr)]"
-    by (metis append_self_conv2 subtyping_append t.distinct(11) t.distinct(5) t_list_subtyping_refl t_list_subtyping_snoc2)
+    by (metis append_self_conv2 subtyping_append t.distinct(11) t.distinct(5) t_list_subtyping_refl t_list_subtyping_snoc_left2)
   have 4: "s\<bullet>\<C> \<turnstile> [$C (V_ref vr)] : (ts1 _> ts2)"
     by (simp add: ts_def(2) v_to_e_def)
   have 5: "ref_typing s vr (typeof_ref vr)"
@@ -4324,7 +4336,7 @@ proof -
     have "(last ts2) = last ts2''_last2" using ts2''_def
       by (metis last_appendR list.distinct(1) list_all2_Cons2 t_list_subtyping_def)
     moreover have "t_subtyping (last ts2''_last2) (last [T_num T_i32, T_ref tr])" using ts2''_def(2)
-      by (metis (no_types, lifting) append_butlast_last_id last_appendR list.distinct(1) list_all2_Cons2 t_list_subtyping_def t_list_subtyping_snoc1 t_subtyping_def)
+      by (metis (no_types, lifting) append_butlast_last_id last_appendR list.distinct(1) list_all2_Cons2 t_list_subtyping_def t_list_subtyping_snoc_left1 t_subtyping_def)
     ultimately show ?thesis by auto
   qed
 
@@ -4387,7 +4399,7 @@ proof -
       by (metis One_nat_def Suc_1 length_Cons list.size(3) list_all2_lengthD)
     then have "ts2'_last2 = ts2''_last2" using ts2'_def(1) ts2''_def(1) by auto
     then have "T_ref tr = T_ref (typeof_ref vr)" using ts2'_def(2) ts2''_def(2) t_list_subtyping_def
-      by (metis append_eq_append_conv append_self_conv2 list.inject list_all2_lengthD t.distinct(11) t.distinct(5) t_list_subtyping_snoc2)
+      by (metis append_eq_append_conv append_self_conv2 list.inject list_all2_lengthD t.distinct(11) t.distinct(5) t_list_subtyping_snoc_left2)
     then show "tab_t_reftype (table \<C> ! ti) = typeof_ref vr"
       using tr_def(2) by fastforce
     then show "([T_ref (typeof_ref vr), T_num T_i32] _> [T_num T_i32]) <ti: (ts2 _> ts')"
