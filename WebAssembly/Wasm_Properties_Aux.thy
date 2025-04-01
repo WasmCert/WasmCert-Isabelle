@@ -400,7 +400,7 @@ lemma instr_subtyping_append_type_eq:
   assumes "(ts1 _> ts2@ts) <ti: (ts1' _> ts2')"
           "(ts3@ts' _> ts4) <ti: (ts2' _> ts3')"
           "list_all (\<lambda> t. t\<noteq>T_bot) ts"
-          "list_all (\<lambda> t. t\<noteq>T_bot) ts'"
+     
           "length ts = length ts'"
         shows "ts=ts'"
 proof -
@@ -410,12 +410,28 @@ proof -
     by (metis append.assoc t_list_subtyping_split2)
   obtain ts2'' where ts''_def: "ts2' = ts2''@ts"
     by (meson assms(1) assms(3) instr_subtyping_split subtyping_append t_list_subtyping_append_type t_list_subtyping_refl)
-  then have "t_list_subtyping ts ts'" using ts''_def ts'''_def assms(5)
-    by (simp add: list_all2_lengthD t_list_subtyping_def)
-  then show "ts = ts'" using assms(3,4,5) t_subtyping_def
-    by (metis append_eq_append_conv t_list_subtyping_append_type t_list_subtyping_prepend)
+  then have "t_list_subtyping ts ts'" using ts''_def ts'''_def
+    by (simp add: assms(4) list_all2_lengthD t_list_subtyping_def)
+  then show "ts = ts'" using assms(3,4) t_subtyping_def
+    using t_list_subtyping_not_bot_eq by blast
 qed
 
+
+lemma instr_subtyping_append_t_list_subtyping:
+  assumes "(ts1 _> ts2@ts) <ti: (ts1' _> ts2')"
+          "(ts3@ts' _> ts4) <ti: (ts2' _> ts3')"
+          "length ts = length ts'"
+        shows "t_list_subtyping ts ts'"
+proof -
+  obtain ts2a ts3_dom where  "ts2' = ts2a@ts3_dom" "t_list_subtyping ts3_dom (ts3@ts')"
+    using assms(2) unfolding instr_subtyping_def by auto
+  then obtain ts2''' ts''' where ts'''_def: "ts2' = ts2'''@ts'''" "t_list_subtyping ts''' ts'" 
+    by (metis append.assoc t_list_subtyping_split2)
+  obtain ts2'' ts'' where ts''_def: "ts2' = ts2''@ts''" "t_list_subtyping ts ts''"
+    by (metis (no_types, lifting) append.assoc assms(1) instr_subtyping_def t_list_subtyping_split1 tf.sel(2))
+  show "t_list_subtyping ts ts'" using ts''_def ts'''_def
+    by (metis append_eq_append_conv assms(3) list_all2_lengthD t_list_subtyping_def t_list_subtyping_trans)
+qed
 
 (*
 definition b_e_principal_type :: "b_e \<Rightarrow> tf" where
@@ -1117,6 +1133,15 @@ lemma b_e_type_cvtop:
         "cvtop = Reinterpret \<Longrightarrow> (t1 \<noteq> t) \<and> t_num_length t1 = t_num_length t"
   using assms
   unfolding arity_1_result_def
+  using assms
+  apply (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
+  apply (auto simp add: instr_subtyping_refl instr_subtyping_empty_comp2)
+  using instr_subtyping_refl instr_subtyping_trans instr_subtyping_empty_comp2 by blast+
+
+lemma b_e_type_null_ref:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Null_ref t"
+  shows " instr_subtyping ([] _> [T_ref t]) (ts _> ts')"
   using assms
   apply (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
   apply (auto simp add: instr_subtyping_refl instr_subtyping_empty_comp2)
