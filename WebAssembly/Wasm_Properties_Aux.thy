@@ -357,7 +357,6 @@ lemma instr_subtyping_append1_type_eq:
   assumes "(ts1 _> ts2@[t1]) <ti: (ts1' _> ts2')"
           "(ts3@[t2] _> ts4) <ti: (ts2' _> ts3')"
           "t1 \<noteq> T_bot"
-          "t2 \<noteq> T_bot"
         shows "t1 = t2"
 proof -
   have "(ts1 _> ts2@[t1]) <ti: (ts1' _> ts2')" using assms(1) by blast
@@ -1377,7 +1376,7 @@ lemma b_e_type_br_if:
 lemma b_e_type_br_table:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Br_table is i"
-  shows "\<exists>ts_c ts'' ts'''. list_all (\<lambda>i. i < length(label \<C>) \<and> (label \<C>)!i = ts'') (is@[i]) \<and> instr_subtyping (ts_c@ts''@[T_num T_i32] _> ts''') (ts _> ts')"
+  shows "\<exists>ts'' t1s t2s. list_all (\<lambda>i. i < length(label \<C>) \<and> (label \<C>)!i = ts'') (is@[i]) \<and> instr_subtyping (t1s@ts''@[T_num T_i32] _> t2s) (ts _> ts')"
   using assms
   apply (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
   apply (auto simp add: instr_subtyping_refl instr_subtyping_empty_comp2)
@@ -4477,6 +4476,7 @@ lemma types_preserved_table_grow_aux:
         "tab_t_reftype (table \<C> ! ti) = typeof_ref vr"
         "ti < length (table \<C>)"
         "ref_typing s vr (typeof_ref vr)"
+        "[] _> [T_num T_i32] <ti: (ts _>ts')"
 proof -
   obtain ts1 ts2 where ts_def:"s\<bullet>\<C> \<turnstile> [Ref vr] : (ts _> ts1)" 
                                    "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 n)] : (ts1 _> ts2)"
@@ -4527,8 +4527,9 @@ proof -
     "tab_t_reftype (table \<C> ! ti) = typeof_ref vr"
     "ti < length (table \<C>)"
     "ref_typing s vr (typeof_ref vr)"
+    "([] _> [T_num T_i32]) <ti: (ts _>ts')"
     apply (metis "3" append_Nil2 e_type_empty e_typing_l_typing.intros(3) e_weakening instr_subtyping_comp instr_subtyping_concat instr_subtyping_refl)
-    using 5 6 7 b_e_type_table_grow(2) by blast+
+    using 3 5 6 7 8 instr_subtyping_comp b_e_type_table_grow(2) by blast+
 qed
 
 
