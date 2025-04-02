@@ -4399,9 +4399,6 @@ next
   qed
 next
   case (table_size ti \<C>)
-  \<comment> \<open>\<open>table size\<close>\<close>
-(*| table_size: "\<lbrakk>stab_ind (f_inst f) ti = Some a; a < length (tabs s); (tabs s)!a = t; tab_size t = n\<rbrakk> \<Longrightarrow>  \<lparr>s;f;[ $(Table_size ti)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat n))]\<rparr>"
-*)
   obtain a where a_def: "stab_ind (f_inst f) ti = Some a"
     using stab_ind_def table_size.hyps table_size.prems(7) by auto
   then obtain t n where t_n_def: "(tabs s)!a = t" "tab_size t = n" by auto
@@ -4482,15 +4479,28 @@ next
   qed
 next
   case (subsumption \<C> es tf1 tf2 tf1' tf2')
-  then show ?case sorry
-(*
-next
-  case (weakening \<C> es t1s t2s ts)
+  have 1: "tf1' = map typeof vs"
+    using  subsumption(4) typing_map_typeof by fastforce
+  then obtain "ts" "tf1_dom_sub" where ts_def: "tf1' = ts @ tf1_dom_sub"  "t_list_subtyping tf1_dom_sub tf1"
+    using subsumption(3) unfolding instr_subtyping_def
+    by auto
+  have tf1_eq: "tf1_dom_sub = tf1"
+  proof -
+    obtain cs where "map typeof cs = tf1_dom_sub" using 1 ts_def
+      by (metis map_eq_append_conv)
+    then have "list_all (\<lambda> t. t \<noteq>  T_bot) tf1_dom_sub" using typeof_not_bot
+      by (metis (mono_tags, lifting) length_map list_all_length nth_map)
+    then show ?thesis using ts_def(2)  t_list_subtyping_not_bot_eq by auto
+  qed
   obtain cs1 cs2 where cs_def:"s\<bullet>\<C> \<turnstile> $C*cs1 : ([] _> ts)"
-                              "s\<bullet>\<C> \<turnstile> $C*cs2 : ([] _> t1s)"
+                              "s\<bullet>\<C> \<turnstile> $C*cs2 : (ts _> tf1')"
                               "vs = cs1 @ cs2"
-    using e_type_consts_cons[OF weakening(3)]  e_typing_imp_list_types_agree list_types_agree_imp_e_typing
-    by (metis e_type_consts same_append_eq store_extension_refl)
+    using e_type_consts_cons[of s \<C> vs ts tf1] subsumption(4) ts_def tf1_eq
+    by blast
+  then have cs_typeof: "map typeof cs2 = tf1" "map typeof cs1 = ts"
+    using typing_map_typeof "1" tf1_eq ts_def(1) by fastforce+
+  then have cs2_typing: "s\<bullet>\<C> \<turnstile> $C*cs2 : ([] _> tf1)"
+    using cs_def sledgehammer sorry
   have "(\<And>lholed. \<not> Lfilled 0 lholed [$Return] (($C*cs2) @ ($* es)))"
        "(\<And>i lholed. \<not> Lfilled 0 lholed [$Br i] (($C*cs2) @ ($* es)))"
   proof safe
@@ -4504,7 +4514,7 @@ next
         by fastforce
     qed simp
     thus False
-      using weakening(4) cs_def(3)
+      using subsumption(5) cs_def(3)
       by simp
   next
     fix i lholed
@@ -4517,15 +4527,15 @@ next
         by fastforce
     qed simp
     thus False
-      using weakening(5) cs_def(3)
+      using subsumption(6) cs_def(3)
       by simp
   qed
   hence "\<exists>a s' f' es'. \<lparr>s;f;($C* cs2)@($*es)\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
-    using weakening(2)[OF cs_def(2) _ _ weakening(6)] weakening(7-)
+    using subsumption(2)[OF cs2_typing _ _] subsumption(7-)
     by fastforce
   thus ?case
     using progress_L0[of s f "($C* cs2) @ ($* es)" _ _ _ "cs1" "[]"] cs_def(3)
-    by fastforce*)
+    by fastforce
 next
   case (memory_init \<C> i)
   then show ?case sorry
@@ -4936,7 +4946,7 @@ proof -
         case 1
         have "length es = length ts"
           using s_type_unfold[OF 6(1)] e_type_const_list[OF 1] store_extension_refl
-          by fastforce
+          by (metis "1" e_type_const_conv_vs typing_map_typeof)
         thus ?thesis
           using reduce_simple.local_const reduce.intros(1) 6(2)
           by (metis "1" e_type_const_conv_vs)
@@ -4971,26 +4981,36 @@ proof -
     obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> ($C*cs) : ([] _> ts'')" "s\<bullet>\<C> \<turnstile> [Invoke i_cl] : (ts'' _> ts')"
       using 7(3,4) e_type_comp_conc1
       by fastforce
-    obtain ts_c t1s t2s where cl_def:"(ts'' = ts_c @ t1s)"
-                                     "(ts' = ts_c @ t2s)"
+    obtain ts_c t1s_dom t1s t2s where cl_def:"(t1s _> t2s) <ti: (ts'' _> ts')"
                                      "cl_type (funcs s!i_cl) = (t1s _> t2s)"
-      using e_type_invoke[OF ts''_def(2)]
+                                     "ts'' = ts_c@t1s_dom"
+                                     "t_list_subtyping t1s_dom t1s"
+      using e_type_invoke[OF ts''_def(2)] instr_subtyping_def
       by fastforce
+    have ts''_typeof: "ts'' = map typeof cs"
+      using ts''_def(1) typing_map_typeof by fastforce
+    then have ts_c_eq: "t1s = t1s_dom" "ts'' = ts_c@t1s"
+    proof -
+      have "list_all (\<lambda> t. t \<noteq> T_bot) ts''" using ts''_typeof typeof_not_bot
+        by (simp add: list_all_length)
+      then have "list_all (\<lambda> t. t \<noteq> T_bot) t1s_dom"
+        using cl_def(3) list_all_append by blast
+      then show "t1s = t1s_dom"
+        using cl_def(4) t_list_subtyping_not_bot_eq by blast
+      then show "ts'' = ts_c@t1s" using cl_def(3) by simp
+    qed
     obtain vs1 vs2 where vs_def:"s\<bullet>\<C> \<turnstile> $C*vs1 : ([] _> ts_c)"
                                 "s\<bullet>\<C> \<turnstile> $C*vs2 : (ts_c _> ts_c @ t1s)"
                                 "cs = vs1 @ vs2"
-      using e_type_consts_cons ts''_def(1) cl_def(1)
-      by fastforce
+      using e_type_consts_cons ts''_def(1) cl_def(1) ts_c_eq(2) by blast
     have l:"(length vs2) = (length t1s)"
       using e_type_consts vs_def(2) store_extension_refl
-      by fastforce
+      by (metis e_typing_imp_list_types_agree list_all2_lengthD)
     show ?case
     proof (cases "(funcs s!i_cl)")
       case (Func_native x11 x12 x13 x14)
       hence func_native_def:"(funcs s!i_cl) = Func_native x11 (t1s _> t2s) x13 x14"
-        using cl_def(3)
-        unfolding cl_type_def
-        by simp
+        using cl_def(2) cl_type_def by fastforce
       have "n_zeros x13 \<noteq> None"
       proof -
         obtain tf where "(cl_typing s (funcs s!i_cl)) tf"
@@ -5009,9 +5029,7 @@ proof -
     next
       case (Func_host x21 x22)
       hence func_host_def:"(funcs s!i_cl) = Func_host (t1s _> t2s) x22"
-        using cl_def(3)
-        unfolding cl_type_def
-        by simp
+        using cl_def(2) cl_type_def by fastforce
       fix hs res
       have "\<exists>s' a a'. \<lparr>s;f;($C*vs2) @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f;a\<rparr>"
       proof (cases "host_apply s (t1s _> t2s) x22 vs2 hs (Some res)")
@@ -5107,7 +5125,7 @@ proof -
       have "\<exists>es' a. \<lparr>[Label n e0s es]\<rparr> \<leadsto> \<lparr>($C*vs')@e0s\<rparr>"
         using reduce_simple.br[OF _ lholed'_def(1)] 8(3)
               e_type_consts[OF lholed'_def(2)] store_extension_refl
-        by fastforce
+             lholed'_def(2) typing_map_typeof by fastforce
       hence "\<exists>es' a. \<lparr>s;f;[Label n e0s es]\<rparr> \<leadsto> \<lparr>s;f;es'\<rparr>"
         using reduce.intros(1)
         by fastforce
