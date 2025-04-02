@@ -2154,6 +2154,204 @@ proof -
     using assms e_typing_l_typing.intros(3) e_typing_l_typing_store_extension_inv(1) types_agree_imp_e_typing by fastforce
 qed
 
+lemma types_preserved_memory_init:
+  assumes
+    "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n), $Memory_init x] : ts _> ts'"
+    "store_typing s"
+    "inst_typing s (f_inst f) \<C>i"
+    "tvs = map typeof (f_locs f)"
+    "\<C> = \<C>i\<lparr>local := tvs, label := arb_labs, return := arb_return\<rparr>"
+    "smem_ind (f_inst f) = Some ma"
+    "s.mems s ! ma = m"
+    "x < length (inst.datas (f_inst f))"
+    "da = inst.datas (f_inst f) ! x"
+    "dat = s.datas s ! da"
+  shows
+    "s\<bullet>\<C> \<turnstile> [] : ts _> ts'"
+    "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2),
+           $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 i3),
+           $EConstNum (ConstInt32 i4), $EConstNum (ConstInt32 i5),
+           $Memory_init x] : ts _> ts'"
+proof -
+  have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n)] @
+          [$Memory_init x] : (ts _> ts')" using assms(1) by auto
+  obtain ts'' vs where ts''_def:
+    "vs = [V_num (ConstInt32 dest), V_num (ConstInt32 src), V_num (ConstInt32 n)]"
+    "($C* vs) = [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n)]"
+    "s\<bullet>\<C> \<turnstile> $C*vs : (ts _> ts'')"
+    "s\<bullet>\<C> \<turnstile> [$Memory_init x] : (ts'' _> ts')"
+    using  e_type_comp_conc1[OF 1] v_to_e_def by auto
+  have "[] _> [T_num T_i32, T_num T_i32, T_num T_i32] <ti: ts _> ts''"
+    using e_typing_imp_list_v_typing(2)[OF ts''_def(3)] unfolding ts''_def(1) by(simp add: typeof_def typeof_num_def)
+  moreover have 3: "([T_num T_i32, T_num T_i32, T_num T_i32] _> []) <ti: (ts'' _> ts')"
+                   "x < length (data \<C>)"
+                   "1 \<le> length (memory \<C>)"
+    using e_type_memory_init[OF ts''_def(4)] by simp_all
+  ultimately show ts_empty: "s\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
+    using e_type_empty instr_subtyping_comp by blast
+  then have 4: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2),
+           $Store T_i32 (Some Tp_i8) 0 0] : (ts _> ts)"
+  proof -
+    have a: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1)] : ([] _> [T_num T_i32])"
+            "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i2)] : ([T_num T_i32] _> [T_num T_i32, T_num T_i32])"
+      using const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1) append_Cons append_self_conv2 e_weakening
+      by metis+
+    have b: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2)] : ([] _> [T_num T_i32, T_num T_i32])"
+      using e_type_comp_conc[OF a(1,2)] by simp
+    have "load_store_t_bounds 0 (Some Tp_i8) T_i32"
+      using t_num_length_def is_int_t_num_def load_store_t_bounds_def tp_num_length_def by simp
+    then have c: "s\<bullet>\<C> \<turnstile> [$Store T_i32 (Some Tp_i8) 0 0] : ([T_num T_i32, T_num T_i32] _> [])"
+      using  e_typing_l_typing.intros(1) store 3(3) by fastforce
+    show ?thesis using e_type_comp_conc[OF b c] e_weakening by fastforce
+  qed
+  then have 5: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i3),
+           $EConstNum (ConstInt32 i4), $EConstNum (ConstInt32 i5),
+           $Memory_init x] : (ts _> ts)"
+  proof -
+    have a: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i3)] : ([] _> [T_num T_i32])"
+            "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i4)] : ([T_num T_i32] _> [T_num T_i32, T_num T_i32])"
+            "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i5)] : ([T_num T_i32, T_num T_i32] _> [T_num T_i32, T_num T_i32,T_num T_i32])"
+      using const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1) append_Cons append_self_conv2 e_weakening
+      by metis+
+    then have b: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i3), $EConstNum (ConstInt32 i4), $EConstNum (ConstInt32 i5)] : ([] _> [T_num T_i32, T_num T_i32, T_num T_i32])"
+      using e_type_comp_conc[OF e_type_comp_conc[OF a(1,2)] a(3)] by simp
+    have c: "s\<bullet>\<C> \<turnstile> [$Memory_init x] : ([T_num T_i32, T_num T_i32,T_num T_i32] _> [])"
+      using b_e_typing.memory_init[OF 3(3,2)]
+      using e_typing_l_typing.intros(1) to_e_list_1 by metis
+    then show ?thesis using e_type_comp_conc[OF b c] e_weakening by fastforce
+  qed
+  show "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2),
+           $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 i3),
+           $EConstNum (ConstInt32 i4), $EConstNum (ConstInt32 i5),
+           $Memory_init x] : ts _> ts'"
+    using e_type_comp_conc[OF 4 5] e_type_comp_conc ts_empty by fastforce
+qed
+
+lemma types_preserved_memory_copy:
+  assumes
+    "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n), $Memory_copy] : (ts _> ts')"
+  shows
+    "s\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
+    "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2), $Load T_i32 (Some (Tp_i8, U)) 0 0,
+           $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 (i3)),
+           $EConstNum (ConstInt32 i4), $EConstNum (ConstInt32 i5), $Memory_copy] : (ts _> ts')"
+proof -
+  have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n)] @
+          [$Memory_copy] : (ts _> ts')" using assms(1) by auto
+  obtain ts'' vs where ts''_def:
+    "vs = [V_num (ConstInt32 dest), V_num (ConstInt32 src), V_num (ConstInt32 n)]"
+    "($C* vs) = [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n)]"
+    "s\<bullet>\<C> \<turnstile> $C*vs : (ts _> ts'')"
+    "s\<bullet>\<C> \<turnstile> [$Memory_copy] : (ts'' _> ts')"
+    using  e_type_comp_conc1[OF 1] v_to_e_def by auto
+  have "[] _> [T_num T_i32, T_num T_i32, T_num T_i32] <ti: ts _> ts''"
+    using e_typing_imp_list_v_typing(2)[OF ts''_def(3)] unfolding ts''_def(1) by(simp add: typeof_def typeof_num_def)
+  moreover have 3: "([T_num T_i32, T_num T_i32, T_num T_i32] _> []) <ti: (ts'' _> ts')"
+                   "1 \<le> length (memory \<C>)"
+    using e_type_memory_copy[OF ts''_def(4)] by simp_all
+  ultimately show ts_empty: "s\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
+    using e_type_empty instr_subtyping_comp by blast
+  then have 4: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2), $Load T_i32 (Some (Tp_i8, U)) 0 0,
+           $Store T_i32 (Some Tp_i8) 0 0] : (ts _> ts)"
+  proof -
+    have a: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1)] : ([] _> [T_num T_i32])"
+            "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i2)] : ([T_num T_i32] _> [T_num T_i32, T_num T_i32])"
+      using const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1) append_Cons append_self_conv2 e_weakening
+      by metis+
+    have b: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2)] : ([] _> [T_num T_i32, T_num T_i32])"
+      using e_type_comp_conc[OF a(1,2)] by simp
+    have load_bounds: "load_store_t_bounds 0 (option_projl (Some (Tp_i8, U))) T_i32"
+                      "load_store_t_bounds 0 (Some (Tp_i8)) T_i32"
+      using t_num_length_def is_int_t_num_def load_store_t_bounds_def tp_num_length_def option_projl_def
+      by (metis (no_types, lifting) One_nat_def dual_order.refl fst_conv less_Suc_numeral option.simps(5) option.simps(9) power_0 pred_numeral_simps(2) t_num.simps(13) tp_num.simps(7) zero_less_numeral)+
+    have c: "s\<bullet>\<C> \<turnstile> [$Load T_i32 (Some (Tp_i8, U)) 0 0] : ([T_num T_i32, T_num T_i32] _> [T_num T_i32, T_num T_i32])"
+      using  e_typing_l_typing.intros(1) load 3(2) load_bounds e_weakening[where ?ts = "[T_num T_i32]"] by fastforce
+    have d: "s\<bullet>\<C> \<turnstile> [$Store T_i32 (Some Tp_i8) 0 0] : ([T_num T_i32, T_num T_i32] _> [])"
+      using  e_typing_l_typing.intros(1) store 3(2) load_bounds by fastforce
+    show ?thesis using e_type_comp_conc[OF e_type_comp_conc[OF b c] d] e_weakening by fastforce
+  qed
+  then have 5: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i3),
+           $EConstNum (ConstInt32 i4), $EConstNum (ConstInt32 i5),
+           $Memory_copy] : (ts _> ts)"
+  proof -
+    have a: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i3)] : ([] _> [T_num T_i32])"
+            "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i4)] : ([T_num T_i32] _> [T_num T_i32, T_num T_i32])"
+            "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i5)] : ([T_num T_i32, T_num T_i32] _> [T_num T_i32, T_num T_i32,T_num T_i32])"
+      using const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1) append_Cons append_self_conv2 e_weakening
+      by metis+
+    then have b: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i3), $EConstNum (ConstInt32 i4), $EConstNum (ConstInt32 i5)] : ([] _> [T_num T_i32, T_num T_i32, T_num T_i32])"
+      using e_type_comp_conc[OF e_type_comp_conc[OF a(1,2)] a(3)] by simp
+    have c: "s\<bullet>\<C> \<turnstile> [$Memory_copy] : ([T_num T_i32, T_num T_i32,T_num T_i32] _> [])"
+      using b_e_typing.memory_copy[OF 3(2)]
+      using e_typing_l_typing.intros(1) to_e_list_1 by metis
+    then show ?thesis using e_type_comp_conc[OF b c] e_weakening by fastforce
+  qed
+  show "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2), $Load T_i32 (Some (Tp_i8, U)) 0 0,
+           $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 (i3)),
+           $EConstNum (ConstInt32 i4), $EConstNum (ConstInt32 i5), $Memory_copy] : (ts _> ts')"
+    using e_type_comp_conc[OF 4 5] e_type_comp_conc ts_empty by fastforce
+qed
+
+lemma types_preserved_memory_fill:
+  assumes
+    "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $EConstNum (ConstInt32 n), $Memory_fill] : ts _> ts'"
+  shows
+    "s\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
+    "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2), $Store T_i32 (Some Tp_i8) 0 0,
+           $EConstNum (ConstInt32 i3), $EConstNum (ConstInt32 i4), $EConstNum (ConstInt32 (i5)),
+           $Memory_fill] : ts _> ts'"
+proof -
+  have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $EConstNum (ConstInt32 n)] @
+          [$Memory_fill] : (ts _> ts')" using assms(1) by auto
+  obtain ts'' vs where ts''_def:
+    "vs = [V_num (ConstInt32 dest), V_num (ConstInt32 val), V_num (ConstInt32 n)]"
+    "($C* vs) = [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $EConstNum (ConstInt32 n)]"
+    "s\<bullet>\<C> \<turnstile> $C*vs : (ts _> ts'')"
+    "s\<bullet>\<C> \<turnstile> [$Memory_fill] : (ts'' _> ts')"
+    using  e_type_comp_conc1[OF 1] v_to_e_def by auto
+  have "[] _> [T_num T_i32, T_num T_i32, T_num T_i32] <ti: ts _> ts''"
+    using e_typing_imp_list_v_typing(2)[OF ts''_def(3)] unfolding ts''_def(1) by(simp add: typeof_def typeof_num_def)
+  moreover have 3: "([T_num T_i32, T_num T_i32, T_num T_i32] _> []) <ti: (ts'' _> ts')"
+                   "1 \<le> length (memory \<C>)"
+    using e_type_memory_fill[OF ts''_def(4)] by simp_all
+  ultimately show ts_empty: "s\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
+    using e_type_empty instr_subtyping_comp by blast
+  then have 4: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2), $Store T_i32 (Some Tp_i8) 0 0] : (ts _> ts)"
+  proof -
+    have a: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1)] : ([] _> [T_num T_i32])"
+            "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i2)] : ([T_num T_i32] _> [T_num T_i32, T_num T_i32])"
+      using const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1) append_Cons append_self_conv2 e_weakening
+      by metis+
+    have b: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2)] : ([] _> [T_num T_i32, T_num T_i32])"
+      using e_type_comp_conc[OF a(1,2)] by simp
+    have load_bounds: "load_store_t_bounds 0 (Some (Tp_i8)) T_i32"
+      using t_num_length_def is_int_t_num_def load_store_t_bounds_def tp_num_length_def option_projl_def by simp
+    have c: "s\<bullet>\<C> \<turnstile> [$Store T_i32 (Some Tp_i8) 0 0] : ([T_num T_i32, T_num T_i32] _> [])"
+      using  e_typing_l_typing.intros(1) store 3(2) load_bounds by fastforce
+    show ?thesis using e_type_comp_conc[OF b c] e_weakening by fastforce
+  qed
+  then have 5: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i3),
+           $EConstNum (ConstInt32 i4), $EConstNum (ConstInt32 i5),
+           $Memory_fill] : (ts _> ts)"
+  proof -
+    have a: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i3)] : ([] _> [T_num T_i32])"
+            "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i4)] : ([T_num T_i32] _> [T_num T_i32, T_num T_i32])"
+            "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i5)] : ([T_num T_i32, T_num T_i32] _> [T_num T_i32, T_num T_i32,T_num T_i32])"
+      using const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1) append_Cons append_self_conv2 e_weakening
+      by metis+
+    then have b: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i3), $EConstNum (ConstInt32 i4), $EConstNum (ConstInt32 i5)] : ([] _> [T_num T_i32, T_num T_i32, T_num T_i32])"
+      using e_type_comp_conc[OF e_type_comp_conc[OF a(1,2)] a(3)] by simp
+    have c: "s\<bullet>\<C> \<turnstile> [$Memory_fill] : ([T_num T_i32, T_num T_i32,T_num T_i32] _> [])"
+      using b_e_typing.memory_fill[OF 3(2)]
+      using e_typing_l_typing.intros(1) to_e_list_1 by metis
+    then show ?thesis using e_type_comp_conc[OF b c] e_weakening by fastforce
+  qed
+  show "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2), $Store T_i32 (Some Tp_i8) 0 0,
+           $EConstNum (ConstInt32 i3), $EConstNum (ConstInt32 i4), $EConstNum (ConstInt32 (i5)),
+           $Memory_fill] : ts _> ts'"
+    using e_type_comp_conc[OF 4 5] e_type_comp_conc ts_empty by fastforce
+qed
+
 lemma types_preserved_table_get:
   assumes "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 n), $Table_get ti] : ts _> ts'"
           "stab_ind (f_inst f) ti = Some a"
@@ -2820,35 +3018,35 @@ next
     then show ?case using types_preserved_table_grow[OF table_grow_fail(5)]
       by simp
 next
-  case (memory_init_trap f ma s m x da dat src n dest)
+  case (memory_init_trap f ma s m x da dat ndest dest nsrc src nn n)
   then show ?case using e_typing_l_typing.intros(5) by blast
 next
-  case (memory_init_done f ma s m x da dat src dest)
-  then show ?case sorry
+  case (memory_init_done f ma s m x da dat ndest dest nsrc src nn n)
+  then show ?case using types_preserved_memory_init by blast
 next
-  case (memory_init f ma s m x da dat src n dest b d)
-  then show ?case sorry
+  case (memory_init f ma s m x da dat ndest dest nsrc src nn n nn_pred b)
+  then show ?case using types_preserved_memory_init(2) by metis
 next
-  case (memory_copy_trap f ma s m src n dest)
+  case (memory_copy_trap f ma s m ndest dest nsrc src nn n)
   then show ?case using e_typing_l_typing.intros(5) by blast
 next
-  case (memory_copy_done f ma s m src dest)
-  then show ?case sorry
+  case (memory_copy_done f ma s m ndest dest nsrc src nn n)
+  then show ?case using types_preserved_memory_copy by metis
 next
-  case (memory_copy_1 f ma s m src n dest sz)
-  then show ?case sorry
+  case (memory_copy_1 f ma s m ndest dest nsrc src nn nn_pred n)
+  then show ?case using types_preserved_memory_copy by metis
 next
-  case (memory_copy_2 f ma s m src n dest sz)
-  then show ?case sorry
+  case (memory_copy_2 f ma s m ndest dest nsrc src nn nn_pred n)
+  then show ?case using types_preserved_memory_copy by metis
 next
-  case (memory_fill_trap f ma s m dest n val)
+  case (memory_fill_trap f ma s m ndest dest nn n val)
   then show ?case using e_typing_l_typing.intros(5) by blast
 next
-  case (memory_fill_done f ma s m dest val)
-  then show ?case sorry
+  case (memory_fill_done f ma s m ndest dest nn n val)
+  then show ?case using types_preserved_memory_fill by metis
 next
-  case (memory_fill f ma s m dest n val)
-  then show ?case sorry
+  case (memory_fill f ma s m ndest dest nn n nn_pred val)
+  then show ?case using types_preserved_memory_fill by metis
 next
   case (table_init_trap f x ta s tab y ea el src n dest)
   then show ?case
@@ -3046,16 +3244,24 @@ next
   then show ?case using types_preserved_table_copy by blast
 next
   case (table_copy_1 f x tax s tabx y tay ty taby ndest dest nrsc src nn n nsrc nn_pred)
-  then show ?case using types_preserved_table_copy by metis
+  then show ?case using types_preserved_table_copy(2) by metis
 next
   case (table_copy_2 f x tax s tabx y tay ty taby ndest dest nrsc src nn n nsrc nn_pred)
   then show ?case using types_preserved_table_copy by metis
 next
   case (elem_drop x f a s)
-  then show ?case sorry
+  then have "([] _> []) <ti: (ts _> ts')" using e_type_elem_drop by blast
+  moreover have "list_all2 (v_typing (s\<lparr>s.elems := (s.elems s)[a := (fst (s.elems s ! a), [])]\<rparr>)) (f_locs f) tvs"
+    by (metis elem_drop.hyps(1) elem_drop.hyps(2) elem_drop.prems(1) elem_drop.prems(2) elem_drop.prems(3) elem_drop.prems(4) elem_drop.prems(5) elem_drop.prems(6) reduce.elem_drop reduce_locs_type_preserved)
+  ultimately show ?case
+    using e_type_empty elem_drop.prems(3) by blast
 next
   case (data_drop x f a s)
-  then show ?case sorry
+  then have "([] _> []) <ti: (ts _> ts')" using e_type_data_drop by blast
+  moreover have "list_all2 (v_typing (s\<lparr>s.datas := (s.datas s)[a := []]\<rparr>)) (f_locs f) tvs"
+    by (metis data_drop.hyps(1) data_drop.hyps(2) data_drop.prems(1) data_drop.prems(2) data_drop.prems(3) data_drop.prems(4) data_drop.prems(5) data_drop.prems(6) reduce.data_drop reduce_locs_type_preserved)
+  ultimately show ?case
+    using e_type_empty data_drop.prems(3) by blast
 qed 
 
 lemma types_preserved_e2:

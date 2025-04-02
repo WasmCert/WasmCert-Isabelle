@@ -90,18 +90,22 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | weakening:"\<C> \<turnstile> es : (t1s _> t2s) \<Longrightarrow> \<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"*)
   \<comment> \<open>\<open>subtyping\<close>\<close>
 | subsumption:"\<lbrakk>\<C> \<turnstile> es : (tf1 _> tf2); instr_subtyping (tf1 _> tf2) (tf1' _> tf2')\<rbrakk> \<Longrightarrow> \<C> \<turnstile> es : (tf1' _> tf2')"
-
+  \<comment> \<open>\<open>memory_init\<close>\<close>
 | memory_init: "\<lbrakk>length (memory \<C>) \<ge> 1; i < length (data \<C>)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Memory_init i] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
+\<comment> \<open>\<open>memory_copy\<close>\<close>
 | memory_copy: "\<lbrakk>length (memory \<C>) \<ge> 1\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Memory_copy] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
+\<comment> \<open>\<open>memory_fill\<close>\<close>
 | memory_fill: "\<lbrakk>length (memory \<C>) \<ge> 1\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Memory_fill] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
-
+\<comment> \<open>\<open>table_init\<close>\<close>
 | table_init: "\<lbrakk>x < length (table \<C>); y < length (elem \<C>); tr = tab_t_reftype (table \<C>!x); tr = elem \<C>!y\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Table_init x y] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
+\<comment> \<open>\<open>memory_copy\<close>\<close>
 | table_copy: "\<lbrakk>x < length (table \<C>); tr = tab_t_reftype (table \<C>!x); y < length (table \<C>); tr = tab_t_reftype (table \<C>!y)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Table_copy x y] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
+\<comment> \<open>\<open>memory_fill\<close>\<close>
 | table_fill: "\<lbrakk>x < length (table \<C>); tr = tab_t_reftype (table \<C>!x)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Table_fill x ] : ([T_num T_i32, T_ref tr, T_num T_i32] _> [])"
-
+\<comment> \<open>\<open>elem_drop\<close>\<close>
 | elem_drop: "x < length (elem \<C>) \<Longrightarrow> \<C> \<turnstile> [Elem_drop x] : ([] _> [])"
+\<comment> \<open>\<open>data_drop\<close>\<close>
 | data_drop: "x < length (data \<C>) \<Longrightarrow> \<C> \<turnstile> [Data_drop x] : ([] _> [])"
-
 
 inductive ref_typing :: "[s, v_ref, t_ref] => bool" where
    "ref_typing s (ConstNull t) (t)"

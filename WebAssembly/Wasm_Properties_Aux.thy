@@ -1013,6 +1013,30 @@ lemma b_e_type_grow_memory:
 proof (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
 qed (auto simp add: instr_subtyping_refl instr_subtyping_empty_comp2, metis instr_subtyping_trans)
 
+lemma b_e_type_memory_init:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Memory_init x"
+  shows "(([T_num T_i32, T_num T_i32, T_num T_i32] _> []) <ti: (ts _> ts')) \<and> length (memory \<C>) \<ge> 1 \<and> x < length (data \<C>)"
+  using assms
+proof (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
+qed (auto simp add: instr_subtyping_refl instr_subtyping_empty_comp2, metis instr_subtyping_trans)
+
+lemma b_e_type_memory_copy:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Memory_copy"
+  shows "(([T_num T_i32, T_num T_i32, T_num T_i32] _> []) <ti: (ts _> ts')) \<and> length (memory \<C>) \<ge> 1"
+  using assms
+proof (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
+qed (auto simp add: instr_subtyping_refl instr_subtyping_empty_comp2, metis instr_subtyping_trans)
+
+lemma b_e_type_memory_fill:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Memory_fill"
+  shows "(([T_num T_i32, T_num T_i32, T_num T_i32] _> []) <ti: (ts _> ts')) \<and> length (memory \<C>) \<ge> 1"
+  using assms
+proof (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
+qed (auto simp add: instr_subtyping_refl instr_subtyping_empty_comp2, metis instr_subtyping_trans)
+
 lemma b_e_type_table_get:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Table_get ti"
@@ -1041,6 +1065,22 @@ lemma b_e_type_table_copy:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Table_copy x y"
   shows "instr_subtyping ([T_num T_i32, T_num T_i32, T_num T_i32] _> []) (ts _> ts')" "x < length (table \<C>)" "y < length (table \<C>)" "tab_t_reftype (table \<C>!x) = tab_t_reftype (table \<C>!y)"
+  using assms
+proof (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
+qed (auto simp add: instr_subtyping_refl instr_subtyping_empty_comp2, metis instr_subtyping_trans)
+
+lemma b_e_type_elem_drop:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Elem_drop x"
+  shows "instr_subtyping ([] _> []) (ts _> ts')" "x < length (elem \<C>)"
+  using assms
+proof (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
+qed (auto simp add: instr_subtyping_refl instr_subtyping_empty_comp2, metis instr_subtyping_trans)
+
+lemma b_e_type_data_drop:
+  assumes "\<C> \<turnstile> [e] : (ts _> ts')"
+          "e = Data_drop x"
+  shows "instr_subtyping ([] _> []) (ts _> ts')" "x < length (data \<C>)"
   using assms
 proof (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
 qed (auto simp add: instr_subtyping_refl instr_subtyping_empty_comp2, metis instr_subtyping_trans)
@@ -1841,6 +1881,72 @@ next
   then show ?case using instr_subtyping_trans by blast
 qed (auto simp add: e_typing_l_typing.intros(10) instr_subtyping_refl instr_subtyping_trans)
 
+lemma e_type_memory_init:
+  assumes "s\<bullet>\<C> \<turnstile> [$Memory_init x] : (ts _> ts')"
+  shows "(([T_num T_i32, T_num T_i32, T_num T_i32] _> []) <ti: (ts _> ts')) \<and> length (memory \<C>) \<ge> 1 \<and> x < length (data \<C>)"
+  using assms
+proof (induction s \<C> "[$Memory_init x]" "(ts _> ts')" arbitrary: ts ts')
+  case (1 \<C> b_es \<S>)
+  then show ?case using b_e_type_memory_init
+    by fastforce
+next
+  case (2 \<S> \<C> es t1s t2s e t3s)
+  then show ?case
+    by (metis e_type_empty instr_subtyping_empty_comp2 last_snoc self_append_conv2)
+next
+  case (3 \<S> \<C> t1s t2s ts)
+  then show ?case
+    using instr_subtyping_trans by blast
+next
+  case (11 \<S> f \<C> rs es ts)
+  then show ?thesis
+    by (metis assms b_e_type_memory_init to_e_list_1 unlift_b_e)
+qed
+
+lemma e_type_memory_copy:
+  assumes "s\<bullet>\<C> \<turnstile> [$Memory_copy] : (ts _> ts')"
+  shows "(([T_num T_i32, T_num T_i32, T_num T_i32] _> []) <ti: (ts _> ts')) \<and> length (memory \<C>) \<ge> 1"
+  using assms
+proof (induction s \<C> "[$Memory_copy]" "(ts _> ts')" arbitrary: ts ts')
+  case (1 \<C> b_es \<S>)
+  then show ?case using b_e_type_memory_copy
+    by fastforce
+next
+  case (2 \<S> \<C> es t1s t2s e t3s)
+  then show ?case
+    by (metis e_type_empty instr_subtyping_empty_comp2 last_snoc self_append_conv2)
+next
+  case (3 \<S> \<C> t1s t2s ts)
+  then show ?case
+    using instr_subtyping_trans by blast
+next
+  case (11 \<S> f \<C> rs es ts)
+  then show ?thesis
+    by (metis assms b_e_type_memory_copy to_e_list_1 unlift_b_e)
+qed
+
+lemma e_type_memory_fill:
+  assumes "s\<bullet>\<C> \<turnstile> [$Memory_fill] : (ts _> ts')"
+  shows "(([T_num T_i32, T_num T_i32, T_num T_i32] _> []) <ti: (ts _> ts')) \<and> length (memory \<C>) \<ge> 1"
+  using assms
+proof (induction s \<C> "[$Memory_fill]" "(ts _> ts')" arbitrary: ts ts')
+  case (1 \<C> b_es \<S>)
+  then show ?case using b_e_type_memory_fill
+    by fastforce
+next
+  case (2 \<S> \<C> es t1s t2s e t3s)
+  then show ?case
+    by (metis e_type_empty instr_subtyping_empty_comp2 last_snoc self_append_conv2)
+next
+  case (3 \<S> \<C> t1s t2s ts)
+  then show ?case
+    using instr_subtyping_trans by blast
+next
+  case (11 \<S> f \<C> rs es ts)
+  then show ?thesis
+    by (metis assms b_e_type_memory_fill to_e_list_1 unlift_b_e)
+qed
+
 lemma e_type_table_init:
   assumes "s\<bullet>\<C> \<turnstile> [$Table_init x y] : (ts _> ts')"
   shows "(([T_num T_i32, T_num T_i32, T_num T_i32] _> []) <ti: (ts _> ts')) \<and> x < length (table \<C>) \<and> y < length (elem \<C>) \<and> tab_t_reftype (table \<C>!x) = (elem \<C>!y)"
@@ -1905,6 +2011,50 @@ next
   case (11 \<S> f \<C> rs es ts)
   then show ?thesis
     by (metis assms b_e_type_table_copy to_e_list_1 unlift_b_e)
+qed
+
+lemma e_type_elem_drop:
+  assumes "s\<bullet>\<C> \<turnstile> [$Elem_drop x] : (ts _> ts')"
+  shows "(([] _> []) <ti: (ts _> ts')) \<and> x < length (elem \<C>)"
+  using assms
+proof (induction s \<C> "[$Elem_drop x]" "(ts _> ts')" arbitrary: ts ts')
+  case (1 \<C> b_es \<S>)
+  then show ?case using b_e_type_elem_drop
+    by fastforce
+next
+  case (2 \<S> \<C> es t1s t2s e t3s)
+  then show ?case
+    by (metis append_self_conv2 e_type_empty1 instr_subtyping_empty_comp2 last_snoc)
+next
+  case (3 \<S> \<C> t1s t2s ts)
+  then show ?case
+    using instr_subtyping_trans by blast
+next
+  case (11 \<S> f \<C> rs es ts)
+  then show ?thesis
+    by (metis assms b_e_type_elem_drop to_e_list_1 unlift_b_e)
+qed
+
+lemma e_type_data_drop:
+  assumes "s\<bullet>\<C> \<turnstile> [$Data_drop x] : (ts _> ts')"
+  shows "(([] _> []) <ti: (ts _> ts')) \<and> x < length (data \<C>)"
+  using assms
+proof (induction s \<C> "[$Data_drop x]" "(ts _> ts')" arbitrary: ts ts')
+  case (1 \<C> b_es \<S>)
+  then show ?case using b_e_type_data_drop
+    by fastforce
+next
+  case (2 \<S> \<C> es t1s t2s e t3s)
+  then show ?case
+    by (metis append_self_conv2 e_type_empty1 instr_subtyping_empty_comp2 last_snoc)
+next
+  case (3 \<S> \<C> t1s t2s ts)
+  then show ?case
+    using instr_subtyping_trans by blast
+next
+  case (11 \<S> f \<C> rs es ts)
+  then show ?thesis
+    by (metis assms b_e_type_data_drop to_e_list_1 unlift_b_e)
 qed
 
 lemma cl_typing_native:
