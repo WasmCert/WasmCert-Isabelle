@@ -4743,14 +4743,248 @@ next
     using progress_L0[of s f "($C* cs2) @ ($* es)" _ _ _ "cs1" "[]"] cs_def(3)
     by fastforce
 next
-  case (memory_init \<C> i)
-  then show ?case sorry
+  case (memory_init \<C> x)
+  obtain vdest vsrc vn where
+    "s\<bullet>\<C> \<turnstile> $C* [vdest] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [vsrc] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [vn] : ([] _> [T_num T_i32])"
+    "vs = [vdest, vsrc, vn]"
+    using const_list_split_3[OF memory_init(3)]
+    by fastforce
+  then obtain dest src n where v_defs:
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 dest)] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 src)] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 n)] : ([] _> [T_num T_i32])"
+    "vdest = V_num (ConstInt32 dest)"
+    "vsrc = V_num (ConstInt32 src)"
+    "vn = V_num (ConstInt32 n)"
+    "vs = [V_num (ConstInt32 dest), V_num (ConstInt32 src), V_num (ConstInt32 n)]"
+    using const_of_i32 list.inject
+    by metis
+  obtain ndest nsrc nn where n_defs:
+    "ndest = nat_of_int dest"
+    "nsrc = nat_of_int src"
+    "nn = nat_of_int n"
+    by fastforce
+  obtain ma m where m_defs:
+    "smem_ind (f_inst f) = Some ma"
+    "(mems s)!ma = m"
+    using smem_ind_def memory_init.hyps(1) memory_init.prems(6) Suc_le_length_iff
+    by (metis One_nat_def list.simps(5))
+  obtain da dat where dat_defs:
+    "da = (inst.datas (f_inst f))!x"
+    "dat = (datas s)!da"
+    by auto
+  then show ?case
+  proof(cases "nsrc+nn > length dat \<or>  ndest+nn > mem_length m")
+    case True
+    then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
+        $Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+        using reduce.memory_init_trap[OF m_defs _ dat_defs n_defs True] memory_init.hyps(2) memory_init.prems(11)
+      by metis
+    then have "\<lparr>s;f;($C* vs) @ [$Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+      using v_defs
+      by (simp add: v_to_e_def)
+    then show ?thesis
+      by (metis to_e_list_1)
+  next
+    case False
+    then have h_bounds:"nsrc+nn\<le> length dat"  "ndest+nn \<le> mem_length m"
+      by auto
+    then show ?thesis
+    proof(cases nn)
+      case 0
+      then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
+        $Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+        using reduce.memory_init_done[OF m_defs _ dat_defs n_defs h_bounds 0] memory_init.hyps(2) memory_init.prems(11)
+        by metis
+      then have "\<lparr>s;f;($C* vs) @ [$Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+        using v_defs
+        by (simp add: v_to_e_def)
+      then show ?thesis
+        by (metis to_e_list_1)
+    next
+      case (Suc nn_pred)
+      then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
+        $Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat (ndest + 1))),
+                         $EConstNum (ConstInt32 (int_of_nat (nat_of_uint8 (dat ! nsrc)))),
+                         $Store T_i32 (Some Tp_i8) 0 0,
+                         $EConstNum (ConstInt32 (int_of_nat (ndest + 1))),
+                         $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))),
+                         $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Memory_init x]\<rparr>"
+        using reduce.memory_init[OF m_defs _ dat_defs n_defs h_bounds _, of nn_pred "nat_of_uint8 (dat ! nsrc)"] Suc memory_init.hyps(2) memory_init.prems(11)
+        by fastforce
+      then have "\<lparr>s;f;($C* vs) @ [$Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat (ndest + 1))),
+                         $EConstNum (ConstInt32 (int_of_nat (nat_of_uint8 (dat ! nsrc)))),
+                         $Store T_i32 (Some Tp_i8) 0 0,
+                         $EConstNum (ConstInt32 (int_of_nat (ndest + 1))),
+                         $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))),
+                         $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Memory_init x]\<rparr>"
+        using v_defs
+        by (simp add: v_to_e_def)
+      then show ?thesis
+        by (metis to_e_list_1)
+    qed
+  qed
 next
   case (memory_copy \<C>)
-  then show ?case sorry
+  obtain vdest vsrc vn where
+    "s\<bullet>\<C> \<turnstile> $C* [vdest] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [vsrc] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [vn] : ([] _> [T_num T_i32])"
+    "vs = [vdest, vsrc, vn]"
+    using const_list_split_3[OF memory_copy(2)]
+    by fastforce
+  then obtain dest src n where v_defs:
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 dest)] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 src)] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 n)] : ([] _> [T_num T_i32])"
+    "vdest = V_num (ConstInt32 dest)"
+    "vsrc = V_num (ConstInt32 src)"
+    "vn = V_num (ConstInt32 n)"
+    "vs = [V_num (ConstInt32 dest), V_num (ConstInt32 src), V_num (ConstInt32 n)]"
+    using const_of_i32 list.inject
+    by metis
+  obtain ndest nsrc nn where n_defs:
+    "ndest = nat_of_int dest"
+    "nsrc = nat_of_int src"
+    "nn = nat_of_int n"
+    by fastforce
+  obtain ma m where m_defs:
+    "smem_ind (f_inst f) = Some ma"
+    "(mems s)!ma = m"
+    using smem_ind_def memory_copy.hyps(1) memory_copy.prems(6) Suc_le_length_iff
+    by (metis One_nat_def list.simps(5))
+  then show ?case
+  proof(cases "mem_length m < nsrc + nn \<or> mem_length m < ndest + nn")
+    case True
+    then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
+        $Memory_copy ]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+        using reduce.memory_copy_trap[OF m_defs n_defs True] by metis
+    then have "\<lparr>s;f;($C* vs) @ [$Memory_copy]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+      using v_defs
+      by (simp add: v_to_e_def)
+    then show ?thesis
+      by (metis to_e_list_1)
+  next
+    case False
+    then have h_bounds: "nsrc + nn \<le> mem_length m " "ndest + nn \<le> mem_length m"
+      using le_def by blast+
+    then show ?thesis
+    proof(cases nn)
+      case 0
+      then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n), $Memory_copy ]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+        using memory_copy_done[OF m_defs n_defs h_bounds 0] by metis
+      then have "\<lparr>s;f;($C* vs) @ [$Memory_copy]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+        using v_defs
+        by (simp add: v_to_e_def)
+      then show ?thesis
+        by (metis to_e_list_1)
+    next
+      case (Suc nn_pred)
+      then show ?thesis
+      proof(cases "ndest \<le> nsrc")
+        case True
+        let ?es = "[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src),
+                                  $Load T_i32 (Some (Tp_i8, U)) 0 0,
+                                  $Store T_i32 (Some Tp_i8) 0 0,
+                                  $EConstNum (ConstInt32 (int_of_nat (ndest + 1))),
+                                  $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))),
+                                  $EConstNum (ConstInt32 n), $Memory_copy]"
+        have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n), $Memory_copy ]\<rparr> \<leadsto> \<lparr>s;f;?es\<rparr>"
+          using memory_copy_1[OF m_defs n_defs h_bounds _ True] Suc Suc_eq_plus1 by blast
+        then have "\<lparr>s;f;($C* vs) @ [$Memory_copy]\<rparr> \<leadsto> \<lparr>s;f;?es\<rparr>"
+          using v_defs
+          by (simp add: v_to_e_def)
+        then show ?thesis
+          by (metis to_e_list_1)
+      next
+        case False
+        let ?es = "[$EConstNum (ConstInt32 (int_of_nat (ndest + nn_pred))),
+                                  $EConstNum (ConstInt32 (int_of_nat (nsrc + nn_pred))),
+                                  $Load T_i32 (Some (Tp_i8, U)) 0 0,
+                                  $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 dest),
+                                  $EConstNum (ConstInt32 src),
+                                  $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Memory_copy]"
+        have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n), $Memory_copy ]\<rparr> \<leadsto> \<lparr>s;f;?es\<rparr>"
+          using memory_copy_2[OF m_defs n_defs h_bounds _] False Suc Suc_eq_plus1 le_def by blast
+        then have "\<lparr>s;f;($C* vs) @ [$Memory_copy]\<rparr> \<leadsto> \<lparr>s;f;?es\<rparr>"
+          using v_defs
+          by (simp add: v_to_e_def)
+        then show ?thesis
+          by (metis to_e_list_1)
+      qed
+    qed
+  qed
 next
   case (memory_fill \<C>)
-  then show ?case sorry
+  obtain vdest vval vn where
+    "s\<bullet>\<C> \<turnstile> $C* [vdest] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [vval] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [vn] : ([] _> [T_num T_i32])"
+    "vs = [vdest, vval, vn]"
+    using const_list_split_3[OF memory_fill(2)]
+    by fastforce
+  then obtain dest val n where v_defs:
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 dest)] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 val)] : ([] _> [T_num T_i32])"
+    "s\<bullet>\<C> \<turnstile> $C* [V_num (ConstInt32 n)] : ([] _> [T_num T_i32])"
+    "vdest = V_num (ConstInt32 dest)"
+    "vval = V_num (ConstInt32 val)"
+    "vn = V_num (ConstInt32 n)"
+    "vs = [V_num (ConstInt32 dest), V_num (ConstInt32 val), V_num (ConstInt32 n)]"
+    using const_of_i32 list.inject
+    by metis
+  obtain ndest  nn where n_defs:
+    "ndest = nat_of_int dest"
+    "nn = nat_of_int n"
+    by fastforce
+  obtain ma m where m_defs:
+    "smem_ind (f_inst f) = Some ma"
+    "(mems s)!ma = m"
+    using smem_ind_def memory_fill.hyps(1) memory_fill.prems(6) Suc_le_length_iff
+    by (metis One_nat_def list.simps(5))
+  then show ?case
+  proof(cases "mem_length m < ndest + nn")
+    case True
+    then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $EConstNum (ConstInt32 n),
+        $Memory_fill ]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+        using reduce.memory_fill_trap[OF m_defs n_defs True] by metis
+    then have "\<lparr>s;f;($C* vs) @ [$Memory_fill]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+      using v_defs
+      by (simp add: v_to_e_def)
+    then show ?thesis
+      by (metis to_e_list_1)
+  next
+    case False
+    then have h_bounds: "ndest + nn \<le> mem_length m" by auto
+    then show ?thesis
+    proof(cases nn)
+      case 0
+      then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $EConstNum (ConstInt32 n),
+          $Memory_fill ]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+          using reduce.memory_fill_done[OF m_defs n_defs h_bounds 0] by metis
+      then have "\<lparr>s;f;($C* vs) @ [$Memory_fill]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+        using v_defs
+        by (simp add: v_to_e_def)
+      then show ?thesis
+        by (metis to_e_list_1)
+    next
+      case (Suc nn_pred)
+      let ?es = "[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val),
+                                  $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 dest),
+                                  $EConstNum (ConstInt32 val),
+                                  $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Memory_fill]"
+      have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $EConstNum (ConstInt32 n),
+          $Memory_fill]\<rparr> \<leadsto> \<lparr>s;f;?es\<rparr>"
+          using reduce.memory_fill[OF m_defs n_defs h_bounds] Suc Suc_eq_plus1 by blast
+      then have "\<lparr>s;f;($C* vs) @ [$Memory_fill]\<rparr> \<leadsto> \<lparr>s;f;?es\<rparr>"
+        using v_defs
+        by (simp add: v_to_e_def)
+      then show ?thesis
+        by (metis to_e_list_1)
+    qed
+  qed
 next
   case (table_init x \<C> y tr)
   obtain vdest vsrc vn where
@@ -4882,13 +5116,38 @@ next
       case 0
       then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
           $Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>" using table_copy_done[OF tabx_defs taby_defs n_defs h_bounds] by simp
-    then have "\<lparr>s;f;($C*vs)@[$Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
-      using v_defs by (simp add: v_to_e_def)
-    then show ?thesis
-      by (metis to_e_list_1)
+      then have "\<lparr>s;f;($C*vs)@[$Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+        using v_defs by (simp add: v_to_e_def)
+      then show ?thesis
+        by (metis to_e_list_1)
     next
       case (Suc nn_pred)
-      then show ?thesis sorry
+      then show ?thesis
+      proof(cases "ndest \<le> nsrc")
+        case True
+        let ?es = "[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $Table_get y,
+                       $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ndest + 1))),
+                       $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))),
+                       $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_copy x y]"
+        have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
+            $Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;?es\<rparr>" using table_copy_1[OF tabx_defs taby_defs n_defs h_bounds _ True] Suc by simp
+        then have "\<lparr>s;f;($C*vs)@[$Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;?es\<rparr>"
+          using v_defs by (simp add: v_to_e_def)
+        then show ?thesis
+          by (metis to_e_list_1)
+      next
+        case False
+        let ?es = "[$EConstNum (ConstInt32 (int_of_nat (ndest + nn_pred))),
+                         $EConstNum (ConstInt32 (int_of_nat (nsrc + nn))), $Table_get y,
+                         $Table_set x, $EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src),
+                         $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_copy x y]"
+        have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
+            $Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;?es\<rparr>" using table_copy_2[OF tabx_defs taby_defs n_defs h_bounds _] False Suc by simp
+        then have "\<lparr>s;f;($C*vs)@[$Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;?es\<rparr>"
+          using v_defs by (simp add: v_to_e_def)
+        then show ?thesis
+          by (metis to_e_list_1)
+      qed
     qed
   qed
 next
@@ -4940,10 +5199,12 @@ next
   qed
 next
   case (elem_drop x \<C>)
-  then show ?case sorry
+  then show ?case using reduce.elem_drop
+    by (metis progress_L0_left to_e_list_1)
 next
   case (data_drop x \<C>)
-  then show ?case sorry
+  then show ?case using reduce.data_drop
+    by (metis progress_L0_left to_e_list_1)
 qed
 
 lemma progress_e:
