@@ -4500,7 +4500,7 @@ next
   then have cs_typeof: "map typeof cs2 = tf1" "map typeof cs1 = ts"
     using typing_map_typeof "1" tf1_eq ts_def(1) by fastforce+
   then have cs2_typing: "s\<bullet>\<C> \<turnstile> $C*cs2 : ([] _> tf1)"
-    using cs_def sledgehammer sorry
+    using cs_def e_type_consts store_extension_refl by blast
   have "(\<And>lholed. \<not> Lfilled 0 lholed [$Return] (($C*cs2) @ ($* es)))"
        "(\<And>i lholed. \<not> Lfilled 0 lholed [$Br i] (($C*cs2) @ ($* es)))"
   proof safe
