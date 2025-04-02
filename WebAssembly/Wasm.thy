@@ -12,7 +12,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
   \<comment> \<open>\<open>references\<close>\<close>
 | null_ref:"\<C> \<turnstile> [Null_ref t] :([] _> [T_ref t])"
 | is_null_ref:"\<C> \<turnstile> [Is_null_ref] :([T_ref t] _> [T_num T_i32])"
-| func_ref:"\<lbrakk>j < length (func_t \<C>)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Func_ref j] :([] _> [T_ref T_func_ref])"
+| func_ref:"\<lbrakk>j < length (func_t \<C>)\<rbrakk> \<Longrightarrow> j \<in> set (refs \<C>) \<Longrightarrow> \<C> \<turnstile> [Func_ref j] :([] _> [T_ref T_func_ref])"
   \<comment> \<open>\<open>vector ops\<close>\<close>
 | unop_vec:"\<C> \<turnstile> [Unop_vec op]  : ([T_vec T_v128]   _> [T_vec T_v128])"
 | binop_vec:"\<lbrakk>binop_vec_wf op\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Binop_vec op]  : ([T_vec T_v128, T_vec T_v128]   _> [T_vec T_v128])"
@@ -30,7 +30,8 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | unreachable:"\<C> \<turnstile> [Unreachable] : (ts _> ts')"
 | nop:"\<C> \<turnstile> [Nop] : ([] _> [])"
 | drop:"\<C> \<turnstile> [Drop] : ([t] _> [])"
-| select:"\<C> \<turnstile> [Select] : ([t,t,T_num T_i32] _> [t])"
+| select:"is_num_type t \<or> is_vec_type t \<Longrightarrow> \<C> \<turnstile> [Select] : ([t,t,T_num T_i32] _> [t])"
+| select_typed:"\<C> \<turnstile> [Select_typed t] : ([t,t,T_num T_i32] _> [t])"
   \<comment> \<open>\<open>block\<close>\<close>
 | block:"\<lbrakk>tb_tf_t \<C> tb = Some (tn _> tm); \<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr> \<turnstile> es : (tn _> tm)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Block tb es] : (tn _> tm)"
   \<comment> \<open>\<open>loop\<close>\<close>
@@ -48,7 +49,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
   \<comment> \<open>\<open>call\<close>\<close>
 | call:"\<lbrakk>i < length(func_t \<C>); (func_t \<C>)!i = tf\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call i] : tf"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
-| call_indirect:"\<lbrakk>i < length(types_t \<C>); (types_t \<C>)!i = (t1s _> t2s); length (table \<C>) \<ge> 1\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call_indirect i] : (t1s @ [T_num T_i32] _> t2s)"
+| call_indirect:"\<lbrakk>i < length(types_t \<C>); (types_t \<C>)!i = (t1s _> t2s); ti < length (table \<C>); (table \<C>)!ti = T_tab _  T_func_ref\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call_indirect ti i] : (t1s @ [T_num T_i32] _> t2s)"
   \<comment> \<open>\<open>get_local\<close>\<close>
 | get_local:"\<lbrakk>i < length(local \<C>); (local \<C>)!i = t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Get_local i] : ([] _> [t])"
   \<comment> \<open>\<open>set_local\<close>\<close>
@@ -73,50 +74,91 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | current_memory:"length (memory \<C>) \<ge> 1 \<Longrightarrow> \<C> \<turnstile> [Current_memory] : ([] _> [T_num T_i32])"
   \<comment> \<open>\<open>Grow_memory\<close>\<close>
 | grow_memory:"length (memory \<C>) \<ge> 1 \<Longrightarrow> \<C> \<turnstile> [Grow_memory] : ([T_num T_i32] _> [T_num T_i32])"
+\<comment> \<open>\<open>table_set\<close>\<close>
+| table_set: "\<lbrakk>ti < length (table \<C>); tab_t_reftype ((table \<C>)!ti) = tr\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Table_set ti] : ([T_num T_i32, T_ref tr] _> [])"
+\<comment> \<open>\<open>table_get\<close>\<close>
+| table_get: "\<lbrakk>ti < length (table \<C>); tab_t_reftype ((table \<C>)!ti) = tr\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Table_get ti] : ([T_num T_i32] _> [T_ref tr])"
+\<comment> \<open>\<open>table_size\<close>\<close>
+| table_size: "ti < length (table \<C>) \<Longrightarrow> \<C> \<turnstile> [Table_size ti] : ([] _> [T_num T_i32])"
+\<comment> \<open>\<open>table_grow\<close>\<close>
+| table_grow: "\<lbrakk>ti < length (table \<C>); tab_t_reftype ((table \<C>)!ti) = tr\<rbrakk>  \<Longrightarrow> \<C> \<turnstile> [Table_grow ti] : ([T_ref tr, T_num T_i32] _> [T_num T_i32])"
   \<comment> \<open>\<open>empty program\<close>\<close>
 | empty:"\<C> \<turnstile> [] : ([] _> [])"
   \<comment> \<open>\<open>composition\<close>\<close>
 | composition:"\<lbrakk>\<C> \<turnstile> es : (t1s _> t2s); \<C> \<turnstile> [e] : (t2s _> t3s)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> es @ [e] : (t1s _> t3s)"
-  \<comment> \<open>\<open>weakening\<close>\<close>
-| weakening:"\<C> \<turnstile> es : (t1s _> t2s) \<Longrightarrow> \<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"
+(*  \<comment> \<open>\<open>weakening\<close>\<close>
+| weakening:"\<C> \<turnstile> es : (t1s _> t2s) \<Longrightarrow> \<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"*)
+  \<comment> \<open>\<open>subtyping\<close>\<close>
+| subsumption:"\<lbrakk>\<C> \<turnstile> es : (tf1 _> tf2); instr_subtyping (tf1 _> tf2) (tf1' _> tf2')\<rbrakk> \<Longrightarrow> \<C> \<turnstile> es : (tf1' _> tf2')"
+  \<comment> \<open>\<open>memory_init\<close>\<close>
+| memory_init: "\<lbrakk>length (memory \<C>) \<ge> 1; i < length (data \<C>)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Memory_init i] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
+\<comment> \<open>\<open>memory_copy\<close>\<close>
+| memory_copy: "\<lbrakk>length (memory \<C>) \<ge> 1\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Memory_copy] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
+\<comment> \<open>\<open>memory_fill\<close>\<close>
+| memory_fill: "\<lbrakk>length (memory \<C>) \<ge> 1\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Memory_fill] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
+\<comment> \<open>\<open>table_init\<close>\<close>
+| table_init: "\<lbrakk>x < length (table \<C>); y < length (elem \<C>); tr = tab_t_reftype (table \<C>!x); tr = elem \<C>!y\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Table_init x y] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
+\<comment> \<open>\<open>memory_copy\<close>\<close>
+| table_copy: "\<lbrakk>x < length (table \<C>); tr = tab_t_reftype (table \<C>!x); y < length (table \<C>); tr = tab_t_reftype (table \<C>!y)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Table_copy x y] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
+\<comment> \<open>\<open>memory_fill\<close>\<close>
+| table_fill: "\<lbrakk>x < length (table \<C>); tr = tab_t_reftype (table \<C>!x)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Table_fill x ] : ([T_num T_i32, T_ref tr, T_num T_i32] _> [])"
+\<comment> \<open>\<open>elem_drop\<close>\<close>
+| elem_drop: "x < length (elem \<C>) \<Longrightarrow> \<C> \<turnstile> [Elem_drop x] : ([] _> [])"
+\<comment> \<open>\<open>data_drop\<close>\<close>
+| data_drop: "x < length (data \<C>) \<Longrightarrow> \<C> \<turnstile> [Data_drop x] : ([] _> [])"
+
+inductive ref_typing :: "[s, v_ref, t_ref] => bool" where
+   "ref_typing s (ConstNull t) (t)"
+ | "f < length (funcs s) \<Longrightarrow> ref_typing s (ConstRef f) (T_func_ref)"
+ | "ref_typing s (ConstRefExtern _) (T_ext_ref)"
+
+inductive v_typing :: "s \<Rightarrow> v \<Rightarrow> t \<Rightarrow> bool" where
+  "v_typing s (V_num vn) (T_num (typeof_num vn))" |
+  "v_typing s (V_vec vv) (T_vec (typeof_vec vv))" |
+  "ref_typing s vr t \<Longrightarrow> v_typing s (V_ref vr) (T_ref t)"
 
 definition "glob_typing g tg = (tg_mut tg = g_mut g \<and> tg_t tg = typeof (g_val g))"
 
 definition "globi_agree gs n g = (n < length gs \<and> glob_typing (gs!n) g)"
 
-definition "limits_compat lt1 lt2 =
-  ((l_min lt1) \<ge> (l_min lt2) \<and>
-  pred_option (\<lambda>lt2_the. (case (l_max lt1) of
-                            Some lt1_the \<Rightarrow> (lt1_the \<le> lt2_the)
-                          | None \<Rightarrow> False)) (l_max lt2))"
-
-definition "tab_typing t tt = (limits_compat \<lparr>l_min=(tab_size t),l_max=(tab_max t)\<rparr> tt)"
-
 definition "tabi_agree ts n tab_t =
-  ((n < length ts) \<and> (tab_typing (ts!n) tab_t))"
-
-definition "mem_typing m mt = (limits_compat \<lparr>l_min=(mem_size m),l_max=(mem_max m)\<rparr> mt)"
+  (n < length ts \<and> tab_subtyping (fst(ts!n)) tab_t)"
 
 definition "memi_agree ms n mem_t =
-  ((n < length ms) \<and> mem_typing (ms!n) mem_t)"
+  (n < length ms \<and> mem_subtyping (fst(ms!n)) mem_t)"
 
 definition "funci_agree fs n f = (n < length fs \<and> (cl_type (fs!n)) = f)"
+
+definition data_typing :: "datainst \<Rightarrow> data_t \<Rightarrow> bool "where
+  "data_typing d dt = True"
+
+definition datai_agree :: "datainst list \<Rightarrow> nat \<Rightarrow> data_t \<Rightarrow> bool" where
+  "datai_agree ds n dt = (n < length ds \<and> data_typing (ds!n) dt)"
+
+definition "elem_typing" :: "s \<Rightarrow> eleminst \<Rightarrow> elem_t \<Rightarrow> bool" where
+  "elem_typing s ei et = (fst ei = et \<and> list_all (\<lambda> vr. ref_typing s vr et) (snd ei))"
+
+definition "elemi_agree s es n et = (n < length es \<and> elem_typing s (es!n) et)"
 
 inductive inst_typing :: "[s, inst, t_context] \<Rightarrow> bool" where
   "\<lbrakk>list_all2 (funci_agree (funcs s)) fs tfs;
     list_all2 (globi_agree (globs s)) gs tgs;
     list_all2 (tabi_agree (tabs s)) tbs tabs_t;
-    list_all2 (memi_agree (mems s)) ms mems_t\<rbrakk>
-      \<Longrightarrow> inst_typing s \<lparr>types = ts, funcs = fs, tabs = tbs, mems = ms, globs = gs\<rparr>
-                        \<lparr>types_t = ts, func_t = tfs, global = tgs, table = tabs_t, memory = mems_t, local = [], label = [], return = None\<rparr>"
+    list_all2 (memi_agree (mems s)) ms mems_t;
+    list_all2 (elemi_agree s (elems s)) es elems_t;
+    list_all2 (datai_agree (datas s)) ds datas_t\<rbrakk>
+      \<Longrightarrow> inst_typing s \<lparr>types = ts, funcs = fs, tabs = tbs, mems = ms, globs = gs, elems = es, datas = ds\<rparr>
+                        \<lparr>types_t = ts, func_t = tfs, global = tgs, elem = elems_t, data = datas_t, table = tabs_t, memory = mems_t, local = [], label = [], return = None, refs = [0..<length fs]\<rparr>"
 
 inductive frame_typing :: "[s, f, t_context] \<Rightarrow> bool" where
-"\<lbrakk>tvs = map typeof (f_locs f); inst_typing s (f_inst f) \<C>\<rbrakk> \<Longrightarrow> frame_typing s f (\<C>\<lparr>local := tvs\<rparr>)"
+"\<lbrakk>list_all2 (\<lambda> v t. v_typing s v t) (f_locs f) tvs; inst_typing s (f_inst f) \<C>\<rbrakk> \<Longrightarrow> frame_typing s f (\<C>\<lparr>local := tvs\<rparr>)"
 
+(* n_zeros ts \<noteq> None precondition was added
+because t now contains not only value types
+but also T_bot. *)
 inductive cl_typing :: "[s, cl, tf] \<Rightarrow> bool" where
-   "\<lbrakk>inst_typing s i \<C>; tf = (t1s _> t2s); \<C>\<lparr>local := t1s @ ts, label := ([t2s] @ (label \<C>)), return := Some t2s\<rparr> \<turnstile> es : ([] _> t2s)\<rbrakk> \<Longrightarrow> cl_typing s (Func_native i tf ts es) (t1s _> t2s)"
+   "\<lbrakk>inst_typing s i \<C>; tf = (t1s _> t2s); \<C>\<lparr>local := t1s @ ts, label := ([t2s] @ (label \<C>)), return := Some t2s\<rparr> \<turnstile> es : ([] _> t2s); n_zeros ts \<noteq> None\<rbrakk> \<Longrightarrow> cl_typing s (Func_native i tf ts es) (t1s _> t2s)"
  |  "cl_typing s (Func_host tf h) tf"
-
 
 (* lifting the b_e_typing relation to the administrative operators *)
 inductive e_typing :: "[s, t_context, e list, tf] \<Rightarrow> bool" ("_\<bullet>_ \<turnstile> _ : _" 60)
@@ -126,9 +168,12 @@ and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> boo
   "\<C> \<turnstile> b_es : tf \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> $*b_es : tf"
   (* composition *)
 | "\<lbrakk>\<S>\<bullet>\<C> \<turnstile> es : (t1s _> t2s); \<S>\<bullet>\<C> \<turnstile> [e] : (t2s _> t3s)\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> es @ [e] : (t1s _> t3s)"
-  (* weakening *)
-| "\<S>\<bullet>\<C> \<turnstile> es : (t1s _> t2s) \<Longrightarrow>\<S>\<bullet>\<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"
-| "\<S>\<bullet>\<C> \<turnstile> [Ref v_r] :([] _> [T_ref (typeof_ref v_r)])"
+(*  (* weakening *)
+| "\<S>\<bullet>\<C> \<turnstile> es : (t1s _> t2s) \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"*)
+  (* subsumption *)
+| "\<lbrakk>\<S>\<bullet>\<C> \<turnstile> es : (tf1 _> tf2); instr_subtyping (tf1 _> tf2) (tf1' _> tf2')\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> es : (tf1' _> tf2')"
+
+| "ref_typing \<S> v_r t \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Ref v_r] :([] _> [T_ref t])"
   (* trap *)
 | "\<S>\<bullet>\<C> \<turnstile> [Trap] : tf"
   (* frame *)
@@ -140,18 +185,44 @@ and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> boo
   (* Init_mem (instantiation) *)
 | "\<lbrakk>length (memory \<C>) \<ge> 1\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Init_mem n bs] : ([] _> [])"
   (* Init_tab (instantiation) *)
-| "\<lbrakk>length (table \<C>) \<ge> 1; list_all (\<lambda>ti. ti < length (funcs \<S>)) tis\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Init_tab n tis] : ([] _> [])"
+  (* TODO: review/change this and check that this is correct *)
+| "\<lbrakk>ti < length (table \<C>); tt = tab_t_reftype (table \<C>!ti); list_all (\<lambda>vr. ref_typing \<S> vr tt) vrs\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Init_tab ti n vrs] : ([] _> [])"
 (* section: l_typing *)
 | "\<lbrakk>frame_typing \<S> f \<C>; \<S>\<bullet>\<C>\<lparr>return := rs\<rparr> \<turnstile> es : ([] _> ts)\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile> f;es : ts"
 
+
+
+definition "glob_agree" :: "s \<Rightarrow> global \<Rightarrow> bool" where
+  "glob_agree s glob = (\<exists> t. v_typing s (g_val glob) t)"
+(*
 definition "tab_agree s tab =
   ((list_all (\<lambda>i_opt. (case i_opt of None \<Rightarrow> True | Some i \<Rightarrow> i < length (funcs s))) (fst tab)) \<and>
    pred_option (\<lambda>max. (tab_size tab) \<le> max) (tab_max tab))"
+*)
 
+definition tab_agree  :: "[s, tabinst] => bool" where
+"tab_agree s t = (case t of
+ ((T_tab lims tr, tab_elems)) \<Rightarrow>
+  l_min lims = (tab_size t) \<and>
+  pred_option (\<lambda> max. tab_size t \<le> max) (tab_max t) \<and>
+  list_all (\<lambda> vr. ref_typing s vr tr) tab_elems)"
+
+definition elem_agree :: "[s, eleminst] \<Rightarrow> bool" where
+  "elem_agree s ei = (list_all (\<lambda> vr. ref_typing s vr (fst ei)) (snd ei))"
+
+definition data_agree :: "[s, datainst] \<Rightarrow> bool" where
+  "data_agree s di = True"
+
+
+(* TODO: should there be more rules here? *)
+(* TODO:  Fix adding this: https://webassembly.github.io/spec/core/appendix/properties.html#valid-tableinst *)
 inductive store_typing :: "s \<Rightarrow> bool" where
   "\<lbrakk>list_all (\<lambda>cl. \<exists>tf. cl_typing s cl tf) (funcs s);
     list_all (tab_agree s) (tabs s);
-    list_all mem_agree (mems s)
+    list_all mem_agree (mems s);
+    list_all (glob_agree s) (globs s);
+    list_all (elem_agree s) (elems s);
+    list_all (data_agree s) (datas s)
     \<rbrakk> \<Longrightarrow> store_typing s"
 
 inductive config_typing :: "[s, f, e list, t list] \<Rightarrow> bool" ("\<turnstile> _;_;_ : _" 60) where
@@ -206,6 +277,8 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
   \<comment> \<open>\<open>select\<close>\<close>
 | select_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$C v1, $C v2, $EConstNum (ConstInt32 n), ($ Select)]\<rparr> \<leadsto> \<lparr>[$C v2]\<rparr>"
 | select_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$C v1, $C v2, $EConstNum (ConstInt32 n), ($ Select)]\<rparr> \<leadsto> \<lparr>[$C v1]\<rparr>"
+| select_typed_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$C v1, $C v2, $EConstNum (ConstInt32 n), ($ Select_typed t)]\<rparr> \<leadsto> \<lparr>[$C v2]\<rparr>"
+| select_typed_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$C v1, $C v2, $EConstNum (ConstInt32 n), ($ Select_typed t)]\<rparr> \<leadsto> \<lparr>[$C v1]\<rparr>"
   \<comment> \<open>\<open>if\<close>\<close>
 | if_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$EConstNum (ConstInt32 n), $(If tb e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tb e2s)]\<rparr>"
 | if_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$EConstNum (ConstInt32 n), $(If tb e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tb e1s)]\<rparr>"
@@ -232,15 +305,14 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
 (* full reduction rule *)
 inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>_;_;_\<rparr> \<leadsto> \<lparr>_;_;_\<rparr>" 60) where
   \<comment> \<open>\<open>lifting basic reduction\<close>\<close>
-
   basic:"\<lparr>e\<rparr> \<leadsto> \<lparr>e'\<rparr> \<Longrightarrow> \<lparr>s;f;e\<rparr> \<leadsto> \<lparr>s;f;e'\<rparr>"
   \<comment> \<open>\<open>call\<close>\<close>
 | call:"\<lparr>s;f;[$(Call j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke (sfunc_ind (f_inst f) j)]\<rparr>"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
-| call_indirect_Some:"\<lbrakk>(f_inst f) = i; stab s i (nat_of_int c) = Some i_cl; stypes i j = tf; cl_type (funcs s!i_cl) = tf\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke i_cl]\<rparr>"
-| call_indirect_None:"\<lbrakk>(f_inst f) = i; (stab s i (nat_of_int c) = Some i_cl \<and> stypes i j \<noteq> cl_type (funcs s!i_cl)) \<or> stab s i (nat_of_int c) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Call_indirect j)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| call_indirect_Some:"\<lbrakk>(f_inst f) = i; stab s i ti (nat_of_int c) = Some (ConstRef i_cl); stypes i j = tf; cl_type (funcs s!i_cl) = tf\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Call_indirect ti j)]\<rparr> \<leadsto> \<lparr>s;f;[Invoke i_cl]\<rparr>"
+| call_indirect_None:"\<lbrakk>(f_inst f) = i; (stab s i ti (nat_of_int c) = Some (ConstRef i_cl) \<and> stypes i j \<noteq> cl_type (funcs s!i_cl)) \<or> \<not> is_some_const_ref_func (stab s i ti (nat_of_int c))\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Call_indirect ti j)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>invoke\<close>\<close>
-| invoke_native:"\<lbrakk>(funcs s!i_cl) = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = zs) \<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;[Frame m \<lparr> f_locs = vcs@zs, f_inst = j \<rparr> [(Label m [] ($*es))]]\<rparr>"
+| invoke_native:"\<lbrakk>(funcs s!i_cl) = Func_native j (t1s _> t2s) ts es; ves = ($C* vcs); length vcs = n; length ts = k; length t1s = n; length t2s = m; (n_zeros ts = Some zs) \<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;[Frame m \<lparr> f_locs = vcs@zs, f_inst = j \<rparr> [(Label m [] ($*es))]]\<rparr>"
 | invoke_host_Some:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs (Some (s', vcs'))\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f;($C* vcs')\<rparr>"
 | invoke_host_None:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>references\<close>\<close>
@@ -280,6 +352,20 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
 | grow_memory:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Grow_memory)]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[$EConstNum (ConstInt32 (int_of_nat n))]\<rparr>"
   \<comment> \<open>\<open>grow_memory fail\<close>\<close>
 | grow_memory_fail:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c),$(Grow_memory)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 int32_minus_one)]\<rparr>"
+  \<comment> \<open>\<open>table get\<close>\<close>
+| table_get: "\<lbrakk>stab_ind (f_inst f) ti = Some a; load_tabs1 (tabs s) a (nat_of_int n) = Some val \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(EConstNum (ConstInt32 n)), $(Table_get ti)]\<rparr> \<leadsto> \<lparr>s;f;[Ref val]\<rparr>"
+  \<comment> \<open>\<open>table get fail\<close>\<close>
+| table_get_fail: "\<lbrakk>(stab_ind (f_inst f) ti = None) \<or> (stab_ind (f_inst f) ti = Some a \<and> load_tabs1 (tabs s) a (nat_of_int n) = None) \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(EConstNum (ConstInt32 n)), $(Table_get ti)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+  \<comment> \<open>\<open>table set\<close>\<close>
+| table_set: "\<lbrakk>stab_ind (f_inst f) ti = Some a; store_tabs1 (tabs s) a (nat_of_int n) vr = Some tabs'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(EConstNum (ConstInt32 n)), Ref vr, $(Table_set ti)]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:= tabs'\<rparr>;f;[]\<rparr>"
+  \<comment> \<open>\<open>table set fail\<close>\<close>
+| table_set_fail: "\<lbrakk>(stab_ind (f_inst f) ti = None) \<or> (stab_ind (f_inst f) ti = Some a \<and> store_tabs1 (tabs s) a (nat_of_int n) vr = None)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(EConstNum (ConstInt32 n)), Ref vr, $(Table_set ti)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+  \<comment> \<open>\<open>table size\<close>\<close>
+| table_size: "\<lbrakk>stab_ind (f_inst f) ti = Some a; (tabs s)!a = t; tab_size t = n\<rbrakk> \<Longrightarrow>  \<lparr>s;f;[ $(Table_size ti)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat n))]\<rparr>"
+  \<comment> \<open>\<open>table grow\<close>\<close>
+| table_grow: "\<lbrakk>stab_ind (f_inst f) ti = Some a; (tabs s)!a = tab; sz = tab_size tab; grow_tab tab (nat_of_int n) vr = Some tab'\<rbrakk> \<Longrightarrow>  \<lparr>s;f;[Ref vr, $EConstNum (ConstInt32 n), $(Table_grow ti)]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:= ((tabs s)[a := tab'])\<rparr>;f;[$EConstNum (ConstInt32 (int_of_nat sz))]\<rparr>"
+  \<comment> \<open>\<open>table grow fail\<close>\<close>
+| table_grow_fail: "\<lparr>s;f;[Ref vr, $EConstNum (ConstInt32 n), $(Table_grow ti)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int32_minus_one))]\<rparr>"
   \<comment> \<open>\<open>block\<close>\<close>
 | block:"\<lbrakk>length vs = n; tb_tf (f_inst f) tb = (t1s _> t2s); length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>s;f;($C* vs) @ [$(Block tb es)]\<rparr> \<leadsto> \<lparr>s;f;[Label m [] (($C* vs) @ ($* es))]\<rparr>"
   \<comment> \<open>\<open>loop\<close>\<close>
@@ -292,8 +378,39 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
   (* instantiation helpers *)
 | init_mem_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; store m n 0 bs (length bs) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_mem n bs]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[]\<rparr>"
 | init_mem_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; store m n 0 bs (length bs) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_mem n bs]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
-| init_tab_Some:"\<lbrakk>stab_ind (f_inst f) = Some j; ((tabs s)!j) = t; store_tab t n icls = Some tab'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_tab n icls]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:= ((tabs s)[j := tab'])\<rparr>;f;[]\<rparr>"
-| init_tab_None:"\<lbrakk>stab_ind (f_inst f) = Some j; ((tabs s)!j) = t; store_tab t n icls = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_tab n icls]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| init_tab_Some:"\<lbrakk>stab_ind (f_inst f) ti = Some j; ((tabs s)!j) = t; store_tab_list t n icls = Some tab'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_tab ti n icls]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:= ((tabs s)[j := tab'])\<rparr>;f;[]\<rparr>"
+| init_tab_None:"\<lbrakk>stab_ind (f_inst f) ti = Some j; ((tabs s)!j) = t; store_tab_list t n icls = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_tab ti n icls]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+  \<comment> \<open>\<open>memory init\<close>\<close>
+| memory_init_trap: "\<lbrakk>smem_ind (f_inst f) = Some ma; (mems s)!ma = m; x < length (inst.datas (f_inst f)); da =(inst.datas (f_inst f))!x; dat = (datas s)!da; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc+nn > length dat \<or>  ndest+nn > mem_length m \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| memory_init_done: "\<lbrakk>smem_ind (f_inst f) = Some ma; (mems s)!ma = m; x < length (inst.datas (f_inst f)); da =(inst.datas (f_inst f))!x; dat = (datas s)!da; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc+nn \<le> length dat;  ndest+nn \<le> mem_length m; nn = 0 \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+| memory_init: "\<lbrakk>smem_ind (f_inst f) = Some ma; (mems s)!ma = m; x < length (inst.datas (f_inst f)); da =(inst.datas (f_inst f))!x; dat = (datas s)!da; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc+nn \<le> length dat;  ndest+nn \<le> mem_length m; nn = nn_pred+1; b = nat_of_uint8 (dat!nsrc) \<rbrakk> \<Longrightarrow>
+  \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat b)), $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 (int_of_nat (nn_pred))) ,$Memory_init x]\<rparr>"
+  \<comment> \<open>\<open>memory copy\<close>\<close>
+| memory_copy_trap: "\<lbrakk>smem_ind (f_inst f) = Some ma; (mems s)!ma = m; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc+nn > mem_length m \<or>  ndest+nn > mem_length m \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Memory_copy]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| memory_copy_done: "\<lbrakk>smem_ind (f_inst f) = Some ma; (mems s)!ma = m; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc+nn \<le> mem_length m; ndest+nn \<le> mem_length m; nn=0 \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Memory_copy]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+| memory_copy_1: "\<lbrakk>smem_ind (f_inst f) = Some ma; (mems s)!ma = m; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc+nn \<le> mem_length m; ndest+nn \<le> mem_length m; nn=nn_pred+1; ndest \<le> nsrc \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n), $Memory_copy]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $Load T_i32 (Some (Tp_i8, U)) 0 0, $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 n), $Memory_copy]\<rparr>"
+| memory_copy_2: "\<lbrakk>smem_ind (f_inst f) = Some ma; (mems s)!ma = m; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc+nn \<le> mem_length m; ndest+nn \<le> mem_length m; nn=nn_pred+1; ndest > nsrc \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n), $Memory_copy]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat (ndest+nn_pred))), $EConstNum (ConstInt32 (int_of_nat (nsrc+nn_pred))), $Load T_i32 (Some (Tp_i8, U)) 0 0, $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Memory_copy]\<rparr>"
+  \<comment> \<open>\<open>memory fill\<close>\<close>
+| memory_fill_trap: "\<lbrakk>smem_ind (f_inst f) = Some ma; (mems s)!ma = m; ndest = nat_of_int dest; nn = nat_of_int n; ndest+nn > mem_length m \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $EConstNum (ConstInt32 n),$Memory_fill]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| memory_fill_done: "\<lbrakk>smem_ind (f_inst f) = Some ma; (mems s)!ma = m; ndest = nat_of_int dest; nn = nat_of_int n; ndest+nn \<le> mem_length m; nn=0 \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $EConstNum (ConstInt32 n),$Memory_fill]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+| memory_fill: "\<lbrakk>smem_ind (f_inst f) = Some ma; (mems s)!ma = m; ndest = nat_of_int dest; nn = nat_of_int n; ndest+nn \<le> mem_length m; nn=nn_pred+1 \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $EConstNum (ConstInt32 n),$Memory_fill]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $EConstNum (ConstInt32 (int_of_nat nn_pred)) ,$Memory_fill]\<rparr>"
+  \<comment> \<open>\<open>table init\<close>\<close>
+| table_init_trap: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; y < length (inst.elems (f_inst f));  ea = (inst.elems (f_inst f))!y; el = (elems s)!ea; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc+nn > length (snd el) \<or> ndest+nn > length (snd tab)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| table_init_done: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; y < length (inst.elems (f_inst f)); ea = (inst.elems (f_inst f))!y; el = (elems s)!ea; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc + nn \<le> length (snd el); ndest + nn  \<le> length (snd tab); nn = 0\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+| table_init: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; y < length (inst.elems (f_inst f)); ea = (inst.elems (f_inst f))!y; el = (elems s)!ea; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc + nn \<le> length (snd el); ndest + nn  \<le> length (snd tab); nn = nn_pred+1; val = (snd el)!nsrc\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $C (V_ref val), $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_init x y]\<rparr>"
+  \<comment> \<open>\<open>table fill\<close>\<close>
+| table_fill_trap: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; ni = nat_of_int i; nn = nat_of_int n; ni+nn > length (snd tab) \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32  n),$Table_fill x]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| table_fill_done: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; ni = nat_of_int i; nn = nat_of_int n; ni+nn \<le> length (snd tab); nn = 0 \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32 n),$Table_fill x]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+| table_fill: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; ni = nat_of_int i; nn = nat_of_int n; ni+nn \<le> length (snd tab); nn = nn_pred+1 \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32 n),$Table_fill x]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ni+1))), $C (V_ref vr), $EConstNum (ConstInt32 (int_of_nat n_pred)), $Table_fill x]\<rparr>"
+  \<comment> \<open>\<open>table copy\<close>\<close>
+| table_copy_trap: "\<lbrakk>stab_ind (f_inst f) x = Some tax; (tabs s)!tax = tabx; stab_ind (f_inst f) y = Some tay; (tabs s)!ty = taby; ndest = nat_of_int dest; nrsc = nat_of_int src; nn = nat_of_int n; nsrc+nn > length (snd tabx) \<or> ndest + nn > length (snd taby) \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| table_copy_done: "\<lbrakk>stab_ind (f_inst f) x = Some tax; (tabs s)!tax = tabx; stab_ind (f_inst f) y = Some tay; (tabs s)!ty = taby; ndest = nat_of_int dest; nrsc = nat_of_int src; nn = nat_of_int n; nsrc+nn \<le> length (snd tabx); ndest+nn \<le> length (snd taby); nn = 0 \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+| table_copy_1: "\<lbrakk>stab_ind (f_inst f) x = Some tax; (tabs s)!tax = tabx; stab_ind (f_inst f) y = Some tay; (tabs s)!ty = taby; ndest = nat_of_int dest; nrsc = nat_of_int src; nn = nat_of_int n; nsrc+nn \<le> length (snd tabx); ndest+nn \<le> length (snd taby); nn = nn_pred+1; ndest \<le> nsrc \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $Table_get y, $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_copy x y]\<rparr>"
+| table_copy_2: "\<lbrakk>stab_ind (f_inst f) x = Some tax; (tabs s)!tax = tabx; stab_ind (f_inst f) y = Some tay; (tabs s)!ty = taby; ndest = nat_of_int dest; nrsc = nat_of_int src; nn = nat_of_int n; nsrc+nn \<le> length (snd tabx); ndest+nn \<le> length (snd taby); nn = nn_pred+1; ndest > nsrc \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat (ndest+nn_pred))), $EConstNum (ConstInt32 (int_of_nat (nsrc+nn))), $Table_get y, $Table_set x, $EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_copy x y]\<rparr>"
+  \<comment> \<open>\<open>elem drop\<close>\<close>
+| elem_drop: "\<lbrakk>x < length (inst.elems (f_inst f)); a = (inst.elems (f_inst f))!x\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$Elem_drop x]\<rparr> \<leadsto> \<lparr>s\<lparr>elems := (elems s)[a := (fst ((elems s)!a), [])]\<rparr>;f;[]\<rparr>"
+  \<comment> \<open>\<open>data drop\<close>\<close>
+| data_drop: "\<lbrakk>x < length (inst.datas (f_inst f)); a = (inst.datas (f_inst f))!x\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$Data_drop x]\<rparr> \<leadsto> \<lparr>s\<lparr>datas := (datas s)[a := []]\<rparr>;f;[]\<rparr>"
 
 definition reduce_trans where
   "reduce_trans \<equiv> (\<lambda>(s,f,es) (s',f',es'). \<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>)^**"
@@ -310,12 +427,11 @@ type_synonym v_stack = "v list"
 abbreviation v_stack_to_es :: " v_stack \<Rightarrow> e list"
   where "v_stack_to_es v \<equiv> $C* (rev v)"
 
-
 definition "computes cfg s' vs \<equiv> \<exists>f'. reduce_trans cfg (s', f', v_stack_to_es vs)"
   
 definition "traps cfg s' \<equiv> \<exists>f'. reduce_trans cfg (s',f',[Trap])"
 
-definition "empty_frame \<equiv> \<lparr>f_locs = [],f_inst = \<lparr> types = [], funcs = [], tabs = [], mems = [], globs = []\<rparr>\<rparr>"
+definition "empty_frame \<equiv> \<lparr>f_locs = [],f_inst = \<lparr> types = [], funcs = [], tabs = [], mems = [], globs = [], elems = [], datas = []\<rparr>\<rparr>"
 
 definition "invoke_config s vargs i \<equiv> (s, empty_frame, ($C* vargs) @ [Invoke i])"
 

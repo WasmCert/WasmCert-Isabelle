@@ -62,11 +62,6 @@ free_constructors case_limit_t_ext for limit_t_ext
   using limit_t.cases_scheme
   by blast+
 
-type_synonym tab_t = \<comment> \<open>table type\<close>
-  "limit_t"
-
-type_synonym mem_t = \<comment> \<open>memory type\<close>
-  "limit_t"
 
 definition Ki64 :: "nat" where
   "Ki64 = 65536"
@@ -75,34 +70,37 @@ typedef mem_rep = "UNIV :: (byte list) set" ..
 setup_lifting type_definition_mem_rep
 declare Quotient_mem_rep[transfer_rule]
 
-type_synonym mem = "(mem_rep \<times> nat option)"
+type_synonym mem_t = \<comment> \<open>memory type\<close>
+  "limit_t"
+
+type_synonym mem = "(mem_t \<times> mem_rep)"
 
 lift_definition mem_rep_mk :: "nat \<Rightarrow> mem_rep" is "(\<lambda>n. (bytes_replicate (n * Ki64) zero_byte))" .
 definition mem_mk :: "limit_t \<Rightarrow> mem" where
-  "mem_mk lim = (mem_rep_mk (l_min lim), l_max lim)"
+  "mem_mk lim = (lim, mem_rep_mk (l_min lim))"
 
 lift_definition mem_rep_byte_at :: "mem_rep \<Rightarrow> nat \<Rightarrow> byte" is "(\<lambda>m n. m!n)::(byte list) \<Rightarrow> nat \<Rightarrow> byte" .
 definition byte_at :: "mem \<Rightarrow> nat \<Rightarrow> byte" where
-  "byte_at m n = mem_rep_byte_at (fst m) n"
+  "byte_at m n = mem_rep_byte_at (snd m) n"
 
 lift_definition mem_rep_length :: "mem_rep \<Rightarrow> nat" is "(\<lambda>m. length m)" .
 definition mem_length :: "mem \<Rightarrow> nat" where
-  "mem_length m = mem_rep_length (fst m)"
+  "mem_length m = mem_rep_length (snd m)"
 
 definition mem_max :: "mem \<Rightarrow> nat option" where
-  "mem_max m = snd m"
+  "mem_max m = l_max (fst m)"
 
 lift_definition mem_rep_read_bytes :: "mem_rep \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes" is "(\<lambda>m n l. (take l (drop n m))::(byte list))" .
 definition read_bytes :: "mem \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bytes" where
-  "read_bytes m n l = mem_rep_read_bytes (fst m) n l"
+  "read_bytes m n l = mem_rep_read_bytes (snd m) n l"
 
 lift_definition mem_rep_write_bytes :: "mem_rep \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> mem_rep" is "(\<lambda>m n bs. ((take n m) @ bs @ (drop (n + length bs) m)) :: byte list)" .
 definition write_bytes :: "mem \<Rightarrow> nat \<Rightarrow> bytes \<Rightarrow> mem" where
-  "write_bytes m n bs = (mem_rep_write_bytes (fst m) n bs, snd m)"
+  "write_bytes m n bs = (fst m, mem_rep_write_bytes (snd m) n bs)"
 
 lift_definition mem_rep_append :: "mem_rep \<Rightarrow> nat \<Rightarrow> byte \<Rightarrow> mem_rep" is "(\<lambda>m n b. (append m (replicate n b))::byte list)" .
 definition mem_append :: "mem \<Rightarrow> nat \<Rightarrow> byte \<Rightarrow> mem" where
-  "mem_append m n b = (mem_rep_append (fst m) n b, snd m)"
+  "mem_append m n b = ((fst m)\<lparr>l_min := l_min (fst m) + (n div Ki64)\<rparr>, mem_rep_append (snd m) n b)"
 
 lemma take_drop_map:
   assumes "ind+n \<le> length bs"
@@ -138,7 +136,7 @@ datatype
   t_ref = T_func_ref | T_ext_ref
 
 datatype \<comment> \<open>value types\<close>
-  t = T_num t_num | T_vec t_vec | T_ref t_ref
+  t = T_num t_num | T_vec t_vec | T_ref t_ref | T_bot
 
 datatype \<comment> \<open>packed numeric types\<close>
   tp_num = Tp_i8 | Tp_i16 | Tp_i32
@@ -157,6 +155,7 @@ free_constructors case_tg_ext for tg_ext
   using tg.cases_scheme
   by blast+
 
+
 datatype \<comment> \<open>function types\<close>
   tf = Tf (dom: "t list") (ran: "t list") ("_ '_> _" 60)
 hide_const (open) tf.dom tf.ran
@@ -164,16 +163,32 @@ hide_const (open) tf.dom tf.ran
 datatype \<comment> \<open>block types\<close>
   tb = Tbf i | Tbv "t option"
 
+datatype tab_t = T_tab limit_t t_ref
+
+definition tab_t_lim :: "tab_t \<Rightarrow> limit_t" where
+"tab_t_lim tt = (case tt of
+  T_tab lim _ \<Rightarrow> lim)"
+
+definition tab_t_reftype :: "tab_t \<Rightarrow> t_ref" where
+"tab_t_reftype tt = (case tt of
+  T_tab _ t \<Rightarrow> t)"
+
+type_synonym data_t = "unit"
+type_synonym elem_t = "t_ref"
+
 (* TYPING *)
 record t_context =
   types_t :: "tf list"
   func_t :: "tf list"
   global :: "tg list"
+  elem :: "elem_t list"
+  data :: "data_t list"
   table :: "tab_t list"
   memory :: "mem_t list"
   local :: "t list"
   label :: "(t list) list"
   return :: "(t list) option"
+  refs :: "i list"
 
 datatype \<comment> \<open>numeric values\<close>
   v_num = ConstInt32 i32
@@ -183,7 +198,7 @@ datatype \<comment> \<open>numeric values\<close>
 
 datatype
   v_ref = ConstNull t_ref
-  | ConstRef i
+  | ConstRef i (* TODO: rename this ConstRefFunc *)
   | ConstRefExtern host
 
 datatype \<comment> \<open>vector values\<close>
@@ -365,6 +380,7 @@ datatype \<comment> \<open>basic instructions\<close>
     | Nop
     | Drop
     | Select
+    | Select_typed t
     | Block tb "b_e list"
     | Loop tb "b_e list"
     | If tb "b_e list" "b_e list"
@@ -373,12 +389,16 @@ datatype \<comment> \<open>basic instructions\<close>
     | Br_table "i list" i
     | Return
     | Call i
-    | Call_indirect i
+    | Call_indirect i i
     | Get_local i
     | Set_local i
     | Tee_local i
     | Get_global i
     | Set_global i
+    | Table_get i
+    | Table_set i
+    | Table_size i
+    | Table_grow i
     | Load t_num "(tp_num \<times> sx) option" a off
     | Store t_num "tp_num option" a off
     | Load_vec loadop_vec a off
@@ -386,6 +406,14 @@ datatype \<comment> \<open>basic instructions\<close>
     | Store_vec storeop_vec a off
     | Current_memory
     | Grow_memory
+    | Memory_init i
+    | Memory_fill
+    | Memory_copy
+    | Table_init i i
+    | Table_copy i i
+    | Table_fill i
+    | Elem_drop i
+    | Data_drop i
     (*| EConst v ("C _" 60) *)
     | EConstNum v_num
     | EConstVec v_vec
@@ -396,7 +424,7 @@ datatype \<comment> \<open>basic instructions\<close>
     | Cvtop t_num cvtop t_num "(sat \<times> sx) option"
     | Null_ref t_ref
     | Is_null_ref
-    | Func_ref i
+    | Func_ref i (* should be Ref_func *)
     | Unop_vec unop_vec
     | Binop_vec binop_vec
     | Ternop_vec ternop_vec
@@ -416,15 +444,25 @@ record inst = \<comment> \<open>instances\<close>
   tabs :: "i list"
   mems :: "i list"
   globs :: "i list"
+  elems :: "i list"
+  datas :: "i list"
 
 datatype cl = \<comment> \<open>function closures\<close>
   Func_native inst tf "t list" "b_e list"
 | Func_host tf host
 
-type_synonym tabinst = "(i option) list \<times> nat option"
+type_synonym tabinst = "tab_t \<times> v_ref list"
+type_synonym eleminst = "elem_t \<times> v_ref list"
+type_synonym datainst =  "bytes"
 
-abbreviation "tab_size (t::tabinst) \<equiv> length (fst t)"
-abbreviation "tab_max (t::tabinst) \<equiv> snd t"
+abbreviation "tab_size (t::tabinst) \<equiv> length (snd t)"
+definition tab_max :: "tabinst \<Rightarrow> nat option" where
+  "tab_max t \<equiv> (case t of
+    (T_tab limits _, _) \<Rightarrow> l_max limits)"
+
+definition tab_reftype :: "tabinst \<Rightarrow> t_ref" where
+  "tab_reftype t \<equiv> (case (fst t) of
+    T_tab _ tt \<Rightarrow> tt)"
 
 record global =
   g_mut :: mut
@@ -435,6 +473,8 @@ record s = \<comment> \<open>store\<close>
   tabs :: "tabinst list"
   mems :: "mem list"
   globs :: "global list"
+  elems :: "eleminst list"
+  datas :: "datainst list"
 
 record f = \<comment> \<open>frame\<close>
   f_locs :: "v list"
@@ -450,7 +490,7 @@ datatype e = \<comment> \<open>administrative instruction\<close>
 
   (* only used by instantiation *)
   | Init_mem nat "byte list"
-  | Init_tab nat "i list"
+  | Init_tab i nat "v_ref list"
 
 datatype Lholed =
     \<comment> \<open>L0 = v* [<hole>] e*\<close>

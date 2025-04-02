@@ -206,11 +206,18 @@ lift_definition deserialise_i64 :: "bytes \<Rightarrow> i64" is "word_rcat_rev\<
 lift_definition wasm_bool :: "bool \<Rightarrow> i32" is "(\<lambda>b. if b then 1 else 0)" .
 lift_definition  int32_minus_one :: i32 is "max_word" .
 
+  (* limits *)
+definition "limits_compat lt1 lt2 =
+  ((l_min lt1) \<ge> (l_min lt2) \<and>
+  pred_option (\<lambda>lt2_the. (case (l_max lt1) of
+                            Some lt1_the \<Rightarrow> (lt1_the \<le> lt2_the)
+                          | None \<Rightarrow> False)) (l_max lt2))"
+
   (* memory *)
 definition mem_size :: "mem \<Rightarrow> nat" where
   "mem_size m = (mem_length m) div Ki64"
 
-abbreviation "mem_agree m \<equiv> pred_option ((\<le>) (mem_size m)) (mem_max m)"
+abbreviation "mem_agree m \<equiv> l_min (fst m) * Ki64 = mem_length m \<and> pred_option ((\<le>) (mem_size m)) (mem_max m)"
 
 definition mem_grow :: "mem \<Rightarrow> nat \<Rightarrow> mem option" where
   "mem_grow m n = (let len = (mem_size m) + n in
@@ -241,10 +248,75 @@ definition store :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes
 definition store_packed :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes \<Rightarrow> nat \<Rightarrow> mem option" where
   "store_packed = store"
 
-definition store_tab :: "tabinst \<Rightarrow> nat \<Rightarrow> i list \<Rightarrow> tabinst option" where
-  "store_tab tab n icls = (if (tab_size tab \<ge> (n+(length icls)))
-                          then Some (((take n (fst tab)) @ (map Some icls) @ (drop (n + length icls) (fst tab))), snd tab)
+definition t_subtyping :: "[t, t] \<Rightarrow> bool" where
+  "t_subtyping t1 t2 = (t1 = T_bot \<or> t1 = t2)"
+
+definition t_list_subtyping :: "[t list, t list] \<Rightarrow> bool" where
+  "t_list_subtyping t1s t2s = list_all2 t_subtyping t1s t2s"
+
+definition tf_subtyping :: "[tf, tf] \<Rightarrow> bool" where
+  "tf_subtyping tf1 tf2 =
+    (t_list_subtyping (tf.dom tf2) (tf.dom tf1) \<and> t_list_subtyping (tf.ran tf1) (tf.ran tf2))"
+
+
+definition instr_subtyping :: "[tf, tf] \<Rightarrow> bool" ("_ '<ti: _" 60) where
+  "instr_subtyping tf1 tf2 \<equiv> \<exists> ts ts' tf1_dom_sub tf1_ran_sub.
+    (tf.dom tf2) = ts@tf1_dom_sub
+  \<and> (tf.ran tf2) = ts'@tf1_ran_sub
+  \<and> t_list_subtyping ts ts'
+  \<and> t_list_subtyping tf1_dom_sub (tf.dom tf1)
+  \<and> t_list_subtyping (tf.ran tf1)(tf1_ran_sub)"
+
+definition mem_subtyping :: "[mem_t, mem_t] \<Rightarrow> bool" where
+"mem_subtyping t1 t2 = limits_compat t1 t2"
+
+  (* tables *)
+
+(* t1 \<le> t2 *)
+definition tab_subtyping :: "[tab_t, tab_t] \<Rightarrow> bool" where
+"tab_subtyping t1 t2 = (case (t1, t2) of
+  (T_tab lims1 tr1, T_tab lims2 tr2) \<Rightarrow> limits_compat lims1 lims2 \<and> tr1 = tr2) "
+
+  (* TODO: think of better convention for these names *)
+  (* currently 'tab' means that a single table instance is taken as argument *)
+  (* currently 'tabs' means that a list of tables is taken as an argument *)
+  (* '1' means a single element is stored/retrieved to/from tables *)
+  (* '_list' means that a list of elements is stored in tables *)
+definition store_tab_list :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref list \<Rightarrow> tabinst option" where
+  "store_tab_list tab n vrs = (if (tab_size tab \<ge> (n+(length vrs)))
+                          then Some (fst tab, ((take n (snd tab)) @ vrs @ (drop (n + length vrs) (snd tab))))
                           else None)"
+
+definition store_tab1 :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref \<Rightarrow> tabinst option" where
+  "store_tab1 tab n vr = (if (n < tab_size tab)
+                          then Some (fst tab, (take n (snd tab)) @ [vr] @ (drop (n + 1) (snd tab)))
+                          else None)"
+
+
+definition load_tabs1 :: "tabinst list \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> v_ref option" where
+  "load_tabs1 tables ti n = 
+    (if (ti < length tables \<and> n < tab_size (tables!ti))
+     then Some ((snd ((tables!ti)))!n)
+     else None)"
+
+
+definition store_tabs1 :: "tabinst list \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> v_ref \<Rightarrow> (tabinst list) option" where
+  "store_tabs1 tables ti n vr = 
+    (if (ti < length tables)
+     then (case (store_tab1 (tables!ti) n vr) of
+        Some tab' \<Rightarrow> Some ((take ti tables) @ [tab'] @ (drop (ti+1) tables))
+      | None \<Rightarrow> None)
+     else None)"
+
+
+definition grow_tab :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref \<Rightarrow> tabinst option" where
+  "grow_tab t n vr = (let len = (tab_size t) + n;
+                          old_limits = tab_t_lim (fst t);
+                          limits' = old_limits\<lparr>l_min:= len\<rparr>
+                       in
+                   if (len < 2^32 \<and> pred_option (\<lambda>max. len \<le> max) (tab_max t))
+                    then Some ((T_tab limits' (tab_t_reftype (fst t))), snd t @ (replicate n vr))
+                    else None)"
 
 consts
   (* host *)
@@ -299,14 +371,24 @@ definition bitzero_ref :: "t_ref \<Rightarrow> v_ref" where
 )"
 
 
-definition bitzero :: "t \<Rightarrow> v" where
+definition bitzero :: "t \<Rightarrow> v option" where
   "bitzero t = (case t of
-                 T_num t_n \<Rightarrow> V_num (bitzero_num t_n)
-               | T_vec t_v \<Rightarrow> V_vec (bitzero_vec t_v)
-               | T_ref t_r \<Rightarrow> V_ref (bitzero_ref t_r))"
+                 T_num t_n \<Rightarrow> Some (V_num (bitzero_num t_n))
+               | T_vec t_v \<Rightarrow> Some (V_vec (bitzero_vec t_v))
+               | T_ref t_r \<Rightarrow> Some (V_ref (bitzero_ref t_r))
+               | T_bot \<Rightarrow> None)"
 
-definition n_zeros :: "t list \<Rightarrow> v list" where
-  "n_zeros ts = (map (\<lambda>t. bitzero t) ts)"
+
+fun list_option_map :: "('a \<Rightarrow> 'b option) \<Rightarrow> ('a list) => (('b list) option)" where
+"list_option_map f xs = those (map f xs)"
+(*"list_option_map f [] = Some []" |
+"list_option_map f (x#xs) = (case (f x, list_option_map f xs) of
+      (Some y', Some ys') \<Rightarrow> Some (y'#ys')
+    | _ \<Rightarrow> None)"*)
+
+
+definition n_zeros :: "t list \<Rightarrow> (v list) option" where
+  "n_zeros ts = those (map bitzero ts)"
 
 definition typeof_num :: "v_num \<Rightarrow> t_num" where
   "typeof_num v = (case v of
@@ -334,6 +416,16 @@ definition typeof :: "v \<Rightarrow> t" where
                  V_num v_n \<Rightarrow> T_num (typeof_num v_n)
                | V_vec v_v \<Rightarrow> T_vec (typeof_vec v_v)
                | V_ref v_r \<Rightarrow> T_ref (typeof_ref v_r))"
+
+definition is_num_type :: "t \<Rightarrow> bool" where
+  "is_num_type t = (case t of
+                      T_num _ \<Rightarrow> True
+                    | _ \<Rightarrow> False)"
+
+definition is_vec_type :: "t \<Rightarrow> bool" where
+  "is_vec_type t = (case t of
+                      T_vec _ \<Rightarrow> True
+                    | _ \<Rightarrow> False)"
 
 definition vec_lane_t :: "shape_vec \<Rightarrow> t_num" where
   "vec_lane_t sv = (case sv of
@@ -717,19 +809,37 @@ definition sglob_val :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v"
 definition smem_ind :: "inst \<Rightarrow> nat option" where
   "smem_ind i = (case (inst.mems i) of (n#_) \<Rightarrow> Some n | [] \<Rightarrow> None)"
 
-definition tab_cl_ind :: "tabinst list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> i option" where
-  "tab_cl_ind st i j = (let stabinst = fst (st!i) in
-                       (if ((length stabinst) > j) then (stabinst!j)
+definition tab_cl_ind :: "tabinst list \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> v_ref option" where
+  "tab_cl_ind st i j = (let stabinst = snd (st!i) in
+                       (if ((length stabinst) > j) then Some (stabinst!j)
                         else None))"
 
-definition stab_cl_ind :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> i option" where
+definition is_some_const_ref_func :: "v_ref option \<Rightarrow> bool" where
+  "is_some_const_ref_func x = (case x of
+    Some (ConstRef i) \<Rightarrow> True
+  | _ \<Rightarrow> False
+)"
+
+definition stab_cl_ind :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> v_ref option" where
   "stab_cl_ind s i j = tab_cl_ind (tabs s) i j"
 
-definition stab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> i option" where
+(* TODO: deprecate this *)
+(*
+definition stab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v_ref option" where
   "stab s i j = (case (inst.tabs i) of (k#_) => stab_cl_ind s k j | [] => None)"
-
+*)
+definition stab:: "s \<Rightarrow> inst \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> v_ref option" where
+  "stab s i ti j = (if ti < length (inst.tabs i) then stab_cl_ind s ((inst.tabs i)!ti) j
+                        else None)"
+(* TODO: deprecate this *)
+(*
 definition stab_ind :: "inst \<Rightarrow> nat option" where
   "stab_ind i = (case (inst.tabs i) of (n#_) \<Rightarrow> Some n | [] \<Rightarrow> None)"
+*)
+definition stab_ind :: "inst \<Rightarrow> i \<Rightarrow> nat option" where
+  "stab_ind i ti = (if ti < length (inst.tabs i) then Some ((inst.tabs i)!ti)
+                        else None)"
+
 
 definition update_glob :: "global list \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v \<Rightarrow> global list" where
   "update_glob gs i j v =  (let k = sglob_ind i j in gs[k:=(gs!k)\<lparr>g_val := v\<rparr>])"
@@ -746,21 +856,30 @@ definition is_const :: "e \<Rightarrow> bool" where
 definition const_list :: "e list \<Rightarrow> bool" where
   "const_list xs = list_all is_const xs"
 
+(* TODO: review this *)
 definition tab_extension :: "tabinst \<Rightarrow> tabinst \<Rightarrow> bool" where
   "tab_extension t1 t2 \<equiv> tab_size t1 \<le> tab_size t2 \<and>
-                         (tab_max t1) = (tab_max t2)"
+                         tab_max t1 = tab_max t2 \<and>
+                         tab_subtyping (fst t2) (fst t1)"
 
 definition mem_extension :: "mem \<Rightarrow> mem \<Rightarrow> bool" where
   "mem_extension m1 m2 \<equiv> mem_size m1 \<le> mem_size m2 \<and>
-                         (mem_max m1) = (mem_max m2)"
+                         (mem_max m1) = (mem_max m2) \<and>
+                         mem_subtyping (fst m2) (fst m1)"
 
 definition global_extension :: "global \<Rightarrow> global \<Rightarrow> bool" where
   "global_extension g1 g2 \<equiv> (g_mut g1 = g_mut g2) \<and> (typeof (g_val g1) = typeof (g_val g2)) \<and> (g_mut g1 = T_immut \<longrightarrow> g_val g1 = g_val g2)"
 
+definition elem_extension :: "eleminst \<Rightarrow> eleminst \<Rightarrow> bool" where
+  "elem_extension e1 e2 \<equiv> (fst e1 = fst e2 \<and> (snd e1 = snd e2 \<or> length (snd e2) = 0))"
+
+definition data_extension :: "datainst \<Rightarrow> datainst \<Rightarrow> bool" where
+  "data_extension d1 d2 \<equiv> (d1 = d2 \<or> length d2 = 0)"
+
 inductive store_extension :: "s \<Rightarrow> s \<Rightarrow> bool" where
-"\<lbrakk>fs = fs'; list_all2 tab_extension tclss tclss'; list_all2 mem_extension bss bss'; list_all2 global_extension gs gs'\<rbrakk>
-  \<Longrightarrow> store_extension \<lparr>s.funcs = fs, s.tabs = tclss, s.mems = bss, s.globs = gs\<rparr>
-                       \<lparr>s.funcs = fs'@fs'', s.tabs = tclss'@tclss'', s.mems = bss'@bss'', s.globs = gs'@gs''\<rparr>"
+"\<lbrakk>fs = fs'; list_all2 tab_extension tclss tclss'; list_all2 mem_extension bss bss'; list_all2 global_extension gs gs'; list_all2 elem_extension es es'; list_all2 data_extension ds ds'\<rbrakk>
+  \<Longrightarrow> store_extension \<lparr>s.funcs = fs, s.tabs = tclss, s.mems = bss, s.globs = gs, s.elems = es, s.datas = ds\<rparr>
+                       \<lparr>s.funcs = fs'@fs'', s.tabs = tclss'@tclss'', s.mems = bss'@bss'', s.globs = gs'@gs'', s.elems = es'@es'', s.datas = ds'@dss''\<rparr>"
 
 abbreviation to_e_list :: "b_e list \<Rightarrow> e list" ("$* _" 60) where
   "to_e_list b_es \<equiv> map Basic b_es"
@@ -899,10 +1018,11 @@ lemma int_float_disjoint: "is_int_t_num t = -(is_float_t_num t)"
   by simp (metis is_float_t_num_def is_int_t_num_def t_num.exhaust t_num.simps(13-16))
 
 lemma stab_unfold:
-  assumes "stab s i j = Some i_cl"
-  shows "\<exists>k ks. inst.tabs i = k#ks \<and>
-                     length (fst ((tabs s)!k)) > j \<and>
-                     (fst ((tabs s)!k))!j = Some i_cl"
+  assumes "stab s i ti j = Some (ConstRef i_cl)"
+  shows "\<exists>k. length (inst.tabs i) > ti \<and>
+                     k =(inst.tabs i)!ti \<and>
+                     length (snd ((tabs s)!k)) > j \<and>
+                     (snd ((tabs s)!k))!j = (ConstRef i_cl)"
   using assms
   unfolding stab_def stab_cl_ind_def tab_cl_ind_def
   by (simp add: Let_def split: list.splits if_splits option.splits)
@@ -991,8 +1111,29 @@ lemma Lfilled_imp_exists_Lfilled_exact:
   using assms Lfilled_exact.intros
   by (induction rule: Lfilled.induct) fastforce+
 
+lemma bitzero_typeof:
+  assumes "bitzero t = Some v"
+  shows "typeof v = t"
+proof(cases t)
+  case (T_num x1)
+  then show ?thesis using assms unfolding bitzero_def
+    by (metis (mono_tags, lifting) bitzero_num_def option.sel t.simps(16) t_num.case(1) t_num.case(2) t_num.case(3) t_num.case(4) t_num.exhaust typeof_def typeof_num_def v.simps(10) v_num.case(2) v_num.case(3) v_num.case(4) v_num.simps(17))
+next
+  case (T_vec x2)
+  then show ?thesis using assms unfolding bitzero_def typeof_def
+    using typeof_vec_def bitzero_vec_def
+    by (metis (mono_tags, lifting) option.sel t.simps(17) t_vec.exhaust v.simps(11))
+next
+  case (T_ref x3)
+  then show ?thesis using bitzero_def assms
+    by (metis (mono_tags, lifting) bitzero_ref_def option.sel t.simps(18) t_ref.exhaust t_ref.simps(3) t_ref.simps(4) typeof_def typeof_ref_def v.simps(12) v_ref.simps(10))
+next
+  case T_bot
+  then show ?thesis using bitzero_def assms by fastforce
+qed
+
 lemma n_zeros_typeof:
-  "n_zeros ts = vs \<Longrightarrow> (ts = map typeof vs)"
+  "n_zeros ts = Some vs  \<Longrightarrow> (ts = map typeof vs)"
 proof (induction ts arbitrary: vs)
   case Nil
   thus ?case
@@ -1000,14 +1141,13 @@ proof (induction ts arbitrary: vs)
     by simp
 next
   case (Cons t ts)
-  obtain vs' where "n_zeros ts = vs'"
-    using n_zeros_def
-    by blast
+  then obtain vs' where "n_zeros ts = Some vs'"
+    using n_zeros_def those.simps bitzero_def
+    by auto (simp split: option.splits t.splits)
   moreover
-  have "typeof (bitzero t) = t"
-    unfolding typeof_def bitzero_def typeof_num_def typeof_vec_def typeof_ref_def bitzero_ref_def bitzero_vec_def bitzero_num_def
-    apply (simp split: t.splits t_num.splits t_vec.splits t_ref.splits)
-    done
+  obtain v' where "bitzero t = Some v'" "typeof v' = t"
+    using Cons n_zeros_def list_option_map.simps bitzero_def bitzero_typeof
+    by (simp split: option.splits t.splits)   
   ultimately
   show ?case
     using Cons
