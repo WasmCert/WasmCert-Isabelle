@@ -277,11 +277,6 @@ definition tab_subtyping :: "[tab_t, tab_t] \<Rightarrow> bool" where
 "tab_subtyping t1 t2 = (case (t1, t2) of
   (T_tab lims1 tr1, T_tab lims2 tr2) \<Rightarrow> limits_compat lims1 lims2 \<and> tr1 = tr2) "
 
-  (* TODO: think of better convention for these names *)
-  (* currently 'tab' means that a single table instance is taken as argument *)
-  (* currently 'tabs' means that a list of tables is taken as an argument *)
-  (* '1' means a single element is stored/retrieved to/from tables *)
-  (* '_list' means that a list of elements is stored in tables *)
 definition store_tab_list :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref list \<Rightarrow> tabinst option" where
   "store_tab_list tab n vrs = (if (tab_size tab \<ge> (n+(length vrs)))
                           then Some (fst tab, ((take n (snd tab)) @ vrs @ (drop (n + length vrs) (snd tab))))
@@ -292,13 +287,11 @@ definition store_tab1 :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref \<Righta
                           then Some (fst tab, (take n (snd tab)) @ [vr] @ (drop (n + 1) (snd tab)))
                           else None)"
 
-
 definition load_tabs1 :: "tabinst list \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> v_ref option" where
   "load_tabs1 tables ti n = 
     (if (ti < length tables \<and> n < tab_size (tables!ti))
      then Some ((snd ((tables!ti)))!n)
      else None)"
-
 
 definition store_tabs1 :: "tabinst list \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> v_ref \<Rightarrow> (tabinst list) option" where
   "store_tabs1 tables ti n vr = 
@@ -307,7 +300,6 @@ definition store_tabs1 :: "tabinst list \<Rightarrow> i \<Rightarrow> nat \<Righ
         Some tab' \<Rightarrow> Some ((take ti tables) @ [tab'] @ (drop (ti+1) tables))
       | None \<Rightarrow> None)
      else None)"
-
 
 definition grow_tab :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref \<Rightarrow> tabinst option" where
   "grow_tab t n vr = (let len = (tab_size t) + n;
@@ -370,22 +362,12 @@ definition bitzero_ref :: "t_ref \<Rightarrow> v_ref" where
                     
 )"
 
-
 definition bitzero :: "t \<Rightarrow> v option" where
   "bitzero t = (case t of
                  T_num t_n \<Rightarrow> Some (V_num (bitzero_num t_n))
                | T_vec t_v \<Rightarrow> Some (V_vec (bitzero_vec t_v))
                | T_ref t_r \<Rightarrow> Some (V_ref (bitzero_ref t_r))
                | T_bot \<Rightarrow> None)"
-
-
-fun list_option_map :: "('a \<Rightarrow> 'b option) \<Rightarrow> ('a list) => (('b list) option)" where
-"list_option_map f xs = those (map f xs)"
-(*"list_option_map f [] = Some []" |
-"list_option_map f (x#xs) = (case (f x, list_option_map f xs) of
-      (Some y', Some ys') \<Rightarrow> Some (y'#ys')
-    | _ \<Rightarrow> None)"*)
-
 
 definition n_zeros :: "t list \<Rightarrow> (v list) option" where
   "n_zeros ts = those (map bitzero ts)"
@@ -1146,7 +1128,7 @@ next
     by auto (simp split: option.splits t.splits)
   moreover
   obtain v' where "bitzero t = Some v'" "typeof v' = t"
-    using Cons n_zeros_def list_option_map.simps bitzero_def bitzero_typeof
+    using Cons n_zeros_def bitzero_def bitzero_typeof
     by (simp split: option.splits t.splits)   
   ultimately
   show ?case

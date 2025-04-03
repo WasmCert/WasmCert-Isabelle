@@ -312,10 +312,6 @@ proof -
     by fastforce
 qed
 
-(*
-"([] _> [T_num (typeof_num v)]) <ti: (ts _> ts'')"
-    "([T_num t] _> [T_num (arity_1_result e)]) <ti: (ts'' _> ts')"*)
-
 lemma typeof_unop_testop:
   assumes "s\<bullet>\<C> \<turnstile> [$EConstNum v, $e] : (ts _> ts')"
           "(e = (Unop t uop)) \<or> (e = (Testop t top'))"
@@ -840,7 +836,11 @@ proof -
   hence "\<C> \<turnstile> [Block tb es] : (ts'' _> ts')"
     using unlift_b_e
     by auto
-  then obtain tfn tfm where tf_def: "(tn _> tm) = (tfn _> tfm)" "tb_tf_t \<C> tb = Some (tfn _> tfm)" "tfn _> tfm <ti: ts'' _> ts'" "\<C>\<lparr>label := [tfm] @ label \<C>\<rparr> \<turnstile> es : tfn _> tfm"
+  then obtain tfn tfm where tf_def:
+    "(tn _> tm) = (tfn _> tfm)"
+    "tb_tf_t \<C> tb = Some (tfn _> tfm)"
+    "(tfn _> tfm) <ti: (ts'' _> ts')"
+    "\<C>\<lparr>label := [tfm] @ label \<C>\<rparr> \<turnstile> es : (tfn _> tfm)"
     using b_e_type_block[of \<C> "Block tb es" ts'' ts' tb es] assms(2,3)
     by (fastforce simp add: tb_tf_def tb_tf_t_def Let_def split: if_splits tb.splits option.splits)
   hence tfn_l:"length tfn = n"
@@ -871,78 +871,6 @@ proof -
           tf_def tvs'_def assms(5,6) e_typing_l_typing.intros(3) c_def
     by (metis 1(1) e_type_consts_typeof instr_subtyping_comp store_extension_refl)
 qed
-(*
-    [] _> [T_num T_i32] <ti: ts _> ts_i
-    tfn @ [T_num T_i32] _> tfm <ti: ts_i _> ts'*)
-
-lemma instr_subtyping_replace1:
-  assumes "t_list_subtyping ts ts'"
-          "(ts _> t2s) <ti: (t1s' _> t2s')"
-        shows "(ts' _> t2s) <ti: (t1s' _> t2s')"
-  by (metis (mono_tags, opaque_lifting) assms(1) assms(2) instr_subtyping_comp instr_subtyping_def instr_subtyping_refl instr_subtyping_trans self_append_conv2 t_list_subtyping_refl tf.sel(1) tf.sel(2))
-
-lemma instr_subtyping_replace3:
-  assumes "t_list_subtyping ts' ts"
-          "(t1s _> t2s) <ti: (ts _> t2s')"
-        shows "(t1s _> t2s) <ti: (ts' _> t2s')"
-  using assms(1) assms(2) instr_subtyping_refl instr_subtyping_replace1 instr_subtyping_trans by blast
-
-lemma instr_subtyping_drop_append:
-  assumes "([] _> ts) <ti: (t1s' _> t2s')"
-          "(t1s@ts _> t2s) <ti: (t2s' _> t3s')"
-  shows "(t1s _> t2s) <ti: (t1s' _> t3s')"
-proof -
-  obtain t1s'' ts'' where ts''_def: "t2s' = t1s''@ts''" "t_list_subtyping ts ts''" "t_list_subtyping t1s' t1s''"
-    using assms(1) instr_subtyping_def t_list_subtyping_replace2 by fastforce
-  then have "(t1s@ts _> t2s) <ti: (t1s''@ts'' _> t3s')"
-    using assms(2) by fastforce
-  then have 1: "(t1s@ts _> t2s) <ti: (t1s''@ts _> t3s')"
-  proof -
-    have "\<forall>t ts. ts _> tf.ran t <ti: t \<or> \<not> t_list_subtyping (tf.dom t) ts"
-      by (metis append.left_neutral instr_subtyping_def t_list_subtyping_refl tf.sel(1) tf.sel(2))
-    then show ?thesis
-      by (metis (no_types) \<open>t1s @ ts _> t2s <ti: t1s'' @ ts'' _> t3s'\<close> instr_subtyping_trans t_list_subtyping_refl t_list_subtyping_replace2 tf.sel(1) tf.sel(2) ts''_def(2))
-  qed
-  have 2: "(t1s _> t2s) <ti: (t1s'' _> t3s')"
-  proof -
-    obtain tsa ts'a tf1_dom_sub tf1_ran_sub where defs:
-      "tf.dom (t1s'' @ ts _> t3s') = tsa @ tf1_dom_sub"
-      "tf.ran (t1s'' @ ts _> t3s') = ts'a @ tf1_ran_sub"
-      "t_list_subtyping tsa ts'a"
-      "t_list_subtyping tf1_dom_sub (tf.dom (t1s @ ts _> t2s))"
-      "t_list_subtyping (tf.ran (t1s @ ts _> t2s)) tf1_ran_sub"
-      using instr_subtyping_def 1 by auto
-    have 3: "t_list_subtyping tf1_dom_sub (t1s @ ts)" using defs(4) by fastforce
-    obtain tf1_dom' tf1_dom'' where tf_dom_defs:
-      "tf1_dom_sub = tf1_dom'@tf1_dom''"
-      "t_list_subtyping tf1_dom' t1s"
-      "t_list_subtyping tf1_dom'' ts" using defs(4) t_list_subtyping_split2[OF 3] by fastforce
-    
-    let ?ts = tsa
-    let ?ts' = ts'a
-    let ?tf1_dom_sub = tf1_dom'
-    let ?tf1_ran_sub = tf1_ran_sub
-    have "tf.dom (t1s'' _> t3s') = ?ts @ ?tf1_dom_sub"
-    proof -
-      have "length tf1_dom'' = length ts" using tf_dom_defs(3)
-        using list_all2_lengthD t_list_subtyping_def by auto
-      then show ?thesis using tf_dom_defs(1) defs(1)
-        apply simp
-        by (metis (full_types) append.assoc append_eq_append_conv)
-    qed
-    moreover
-    have "tf.ran (t1s'' _> t3s') = ?ts' @ ?tf1_ran_sub" using defs by fastforce
-    moreover
-    have "t_list_subtyping ?ts ?ts'" using defs by fastforce
-    moreover
-    have "t_list_subtyping ?tf1_dom_sub (tf.dom (t1s _> t2s))" using tf_dom_defs by fastforce
-    moreover
-    have "t_list_subtyping (tf.ran (t1s _> t2s)) ?tf1_ran_sub" using defs(5) by fastforce
-    ultimately show ?thesis unfolding instr_subtyping_def by blast
-  qed
-  then show ?thesis using  instr_subtyping_replace3[OF ts''_def(3)]
-    by blast
-qed
 
 lemma types_preserved_if:
   assumes "\<lparr>[$EConstNum (ConstInt32 n), $If tb e1s e2s]\<rparr> \<leadsto> \<lparr>[$Block tb es']\<rparr>"
@@ -956,7 +884,7 @@ proof -
     using b_e_type_comp
     by (metis append_Cons append_Nil)
   then obtain tfn tfm where tf_def:"tb_tf_t \<C> tb = Some (tfn _> tfm)"
-                                   "tfn @ [T_num T_i32] _> tfm <ti: ts_i _> ts'"
+                                   "(tfn @ [T_num T_i32] _> tfm) <ti: (ts_i _> ts')"
                                    "(\<C>\<lparr>label := [tfm] @ label \<C>\<rparr> \<turnstile> e1s : (tfn _> tfm))"
                                    "(\<C>\<lparr>label := [tfm] @ label \<C>\<rparr> \<turnstile> e2s : (tfn _> tfm))"
     using b_e_type_if[of \<C> "If tb e1s e2s"]
@@ -2037,7 +1965,6 @@ proof -
     by (metis (full_types) const_vec e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) t_vec.exhaust to_e_list_1)
 qed
 
-(*TODO: fix this*)
 lemma types_preserved_get_local:
   assumes "s\<bullet>\<C> \<turnstile> [$Get_local i] : (ts _> ts')"
           "length vi = i"
@@ -2156,22 +2083,14 @@ qed
 
 lemma types_preserved_memory_init:
   assumes
-    "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n), $Memory_init x] : ts _> ts'"
-    "store_typing s"
-    "inst_typing s (f_inst f) \<C>i"
-    "tvs = map typeof (f_locs f)"
-    "\<C> = \<C>i\<lparr>local := tvs, label := arb_labs, return := arb_return\<rparr>"
-    "smem_ind (f_inst f) = Some ma"
-    "s.mems s ! ma = m"
-    "x < length (inst.datas (f_inst f))"
-    "da = inst.datas (f_inst f) ! x"
-    "dat = s.datas s ! da"
+    "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n), $Memory_init x] : (ts _> ts')"
+
   shows
-    "s\<bullet>\<C> \<turnstile> [] : ts _> ts'"
+    "s\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
     "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2),
            $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 i3),
            $EConstNum (ConstInt32 i4), $EConstNum (ConstInt32 i5),
-           $Memory_init x] : ts _> ts'"
+           $Memory_init x] : (ts _> ts')"
 proof -
   have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n)] @
           [$Memory_init x] : (ts _> ts')" using assms(1) by auto
@@ -2223,7 +2142,7 @@ proof -
   show "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2),
            $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 i3),
            $EConstNum (ConstInt32 i4), $EConstNum (ConstInt32 i5),
-           $Memory_init x] : ts _> ts'"
+           $Memory_init x] : (ts _> ts')"
     using e_type_comp_conc[OF 4 5] e_type_comp_conc ts_empty by fastforce
 qed
 
@@ -2403,24 +2322,12 @@ qed
 lemma types_preserved_table_set:
   assumes
     "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 n), Ref vr, $Table_set ti] : (ts _> ts')"
-    "stab_ind (f_inst f) ti = Some a"
-    "store_tabs1 (s.tabs s) a (nat_of_int n) vr = Some tabs'"
-    "store_typing s"
-    "inst_typing s (f_inst f) \<C>i"
-    "\<C> = \<C>i\<lparr>local := tvs, label := arb_labs, return := arb_return\<rparr>"
   shows
     "s\<lparr>s.tabs := tabs'\<rparr>\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
   using assms(1) types_preserved_table_set_aux(1) by metis
 
 lemma types_preserved_table_copy:
   assumes "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n), $Table_copy x y] : (ts _> ts')"
-          "stab_ind (f_inst f) x = Some tax"
-          "s.tabs s ! tax = tabx"
-          "stab_ind (f_inst f) y = Some tay"
-          "s.tabs s ! ty = taby"
-          "store_typing s"
-          "inst_typing s (f_inst f) \<C>i"
-          " \<C> = \<C>i\<lparr>local := tvs, label := arb_labs, return := arb_return\<rparr>"
   shows "s\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
         "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i1), $EConstNum (ConstInt32 i2), $Table_get y, $Table_set x,
            $EConstNum (ConstInt32 i3), $EConstNum (ConstInt32 i4),

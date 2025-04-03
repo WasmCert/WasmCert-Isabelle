@@ -86,9 +86,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | empty:"\<C> \<turnstile> [] : ([] _> [])"
   \<comment> \<open>\<open>composition\<close>\<close>
 | composition:"\<lbrakk>\<C> \<turnstile> es : (t1s _> t2s); \<C> \<turnstile> [e] : (t2s _> t3s)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> es @ [e] : (t1s _> t3s)"
-(*  \<comment> \<open>\<open>weakening\<close>\<close>
-| weakening:"\<C> \<turnstile> es : (t1s _> t2s) \<Longrightarrow> \<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"*)
-  \<comment> \<open>\<open>subtyping\<close>\<close>
+  \<comment> \<open>\<open>subsumption\<close>\<close>
 | subsumption:"\<lbrakk>\<C> \<turnstile> es : (tf1 _> tf2); instr_subtyping (tf1 _> tf2) (tf1' _> tf2')\<rbrakk> \<Longrightarrow> \<C> \<turnstile> es : (tf1' _> tf2')"
   \<comment> \<open>\<open>memory_init\<close>\<close>
 | memory_init: "\<lbrakk>length (memory \<C>) \<ge> 1; i < length (data \<C>)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Memory_init i] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
@@ -168,11 +166,9 @@ and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> boo
   "\<C> \<turnstile> b_es : tf \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> $*b_es : tf"
   (* composition *)
 | "\<lbrakk>\<S>\<bullet>\<C> \<turnstile> es : (t1s _> t2s); \<S>\<bullet>\<C> \<turnstile> [e] : (t2s _> t3s)\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> es @ [e] : (t1s _> t3s)"
-(*  (* weakening *)
-| "\<S>\<bullet>\<C> \<turnstile> es : (t1s _> t2s) \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> es : (ts @ t1s _> ts @ t2s)"*)
   (* subsumption *)
 | "\<lbrakk>\<S>\<bullet>\<C> \<turnstile> es : (tf1 _> tf2); instr_subtyping (tf1 _> tf2) (tf1' _> tf2')\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> es : (tf1' _> tf2')"
-
+  (* reference typing *)
 | "ref_typing \<S> v_r t \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Ref v_r] :([] _> [T_ref t])"
   (* trap *)
 | "\<S>\<bullet>\<C> \<turnstile> [Trap] : tf"
@@ -190,15 +186,8 @@ and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> boo
 (* section: l_typing *)
 | "\<lbrakk>frame_typing \<S> f \<C>; \<S>\<bullet>\<C>\<lparr>return := rs\<rparr> \<turnstile> es : ([] _> ts)\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile> f;es : ts"
 
-
-
 definition "glob_agree" :: "s \<Rightarrow> global \<Rightarrow> bool" where
   "glob_agree s glob = (\<exists> t. v_typing s (g_val glob) t)"
-(*
-definition "tab_agree s tab =
-  ((list_all (\<lambda>i_opt. (case i_opt of None \<Rightarrow> True | Some i \<Rightarrow> i < length (funcs s))) (fst tab)) \<and>
-   pred_option (\<lambda>max. (tab_size tab) \<le> max) (tab_max tab))"
-*)
 
 definition tab_agree  :: "[s, tabinst] => bool" where
 "tab_agree s t = (case t of
@@ -214,8 +203,8 @@ definition data_agree :: "[s, datainst] \<Rightarrow> bool" where
   "data_agree s di = True"
 
 
-(* TODO: should there be more rules here? *)
-(* TODO:  Fix adding this: https://webassembly.github.io/spec/core/appendix/properties.html#valid-tableinst *)
+
+(* https://webassembly.github.io/spec/core/appendix/properties.html#valid-tableinst *)
 inductive store_typing :: "s \<Rightarrow> bool" where
   "\<lbrakk>list_all (\<lambda>cl. \<exists>tf. cl_typing s cl tf) (funcs s);
     list_all (tab_agree s) (tabs s);
