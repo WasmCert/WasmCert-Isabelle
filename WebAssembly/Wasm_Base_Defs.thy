@@ -384,7 +384,7 @@ definition typeof_vec :: "v_vec \<Rightarrow> t_vec" where
 
 definition typeof_ref :: "v_ref \<Rightarrow> t_ref" where
   "typeof_ref v = (case v of
-                     ConstRef _ \<Rightarrow> T_func_ref
+                     ConstRefFunc _ \<Rightarrow> T_func_ref
                    | ConstRefExtern _ \<Rightarrow> T_ext_ref
                    | ConstNull t_ref \<Rightarrow> t_ref)"
 
@@ -798,7 +798,7 @@ definition tab_cl_ind :: "tabinst list \<Rightarrow> nat \<Rightarrow> nat \<Rig
 
 definition is_some_const_ref_func :: "v_ref option \<Rightarrow> bool" where
   "is_some_const_ref_func x = (case x of
-    Some (ConstRef i) \<Rightarrow> True
+    Some (ConstRefFunc i) \<Rightarrow> True
   | _ \<Rightarrow> False
 )"
 
@@ -1000,11 +1000,11 @@ lemma int_float_disjoint: "is_int_t_num t = -(is_float_t_num t)"
   by simp (metis is_float_t_num_def is_int_t_num_def t_num.exhaust t_num.simps(13-16))
 
 lemma stab_unfold:
-  assumes "stab s i ti j = Some (ConstRef i_cl)"
+  assumes "stab s i ti j = Some (ConstRefFunc i_cl)"
   shows "\<exists>k. length (inst.tabs i) > ti \<and>
                      k =(inst.tabs i)!ti \<and>
                      length (snd ((tabs s)!k)) > j \<and>
-                     (snd ((tabs s)!k))!j = (ConstRef i_cl)"
+                     (snd ((tabs s)!k))!j = (ConstRefFunc i_cl)"
   using assms
   unfolding stab_def stab_cl_ind_def tab_cl_ind_def
   by (simp add: Let_def split: list.splits if_splits option.splits)

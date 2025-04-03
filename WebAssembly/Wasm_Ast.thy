@@ -198,7 +198,7 @@ datatype \<comment> \<open>numeric values\<close>
 
 datatype
   v_ref = ConstNull t_ref
-  | ConstRef i (* TODO: rename this ConstRefFunc *)
+  | ConstRefFunc i
   | ConstRefExtern host
 
 datatype \<comment> \<open>vector values\<close>

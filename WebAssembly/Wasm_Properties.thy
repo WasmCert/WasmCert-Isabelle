@@ -954,16 +954,16 @@ lemma types_preserved_func_ref:
   assumes
     "length fi = j"
     "(inst.funcs (f_inst f)) = (fi @ [fa] @ fas)"
-    "\<lparr>s;f;[$(Func_ref j)]\<rparr> \<leadsto> \<lparr>s;f;[Ref (ConstRef (fa))]\<rparr>"
+    "\<lparr>s;f;[$(Func_ref j)]\<rparr> \<leadsto> \<lparr>s;f;[Ref (ConstRefFunc (fa))]\<rparr>"
     "s\<bullet>\<C> \<turnstile> [$(Func_ref j)] : (ts _> ts')"
     "list_all2 (funci_agree (funcs s)) (inst.funcs (f_inst f)) (func_t \<C>)"
     "store_typing s"
-  shows "s\<bullet>\<C> \<turnstile> [Ref (ConstRef (fa))] : (ts _> ts')"
+  shows "s\<bullet>\<C> \<turnstile> [Ref (ConstRefFunc (fa))] : (ts _> ts')"
 proof -
   have "\<C> \<turnstile> [(Func_ref j)] : (ts _> ts')" using assms
     by (metis to_e_list_1 unlift_b_e)
   then have 1: "([] _> [T_ref T_func_ref]) <ti: (ts _> ts')" using b_e_type_func_ref by blast
-  have 2: "ref_typing s (ConstRef fa) T_func_ref"
+  have 2: "ref_typing s (ConstRefFunc fa) T_func_ref"
   proof -
     have a: "list_all2 (funci_agree (funcs s)) (inst.funcs (f_inst f)) (func_t \<C>)"
       using assms(5) inst_typing.simps by auto
@@ -975,7 +975,7 @@ proof -
     then show ?thesis
       by (simp add: ref_typing.intros(2))
   qed
-  have "s\<bullet>\<C> \<turnstile> [Ref (ConstRef (fa))] : ([] _> [T_ref T_func_ref])"
+  have "s\<bullet>\<C> \<turnstile> [Ref (ConstRefFunc (fa))] : ([] _> [T_ref T_func_ref])"
     using  typeof_ref_def v_to_e_def 2
     using e_typing_l_typing.intros(4) by blast
   then show ?thesis using 2
@@ -1203,7 +1203,7 @@ qed
 
 lemma types_preserved_call_indirect_Some:
   assumes "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 c), $(Call_indirect ti j)] : (ts _> ts')"
-          "stab s i' ti (nat_of_int c) = Some (ConstRef i_cl)"
+          "stab s i' ti (nat_of_int c) = Some (ConstRefFunc i_cl)"
           "stypes i' j = tf"
           "cl_type (funcs s!i_cl) = tf"
           "store_typing s"
@@ -3919,7 +3919,7 @@ next
     by fastforce
   hence 1: "inst.funcs (f_inst f) = fj @ [fi] @ fj'"
     by (metis Cons_eq_appendI Suc_eq_plus1 append_eq_conv_conj append_self_conv2 drop_Suc_nth f_def(1) f_def(2) f_def(3) j_def)
-  then have "\<lparr>s;f;[$Func_ref j]\<rparr>  \<leadsto> \<lparr>s;f;[Ref (ConstRef fi)]\<rparr>"
+  then have "\<lparr>s;f;[$Func_ref j]\<rparr>  \<leadsto> \<lparr>s;f;[Ref (ConstRefFunc fi)]\<rparr>"
     using reduce.func_ref[OF fj_len 1] by simp
   then show ?case
     by (metis progress_L0_left to_e_list_1)
@@ -4172,11 +4172,11 @@ next
     using cs_def(2) const_of_i32
     by fastforce
   consider 
-    (1) "\<exists>i_cl tf. stab s (f_inst f) ti (nat_of_int c) = Some (ConstRef i_cl) \<and> stypes (f_inst f) i = tf \<and> cl_type (funcs s!i_cl) = tf"
-  | (2) "\<exists>i_cl. stab s (f_inst f) ti (nat_of_int c) = Some (ConstRef i_cl) \<and> stypes (f_inst f) i \<noteq> cl_type (funcs s!i_cl)"
+    (1) "\<exists>i_cl tf. stab s (f_inst f) ti (nat_of_int c) = Some (ConstRefFunc i_cl) \<and> stypes (f_inst f) i = tf \<and> cl_type (funcs s!i_cl) = tf"
+  | (2) "\<exists>i_cl. stab s (f_inst f) ti (nat_of_int c) = Some (ConstRefFunc i_cl) \<and> stypes (f_inst f) i \<noteq> cl_type (funcs s!i_cl)"
   | (3) "\<not> is_some_const_ref_func(stab s (f_inst f) ti (nat_of_int c))"
     apply(auto simp add: is_some_const_ref_func_def split: v.splits)
-    apply(cases "\<exists>i_cl. stab s (f_inst f) ti (nat_of_int c) = Some (ConstRef i_cl)")
+    apply(cases "\<exists>i_cl. stab s (f_inst f) ti (nat_of_int c) = Some (ConstRefFunc i_cl)")
      apply fastforce
     by (simp add: is_some_const_ref_func_def split: option.splits v_ref.splits)
   hence "\<exists>a s' f' es'. \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Call_indirect ti i)]\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"

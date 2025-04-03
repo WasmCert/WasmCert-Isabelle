@@ -671,7 +671,7 @@ next
 qed auto
 
 lemma stab_some_length:
-  assumes "stab s i ti c = Some (ConstRef i_cl)"
+  assumes "stab s i ti c = Some (ConstRefFunc i_cl)"
           "inst_typing s i \<C>"
           "store_typing s"
         shows "i_cl < length (funcs s)"
@@ -680,7 +680,7 @@ proof -
      "length (inst.tabs i) > ti"
      "k =(inst.tabs i)!ti "
      "c < tab_size (s.tabs s ! k)"
-     "snd (s.tabs s ! k) ! c = (ConstRef i_cl)"
+     "snd (s.tabs s ! k) ! c = (ConstRefFunc i_cl)"
     using stab_unfold[OF assms(1)]
     by blast
   have "k < length (tabs s)"
@@ -698,7 +698,7 @@ proof -
 qed
 
 lemma stab_typed_some_imp_cl_typed:
-  assumes "stab s i ti c = Some (ConstRef i_cl)"
+  assumes "stab s i ti c = Some (ConstRefFunc i_cl)"
           "inst_typing s i \<C>"
           "store_typing s"
   shows "i_cl < length (funcs s) \<and> (\<exists>tf. cl_typing s (funcs s!i_cl) tf)"
@@ -860,7 +860,7 @@ qed (auto)
 lemma type_const:
   assumes "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')"
   shows "instr_subtyping ([] _> [typeof v]) (ts _> ts')"
-        "(\<forall> f. v = V_ref (ConstRef f) \<longrightarrow> f < length (funcs \<S>))"
+        "(\<forall> f. v = V_ref (ConstRefFunc f) \<longrightarrow> f < length (funcs \<S>))"
         "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts@[typeof v])"
 proof -
   show "instr_subtyping ([] _> [typeof v]) (ts _> ts')"
@@ -868,7 +868,7 @@ proof -
     using assms e_type_cnum e_type_cvec e_type_cref typeof_def v_to_e_def by (auto split: v.splits)+
 
   have "\<S>\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts')" using assms by simp
-  then show 2: "(\<forall>f. v = V_ref (ConstRef f) \<longrightarrow> f < length (funcs \<S>))"
+  then show 2: "(\<forall>f. v = V_ref (ConstRefFunc f) \<longrightarrow> f < length (funcs \<S>))"
   proof (induction "\<S>" "\<C>" "[$C v]" "(ts _> ts')" arbitrary: ts ts')
   qed (auto simp add: ref_typing.simps v_to_e_def)
 
@@ -889,10 +889,10 @@ proof -
       then show ?thesis using v_to_e_def V_ref typeof_def
         by (simp add: ref_typing.intros(1) typeof_ref_def)
     next
-      case (ConstRef x2)
+      case (ConstRefFunc x2)
       then have "x2 < length (s.funcs \<S>)" using 2 V_ref by blast
       then show ?thesis using ref_typing.intros(2) V_ref typeof_ref_def
-        by (simp add: ConstRef)
+        by (simp add: ConstRefFunc)
     next
       case (ConstRefExtern x3)
       then show ?thesis using v_to_e_def V_ref typeof_def
@@ -980,7 +980,7 @@ next
         then show ?thesis
           by (metis V_ref ref_typing.simps v_typing.intros(3) v_typing_typeof)
       next
-        case (ConstRef x2)
+        case (ConstRefFunc x2)
         then show ?thesis using type_const(2)
           by (metis "3.hyps"(1) V_ref ref_typing.simps v_typing.intros(3) v_typing_typeof)
       next
@@ -2611,9 +2611,9 @@ next
     then show ?thesis
       using Ref calculation e_typing_l_typing.intros(4) ref_typing.intros(1) typeof_ref_def by auto
   next
-    case (ConstRef x2)
-    obtain f where hf: "x6 = (ConstRef f)" "length (funcs \<S>) > f"
-      using 1 type_const ConstRef 3 ref_typing.simps by auto
+    case (ConstRefFunc x2)
+    obtain f where hf: "x6 = (ConstRefFunc f)" "length (funcs \<S>) > f"
+      using 1 type_const ConstRefFunc 3 ref_typing.simps by auto
     moreover have "length (funcs \<S>) \<le> length (funcs \<S>')" using assms(3)
       using store_extension.simps by auto
     moreover have "ref_typing \<S>' x6 ((typeof_ref x6))"
@@ -3642,13 +3642,13 @@ next
     then show ?thesis 
       using V_ref assms(1) ref_typing.simps v_typing.simps by fastforce
   next
-    case (ConstRef x2)
-    then have "ref_typing s (ConstRef x2) T_func_ref"
+    case (ConstRefFunc x2)
+    then have "ref_typing s (ConstRefFunc x2) T_func_ref"
       using V_ref assms(1) ref_typing.simps v_typing.simps by auto
-   then have "ref_typing s' (ConstRef x2) T_func_ref"
+   then have "ref_typing s' (ConstRefFunc x2) T_func_ref"
      using assms(2) ref_typing.simps store_extension.simps by fastforce
     then show ?thesis
-      by (metis ConstRef V_ref assms(1) v_typing.intros(3) v_typing_typeof)
+      by (metis ConstRefFunc V_ref assms(1) v_typing.intros(3) v_typing_typeof)
   next
     case (ConstRefExtern x3)
     then show ?thesis
