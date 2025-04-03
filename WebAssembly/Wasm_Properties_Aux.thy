@@ -1236,9 +1236,9 @@ lemma b_e_type_is_null_ref:
   apply (auto simp add: instr_subtyping_refl b_e_type_composition_aux_lemma)
   using instr_subtyping_refl instr_subtyping_trans b_e_type_composition_aux_lemma by blast+
 
-lemma b_e_type_func_ref:
+lemma b_e_type_ref_func:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = Func_ref i"
+          "e = Ref_func i"
   shows "instr_subtyping ([] _> [T_ref T_func_ref]) (ts _> ts')"
         "i < length (func_t \<C>)"
   using assms
