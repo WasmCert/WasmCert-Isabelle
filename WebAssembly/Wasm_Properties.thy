@@ -712,10 +712,11 @@ proof -
     by fastforce
 qed
 
+
 lemma types_preserved_select:
   assumes "\<lparr>[$C v1, $C v2, $C vn, $e]\<rparr> \<leadsto> \<lparr>[$C v3]\<rparr>"
           "s\<bullet>\<C> \<turnstile> [$C v1, $C v2, $C vn, $e] : (ts _> ts')"
-          "(e = Select)"
+          "(e = Select t_tag)"
         shows "s\<bullet>\<C> \<turnstile> [$C v3] : (ts _> ts')"
 proof -
   have "s\<bullet>\<C> \<turnstile> [$C v1, $C v2, $C vn, $e] : (ts _> ts')"
@@ -726,7 +727,7 @@ proof -
     by fastforce
   then obtain t where t_def:
       "([t, t, (T_num T_i32)] _> [t]) <ti: (t1s _> ts') " 
-      "is_num_type t \<or> is_vec_type t"
+      "(t_tag = None \<and> (is_num_type t \<or> is_vec_type t)) \<or> t_tag = Some t"
     using b_e_type_select[of \<C> e t1s] assms
     by (metis to_e_list_1 unlift_b_e)
   have 0: "[] _> [typeof v1, typeof v2, typeof vn]  <ti: ts _> t1s" using t1s_def(1)
@@ -754,64 +755,11 @@ proof -
   have 3: "([] _> [t]) <ti: (ts _> ts')" using 0 t_def(1)
     by (metis "1"(1) instr_subtyping_comp)
   have "v_typing s v3 t"
-    using t_def is_num_type_def  is_vec_type_def 2
-    apply (auto simp add: v_typing.simps )
-    by (metis t.simps(18) typeof_def v.exhaust v.simps(10) v.simps(11) v.simps(12))+
-  hence "s\<bullet>\<C> \<turnstile> [$C v3] : (ts _> ts')"
-    using "3" e_typing_l_typing.intros(3) types_agree_imp_e_typing by blast 
-  thus ?thesis
-    using e_typing_l_typing.intros(1)
-    by fastforce
-qed
-
-lemma types_preserved_select_typed:
-  assumes "\<lparr>[$C v1, $C v2, $C vn, $e]\<rparr> \<leadsto> \<lparr>[$C v3]\<rparr>"
-          "s\<bullet>\<C> \<turnstile> [$C v1, $C v2, $C vn, $e] : (ts _> ts')"
-          "(e = Select_typed t)"
-        shows "s\<bullet>\<C> \<turnstile> [$C v3] : (ts _> ts')"
-proof -
-  have "s\<bullet>\<C> \<turnstile> [$C v1, $C v2, $C vn, $e] : (ts _> ts')"
-    using  assms(2)
-    by simp
-  then obtain t1s where t1s_def: "s\<bullet>\<C> \<turnstile> [$C v1, $C v2, $C vn] : (ts _> t1s)"
-                                     "s\<bullet>\<C> \<turnstile> [$e] : (t1s _> ts')"
-    by (metis Cons_eq_append_conv e_type_comp_conc1)
-  then obtain t where t_def:
-      "([t, t, (T_num T_i32)] _> [t]) <ti: (t1s _> ts') " 
-    using b_e_type_select_typed[of \<C> e t1s] assms
-    by (metis to_e_list_1 unlift_b_e)
-  have 0: "([] _> [typeof v1, typeof v2, typeof vn]) <ti: (ts _> t1s)" using t1s_def(1)
-      using e_type_consts[ of _ _ "[v1,v2,vn]" ts t1s] store_extension_refl
-      by fastforce
-  have 1: "[typeof v1, typeof v2, typeof vn] = [t, t, T_num T_i32]" "typeof v1 = t" "typeof v2 = t" "typeof vn = T_num T_i32"
-  proof -
-    have "list_all (\<lambda>t. t \<noteq> T_bot) [typeof v1, typeof v2, typeof vn]"
-      by (simp add: typeof_not_bot)
-    then show
-      "[typeof v1, typeof v2, typeof vn] = [t, t, T_num T_i32]"
-      "typeof v1 = t"
-      "typeof v2 = t"
-      "typeof vn = T_num T_i32"
-      using 0 instr_subtyping_append_type_eq[of "[]" "[]" "[typeof v1, typeof v2, typeof vn]" ts t1s "[]" "[t, t, T_num T_i32]" "[t]" ts'] t_def(1)
-      by fastforce+
-  qed
-  have 2: "typeof v3 = t"
-    using assms(1) assms(3) const_typeof e_typing_l_typing.intros(5) 1
-    apply (cases rule: reduce_simple.cases)
-    apply fastforce
-    apply (metis Cons_eq_append_conv assms(2)  e_type_comp_conc2 type_const_v_typing(2) types_agree_imp_e_typing)
-    apply (metis  append_Cons assms(2) e_type_comp_conc1 e_type_value_list(2) eq_Nil_appendI type_const(3))
-    apply (metis append_Cons e_type_comp_conc2 e_type_value_list(2) eq_Nil_appendI t1s_def(1) type_const(3))
-    apply (metis append_Cons assms(2) e_type_comp_conc1 eq_Nil_appendI type_const_v_typing(2) types_agree_imp_e_typing)
-    by fastforce+
-  have 3: "([] _> [t]) <ti: (ts _> ts')" using 0 t_def(1)
-    by (metis "1"(1) instr_subtyping_comp)
-  have "v_typing s v3 t"
     using assms(1) 2  assms(3)
     apply (cases rule: reduce_simple.cases)
-    apply fastforce+
-    apply (metis t1s_def(1) append_Cons e_type_comp_conc1 eq_Nil_appendI type_const_v_typing(2))
-    apply (metis append.left_neutral append_Cons e_type_comp_conc1 t1s_def(1) type_const_v_typing(2))
+    apply fastforce
+    apply (metis Cons_eq_appendI t1s_def(1) append_self_conv2 e_type_comp_conc1 type_const_v_typing(2))
+    apply (metis Cons_eq_appendI t1s_def(1) append_self_conv2 e_type_comp_conc1 type_const_v_typing(2))
     by (metis e_typing_l_typing.intros(5) type_const_v_typing(2))
   hence "s\<bullet>\<C> \<turnstile> [$C v3] : (ts _> ts')"
     using "3" e_typing_l_typing.intros(3) types_agree_imp_e_typing by blast 
@@ -1663,8 +1611,8 @@ next
     using assms(1, 3) types_preserved_drop
     by simp
 next
-  case (select_false n v1 v2)
-  then have 1: "\<lparr>[$C v1, $C v2, $C (V_num (ConstInt32 n)), $Select]\<rparr> \<leadsto> \<lparr>[$C v2]\<rparr>"
+  case (select_false n v1 v2 t_tag)
+  then have 1: "\<lparr>[$C v1, $C v2, $C (V_num (ConstInt32 n)), $Select t_tag]\<rparr> \<leadsto> \<lparr>[$C v2]\<rparr>"
     using assms(1)
     by (simp add: v_to_e_def)
   have "s\<bullet>\<C> \<turnstile> [$C v2] : (ts _> ts')" using types_preserved_select[OF 1]
@@ -1672,32 +1620,14 @@ next
   then show ?thesis
     using local.select_false(2) by fastforce
 next
-  case (select_true n v1 v2)
-  then have 1: "\<lparr>[$C v1, $C v2, $C (V_num (ConstInt32 n)), $Select]\<rparr> \<leadsto> \<lparr>[$C v1]\<rparr>"
+  case (select_true n v1 v2 t_tag)
+  then have 1: "\<lparr>[$C v1, $C v2, $C (V_num (ConstInt32 n)), $Select t_tag]\<rparr> \<leadsto> \<lparr>[$C v1]\<rparr>"
     using assms(1)
     by (simp add: v_to_e_def)
   have "s\<bullet>\<C> \<turnstile> [$C v1] : (ts _> ts')" using types_preserved_select[OF 1]
     using assms(3) local.select_true(1) v_to_e_def by auto
   then show ?thesis
     using local.select_true(2) by fastforce
-next
-  case (select_typed_false n v1 v2 t)
-  then have 1: "\<lparr>[$C v1, $C v2, $C (V_num (ConstInt32 n)), $Select_typed t]\<rparr> \<leadsto> \<lparr>[$C v2]\<rparr>"
-    using assms(1)
-    by (simp add: v_to_e_def)
-  have "s\<bullet>\<C> \<turnstile> [$C v2] : (ts _> ts')" using types_preserved_select_typed[OF 1]
-    using assms(3) local.select_typed_false(1) v_to_e_def by auto
-  then show ?thesis
-    using local.select_typed_false(2) by fastforce
-next
-  case (select_typed_true n v1 v2 t)
-  then have 1: "\<lparr>[$C v1, $C v2, $C (V_num (ConstInt32 n)), $Select_typed t]\<rparr> \<leadsto> \<lparr>[$C v1]\<rparr>"
-    using assms(1)
-    by (simp add: v_to_e_def)
-  have "s\<bullet>\<C> \<turnstile> [$C v1] : (ts _> ts')" using types_preserved_select_typed[OF 1]
-    using assms(3) local.select_typed_true(1) v_to_e_def by auto
-  then show ?thesis
-    using local.select_typed_true(2) by fastforce
 next
   case (if_false tf e1s e2s)
   then show ?thesis
@@ -4006,7 +3936,7 @@ next
     using reduce.intros(1)[OF reduce_simple.drop] progress_L0
     by fastforce
 next
-  case (select t \<C>)
+  case (select t_tag t \<C>)
   obtain v1 v2 v3 where cs_def:"s\<bullet>\<C> \<turnstile> [$C v3] : ([] _> [T_num T_i32])"
                                "vs = [v1, v2, v3]"
     using const_list_split_3 select.prems(1) by blast
@@ -4014,7 +3944,7 @@ next
     using select(4) const_typeof[OF cs_def(1)] typeof_num_i32
     unfolding typeof_def
     by (auto split: v.splits)
-  have "\<exists>a s' f' es'. \<lparr>s;f;[$C v1, $C v2, $ EConstNum (ConstInt32 c3), $Select]\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
+  have "\<exists>a s' f' es'. \<lparr>s;f;[$C v1, $C v2, $ EConstNum (ConstInt32 c3), $Select t_tag]\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
   proof (cases "int_eq c3 0")
     case True
     thus ?thesis
@@ -4024,30 +3954,6 @@ next
     case False
     thus ?thesis
       using reduce.intros(1)[OF reduce_simple.select_true]
-      by fastforce
-  qed
-  thus ?case
-    using c_def cs_def v_to_e_def
-    by fastforce
-next
-  case (select_typed \<C> t)
-  obtain v1 v2 v3 where cs_def:"s\<bullet>\<C> \<turnstile> [$C v3] : ([] _> [T_num T_i32])"
-                               "vs = [v1, v2, v3]"
-    using const_list_split_3 select_typed.prems(1) by blast
-  obtain c3 where c_def:"v3 = V_num (ConstInt32 c3)"
-    using select_typed(4) const_typeof[OF cs_def(1)] typeof_num_i32
-    unfolding typeof_def
-    by (auto split: v.splits)
-  have "\<exists>a s' f' es'. \<lparr>s;f;[$C v1, $C v2, $ EConstNum (ConstInt32 c3), $Select_typed t]\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
-  proof (cases "int_eq c3 0")
-    case True
-    thus ?thesis
-      using reduce.intros(1)[OF reduce_simple.select_typed_false]
-      by fastforce
-  next
-    case False
-    thus ?thesis
-      using reduce.intros(1)[OF reduce_simple.select_typed_true]
       by fastforce
   qed
   thus ?case

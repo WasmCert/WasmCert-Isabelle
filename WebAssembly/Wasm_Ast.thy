@@ -379,8 +379,7 @@ datatype \<comment> \<open>basic instructions\<close>
     Unreachable
     | Nop
     | Drop
-    | Select
-    | Select_typed t
+    | Select "(t option)"
     | Block tb "b_e list"
     | Loop tb "b_e list"
     | If tb "b_e list" "b_e list"

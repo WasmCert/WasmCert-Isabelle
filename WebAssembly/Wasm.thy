@@ -30,8 +30,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | unreachable:"\<C> \<turnstile> [Unreachable] : (ts _> ts')"
 | nop:"\<C> \<turnstile> [Nop] : ([] _> [])"
 | drop:"\<C> \<turnstile> [Drop] : ([t] _> [])"
-| select:"is_num_type t \<or> is_vec_type t \<Longrightarrow> \<C> \<turnstile> [Select] : ([t,t,T_num T_i32] _> [t])"
-| select_typed:"\<C> \<turnstile> [Select_typed t] : ([t,t,T_num T_i32] _> [t])"
+| select:"(t_tag = None \<and> (is_num_type t \<or> is_vec_type t)) \<or> t_tag = Some t \<Longrightarrow> \<C> \<turnstile> [Select t_tag] : ([t,t,T_num T_i32] _> [t])"
   \<comment> \<open>\<open>block\<close>\<close>
 | block:"\<lbrakk>tb_tf_t \<C> tb = Some (tn _> tm); \<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr> \<turnstile> es : (tn _> tm)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Block tb es] : (tn _> tm)"
   \<comment> \<open>\<open>loop\<close>\<close>
@@ -264,10 +263,8 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
   \<comment> \<open>\<open>drop\<close>\<close>
 | drop:"\<lparr>[$C v, ($ Drop)]\<rparr> \<leadsto> \<lparr>[]\<rparr>"
   \<comment> \<open>\<open>select\<close>\<close>
-| select_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$C v1, $C v2, $EConstNum (ConstInt32 n), ($ Select)]\<rparr> \<leadsto> \<lparr>[$C v2]\<rparr>"
-| select_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$C v1, $C v2, $EConstNum (ConstInt32 n), ($ Select)]\<rparr> \<leadsto> \<lparr>[$C v1]\<rparr>"
-| select_typed_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$C v1, $C v2, $EConstNum (ConstInt32 n), ($ Select_typed t)]\<rparr> \<leadsto> \<lparr>[$C v2]\<rparr>"
-| select_typed_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$C v1, $C v2, $EConstNum (ConstInt32 n), ($ Select_typed t)]\<rparr> \<leadsto> \<lparr>[$C v1]\<rparr>"
+| select_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$C v1, $C v2, $EConstNum (ConstInt32 n), ($ Select t_tag)]\<rparr> \<leadsto> \<lparr>[$C v2]\<rparr>"
+| select_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$C v1, $C v2, $EConstNum (ConstInt32 n), ($ Select t_tag)]\<rparr> \<leadsto> \<lparr>[$C v1]\<rparr>"
   \<comment> \<open>\<open>if\<close>\<close>
 | if_false:"int_eq n 0 \<Longrightarrow> \<lparr>[$EConstNum (ConstInt32 n), $(If tb e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tb e2s)]\<rparr>"
 | if_true:"int_ne n 0 \<Longrightarrow> \<lparr>[$EConstNum (ConstInt32 n), $(If tb e1s e2s)]\<rparr> \<leadsto> \<lparr>[$(Block tb e1s)]\<rparr>"
