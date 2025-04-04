@@ -1314,7 +1314,7 @@ qed (auto simp add: instr_subtyping_refl b_e_type_composition_aux_lemma, metis i
 lemma b_e_type_select:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Select t_tag"
-  shows "\<exists>t. instr_subtyping ([t,t,T_num T_i32] _> [t]) (ts _> ts') \<and> ((t_tag = None \<and> (is_num_type t \<or> is_vec_type t)) \<or> (t_tag = Some t \<and> t \<noteq> T_bot))"
+  shows "\<exists>t. instr_subtyping ([t,t,T_num T_i32] _> [t]) (ts _> ts') \<and> ((t_tag = None \<and> (is_num_type t \<or> is_vec_type t)) \<or> t_tag = Some t)"
   using assms
   apply (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
   apply (auto simp add: instr_subtyping_refl b_e_type_composition_aux_lemma)
