@@ -727,7 +727,7 @@ proof -
     by fastforce
   then obtain t where t_def:
       "([t, t, (T_num T_i32)] _> [t]) <ti: (t1s _> ts') " 
-      "(t_tag = None \<and> (is_num_type t \<or> is_vec_type t)) \<or> t_tag = Some t"
+      "(t_tag = None \<and> (is_num_type t \<or> is_vec_type t)) \<or> (t_tag = Some t \<and> t \<noteq> T_bot)"
     using b_e_type_select[of \<C> e t1s] assms
     by (metis to_e_list_1 unlift_b_e)
   have 0: "[] _> [typeof v1, typeof v2, typeof vn]  <ti: ts _> t1s" using t1s_def(1)
