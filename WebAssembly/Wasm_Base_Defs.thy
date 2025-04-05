@@ -3,6 +3,7 @@ section \<open> WebAssembly Base Definitions \<close>
 theory Wasm_Base_Defs
   imports
     Wasm_Ast
+    Wasm_Subtyping
     Wasm_Type_Abs
     Wasm_Type_Word
     Word_Lib.Rsplit
@@ -206,13 +207,6 @@ lift_definition deserialise_i64 :: "bytes \<Rightarrow> i64" is "word_rcat_rev\<
 lift_definition wasm_bool :: "bool \<Rightarrow> i32" is "(\<lambda>b. if b then 1 else 0)" .
 lift_definition  int32_minus_one :: i32 is "max_word" .
 
-  (* limits *)
-definition "limits_compat lt1 lt2 =
-  ((l_min lt1) \<ge> (l_min lt2) \<and>
-  pred_option (\<lambda>lt2_the. (case (l_max lt1) of
-                            Some lt1_the \<Rightarrow> (lt1_the \<le> lt2_the)
-                          | None \<Rightarrow> False)) (l_max lt2))"
-
   (* memory *)
 definition mem_size :: "mem \<Rightarrow> nat" where
   "mem_size m = (mem_length m) div Ki64"
@@ -247,35 +241,6 @@ definition store :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes
 
 definition store_packed :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> bytes \<Rightarrow> nat \<Rightarrow> mem option" where
   "store_packed = store"
-
-definition t_subtyping :: "[t, t] \<Rightarrow> bool" where
-  "t_subtyping t1 t2 = (t1 = T_bot \<or> t1 = t2)"
-
-definition t_list_subtyping :: "[t list, t list] \<Rightarrow> bool" where
-  "t_list_subtyping t1s t2s = list_all2 t_subtyping t1s t2s"
-
-definition tf_subtyping :: "[tf, tf] \<Rightarrow> bool" where
-  "tf_subtyping tf1 tf2 =
-    (t_list_subtyping (tf.dom tf2) (tf.dom tf1) \<and> t_list_subtyping (tf.ran tf1) (tf.ran tf2))"
-
-
-definition instr_subtyping :: "[tf, tf] \<Rightarrow> bool" ("_ '<ti: _" 60) where
-  "instr_subtyping tf1 tf2 \<equiv> \<exists> ts ts' tf1_dom_sub tf1_ran_sub.
-    (tf.dom tf2) = ts@tf1_dom_sub
-  \<and> (tf.ran tf2) = ts'@tf1_ran_sub
-  \<and> t_list_subtyping ts ts'
-  \<and> t_list_subtyping tf1_dom_sub (tf.dom tf1)
-  \<and> t_list_subtyping (tf.ran tf1)(tf1_ran_sub)"
-
-definition mem_subtyping :: "[mem_t, mem_t] \<Rightarrow> bool" where
-"mem_subtyping t1 t2 = limits_compat t1 t2"
-
-  (* tables *)
-
-(* t1 \<le> t2 *)
-definition tab_subtyping :: "[tab_t, tab_t] \<Rightarrow> bool" where
-"tab_subtyping t1 t2 = (case (t1, t2) of
-  (T_tab lims1 tr1, T_tab lims2 tr2) \<Rightarrow> limits_compat lims1 lims2 \<and> tr1 = tr2) "
 
 definition store_tab_list :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref list \<Rightarrow> tabinst option" where
   "store_tab_list tab n vrs = (if (tab_size tab \<ge> (n+(length vrs)))
@@ -866,10 +831,6 @@ inductive store_extension :: "s \<Rightarrow> s \<Rightarrow> bool" where
 abbreviation to_e_list :: "b_e list \<Rightarrow> e list" ("$* _" 60) where
   "to_e_list b_es \<equiv> map Basic b_es"
 
-(*
-datatype \<comment> \<open>values\<close>
-  v = V_num v_num | V_vec v_vec | V_ref v_ref
-*)
 definition v_to_e :: "v \<Rightarrow> e" ("$C _" 60) where
   "v_to_e ve \<equiv> (case ve of
     V_num x \<Rightarrow>  $ EConstNum x |
