@@ -2,6 +2,83 @@ section \<open>Augmented Type Syntax for Concrete Checker\<close>
 
 theory Wasm_Checker_Types imports Wasm "HOL-Library.Sublist" begin
 
+datatype reach = Reach | Unreach
+
+type_synonym c_t = "(t list \<times> reach)"
+
+fun pop :: "c_t \<Rightarrow> (t \<times> c_t) option" where
+  "pop ([], r) = (case r of Reach \<Rightarrow> None | Unreach \<Rightarrow> Some (T_bot, ([], Unreach)))"
+| "pop (t#ts, r) = Some (t, (ts, r))"
+
+fun push :: "c_t \<Rightarrow> t \<Rightarrow> c_t" where
+  "push (ts, r) t =(t#ts, r)"
+
+fun pop_expect :: "c_t \<Rightarrow> t \<Rightarrow> c_t option" where
+  "pop_expect ct t =
+    (case pop ct of
+      None \<Rightarrow> None
+    | Some (t', ct') \<Rightarrow> (if t' <t: t then Some ct' else None))"
+
+fun pop_expect_list :: "c_t \<Rightarrow> t list \<Rightarrow> c_t option" where
+  "pop_expect_list ct [] = Some ct"
+| "pop_expect_list ct (t#ts) =
+    (case (pop_expect ct t) of
+      None \<Rightarrow> None
+    | Some ct' \<Rightarrow> (pop_expect_list ct' ts))"
+
+fun consume :: "c_t \<Rightarrow> t list \<Rightarrow> c_t option" where
+  "consume ct ts = pop_expect_list ct (rev ts)"
+
+fun push_rev_list :: "c_t \<Rightarrow> t list \<Rightarrow> c_t" where
+  "push_rev_list (ts, r) ts' =(ts'@ts, r)"
+
+fun produce :: "c_t \<Rightarrow> t list \<Rightarrow> c_t" where
+  "produce ct ts' = push_rev_list ct (rev ts')"
+
+
+fun c_types_agree :: "c_t \<Rightarrow> t list \<Rightarrow> bool" where
+  "c_types_agree ct ts =
+    (case consume ct ts of
+      None \<Rightarrow> False
+    | Some (ts, _) \<Rightarrow> ts = [])"
+
+fun type_update :: "c_t \<Rightarrow> t list \<Rightarrow> t list \<Rightarrow> c_t option" where
+  "type_update ct cons prods = map_option (\<lambda> ct'. produce ct' prods) (consume ct cons)"
+
+fun type_update_is_null_ref :: "c_t \<Rightarrow> c_t option" where
+  "type_update_is_null_ref ct =
+    (case pop ct of
+      None \<Rightarrow> None
+    | Some (t, ct') \<Rightarrow> if (is_ref_type t \<or> t = T_bot) then Some (push ct' (T_num T_i32)) else None)"
+
+fun type_update_drop :: "c_t \<Rightarrow> c_t option" where
+  "type_update_drop ct = map_option snd (pop ct)"
+
+fun type_update_select :: "c_t \<Rightarrow> t option \<Rightarrow> c_t option" where
+  "type_update_select ct None =
+    (case (pop_expect ct (T_num T_i32)) of
+      None \<Rightarrow> None
+    | Some ct' \<Rightarrow>
+      (case (pop ct') of
+        None \<Rightarrow> None
+      | Some (t1, ct'') \<Rightarrow>
+          (case (pop ct'') of
+            None \<Rightarrow> None
+          | Some (t2, ct''') \<Rightarrow>
+            if (\<not>(((is_num_type t1 \<or> t1 = T_bot) \<and> (is_num_type t2 \<or> t2 = T_bot)) \<or> ((is_vec_type t1 \<or> t1 = T_bot) \<and> (is_vec_type t2 \<or> t2 = T_bot))))
+            then
+              None
+            else
+              if (t1 \<noteq> t2 \<and> t1 \<noteq> T_bot \<and> t2 \<noteq> T_bot)
+              then None
+              else Some (push ct''' (if t1 = T_bot then t2 else t1))
+          )
+      )
+    )"
+| "type_update_select ct (Some t) = type_update ct [t, t, T_num T_i32] [t]"
+
+
+(*
 datatype ct =
     TAny
   | TSome t
@@ -1077,5 +1154,5 @@ next
       by simp
   qed
 qed
-
+*)
 end

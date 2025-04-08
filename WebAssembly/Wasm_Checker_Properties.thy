@@ -2,6 +2,21 @@ section \<open>Correctness of Type Checker\<close>
 
 theory Wasm_Checker_Properties imports Wasm_Checker Wasm_Properties begin
 
+lemma b_e_type_checker_sound:
+  assumes "b_e_type_checker \<C> es (tn _> tm)"
+  shows "\<C> \<turnstile> es : (tn _> tm)"
+  sorry
+
+lemma b_e_type_checker_complete:
+  assumes "\<C> \<turnstile> es : (tn _> tm)"
+  shows "b_e_type_checker \<C> es (tn _> tm)"
+  sorry
+
+theorem b_e_typing_equiv_b_e_type_checker:
+  shows "(\<C> \<turnstile> es : tf) = (b_e_type_checker \<C> es tf)"
+  sorry
+
+(*
 subsection \<open> Soundness \<close>
 
 lemma b_e_check_single_type_sound:
@@ -1426,5 +1441,5 @@ theorem b_e_typing_equiv_b_e_type_checker:
   shows "(\<C> \<turnstile> es : tf) = (b_e_type_checker \<C> es tf)"
   using b_e_type_checker_sound b_e_type_checker_complete
   by (metis tf.exhaust)
-
+*)
 end

@@ -374,6 +374,11 @@ definition is_vec_type :: "t \<Rightarrow> bool" where
                       T_vec _ \<Rightarrow> True
                     | _ \<Rightarrow> False)"
 
+definition is_ref_type :: "t \<Rightarrow> bool" where
+  "is_ref_type t = (case t of
+                      T_ref _ \<Rightarrow> True
+                    | _ \<Rightarrow> False)"
+
 definition vec_lane_t :: "shape_vec \<Rightarrow> t_num" where
   "vec_lane_t sv = (case sv of
                       Svi I8_16 \<Rightarrow> T_i32
