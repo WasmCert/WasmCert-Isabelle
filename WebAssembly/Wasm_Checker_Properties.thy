@@ -107,6 +107,72 @@ proof -
   qed
 qed
 
+lemma b_e_type_checker_is_null_ref_sound:
+  assumes "check_single \<C> Is_null_ref ct = Some ct'"
+          "c_types_agree ct' ts'"
+  shows "\<exists>ts. c_types_agree ct ts \<and> \<C> \<turnstile> [Is_null_ref] : ts _> ts'"
+proof -
+  obtain t ct'' where t_def:
+    "pop ct = Some (t, ct'')" 
+    using assms(1) Wasm_Checker.check_is_null_ref
+    apply simp
+    by (metis (no_types, lifting) option.case_eq_if option.collapse option.discI surj_pair)
+  then have 1: "is_ref_type t \<or> t = T_bot" "(push ct'' (T_num T_i32)) = ct'"
+    using assms Wasm_Checker.check_is_null_ref t_def
+    by (auto simp add: handy_if_lemma split: option.splits prod.splits)
+  have "produce ct'' [T_num T_i32] = ct'"
+    using 1(2)
+    apply simp
+    by (metis append.left_neutral append_Cons push.simps push_rev_list.elims)
+  then obtain ts'' where ts''_def: "c_types_agree ct'' ts''" "[] _> [T_num T_i32] <ti: ts'' _> ts'"
+    using assms(2) produce_subtyping by blast
+  then obtain ts where ts_def: "c_types_agree ct ts" "[t] _> [] <ti: ts _> ts''"
+    using pop_some(2) t_def by blast
+  then have 2: "[t] _> [T_num T_i32] <ti: ts _> ts'"
+    using instr_subtyping_comp ts''_def(2) by blast
+  obtain tr where tr_def: "t <t: T_ref tr"
+    using 1(1) t_subtyping_def
+    by (auto simp add: is_ref_type_def split: t.splits)
+  then have "[T_ref tr] _> [T_num T_i32] <ti: [t] _> [T_num T_i32]"
+    by (meson instr_subtyping_refl instr_subtyping_replace1 list.rel_intros(2) list_all2_Nil t_list_subtyping_def)
+  then have "\<C> \<turnstile> [Is_null_ref] : [t] _> [T_num T_i32]" using 1 b_e_typing.is_null_ref subsumption by blast
+  then have "\<C> \<turnstile> [Is_null_ref] : ts _> ts'"
+    using 2 subsumption by blast
+  then show ?thesis using ts_def by blast
+qed
+
+lemma b_e_type_checker_select_sound:
+  assumes "check_single \<C> (Select t_tag) ct = Some ct'"
+          "c_types_agree ct' ts'"
+  shows "\<exists>ts. c_types_agree ct ts \<and> \<C> \<turnstile> [Select t_tag] : ts _> ts'"
+proof(cases t_tag)
+  case None
+  obtain t' ct' where t'_def: "pop ct = Some (t', ct')" "t' <t: T_num T_i32"
+    using assms(1) None
+    apply (auto simp del: c_types_agree.simps produce.simps consume.simps split: option.splits)
+    by fastforce
+  obtain t1 ct'' where t1_def: "pop ct' = Some (t1, ct'')"
+    using t'_def assms(1) None
+    by (auto split: option.splits)
+  obtain t2 ct''' where t2_def: "pop ct'' = Some (t2, ct''')"
+    using t'_def t1_def assms(1) None
+    by (auto split: option.splits)
+  have h1: "(is_num_type t1 \<or> t1 = T_bot) \<and> (is_num_type t2 \<or> t2 = T_bot) \<or>
+                        (is_vec_type t1 \<or> t1 = T_bot) \<and> (is_vec_type t2 \<or> t2 = T_bot)"
+    using t'_def t1_def t2_def assms(1) None
+    apply (simp del: c_types_agree.simps produce.simps consume.simps)
+    by (metis option.simps(3))
+  then have h2: "t1 = t2 \<or> t1 = T_bot \<or> t2 = T_bot"
+    using t'_def t1_def t2_def assms(1) None
+    apply (simp del: c_types_agree.simps produce.simps consume.simps)
+    by (metis option.simps(3))
+  show ?thesis using None assms apply (simp del: c_types_agree.simps produce.simps consume.simps) sorry
+next
+  case (Some a)
+  then show ?thesis using assms check_select
+    by (metis b_e_typing.select subsumption type_update_general type_update_select.simps(2))
+qed
+
 lemma b_e_type_checker_sound:
   assumes "b_e_type_checker \<C> es (ts _> ts')"
   shows "\<C> \<turnstile> es : (ts _> ts')"
@@ -210,7 +276,7 @@ proof -
       by (metis Wasm_Checker.check_null_ref null_ref subsumption type_update_general)
   next
     case (18 \<C> ct)
-    then show ?case sorry
+    then show ?case using b_e_type_checker_is_null_ref_sound by blast
   next
     case (19 \<C> j ct)
     then show ?case
@@ -235,7 +301,18 @@ proof -
       using b_e_type_checker_drop_sound by blast
   next
     case (25 \<C> t_tag ct)
-    then show ?case sorry
+    then show ?case
+    proof(cases t_tag)
+      case None
+      then show ?thesis
+        using 25 t_subtyping_def
+        apply (auto simp add: handy_if_lemma split: option.splits simp del: c_types_agree.simps)
+        using handy_if_lemma 
+        sorry
+    next
+      case (Some a)
+      then show ?thesis sorry
+    qed  
   next
     case (26 \<C> tb es ct)
     obtain tn tm where tn_tm_def: "tb_tf_t \<C> tb = Some (tn _> tm)"
