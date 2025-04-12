@@ -2,15 +2,121 @@ section \<open>Correctness of Type Checker\<close>
 
 theory Wasm_Checker_Properties imports Wasm_Checker Wasm_Properties begin
 
+lemma consume_subtyping:
+  assumes "consume ct cons = Some ct'" "c_types_agree ct' ts'"
+  shows "\<exists> ts. c_types_agree ct ts  \<and> (cons _> []) <ti: (ts _> ts')"
+  using assms
+proof(induction cons arbitrary: ct ct' rule: List.rev_induct)
+  case Nil
+  then show ?case
+    using b_e_weakening empty
+    by (metis append_Nil2 b_e_type_empty1 consume.simps handy_if_lemma pop_expect_list.simps(1) rev_is_Nil_conv)
+next
+  case (snoc x xs)
+  then obtain ct'' where ct''_def: "consume ct [x] = Some ct''" "consume ct'' xs = Some ct'"
+    using consume_some_split[OF snoc(2)] by blast
+  then obtain x' where x'_def: "pop ct = Some (x', ct'')" "x' <t: x" by (auto simp add: handy_if_lemma split: option.splits)
+  obtain ts'' where ts''_def: "c_types_agree ct'' ts''" "xs _> [] <ti: ts'' _> ts'"
+    using snoc(1)[OF ct''_def(2)]
+    using snoc.prems(2) by blast
+  then obtain ts where ts_def: "c_types_agree ct ts" "[x'] _> [] <ti: ts _> ts''" using x'_def pop_some by blast
+  have "xs@[x'] _> [] <ti: ts _> ts'"
+    using instr_subtyping_concat_left ts''_def(2) ts_def(2) by blast
+  then have "xs@[x] _> [] <ti: ts _> ts'"
+    using x'_def(2) using instr_subtyping_replace2[of "[x']" "[x]"]
+    by (metis instr_subtyping_replace1 list.rel_inject(2) list_all2_Nil t_list_subtyping_def t_list_subtyping_prepend)
+  then show ?case using ts_def by blast
+qed
+
+lemma produce_subtyping:
+  assumes "produce ct prods = ct'" "c_types_agree ct' ts'"
+  shows "\<exists> ts. c_types_agree ct ts \<and> ([] _> prods) <ti: (ts _> ts')"
+proof -
+  obtain r cts cts' where cts_def: "ct' = (cts', r)" "ct = (cts, r)"
+    by (metis assms(1) prod.exhaust_sel produce.simps push_rev_list.simps)
+  then have 0: "consume ct' ts' = Some ([],r)"
+    using assms(2) pop_expect_list_some_reachability_inv
+    apply (simp split: option.splits)
+    by fastforce
+  have 1: "ct' = ((rev prods)@cts, r)" using assms(1) cts_def by simp
+  obtain ts_tail where ts''_def: "(rev prods)@cts@ts_tail <ts: rev ts'"
+    by (metis "1" append.assoc append_Nil2 assms(2) c_types_agree_subtyping)
+  then have 2: "rev (cts@ts_tail) @ prods <ts: ts'"
+    by (metis list_all2_rev1 rev_append rev_rev_ident t_list_subtyping_def)
+  obtain ts prods' where ts_def: "ts'=ts@prods'" "rev (cts@ts_tail) <ts: ts" "prods <ts: prods'"
+    by (meson "2" t_list_subtyping_split1)
+  have "([] _> prods) <ti: (ts _> ts @ prods)"
+    by (metis append.right_neutral instr_subtyping_def t_list_subtyping_refl tf.sel(1) tf.sel(2))
+  then have "([] _> prods) <ti: (ts _> ts')"
+    using ts_def instr_subtyping_replace4 t_list_subtyping_prepend by blast
+  moreover have "c_types_agree ct ts"
+     using "1" assms(2) c_types_agree_drop_append cts_def(2) ts_def(1) ts_def(3) by blast
+  ultimately show ?thesis by blast
+qed
+
+lemma produce_subtyping2:
+  assumes "produce ct prods = ct'" "c_types_agree ct ts"
+  shows "\<exists> ts'. c_types_agree ct' ts' \<and> ([] _> prods) <ti: (ts _> ts')"
+proof -
+  obtain r cts where cts_def: "ct = (cts, r)"
+    by fastforce
+  then have 0: "consume ct ts = Some ([],r)"
+    using assms(2) pop_expect_list_some_reachability_inv
+    apply (simp split: option.splits)
+    by fastforce
+  have 1: "ct' = ((rev prods)@cts, r)" using assms(1) cts_def by simp
+  obtain ts'' where ts''_def: "cts@ts'' <ts: rev ts"
+    by (metis append.right_neutral assms(2) c_types_agree_subtyping cts_def)
+  let ?ts' = "ts@prods"
+  have "([] _> prods) <ti: (ts _> ?ts')"
+    by (metis append.right_neutral instr_subtyping_def t_list_subtyping_refl tf.sel(1) tf.sel(2))
+  moreover have "c_types_agree ct' ?ts'"
+    using "1" assms(2) c_types_agree_append cts_def by blast
+  ultimately show ?thesis by blast
+qed
+
+lemma type_update_general:
+  assumes "type_update ct t1s t2s = Some ct'" "c_types_agree ct' ts'"
+  shows "\<exists> ts. c_types_agree ct ts  \<and> (t1s _> t2s <ti: ts _> ts')"
+proof -
+  obtain ct'' where ct''_def: "consume ct t1s = Some ct''" "produce ct'' t2s = ct'" using assms(1) by auto
+  then obtain ts'' where ts''_def: "c_types_agree ct'' ts''" "[] _> t2s <ti: ts'' _> ts'"
+    using produce_subtyping using assms(2) by blast
+  then obtain ts where ts_def: "c_types_agree ct ts" "t1s _> [] <ti: ts _> ts''"
+    using consume_subtyping ct''_def(1) by blast
+  then show ?thesis
+    using instr_subtyping_comp ts''_def(2) by blast
+qed
+
 lemma b_e_type_checker_sound:
   assumes "b_e_type_checker \<C> es (tn _> tm)"
   shows "\<C> \<turnstile> es : (tn _> tm)"
-  sorry
+  using assms
+proof -
+  fix e tn'
+  have "b_e_type_checker \<C> es (tn _> tm) \<Longrightarrow>
+          \<C> \<turnstile> es : (tn _> tm)"
+  and "\<And>tm' tm.
+       check \<C> es tn' = Some tm' \<Longrightarrow>
+       c_types_agree tm' tm \<Longrightarrow>
+         \<exists>tn. c_types_agree tn' tn \<and> \<C> \<turnstile> es : (tn _> tm)"
+  and "\<And>tm' tm.
+       check_single \<C> e tn' = Some tm' \<Longrightarrow>
+       c_types_agree tm' tm \<Longrightarrow>
+         \<exists>tn. c_types_agree tn' tn \<and> \<C> \<turnstile> [e] : (tn _> tm)"
+    sorry
+ 
+  then show ?thesis
+    using assms by blast
+
+qed
+
 
 lemma b_e_type_checker_complete:
   assumes "\<C> \<turnstile> es : (tn _> tm)"
   shows "b_e_type_checker \<C> es (tn _> tm)"
   sorry
+
 
 theorem b_e_typing_equiv_b_e_type_checker:
   shows "(\<C> \<turnstile> es : tf) = (b_e_type_checker \<C> es tf)"

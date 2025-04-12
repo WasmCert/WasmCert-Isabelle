@@ -301,6 +301,43 @@ proof -
   ultimately show ?thesis unfolding instr_subtyping_def by blast
 qed
 
+
+lemma instr_subtyping_concat_left:
+  assumes "instr_subtyping (ts1 _> []) (ts1' _> ts2')"
+          "instr_subtyping (ts2 _> []) (ts2' _> ts3')"
+        shows "instr_subtyping ((ts2@ts1) _> []) (ts1' _> ts3')"
+proof -
+  obtain ts_1 tf1_dom_sub_1 where ts_1_def:
+    "ts1'  = ts_1 @ tf1_dom_sub_1"
+    "ts_1 <ts: ts2'"
+    "tf1_dom_sub_1 <ts: ts1"
+    using assms(1) unfolding instr_subtyping_def
+    using t_list_subtyping_not_bot_eq by fastforce
+  obtain ts_2 tf1_dom_sub_2 where ts_2_def:
+     "ts2' = ts_2 @ tf1_dom_sub_2"
+     "ts_2 <ts: ts3'"
+     "tf1_dom_sub_2 <ts: ts2"
+    using assms(2) unfolding instr_subtyping_def using t_list_subtyping_not_bot_eq by fastforce
+  obtain "ts_2'" "tf1_dom_sub_2'" where ts_2'_def: "ts_1 = ts_2'@tf1_dom_sub_2'" "ts_2' <ts: ts_2" "tf1_dom_sub_2' <ts: tf1_dom_sub_2"
+    using ts_1_def(2) ts_2_def(1)
+    by (meson t_list_subtyping_split2)
+  let ?ts = ts_2'
+  let ?ts' = ts3'
+  let ?tf1_dom_sub = "tf1_dom_sub_2'@tf1_dom_sub_1"
+  let ?tf1_ran_sub = "[]"
+  have "tf.dom (ts1' _> ts3') = ?ts @ ?tf1_dom_sub"
+    by (simp add: ts_1_def(1) ts_2'_def(1))
+  moreover have "tf.ran (ts1' _> ts3') = ?ts' @ ?tf1_ran_sub" by simp
+  moreover have "?ts <ts: ?ts'"
+    using t_list_subtyping_trans ts_2'_def(2) ts_2_def(2) by blast
+  moreover have "?tf1_dom_sub <ts: tf.dom (ts2 @ ts1 _> [])"
+    using t_list_subtyping_prepend t_list_subtyping_replace1 tf.sel(1) ts_1_def(3) ts_2'_def(3) ts_2_def(3) by metis
+  moreover have "tf.ran (ts2 @ ts1 _> []) <ts: ?tf1_ran_sub"
+    by (simp add: t_list_subtyping_refl)
+  ultimately show ?thesis unfolding instr_subtyping_def by blast
+qed
+
+
 (* TODO: Replace this lemma *)
 lemma t_list_subtyping_instr_subtyping_append:
   assumes "t_list_subtyping (dtf@dp) (rtf)"
@@ -434,11 +471,26 @@ lemma instr_subtyping_replace1:
         shows "(ts' _> t2s) <ti: (t1s' _> t2s')"
   by (metis (mono_tags, opaque_lifting) assms(1) assms(2) instr_subtyping_comp instr_subtyping_def instr_subtyping_refl instr_subtyping_trans self_append_conv2 t_list_subtyping_refl tf.sel(1) tf.sel(2))
 
+lemma instr_subtyping_replace2:
+  assumes "t_list_subtyping ts' ts"
+          "(t1s _> ts) <ti: (t1s' _> t2s')"
+        shows "(t1s _> ts') <ti: (t1s' _> t2s')"
+  using assms(1) assms(2) instr_subtyping_refl
+  by (metis (mono_tags, opaque_lifting) instr_subtyping_comp instr_subtyping_def instr_subtyping_trans self_append_conv2 t_list_subtyping_refl tf.sel(1) tf.sel(2))
+
 lemma instr_subtyping_replace3:
   assumes "t_list_subtyping ts' ts"
           "(t1s _> t2s) <ti: (ts _> t2s')"
         shows "(t1s _> t2s) <ti: (ts' _> t2s')"
   using assms(1) assms(2) instr_subtyping_refl instr_subtyping_replace1 instr_subtyping_trans by blast
+
+lemma instr_subtyping_replace4:
+  assumes "t_list_subtyping ts ts'"
+          "(t1s _> t2s) <ti: (t1s' _> ts)"
+        shows "(t1s _> t2s) <ti: (t1s' _> ts')"
+  using assms instr_subtyping_refl instr_subtyping_comp instr_subtyping_def instr_subtyping_trans
+  by (metis (mono_tags, opaque_lifting) self_append_conv2 t_list_subtyping_refl tf.sel(1) tf.sel(2))
+
 
 lemma instr_subtyping_drop_append:
   assumes "([] _> ts) <ti: (t1s' _> t2s')"

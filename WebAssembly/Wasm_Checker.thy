@@ -70,8 +70,7 @@ and check_single :: "t_context \<Rightarrow>  b_e \<Rightarrow> c_t \<Rightarrow
 | check_iter:"check \<C> es ts = (case es of
                                  [] \<Rightarrow> Some ts
                                | (e#es) \<Rightarrow> (case (check_single \<C> e ts) of 
-                                              Some ts' \<Rightarrow> check \<C> es ts'))
-                                           "
+                                              Some ts' \<Rightarrow> check \<C> es ts'))"
   (* num ops *)
 | check_const_num:"check_single \<C> (EConstNum v) ts = type_update ts [] ([T_num (typeof_num v)])"
 | check_const_vec:"check_single \<C> (EConstVec v) ts = type_update ts [] ([T_vec (typeof_vec v)])"

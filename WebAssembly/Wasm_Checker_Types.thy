@@ -1,6 +1,6 @@
 section \<open>Augmented Type Syntax for Concrete Checker\<close>
 
-theory Wasm_Checker_Types imports Wasm "HOL-Library.Sublist" begin
+theory Wasm_Checker_Types imports Wasm Wasm_Subtyping_Properties "HOL-Library.Sublist" begin
 
 datatype reach = Reach | Unreach
 
@@ -76,6 +76,237 @@ fun type_update_select :: "c_t \<Rightarrow> t option \<Rightarrow> c_t option" 
       )
     )"
 | "type_update_select ct (Some t) = type_update ct [t, t, T_num T_i32] [t]"
+
+lemma pop_some_reachability_inv:
+  assumes "pop ct = Some (t, ct')"
+  shows "snd ct = snd ct'"
+  using assms
+  apply(cases "ct" rule: pop.cases)
+  apply simp_all
+  apply (metis (mono_tags, lifting) option.inject option.simps(3) reach.exhaust reach.simps(3) reach.simps(4) snd_conv)
+  by fastforce
+
+lemma pop_expect_list_some_reachability_inv:
+  assumes "pop_expect_list ct ts = Some ( ct')"
+  shows "snd ct = snd ct'"
+  using assms
+  apply(induction ts arbitrary: ct ct')
+  by (auto simp add: pop_some_reachability_inv handy_if_lemma split:option.splits prod.splits)
+
+lemma consume_some_reachability_inv:
+  assumes "consume ct ts = Some ct'"
+  shows "snd ct = snd ct'"
+  using assms
+proof(induction ts arbitrary: ct ct' rule: rev_induct)
+  case Nil
+  then show ?case
+    by simp
+next
+  case (snoc x xs)
+  then show ?case
+    using pop_some_reachability_inv consume.simps pop_expect_list_some_reachability_inv snoc.prems by metis
+qed
+
+lemma consume_some_split:
+  assumes "consume ct (t1s@t2s) = Some ct'"
+  shows "\<exists> ct''. consume ct t2s = Some ct'' \<and> consume ct'' t1s = Some ct'"
+  using assms
+proof(induction t2s arbitrary: ct ct' rule: List.rev_induct)
+  case Nil
+  then show ?case
+    by simp
+next
+  case (snoc x xs)
+  then have "consume ct (t1s @ xs @ [x]) = Some ct'" by simp
+  then have "pop_expect_list ct (x # (rev xs @ rev t1s)) = Some ct'" by simp
+  then obtain  ct'' where ct''_def: "pop_expect ct x = Some ct''" "Some ct' = pop_expect_list ct'' (rev xs @ rev t1s)"
+    apply simp
+    by (metis (no_types, lifting) not_None_eq option.simps(4) option.simps(5))
+  then have ct''_consume: "consume ct'' (t1s@xs) = Some ct'" by simp
+  then obtain ct''' where ct'''_def:  "consume ct'' xs = Some ct'''" "consume ct''' t1s = Some ct'"
+    using snoc(1)[OF ct''_consume] by blast
+  have "consume ct (xs @ [x]) = Some ct'''" using ct'''_def ct''_def by simp
+  then show ?case
+    using ct'''_def(2) by blast
+qed
+
+lemma types_eq_c_types_agree: "c_types_agree (ts, r) (rev ts)"
+proof (induction ts)
+qed (simp add: t_subtyping_refl split: option.splits)+
+
+lemma c_types_agree_append:
+  assumes "c_types_agree (cts, r) ts"
+  shows "c_types_agree (rev(ts')@cts, r) (ts@ts')"
+  using assms t_subtyping_refl
+proof (induction ts' rule: rev_induct)
+qed (simp add: t_subtyping_refl split: option.splits)+
+
+lemma c_types_agree_drop_append:
+  assumes "c_types_agree (rev(ts')@cts, r) (ts@ts'')" "ts' <ts: ts''"
+  shows "c_types_agree (cts, r) ts"
+  using assms t_subtyping_refl
+proof (induction ts' arbitrary: ts'' rule: rev_induct)
+  case Nil
+  then show ?case
+    by (simp add: t_list_subtyping_def)
+next
+  case (snoc x xs)
+  obtain ts''' t' where ts'''_def: "ts'' = ts'''@[t']" "xs <ts: ts'''" "[x] <ts: [t']"
+    by (metis (full_types) list_all2_Cons1 list_all2_Nil snoc.prems(2) t_list_subtyping_def t_list_subtyping_split1)
+  then have "c_types_agree (rev xs @ cts, r) (ts @ ts''')" using snoc(2) apply (auto split: option.splits)
+    by (metis Pair_inject option.inject option.simps(3))+
+  then show ?case using ts'''_def snoc.IH t_subtyping_refl by blast
+qed
+
+lemma c_types_agree_subtyping_reach:
+  assumes "c_types_agree (ts, Reach) ts'"
+  shows "ts <ts: rev ts'"
+  using assms
+proof(induction ts arbitrary: ts')
+  case Nil
+  then show ?case
+    by (metis (no_types, lifting) c_types_agree.elims(2) consume.simps option.simps(4) pop.simps(1) pop_expect.simps pop_expect_list.elims reach.simps(3) t_list_subtyping_refl)
+next
+  case (Cons x xs)
+  then show ?case
+  proof(cases ts' rule: List.rev_cases)
+    case Nil
+    then show ?thesis
+      using Cons.prems by fastforce
+  next
+    case (snoc ys y)
+    then obtain r where "consume (x#xs, Reach) (ys@[y]) = Some ([], r)" using Cons by (auto split: option.splits)
+    then obtain ct' where ct'_def: "consume (x#xs, Reach) [y] = Some ct'" "consume ct' ys = Some ([], r)" using consume_some_split by blast
+    have "ct' = (xs, Reach)" using ct'_def(1) by (auto simp add: handy_if_lemma split: option.splits)
+    then have "xs <ts: rev ys"
+      using Cons.IH ct'_def(2) by auto
+    moreover have "x <t: y" using ct'_def(1) by (auto simp add: handy_if_lemma split: option.splits)
+    ultimately show ?thesis
+      by (simp add: snoc t_list_subtyping_def)
+  qed
+qed
+
+lemma c_types_agree_subtyping_unreach:
+  assumes "c_types_agree (ts, Unreach) ts'"
+  shows "\<exists> ts''. ts@ts'' <ts: rev ts'"
+  using assms
+proof(induction ts arbitrary: ts')
+  case Nil
+  then show ?case
+    using t_list_subtyping_refl by auto
+next
+  case (Cons x xs)
+  then show ?case
+  proof(cases ts' rule: List.rev_cases)
+    case Nil
+    then show ?thesis
+      using Cons.prems by auto
+  next
+    case (snoc ys y)
+    then obtain r where r_def: "consume (x#xs, Unreach) (ys@[y]) = Some ([], r)" using Cons by (auto split: option.splits)
+    then obtain ct' where ct'_def: "consume (x#xs, Unreach) [y] = Some ct'" "consume ct' ys = Some ([], r)" using consume_some_split by blast
+    have "ct' = (xs, Unreach)" using ct'_def(1) by (auto simp add: handy_if_lemma split: option.splits)
+    then obtain ts'' where ts''_def: "xs@ts'' <ts: rev ys"
+      using Cons.IH ct'_def(2) by fastforce
+    moreover have "x <t: y" using ct'_def ts''_def r_def by (auto simp add: handy_if_lemma split: option.splits)
+    ultimately show ?thesis
+      using snoc t_list_subtyping_def by auto
+  qed
+qed
+
+lemma c_types_agree_subtyping:
+  assumes "c_types_agree (ts, r) ts'"
+  shows "(r = Reach \<and> ts <ts: rev ts') \<or> (r = Unreach \<and> (\<exists> ts''. ts@ts'' <ts: rev ts'))"
+  using assms c_types_agree_subtyping_unreach  c_types_agree_subtyping_reach
+  apply(cases r) by simp_all
+
+
+lemma pop_expect_list_unreach_empty:
+  "pop_expect_list ([], Unreach) (ts) = Some ([], Unreach)"
+proof(induction ts)
+qed (simp add: t_subtyping_def)+
+
+lemma pop_expect_list_unreach_append: "pop_expect_list (ts, Unreach) (ts @ ts') = Some ([], Unreach)"
+proof(induction ts)
+qed (simp add: pop_expect_list_unreach_empty t_subtyping_def)+
+
+lemma pop_some:
+  assumes "pop ct = Some (t, ct')" "c_types_agree ct' ts'"
+  shows "snd ct = snd ct'" "\<exists> ts. c_types_agree ct ts \<and> [t] _> [] <ti: ts _> ts'" 
+proof -
+  show h_r: "snd ct = snd ct'"
+    using assms
+    apply (cases ct)
+    apply (rule pop.cases[of ct])
+    apply (simp split: reach.splits)
+    by fastforce+   
+  show "\<exists> ts . c_types_agree ct ts \<and> [t] _> [] <ti: ts _> ts'"
+  proof (cases "snd ct")
+    case Reach
+    then obtain cts cts' where cts_def: "ct = (cts, Reach)" "ct' = (cts', Reach)" "pop (cts, Reach) = Some (t, (cts', Reach))"
+      using h_r
+      by (metis assms eq_snd_iff)
+    have "cts' <ts: rev ts'" using c_types_agree_subtyping_reach assms(2) cts_def(2) by blast
+    then have 1: "rev cts' <ts: ts'" unfolding t_list_subtyping_def
+      using list_all2_rev1 by blast
+    have t_append: "cts = t#cts'"
+      using cts_def
+      apply(cases cts)
+      by simp+
+    then have "[t] _> [] <ti: (rev cts _> rev cts')" unfolding instr_subtyping_def using t_list_subtyping_def
+      by (metis append.right_neutral rev.simps(2) t_list_subtyping_refl tf.sel(1) tf.sel(2))
+    then have "[t] _> [] <ti: (rev cts _> ts')" using 1
+      by (metis append.right_neutral instr_subtyping_def rev.simps(2) t_append t_list_subtyping_refl tf.sel(1) tf.sel(2))
+    moreover have "c_types_agree ct (rev cts)" "c_types_agree ct' (rev cts')" using cts_def types_eq_c_types_agree
+      by fastforce+
+    ultimately show ?thesis unfolding c_types_agree.simps 1 by blast
+  next
+    case Unreach
+    then obtain cts cts' where cts_def: "ct = (cts, Unreach)" "ct' = (cts', Unreach)" "pop (cts, Unreach) = Some (t, (cts', Unreach))"
+      using h_r
+      by (metis assms eq_snd_iff)
+    then have cts_is: "cts = t#cts' \<or> (cts = [] \<and> t = T_bot \<and> cts' = [])"
+      apply (cases cts)
+      by simp+
+    then show ?thesis
+    proof 
+      assume cts_t: "cts = t#cts'"
+
+      obtain ts'' where ts''_def: "cts'@ts'' <ts: rev ts'"
+        using assms(2) c_types_agree_subtyping_unreach cts_def(2) by blast
+      then have 1: "rev ts'' @ rev cts' <ts: ts'"
+        by (metis list_all2_rev1 rev_append t_list_subtyping_def)
+      have "([t] _> [] <ti: rev (cts) _> rev cts')"
+        using cts_t
+        by (metis fold_Cons_rev instr_subtyping_def rev.simps(2) rev_conv_fold t_list_subtyping_refl tf.sel(1) tf.sel(2))
+      then have "([t] _> [] <ti: rev ts'' @ rev (cts) _> rev ts'' @ rev cts')" using instr_subtyping_trans
+        by (metis (no_types, lifting) instr_subtyping_def t_list_subtyping_refl tf.sel(1) tf.sel(2))
+      then have "([t] _> [] <ti: rev ts'' @ rev (cts) _> ts')" using 1 instr_subtyping_replace4 by simp
+      moreover have "c_types_agree ct (rev ts'' @ rev (cts))" using cts_def(1) by (auto simp add: pop_expect_list_unreach_append split: option.splits)
+      ultimately show ?thesis by blast
+    next
+      assume h: "(cts = [] \<and> t = T_bot \<and> cts' = [])"
+      then obtain cts'' where "cts'' = [T_bot]" "c_types_agree ct (rev cts'')"
+        by (simp add: assms cts_def(2) t_subtyping_def)
+      then show ?thesis
+        by (metis append_self_conv c_types_agree.simps consume.simps cts_def(1) h instr_subtyping_def pop_expect_list_unreach_empty t_list_subtyping_refl tf.case tf.dom_def tf.ran_def)
+    qed
+  qed
+qed
+
+lemma pop_expect_some:
+  assumes "pop_expect ct t = Some ct'" "c_types_agree ct' ts'"
+  shows "snd ct = snd ct'" "\<exists> ts. c_types_agree ct ts  \<and> [t] _> [] <ti: ts _> ts'" 
+proof -
+  obtain t' where t'_def: "pop ct = Some (t', ct')" "t' <t: t" using assms by (auto simp add: handy_if_lemma split: option.splits)
+  then obtain ts where ts_def: "snd ct = snd ct'" "c_types_agree ct ts " "[t'] _> [] <ti: ts _> ts'"
+    using pop_some assms(2) by blast
+  then have "[t] _> [] <ti: ts _> ts'" using t'_def
+    by (meson instr_subtyping_replace1 list.rel_intros(2) list_all2_Nil t_list_subtyping_def)
+  then show "snd ct = snd ct'" "\<exists> ts. c_types_agree ct ts  \<and> [t] _> [] <ti: ts _> ts'" 
+    using ts_def by blast+
+qed
+
 
 
 (*
