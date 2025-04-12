@@ -238,13 +238,52 @@ proof -
     then show ?case sorry
   next
     case (26 \<C> tb es ct)
-    then show ?case sorry
+    obtain tn tm where tn_tm_def: "tb_tf_t \<C> tb = Some (tn _> tm)"
+      by (metis (no_types, lifting) "26.prems"(1) Wasm_Checker.check_block is_none_code(2) is_none_simps(1) option.split_sel_asm tf.split_sel_asm)
+    then have 1: "b_e_type_checker (\<C>\<lparr>label := [tm] @ label \<C>\<rparr>) es (tn _> tm)" "type_update ct tn tm = Some ct'" 
+      using "26.prems"(1) Wasm_Checker.check_block 
+      apply (auto simp add: handy_if_lemma simp del: b_e_type_checker.simps type_update.simps)
+      by (meson option.distinct(1))+
+    then obtain ts where ts_def: "c_types_agree ct ts" "tn _> tm <ti: ts _> ts'"
+      using "26.prems"(2) type_update_general by blast
+    have "\<C> \<turnstile> [Block tb es] : tn _> tm"
+      using "1"(1) "26"(1) b_e_typing.block tn_tm_def by metis
+    then have "\<C> \<turnstile> [Block tb es] : ts _> ts'"
+      using ts_def(2) subsumption by blast
+    then show ?case using ts_def(1) by blast
   next
     case (27 \<C> tb es ct)
-    then show ?case sorry
+    obtain tn tm where tn_tm_def: "tb_tf_t \<C> tb = Some (tn _> tm)"
+      by (metis (no_types, lifting) "27.prems"(1) Wasm_Checker.check_loop is_none_code(2) is_none_simps(1) option.split_sel_asm tf.split_sel_asm)
+    then have 1: "b_e_type_checker (\<C>\<lparr>label := [tn] @ label \<C>\<rparr>) es (tn _> tm)" "type_update ct tn tm = Some ct'" 
+      using "27.prems"(1) Wasm_Checker.check_block 
+      apply (auto simp add: handy_if_lemma simp del: b_e_type_checker.simps type_update.simps)
+      by (meson option.distinct(1))+
+    then obtain ts where ts_def: "c_types_agree ct ts" "tn _> tm <ti: ts _> ts'"
+      using "27.prems"(2) type_update_general by blast
+    have "\<C> \<turnstile> [Loop tb es] : tn _> tm"
+      using "1"(1) "27"(1) b_e_typing.loop tn_tm_def by metis
+    then have "\<C> \<turnstile> [Loop tb es] : ts _> ts'"
+      using ts_def(2) subsumption by blast
+    then show ?case using ts_def by blast
   next
     case (28 \<C> tb es1 es2 ct)
-    then show ?case sorry
+    obtain tn tm where tn_tm_def: "tb_tf_t \<C> tb = Some (tn _> tm)"
+      using "28.prems"(1) Wasm_Checker.check_if
+      apply (simp del: b_e_type_checker.simps)
+      by (metis (no_types, lifting) option.case_eq_if option.collapse option.distinct(1) tf.split_sel_asm)
+    then have 1: "b_e_type_checker (\<C>\<lparr>label := [tm] @ label \<C>\<rparr>) es1 (tn _> tm)" "b_e_type_checker (\<C>\<lparr>label := [tm] @ label \<C>\<rparr>) es2 (tn _> tm)"
+      using "28.prems"(1,2) Wasm_Checker.check_if
+      apply (simp_all del: b_e_type_checker.simps)
+      by (meson option.distinct(1))+
+    then have 2: "type_update ct (tn @ [T_num T_i32]) tm = Some ct'"
+      using "28.prems"(1) tn_tm_def by fastforce
+    then obtain ts where ts_def: "c_types_agree ct ts" "tn@[T_num T_i32] _> tm <ti: ts _> ts'"
+      using "28.prems"(2) type_update_general by blast
+    have "\<C> \<turnstile> [b_e.If tb es1 es2] : tn@[T_num T_i32] _> tm"
+      by (meson "1"(1) "1"(2) "28"(1) "28"(2) if_wasm tn_tm_def)
+    then have "\<C> \<turnstile> [b_e.If tb es1 es2] : ts _> ts'" using ts_def(2) subsumption by blast
+    then show ?case using ts_def by blast
   next
     case (29 \<C> i ct)
     then obtain ct'' cts'' r'' where ct''_def: "ct' = ([], Unreach)" "i < length (label \<C>)" "consume ct (label \<C> ! i) = Some ct''" "ct'' = (cts'', r'')"
@@ -289,7 +328,8 @@ proof -
       by (metis Wasm_Checker.check_call_indirect option.distinct(1))+
     obtain tn tm lims where tn_defs:
       "(types_t \<C> ! i, table \<C> ! ti) = (tn _> tm, T_tab lims T_func_ref)"
-      using 34(1) 1 apply (auto simp add: handy_if_lemma  simp del: c_types_agree.simps consume.simps split: tab_t.splits prod.splits option.splits tf.splits)
+      using 34(1) 1
+      apply (auto simp add: handy_if_lemma  simp del: c_types_agree.simps consume.simps split: tab_t.splits prod.splits option.splits tf.splits)
       using t_ref.exhaust by force
     have 2: "type_update ct (tn @ [T_num T_i32]) tm = Some ct'"
       using 34(1) 1 tn_defs by fastforce
