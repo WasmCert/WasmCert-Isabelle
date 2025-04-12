@@ -195,9 +195,8 @@ proof(cases t_tag)
     have "\<C> \<turnstile> [Select t_tag] : [t3, t3, T_num T_i32] _> [t3]"
     proof(cases "t3 = T_bot")
       case True
-      then have "[T_num T_i32, T_num T_i32, T_num T_i32] _> [t3] <ti: [t3, t3, T_num T_i32] _> [t3]"
-        by (metis instr_subtyping_refl instr_subtyping_replace1 list.ctr_transfer(1) list_all2_Cons t_list_subtyping_def t_subtyping_def)
-      then show ?thesis sorry
+      then show ?thesis
+        using None b_e_typing.select by blast
     next
       case False
       then have "is_num_type t3 \<or> is_vec_type t3"
@@ -345,17 +344,7 @@ proof -
   next
     case (25 \<C> t_tag ct)
     then show ?case
-    proof(cases t_tag)
-      case None
-      then show ?thesis
-        using 25 t_subtyping_def
-        apply (auto simp add: handy_if_lemma split: option.splits simp del: c_types_agree.simps)
-        using handy_if_lemma 
-        sorry
-    next
-      case (Some a)
-      then show ?thesis sorry
-    qed  
+      using b_e_type_checker_select_sound by blast
   next
     case (26 \<C> tb es ct)
     obtain tn tm where tn_tm_def: "tb_tf_t \<C> tb = Some (tn _> tm)"

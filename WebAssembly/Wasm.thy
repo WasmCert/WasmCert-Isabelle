@@ -30,7 +30,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | unreachable:"\<C> \<turnstile> [Unreachable] : (ts _> ts')"
 | nop:"\<C> \<turnstile> [Nop] : ([] _> [])"
 | drop:"\<C> \<turnstile> [Drop] : ([t] _> [])"
-| select:"(t_tag = None \<and> (is_num_type t \<or> is_vec_type t)) \<or> t_tag = Some t \<Longrightarrow> \<C> \<turnstile> [Select t_tag] : ([t,t,T_num T_i32] _> [t])"
+| select:"(t_tag = None \<and> (is_num_type t \<or> is_vec_type t \<or> t = T_bot)) \<or> t_tag = Some t \<Longrightarrow> \<C> \<turnstile> [Select t_tag] : ([t,t,T_num T_i32] _> [t])"
   \<comment> \<open>\<open>block\<close>\<close>
 | block:"\<lbrakk>tb_tf_t \<C> tb = Some (tn _> tm); \<C>\<lparr>label := ([tm] @ (label \<C>))\<rparr> \<turnstile> es : (tn _> tm)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Block tb es] : (tn _> tm)"
   \<comment> \<open>\<open>loop\<close>\<close>
