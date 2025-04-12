@@ -247,22 +247,58 @@ proof -
     then show ?case sorry
   next
     case (29 \<C> i ct)
-    then show ?case sorry
+    then obtain ct'' cts'' r'' where ct''_def: "ct' = ([], Unreach)" "i < length (label \<C>)" "consume ct (label \<C> ! i) = Some ct''" "ct'' = (cts'', r'')"
+      by (metis Wasm_Checker.check_br not_Some_eq option.sel surj_pair)
+    have "c_types_agree ct ((rev cts'') @label \<C> ! i)" using ct''_def(3,4) consume_some_unsplit[OF ct''_def(3), of "rev cts''"]
+      by (metis (no_types, lifting) c_types_agree.simps option.case_eq_if option.exhaust types_eq_c_types_agree)
+    moreover have "\<C> \<turnstile> [Br i] : ((rev cts'') @label \<C> ! i) _> ts'"
+      using b_e_typing.br ct''_def(2) by blast
+    ultimately show ?case by blast
   next
     case (30 \<C> i ct)
-    then show ?case sorry
+    then show ?case
+      by (metis (no_types, lifting) Wasm_Checker.check_br_if br_if option.simps(3) subsumption type_update_general)
   next
     case (31 \<C> "is" i ct)
-    then show ?case  sorry
+    then obtain ct'' cts'' r'' tls where ct''_def: "ct' = ([], Unreach)" "same_lab (is @ [i]) (label \<C>) = Some tls" "consume ct (tls @ [T_num T_i32]) = Some ct''" "ct'' = (cts'', r'')"
+      apply (simp del: consume.simps split: option.splits)
+      by (metis option.inject option.simps(3))
+    have "c_types_agree ct ((rev cts'') @(tls @ [T_num T_i32]))" using ct''_def(3,4) consume_some_unsplit[OF ct''_def(3), of "rev cts''"]
+      by (metis (no_types, lifting) c_types_agree.simps option.case_eq_if option.exhaust types_eq_c_types_agree)
+    moreover have "\<C> \<turnstile> [Br_table is i] : ((rev cts'') @(tls@[T_num T_i32])) _> ts'"
+      using b_e_typing.br_table ct''_def(2) same_lab_conv_list_all by blast
+    ultimately show ?case by blast
   next
     case (32 \<C> ct)
-    then show ?case  sorry
+    then obtain tls ct'' cts'' r'' where ct''_def: "ct' = ([], Unreach)" "return \<C> = Some tls" "consume ct tls = Some ct''" "ct'' = (cts'', r'')"
+      apply (simp del: consume.simps split: option.splits)
+      by (metis option.inject option.simps(3))
+    have "c_types_agree ct ((rev cts'') @tls)" using ct''_def(3,4) consume_some_unsplit[OF ct''_def(3), of "rev cts''"]
+      by (metis (no_types, lifting) c_types_agree.simps option.case_eq_if option.exhaust types_eq_c_types_agree)
+    moreover have "\<C> \<turnstile> [Return] : ((rev cts'') @(tls)) _> ts'"
+      using b_e_typing.return ct''_def same_lab_conv_list_all by blast
+    ultimately show ?case by blast
   next
     case (33 \<C> i ct)
-    then show ?case sorry
+    then show ?case
+      apply (auto simp add: handy_if_lemma simp del: c_types_agree.simps consume.simps split: option.splits)
+      by (metis (mono_tags, lifting) b_e_typing.call option.discI subsumption tf.case tf.exhaust type_update_general)
   next
     case (34 \<C> ti i ct)
-    then show ?case sorry
+    then have 1: "i < length (types_t \<C>)" "ti < length (table \<C>)"
+      by (metis Wasm_Checker.check_call_indirect option.distinct(1))+
+    obtain tn tm lims where tn_defs:
+      "(types_t \<C> ! i, table \<C> ! ti) = (tn _> tm, T_tab lims T_func_ref)"
+      using 34(1) 1 apply (auto simp add: handy_if_lemma  simp del: c_types_agree.simps consume.simps split: tab_t.splits prod.splits option.splits tf.splits)
+      using t_ref.exhaust by force
+    have 2: "type_update ct (tn @ [T_num T_i32]) tm = Some ct'"
+      using 34(1) 1 tn_defs by fastforce
+    then obtain ts where ts_def: "c_types_agree ct ts" "(tn @ [T_num T_i32]) _> tm <ti: ts _> ts'"
+      using "34.prems"(2) type_update_general by blast
+    have "\<C> \<turnstile> [Call_indirect ti i] : (tn @ [T_num T_i32])_> tm" using b_e_typing.call_indirect[OF 1(1), of tn tm ti lims] tn_defs
+      using "1"(2) by fastforce
+    then show ?case
+      using 2 ts_def subsumption by blast
   next
     case (35 \<C> i ct)
     then show ?case

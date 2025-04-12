@@ -130,6 +130,24 @@ next
     using ct'''_def(2) by blast
 qed
 
+lemma consume_some_unsplit:
+  assumes "consume ct t2s = Some ct''" "consume ct'' t1s = Some ct'"
+  shows "consume ct (t1s@t2s) = Some ct'"
+  using assms
+proof(induction t2s arbitrary: ct ct' rule: List.rev_induct)
+  case Nil
+  then show ?case
+    by simp
+next
+  case (snoc x xs)
+  then obtain ct''' where ct'''_def: "consume ct [x] = Some ct'''" "consume ct''' xs = Some ct''"
+    using consume_some_split[OF snoc(2)] by blast
+  then have "consume ct''' (t1s @ xs) = Some ct'"
+    using snoc.IH snoc.prems(2) by blast
+  then have "consume ct (t1s @ xs @ [x]) = Some ct'" using ct'''_def(1) by (auto split: option.splits)
+  then show ?case by auto
+qed
+
 lemma types_eq_c_types_agree: "c_types_agree (ts, r) (rev ts)"
 proof (induction ts)
 qed (simp add: t_subtyping_refl split: option.splits)+
