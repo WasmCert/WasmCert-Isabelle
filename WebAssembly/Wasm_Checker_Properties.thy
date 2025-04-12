@@ -325,10 +325,22 @@ proof -
       by (metis Wasm_Checker.check_ref_func b_e_typing.func_ref option.simps(3) subsumption type_update_general)
   next
     case (20 \<C> t1 t2 sat_sx ct)
-    then show ?case sorry
+    then have "convert_cond t1 t2 sat_sx" "Some ct' = type_update ct [T_num t2] [T_num t1]"
+      apply (simp del: c_types_agree.simps convert_cond.simps)
+       apply (meson option.distinct(1))
+       by (metis "20.prems"(1) Wasm_Checker.check_convert option.distinct(1))
+    then show ?case using b_e_typing.convert type_update_general
+      by (metis (full_types) "20.prems"(2) convert_cond.elims(1) subsumption)
   next
     case (21 \<C> t1 t2 sx ct)
-    then show ?case sorry
+    then have
+      "t1 \<noteq> t2 \<and> t_num_length t1 = t_num_length t2 \<and> sx = None"
+      "Some ct' = type_update ct [T_num t2] [T_num t1]"
+       apply (simp del: c_types_agree.simps)
+       apply (metis not_None_eq)
+      by (metis "21.prems"(1) Wasm_Checker.check_reinterpret option.distinct(1))
+    then show ?case using b_e_typing.reinterpret type_update_general
+      by (metis "21.prems"(2) subsumption)
   next
     case (22 \<C> ct)
     then show ?case
@@ -549,7 +561,6 @@ proof -
   qed
   then show ?thesis
     using assms by blast
-
 qed
 
 
