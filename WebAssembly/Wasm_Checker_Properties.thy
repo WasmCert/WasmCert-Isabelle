@@ -147,26 +147,69 @@ lemma b_e_type_checker_select_sound:
   shows "\<exists>ts. c_types_agree ct ts \<and> \<C> \<turnstile> [Select t_tag] : ts _> ts'"
 proof(cases t_tag)
   case None
-  obtain t' ct' where t'_def: "pop ct = Some (t', ct')" "t' <t: T_num T_i32"
+  obtain t0 ct0 where t0_def: "pop ct = Some (t0, ct0)" "t0 <t: T_num T_i32"
     using assms(1) None
     apply (auto simp del: c_types_agree.simps produce.simps consume.simps split: option.splits)
     by fastforce
-  obtain t1 ct'' where t1_def: "pop ct' = Some (t1, ct'')"
-    using t'_def assms(1) None
+  obtain t1 ct1 where t1_def: "pop ct0 = Some (t1, ct1)"
+    using t0_def assms(1) None
     by (auto split: option.splits)
-  obtain t2 ct''' where t2_def: "pop ct'' = Some (t2, ct''')"
-    using t'_def t1_def assms(1) None
+  obtain t2 ct2 where t2_def: "pop ct1 = Some (t2, ct2)"
+    using t0_def t1_def assms(1) None
     by (auto split: option.splits)
   have h1: "(is_num_type t1 \<or> t1 = T_bot) \<and> (is_num_type t2 \<or> t2 = T_bot) \<or>
                         (is_vec_type t1 \<or> t1 = T_bot) \<and> (is_vec_type t2 \<or> t2 = T_bot)"
-    using t'_def t1_def t2_def assms(1) None
+    using t0_def t1_def t2_def assms(1) None
     apply (simp del: c_types_agree.simps produce.simps consume.simps)
     by (metis option.simps(3))
   then have h2: "t1 = t2 \<or> t1 = T_bot \<or> t2 = T_bot"
-    using t'_def t1_def t2_def assms(1) None
+    using t0_def t1_def t2_def assms(1) None
     apply (simp del: c_types_agree.simps produce.simps consume.simps)
     by (metis option.simps(3))
-  show ?thesis using None assms apply (simp del: c_types_agree.simps produce.simps consume.simps) sorry
+  obtain t3 where t3_def: "t3 = (if t1 = T_bot then t2 else t1)" "push ct2 t3 = ct'"
+    using t0_def t1_def t2_def h1 h2 assms(1) None
+    by (auto simp del: c_types_agree.simps produce.simps consume.simps split: option.splits)
+  then have "produce ct2 [t3] = ct'" apply simp
+    by (metis (mono_tags, lifting) append.left_neutral append_Cons push.simps push_rev_list.elims)
+  then obtain ts2 where ts2_def: "c_types_agree ct2 ts2" "[] _> [t3] <ti: ts2 _> ts'"
+    using assms(2) produce_subtyping by blast
+  then obtain ts1 where  ts1_def: "c_types_agree ct1 ts1" "[t2] _> [] <ti: ts1 _> ts2"
+    using pop_some(2) t2_def by blast
+  then obtain ts0 where ts0_def: "c_types_agree ct0 ts0" "[t1] _> [] <ti: ts0 _> ts1"
+    using pop_some(2) t1_def by blast
+  then obtain ts where ts_def: "c_types_agree ct ts" "[t0] _> [] <ti: ts _> ts0"
+    using pop_some(2) t0_def(1) by blast
+  have "\<C> \<turnstile> [Select t_tag] : ts _> ts'"
+  proof -
+    have "[t1, t0] _> [] <ti: ts _> ts1" using ts_def ts0_def
+      using instr_subtyping_concat_left by fastforce
+    then have  "[t2, t1, t0] _> [] <ti: ts _> ts2"
+      using ts1_def instr_subtyping_concat_left by fastforce
+    then have 1:  "[t2, t1, t0] _> [t3] <ti: ts _> ts'"
+      using instr_subtyping_comp ts2_def(2) by blast
+    have "t2 <t: t3" "t1 <t: t3" using t3_def(1) h2 t_subtyping_def by metis+
+    then have 2: "[t3, t3, T_num T_i32] _> [t3] <ti: [t2, t1, t0] _> [t3]"
+      unfolding instr_subtyping_def using t_list_subtyping_def t0_def(2)
+      apply auto
+      by (metis eq_Nil_appendI list.rel_inject(2) t_list_subtyping_refl)
+    have "\<C> \<turnstile> [Select t_tag] : [t3, t3, T_num T_i32] _> [t3]"
+    proof(cases "t3 = T_bot")
+      case True
+      then have "[T_num T_i32, T_num T_i32, T_num T_i32] _> [t3] <ti: [t3, t3, T_num T_i32] _> [t3]"
+        by (metis instr_subtyping_refl instr_subtyping_replace1 list.ctr_transfer(1) list_all2_Cons t_list_subtyping_def t_subtyping_def)
+      then show ?thesis sorry
+    next
+      case False
+      then have "is_num_type t3 \<or> is_vec_type t3"
+        using h1 t3_def(1) by metis
+      then show ?thesis
+        using None b_e_typing.select by metis
+    qed
+    then show ?thesis
+      using 1 2 subsumption by blast
+  qed
+  then show ?thesis
+    using ts_def(1) by blast
 next
   case (Some a)
   then show ?thesis using assms check_select
