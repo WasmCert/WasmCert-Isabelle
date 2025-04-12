@@ -88,24 +88,280 @@ proof -
     using instr_subtyping_comp ts''_def(2) by blast
 qed
 
+lemma b_e_type_checker_drop_sound:
+  assumes "check_single \<C> Drop ct = Some ct'"
+         "c_types_agree ct' ts'"
+  shows "\<exists>ts. c_types_agree ct ts \<and> \<C> \<turnstile> [Drop] : ts _> ts'"
+proof -
+  obtain cts r where cts_def: "ct = (cts, r)"
+    by fastforce
+  show ?thesis
+  proof(cases cts)
+    case Nil
+    then show ?thesis using cts_def assms apply (simp split: reach.splits)
+      by (metis append.right_neutral b_e_typing.drop b_e_weakening pop_expect_list_unreach_empty)
+  next
+    case (Cons a list)
+    then show ?thesis using cts_def assms apply (simp split: reach.splits)
+      by (metis assms(2) b_e_typing.drop c_types_agree.elims(2) consume.simps pop.simps(2) pop_some(2) subsumption)
+  qed
+qed
+
 lemma b_e_type_checker_sound:
-  assumes "b_e_type_checker \<C> es (tn _> tm)"
-  shows "\<C> \<turnstile> es : (tn _> tm)"
+  assumes "b_e_type_checker \<C> es (ts _> ts')"
+  shows "\<C> \<turnstile> es : (ts _> ts')"
   using assms
 proof -
-  fix e tn'
-  have "b_e_type_checker \<C> es (tn _> tm) \<Longrightarrow>
-          \<C> \<turnstile> es : (tn _> tm)"
-  and "\<And>tm' tm.
-       check \<C> es tn' = Some tm' \<Longrightarrow>
-       c_types_agree tm' tm \<Longrightarrow>
-         \<exists>tn. c_types_agree tn' tn \<and> \<C> \<turnstile> es : (tn _> tm)"
-  and "\<And>tm' tm.
-       check_single \<C> e tn' = Some tm' \<Longrightarrow>
-       c_types_agree tm' tm \<Longrightarrow>
-         \<exists>tn. c_types_agree tn' tn \<and> \<C> \<turnstile> [e] : (tn _> tm)"
-    sorry
- 
+  fix e ct
+  have "b_e_type_checker \<C> es (ts _> ts') \<Longrightarrow>
+          \<C> \<turnstile> es : (ts _> ts')"
+  and "\<And>ct' ts'.
+       check \<C> es ct = Some ct' \<Longrightarrow>
+       c_types_agree ct' ts' \<Longrightarrow>
+         \<exists>ts. c_types_agree ct ts \<and> \<C> \<turnstile> es : (ts _> ts')"
+  and "\<And>ct' ts'.
+       check_single \<C> e ct = Some ct' \<Longrightarrow>
+       c_types_agree ct' ts' \<Longrightarrow>
+         \<exists>ts. c_types_agree ct ts \<and> \<C> \<turnstile> [e] : (ts _> ts')"
+  proof (induction rule: b_e_type_checker_check_check_single.induct)
+    case (1 \<C> es ts ts')
+    obtain ct' where "check \<C> es (rev ts, Reach) = Some ct'" "c_types_agree ct' ts'"
+      by (metis "1.prems" Wasm_Checker.check_top case_optionE)
+    then obtain ts'' where ts''_def: "c_types_agree (rev ts, Reach) ts''" "\<C> \<turnstile> es : ts'' _> ts'"
+      using "1.IH" types_eq_c_types_agree by fastforce
+    have "ts <ts: ts''" using ts''_def(1) c_types_agree_subtyping_reach[of "rev ts" ts'']
+      by (simp add: t_list_subtyping_def)
+    then show ?case
+      using instr_subtyping_refl instr_subtyping_replace1 subsumption ts''_def(2) by blast
+  next
+    case (2 \<C> es ct)
+    then show ?case
+    proof(cases es)
+      case Nil
+      then have "ct = ct'" using 2(3) by simp
+      then show ?thesis using 2(4)
+        by (metis append.right_neutral b_e_weakening empty local.Nil)
+    next
+      case (Cons e' es')
+      then obtain ct'' where ct''_def: "check_single \<C> e' ct = Some ct''" "check \<C> es' ct'' = Some ct'"
+        using 2(3) by (simp split: option.splits)
+      then show ?thesis using Cons 2(1)[OF Cons ct''_def(1)]  2(2)[OF Cons ct''_def(1,2)]
+        by (metis "2.prems"(2) append_Cons b_e_type_comp_conc self_append_conv2)
+    qed  
+  next
+    case (3 \<C> v ct)
+    then show ?case
+      by (metis Wasm_Checker.check_const_num const_num subsumption type_update_general)
+  next
+    case (4 \<C> v ct)
+    then show ?case
+      by (metis check_single.simps(2) const_vec subsumption type_update_general)
+  next
+    case (5 \<C> t op ct)
+    then show ?case
+      by (metis Wasm_Checker.check_unop b_e_typing.unop option.simps(3) subsumption type_update_general)
+  next
+    case (6 \<C> t op ct)
+    then show ?case
+      by (metis Wasm_Checker.check_binop binop option.simps(3) subsumption type_update_general)
+  next
+    case (7 \<C> t uu ct)
+    then show ?case
+      by (metis Wasm_Checker.check_testop b_e_typing.testop option.simps(3) subsumption type_update_general)
+  next
+    case (8 \<C> t op ct)
+    then show ?case 
+      by (metis Wasm_Checker.check_relop b_e_typing.relop option.simps(3) subsumption type_update_general)
+  next
+    case (9 \<C> op ct)
+    then show ?case
+      by (metis Wasm_Checker.check_unop_vec b_e_typing.unop_vec subsumption type_update_general)
+  next
+    case (10 \<C> op ct)
+    then show ?case
+      by (metis Wasm_Checker.check_binop_vec binop_vec option.simps(3) subsumption type_update_general)
+  next
+    case (11 \<C> op ct)
+    then show ?case
+      by (metis Wasm_Checker.check_ternop_vec b_e_typing.ternop_vec subsumption type_update_general)
+  next
+    case (12 \<C> op ct)
+    then show ?case
+      by (metis Wasm_Checker.check_test_vec b_e_typing.test_vec subsumption type_update_general)
+  next
+    case (13 \<C> op ct)
+    then show ?case
+      by (metis Wasm_Checker.check_shift_vec b_e_typing.shift_vec subsumption type_update_general)
+  next
+    case (14 \<C> sv ct)
+    then show ?case
+      by (metis Wasm_Checker.check_splat_vec b_e_typing.splat_vec subsumption type_update_general)
+  next
+    case (15 \<C> sv sx i ct)
+    then show ?case
+      by (metis (no_types, lifting) b_e_typing.extract_vec check_single.simps(13) option.simps(3) subsumption type_update_general)
+  next
+    case (16 \<C> sv i ct)
+    then show ?case
+      by (metis Wasm_Checker.check_replace_vec b_e_typing.replace_vec option.simps(3) subsumption type_update_general)
+  next
+    case (17 \<C> t ct)
+    then show ?case
+      by (metis Wasm_Checker.check_null_ref null_ref subsumption type_update_general)
+  next
+    case (18 \<C> ct)
+    then show ?case sorry
+  next
+    case (19 \<C> j ct)
+    then show ?case
+      by (metis Wasm_Checker.check_ref_func b_e_typing.func_ref option.simps(3) subsumption type_update_general)
+  next
+    case (20 \<C> t1 t2 sat_sx ct)
+    then show ?case sorry
+  next
+    case (21 \<C> t1 t2 sx ct)
+    then show ?case sorry
+  next
+    case (22 \<C> ct)
+    then show ?case
+      by (metis b_e_typing.unreachable pop.elims types_eq_c_types_agree)
+  next
+    case (23 \<C> ct)
+    then show ?case
+      using b_e_typing.nop b_e_weakening by fastforce
+  next
+    case (24 \<C> ct)
+    then show ?case
+      using b_e_type_checker_drop_sound by blast
+  next
+    case (25 \<C> t_tag ct)
+    then show ?case sorry
+  next
+    case (26 \<C> tb es ct)
+    then show ?case sorry
+  next
+    case (27 \<C> tb es ct)
+    then show ?case sorry
+  next
+    case (28 \<C> tb es1 es2 ct)
+    then show ?case sorry
+  next
+    case (29 \<C> i ct)
+    then show ?case sorry
+  next
+    case (30 \<C> i ct)
+    then show ?case sorry
+  next
+    case (31 \<C> "is" i ct)
+    then show ?case  sorry
+  next
+    case (32 \<C> ct)
+    then show ?case  sorry
+  next
+    case (33 \<C> i ct)
+    then show ?case sorry
+  next
+    case (34 \<C> ti i ct)
+    then show ?case sorry
+  next
+    case (35 \<C> i ct)
+    then show ?case
+      by (metis Wasm_Checker.check_get_local b_e_typing.get_local option.simps(3) subsumption type_update_general)
+  next
+    case (36 \<C> i ct)
+    then show ?case
+      by (metis Wasm_Checker.check_set_local b_e_typing.set_local option.simps(3) subsumption type_update_general)
+  next
+    case (37 \<C> i ct)
+    then show ?case
+      by (metis (mono_tags, lifting) Wasm_Checker.check_tee_local b_e_typing.tee_local option.simps(3) subsumption type_update_general)
+  next
+    case (38 \<C> i ct)
+    then show ?case
+      by (metis Wasm_Checker.check_get_global b_e_typing.get_global option.simps(3) subsumption type_update_general)
+  next
+    case (39 \<C> i ct)
+    then show ?case
+      by (metis (no_types, lifting) Wasm_Checker.check_set_global b_e_typing.set_global option.simps(3) subsumption type_update_general)
+  next
+    case (40 \<C> t tp_sx a off ct)
+    then show ?case
+      by (metis Wasm_Checker.check_load load option.simps(3) subsumption type_update_general)
+  next
+    case (41 \<C> t tp a off ct)
+    then show ?case
+      by (metis Wasm_Checker.check_store store option.simps(3) subsumption type_update_general)
+  next
+    case (42 \<C> lv a off ct)
+    then show ?case
+      by (metis Wasm_Checker.check_load_vec load_vec option.simps(3) subsumption type_update_general)
+  next
+    case (43 \<C> svi i a off ct)
+    then show ?case
+      by (metis Wasm_Checker.check_load_lane_vec load_lane_vec option.simps(3) subsumption type_update_general)
+  next
+    case (44 \<C> sv a off ct)
+    then show ?case
+      by (metis Wasm_Checker.check_store_vec store_vec option.simps(3) subsumption type_update_general)
+  next
+    case (45 \<C> ct)
+    then show ?case
+      by (metis Wasm_Checker.check_current_memory b_e_typing.current_memory option.simps(3) subsumption type_update_general)
+  next
+    case (46 \<C> ct)
+    then show ?case
+      by (metis Wasm_Checker.check_grow_memory b_e_typing.grow_memory option.simps(3) subsumption type_update_general)
+  next
+    case (47 \<C> i ct)
+    then show ?case
+      by (metis (no_types, lifting) Wasm_Checker.check_memory_init b_e_typing.memory_init option.simps(3) subsumption type_update_general)
+  next
+    case (48 \<C> ct)
+    then show ?case
+      by (metis Wasm_Checker.check_memory_copy memory_copy option.simps(3) subsumption type_update_general)
+  next
+    case (49 \<C> ct)
+    then show ?case
+      by (metis Wasm_Checker.check_memory_fill b_e_typing.memory_fill option.simps(3) subsumption type_update_general)
+  next
+    case (50 \<C> ti ct)
+    then show ?case
+      by (metis (no_types, lifting) Wasm_Checker.check_table_set b_e_typing.table_set option.simps(3) subsumption type_update_general)
+  next
+    case (51 \<C> ti ct)
+    then show ?case
+      by (metis (no_types, lifting) Wasm_Checker.check_table_get b_e_typing.table_get option.simps(3) subsumption type_update_general)
+  next
+    case (52 \<C> ti ct)
+    then show ?case
+      by (metis Wasm_Checker.check_table_size b_e_typing.table_size option.simps(3) subsumption type_update_general)
+  next
+    case (53 \<C> ti ct)
+    then show ?case
+      using  Wasm_Checker.check_table_grow b_e_typing.table_grow option.simps(3) subsumption type_update_general
+      by (metis (no_types, lifting))
+  next
+    case (54 \<C> x y ct)
+    then show ?case
+      by (metis (no_types, lifting) Wasm_Checker.check_table_init b_e_typing.table_init option.simps(3) subsumption type_update_general)
+  next
+    case (55 \<C> x y ct)
+    then show ?case
+      using  Wasm_Checker.check_table_copy b_e_typing.table_copy option.simps(3) subsumption type_update_general
+      by (metis (no_types, lifting))
+  next
+    case (56 \<C> x ct)
+    then show ?case
+      by (metis (no_types, lifting) Wasm_Checker.check_table_fill b_e_typing.table_fill option.simps(3) subsumption type_update_general)
+  next
+    case (57 \<C> x ct)
+    then show ?case
+      by (metis Wasm_Checker.check_elem_drop b_e_typing.elem_drop option.simps(3) subsumption type_update_general)
+  next
+    case (58 \<C> x ct)
+    then show ?case
+      by (metis Wasm_Checker.check_data_drop b_e_typing.data_drop option.simps(3) subsumption type_update_general)
+  qed
   then show ?thesis
     using assms by blast
 

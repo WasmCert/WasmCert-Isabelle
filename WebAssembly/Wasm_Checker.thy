@@ -63,14 +63,15 @@ qed auto
 fun b_e_type_checker :: "t_context \<Rightarrow>  b_e list \<Rightarrow> tf \<Rightarrow> bool"
 and check :: "t_context \<Rightarrow> b_e list \<Rightarrow> c_t \<Rightarrow> c_t option"
 and check_single :: "t_context \<Rightarrow>  b_e \<Rightarrow> c_t \<Rightarrow> c_t option" where
-  check_top:"b_e_type_checker \<C> es (tn _> tm) =
-    (case (check \<C> es (tn, Reach)) of
+  check_top:"b_e_type_checker \<C> es (ts _> ts') =
+    (case (check \<C> es (rev ts, Reach)) of
       None \<Rightarrow> False
-    | Some ts \<Rightarrow>  c_types_agree ts tm)"
-| check_iter:"check \<C> es ts = (case es of
-                                 [] \<Rightarrow> Some ts
-                               | (e#es) \<Rightarrow> (case (check_single \<C> e ts) of 
-                                              Some ts' \<Rightarrow> check \<C> es ts'))"
+    | Some cts' \<Rightarrow>  c_types_agree cts' ts')"
+| check_iter:"check \<C> es ct = (case es of
+                                 [] \<Rightarrow> Some ct
+                               | (e#es) \<Rightarrow> (case (check_single \<C> e ct) of 
+                                              Some ct' \<Rightarrow> check \<C> es ct'
+                                            | None \<Rightarrow> None))"
   (* num ops *)
 | check_const_num:"check_single \<C> (EConstNum v) ts = type_update ts [] ([T_num (typeof_num v)])"
 | check_const_vec:"check_single \<C> (EConstVec v) ts = type_update ts [] ([T_vec (typeof_vec v)])"
@@ -242,13 +243,13 @@ and check_single :: "t_context \<Rightarrow>  b_e \<Rightarrow> c_t \<Rightarrow
                                                             else None)"
   (* table grow *)
 | check_table_grow:"check_single \<C> (Table_grow ti) ts = (if ti < length (table \<C>)
-                                                            then type_update ts [T_ref (tab_t_reftype (table \<C>!ti)), T_num T_i32] []
+                                                            then type_update ts [T_ref (tab_t_reftype (table \<C>!ti)), T_num T_i32] [T_num T_i32]
                                                             else None)"
 | check_table_init:"check_single \<C> (Table_init x y) ts = (if x < length (table \<C>) \<and> y < length (elem \<C>) \<and> tab_t_reftype (table \<C>!x) = elem \<C>!y
                                                             then type_update ts [T_num T_i32, T_num T_i32, T_num T_i32] []
                                                             else None)"
   (* table_init *)
-| check_table_copy:"check_single \<C> (Table_copy x y) ts = (if x < length (table \<C>) \<and> y < length (table \<C>) \<and> tab_t_reftype (table \<C>!x) = elem \<C>!y
+| check_table_copy:"check_single \<C> (Table_copy x y) ts = (if x < length (table \<C>) \<and> y < length (table \<C>) \<and> tab_t_reftype (table \<C>!x) = tab_t_reftype (table \<C>!y)
                                                             then type_update ts [T_num T_i32, T_num T_i32, T_num T_i32] []
                                                             else None)"
   (* table_fill *)
