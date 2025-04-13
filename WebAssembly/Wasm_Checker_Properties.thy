@@ -565,14 +565,48 @@ qed
 
 
 lemma b_e_type_checker_complete:
-  assumes "\<C> \<turnstile> es : (tn _> tm)"
-  shows "b_e_type_checker \<C> es (tn _> tm)"
-  sorry
+  assumes "\<C> \<turnstile> es : (ts _> ts')"
+  shows "b_e_type_checker \<C> es (ts _> ts')"
+  using assms
+proof(induction \<C> es "ts _> ts'" arbitrary: ts ts' rule: b_e_typing.induct)
+  case (block \<C> tb tn tm es)
+  then show ?case sorry
+next
+  case (loop \<C> tb tn tm es)
+  then show ?case sorry
+next
+  case (if_wasm \<C> tb tn tm es1 es2)
+  then show ?case sorry
+next
+  case (br i \<C> ts t1s t2s)
+  then show ?case  sorry
+next
+  case (br_if i \<C> ts)
+  then show ?case sorry
+next
+  case (br_table \<C> ts "is" i t1s t2s)
+  then show ?case sorry
+next
+  case (return \<C> ts t1s t2s)
+  then show ?case sorry
+next
+  case (call i \<C>)
+  then show ?case sorry
+next
+  case (call_indirect i \<C> t1s t2s ti uv)
+  then show ?case sorry
+next
+  case (composition \<C> es t1s t2s e t3s)
+  then show ?case sorry
+next
+  case (subsumption \<C> es tf1 tf2 tf1' tf2')
+  then show ?case sorry
+qed (auto simp add: t_subtyping_def is_ref_type_def pop_expect_list_unreach_empty)
 
 
 theorem b_e_typing_equiv_b_e_type_checker:
   shows "(\<C> \<turnstile> es : tf) = (b_e_type_checker \<C> es tf)"
-  sorry
+  by (metis b_e_type_checker_complete b_e_type_checker_sound tf.exhaust_sel)
 
 (*
 subsection \<open> Soundness \<close>
