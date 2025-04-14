@@ -563,17 +563,39 @@ proof -
     using assms by blast
 qed
 
-
 lemma b_e_type_checker_complete:
   assumes "\<C> \<turnstile> es : (ts _> ts')"
   shows "b_e_type_checker \<C> es (ts _> ts')"
   using assms
 proof(induction \<C> es "ts _> ts'" arbitrary: ts ts' rule: b_e_typing.induct)
   case (block \<C> tb tn tm es)
-  then show ?case sorry
+  obtain ct' where ct'_def:
+    "check (\<C>\<lparr>label := [tm] @ label \<C>\<rparr>) es (rev tn, Reach) = Some ct'"
+    "c_types_agree ct' tm" using block(3)
+    by (simp del: check.simps split: option.splits)
+  then have 1: "check_single \<C> (Block tb es) (rev tn, Reach) = type_update (rev tn, Reach) tn tm"
+    using block check_block by auto
+  have "type_update (rev tn, Reach) tn tm = Some (rev tm, Reach)"
+    using pop_expect_list_reach_subtypes t_list_subtyping_refl
+    by auto
+  then have "check_single \<C> (Block tb es) (rev tn, Reach) = Some (rev tm, Reach)"
+    using 1 by metis
+  then show ?case
+    using types_eq_c_types_agree by fastforce
 next
   case (loop \<C> tb tn tm es)
-  then show ?case sorry
+  obtain ct' where ct'_def:
+    "check (\<C>\<lparr>label := [tn] @ label \<C>\<rparr>) es (rev tn, Reach) = Some ct'"
+    "c_types_agree ct' tm" using loop(3)
+    by (simp del: check.simps split: option.splits)
+  then have 1: "check_single \<C> (Loop tb es) (rev tn, Reach) = type_update (rev tn, Reach) tn tm"
+    using loop check_loop by auto
+  have "type_update (rev tn, Reach) tn tm = Some (rev tm, Reach)"
+    using pop_expect_list_reach_subtypes t_list_subtyping_refl
+    by auto
+  then have "check_single \<C> (Loop tb es) (rev tn, Reach) = Some (rev tm, Reach)"
+    using 1 by metis
+  then show ?case using types_eq_c_types_agree by fastforce
 next
   case (if_wasm \<C> tb tn tm es1 es2)
   then show ?case sorry

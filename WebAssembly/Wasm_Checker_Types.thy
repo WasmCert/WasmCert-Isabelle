@@ -248,6 +248,20 @@ lemma pop_expect_list_unreach_append: "pop_expect_list (ts, Unreach) (ts @ ts') 
 proof(induction ts)
 qed (simp add: pop_expect_list_unreach_empty t_subtyping_def)+
 
+lemma pop_expect_list_reach_subtypes:
+  assumes "ts <ts: ts'"
+  shows "pop_expect_list (ts, Reach) (ts') = Some ([], Reach)" 
+  using assms
+proof(induction ts arbitrary: ts')
+  case Nil
+  then show ?case by (simp add: t_subtyping_def t_list_subtyping_def)
+next
+  case (Cons a ts)
+  then show ?case
+    apply (auto simp add:  t_list_subtyping_def)
+    using list.rel_cases by force
+qed
+
 lemma pop_some:
   assumes "pop ct = Some (t, ct')" "c_types_agree ct' ts'"
   shows "snd ct = snd ct'" "\<exists> ts. c_types_agree ct ts \<and> [t] _> [] <ti: ts _> ts'" 
