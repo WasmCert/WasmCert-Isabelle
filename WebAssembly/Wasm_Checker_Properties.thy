@@ -563,6 +563,185 @@ proof -
     using assms by blast
 qed
 
+lemma check_single_imp_unreach:
+  assumes "check_single \<C> e ct = Some ct'" "(e = Br i) \<or> (e = Br_table is i) \<or> (e = Return)"
+  shows "(\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
+  using assms(2)
+proof(cases e)
+  case (Br x8)
+  then show ?thesis
+    using assms(1)
+    by fastforce
+next
+  case (Br_table x101 x102)
+  then show ?thesis
+    using assms(1)
+    by (fastforce simp del: consume.simps split: option.splits)
+next
+  case Return
+  then show ?thesis
+    using assms(1)
+    by (fastforce simp del: consume.simps split: option.splits)
+qed auto+
+
+lemma check_single_imp:
+  assumes "check_single \<C> e ct = Some ct'"
+  shows " check_single \<C> e = (\<lambda> ct''. Some ct'')
+         \<or> (\<exists> t_tag. check_single \<C> e = (\<lambda> ct''. type_update_select ct'' t_tag))
+         \<or> (check_single \<C> e = type_update_is_null_ref)
+         \<or> (check_single \<C> e = type_update_drop)
+         \<or> (\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))
+         \<or> (check_single \<C> e = (\<lambda> ct''. Some ([], Unreach)))
+         \<or> (\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
+  using assms
+  apply (cases rule: check_single.cases[of "(\<C>, e, ct)"])
+  using check_single_imp_unreach
+  apply (simp_all add: check_single_imp_unreach  del: convert_cond.simps b_e_type_checker.simps c_types_agree.simps type_update.simps type_update_select.simps type_update_is_null_ref.simps consume.simps)
+  apply (fastforce simp del: convert_cond.simps b_e_type_checker.simps c_types_agree.simps type_update.simps type_update_select.simps type_update_is_null_ref.simps split: option.splits if_splits tf.splits t_ref.splits tab_t.splits)
+  by(fastforce simp del: convert_cond.simps b_e_type_checker.simps c_types_agree.simps type_update.simps type_update_select.simps type_update_is_null_ref.simps split: option.splits if_splits tf.splits t_ref.splits tab_t.splits)+
+
+lemma check_snoc:
+  assumes "check \<C> es ct = Some ct'" "check \<C> [e] ct' = Some ct''"
+  shows "check \<C> (es @ [e]) ct = Some ct''"
+  using assms
+proof(induction es arbitrary: ct ct' ct'')
+  case Nil
+  then show ?case by simp
+next
+  case (Cons e' es')
+  then show ?case
+    apply (auto split: option.splits)
+    using Cons.IH by auto
+qed
+
+lemma b_e_type_checker_imp_check_single:
+  assumes
+    "b_e_type_checker \<C> [e] (ts _> ts')"
+    "c_types_agree ct ts"
+  shows
+    "\<exists> ct'. check_single \<C> es ct = Some ct' \<and> c_types_agree ct' ts'"
+proof -
+  obtain ct'' where ct''_def: "check_single \<C> e (rev ts, Reach) = Some ct''" "c_types_agree ct'' ts'"
+    using assms(1) by (auto split: option.splits)
+  consider
+    (1) "check_single \<C> e = Some" 
+  | (2) " (\<exists> t_tag. check_single \<C> e = (\<lambda> ct''. type_update_select ct'' t_tag))"
+  | (3) "(check_single \<C> e = type_update_is_null_ref)"
+  | (4) "(check_single \<C> e = type_update_drop)"
+  | (5) "(\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))"
+  | (6) "(check_single \<C> e = (\<lambda> ct''. Some ([], Unreach)))"
+  | (7) "(\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
+    using ct''_def(1) check_single_imp by blast
+  then show ?thesis
+  proof(cases)
+    case 1
+    then show ?thesis
+    proof(cases "snd ct")
+      case Reach
+      then show ?thesis  sorry
+    next
+      case Unreach
+      then show ?thesis sorry
+    qed  
+  next
+    case 2
+    then show ?thesis sorry
+  next
+    case 3
+    then show ?thesis sorry
+  next
+    case 4
+    then show ?thesis sorry
+  next
+    case 5
+    then show ?thesis sorry
+  next
+    case 6
+    then show ?thesis sorry
+  next
+    case 7
+    then show ?thesis sorry
+  qed
+qed
+
+lemma c_types_agre_t_list_subtyping_inv:
+  assumes
+    "c_types_agree ct ts"
+    "ts <ts:ts'"
+  shows
+    "c_types_agree ct ts'"
+  using assms
+proof(induction ts arbitrary: ts' ct rule: rev_induct)
+  case Nil
+  then show ?case
+    by (metis list.distinct(1) pop_expect_list.elims rev.simps(1) rev.simps(2) rev_rev_ident t_list_subtyping_snoc_right1)
+next
+  case (snoc x xs)
+  then obtain y ys where ys_def: "ts' = ys@[y]" "x <t: y" "xs <ts: ys"
+    by (metis (full_types) list_all2_Cons1 list_all2_Nil t_list_subtyping_def t_list_subtyping_split1)
+
+  obtain ct' where ct'_def: "Some (ct') = pop_expect ct x" "c_types_agree ct' xs"
+    using snoc(2) handy_if_lemma by (auto simp add: handy_if_lemma split: if_splits option.splits prod.splits)
+  then have "Some ct' = pop_expect ct y" using ys_def(2) by (auto simp add: t_subtyping_def split: option.splits)
+  moreover have "c_types_agree ct' ys" using snoc(1) ys_def(3) ct'_def(2) by blast
+  
+  ultimately show ?case using ys_def(1)
+    by (metis c_types_agree.simps consume.simps option.simps(5) pop_expect_list.simps(2) rev.simps(2) rev_swap)
+qed
+
+lemma b_e_type_checker_composition_complete:
+  assumes "\<C> \<turnstile> es : t1s _> t2s"
+          "b_e_type_checker \<C> es (t1s _> t2s)"
+          "\<C> \<turnstile> [e] : t2s _> t3s"
+          "b_e_type_checker \<C> [e] (t2s _> t3s)"
+  shows "b_e_type_checker \<C> (es @ [e]) (t1s _> t3s)"
+proof -
+  obtain ct2 where ct2_def: "check \<C> es (rev t1s, Reach) = Some ct2" "c_types_agree ct2 t2s" using assms(2)
+    by (metis Wasm_Checker.check_top case_optionE)
+  have "\<exists> ct3. check_single \<C> e ct2 = Some ct3 \<and> c_types_agree ct3 t3s"
+    using assms(4) b_e_type_checker_imp_check_single ct2_def(2) by blast
+  then show ?thesis using ct2_def check_snoc by (auto split: option.splits)
+qed
+
+
+lemma b_e_type_checker_imp_check:
+  assumes
+    "b_e_type_checker \<C> es (ts _> ts')"
+    "c_types_agree ct ts"
+  shows
+    "\<exists> ct'. check \<C> es ct = Some ct' \<and> c_types_agree ct' ts'"
+  using assms
+  (* probably a wrong induction,
+    perhaps I need to use the mutual induction rule for b_e_type_chekcer, check, and check_single*)
+proof(induction es arbitrary: ts ts' ct)
+  case Nil
+  then have "ts <ts: ts'"
+    using c_types_agree_subtyping_reach t_list_subtyping_def by auto
+  then have "c_types_agree ct ts'"
+    using Nil(2) c_types_agre_t_list_subtyping_inv by blast
+  then show ?case by auto
+next
+  case (Cons e' es')
+  then show ?case sorry
+qed
+
+lemma b_e_type_checker_subsumption_complete:
+  assumes
+    "b_e_type_checker \<C> es (tf1 _> tf2)"
+    "tf1 _> tf2 <ti: tf1' _> tf2'"
+  shows
+    "b_e_type_checker \<C> es (tf1' _> tf2')"
+proof -
+  obtain ts ts' tf1_dom_sub tf1_ran_sub where
+     "tf1'= ts @ tf1_dom_sub"
+     "tf2' = ts' @ tf1_ran_sub"
+     "ts <ts: ts'"
+     "tf1_dom_sub <ts: tf1"
+     "tf2  <ts: tf1_ran_sub"
+    using assms(2) unfolding instr_subtyping_def by auto
+  show ?thesis using assms(2) unfolding instr_subtyping_def sorry
+qed
+
 lemma b_e_type_checker_complete:
   assumes "\<C> \<turnstile> es : (ts _> ts')"
   shows "b_e_type_checker \<C> es (ts _> ts')"
@@ -619,10 +798,10 @@ next
   then show ?case sorry
 next
   case (composition \<C> es t1s t2s e t3s)
-  then show ?case sorry
+  then show ?case using b_e_type_checker_composition_complete by blast
 next
   case (subsumption \<C> es tf1 tf2 tf1' tf2')
-  then show ?case sorry
+  then show ?case using b_e_type_checker_subsumption_complete by blast
 qed (auto simp add: t_subtyping_def is_ref_type_def pop_expect_list_unreach_empty)
 
 
