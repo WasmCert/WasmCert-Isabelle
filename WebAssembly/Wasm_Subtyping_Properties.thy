@@ -549,4 +549,9 @@ proof -
     by blast
 qed
 
+lemma t_list_subtyping_concat:
+  assumes "xs <ts: ys" "xs' <ts: ys'"
+  shows "xs@xs' <ts: ys@ys'"
+  using assms(1) assms(2) t_list_subtyping_prepend t_list_subtyping_replace1 by metis
+
 end
