@@ -536,7 +536,13 @@ next
     by (simp add: list_all2_appendI t_list_subtyping_def)
 qed
 
-
+lemma consume_c_types_agree:
+  assumes
+    "consume ct ts = Some ct'"
+    "c_types_agree ct' ts'"
+  shows "c_types_agree ct (ts'@ts)"
+  using assms c_types_agree_consume consume_some_unsplit
+  by (auto split: option.splits)
 (*
 datatype ct =
     TAny

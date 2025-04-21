@@ -591,8 +591,8 @@ lemma check_single_imp:
   assumes "check_single \<C> e ct = Some ct'"
   shows " check_single \<C> e = (\<lambda> ct''. Some ct'')
          \<or> (\<exists> t_tag. check_single \<C> e = (\<lambda> ct''. type_update_select ct'' t_tag) \<and> e = Select t_tag)
-         \<or> (check_single \<C> e = type_update_is_null_ref)
-         \<or> (check_single \<C> e = type_update_drop)
+         \<or> (check_single \<C> e = type_update_is_null_ref \<and> e = Is_null_ref)
+         \<or> (check_single \<C> e = type_update_drop \<and> e = Drop)
          \<or> (\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))
          \<or> (\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
   using assms
@@ -685,7 +685,7 @@ proof -
   consider
     (1) "check_single \<C> e = Some" 
   | (2) " (\<exists> t_tag. check_single \<C> e = (\<lambda> ct''. type_update_select ct'' t_tag) \<and> e = Select t_tag)"
-  | (3) "(check_single \<C> e = type_update_is_null_ref)"
+  | (3) "(check_single \<C> e = type_update_is_null_ref) \<and> e = Is_null_ref"
   | (4) "(check_single \<C> e = type_update_drop)"
   | (5) "(\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))"
   | (6) "(\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
@@ -739,8 +739,8 @@ proof -
   consider
     (1) "check_single \<C> e = Some" 
   | (2) " (\<exists> t_tag. check_single \<C> e = (\<lambda> ct''. type_update_select ct'' t_tag) \<and> e = Select t_tag)"
-  | (3) "(check_single \<C> e = type_update_is_null_ref)"
-  | (4) "(check_single \<C> e = type_update_drop)"
+  | (3) "(check_single \<C> e = type_update_is_null_ref) \<and> e = Is_null_ref"
+  | (4) "(check_single \<C> e = type_update_drop) \<and> e = Drop"
   | (5) "(\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))"
   | (6) "(\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
     using ct''_def(1) check_single_imp by blast
@@ -780,9 +780,9 @@ proof -
       then obtain t'' where t''_def: "t'' = (if t1 = T_bot then t2 else t1)"
         by blast
       then have t_props: "t1 <t: t''" "t2 <t: t''" "t'' <t: t"
-          apply (simp add: t_subtyping_def)
-         apply (simp add: t_subtyping_def) 
-         apply (metis t''_def ct2_def(2) ct3_def(2) t_subtyping_def)
+        apply (simp add: t_subtyping_def)
+        apply (simp add: t_subtyping_def) 
+        apply (metis t''_def ct2_def(2) ct3_def(2) t_subtyping_def)
         using t''_def ct2_def(2) ct3_def(2) by presburger
       then have t''_prop: "(is_num_type t'' \<or> is_vec_type t'' \<or> t'' = T_bot)"
         using t_def(2) t_subtyping_def by auto
@@ -812,10 +812,39 @@ proof -
 
   next
     case 3
-    then show ?thesis sorry
+    then obtain tr where tr_def: "[T_ref tr] _> [T_num T_i32] <ti: ts _> ts'"
+      using assms b_e_type_is_null_ref
+      using b_e_type_checker_sound by blast
+    then obtain ts'' where ts''_def: "ts <ts: ts''@[T_ref tr]" "ts''@[T_num T_i32] <ts: ts'"
+      using instr_subtyping_def t_list_subtyping_concat t_list_subtyping_refl by fastforce
+    then obtain ct'' t'' where ct''_def: "pop ct = Some (t'', ct'')" "t'' <t: T_ref tr" " c_types_agree ct'' ts''"
+      using assms(2) c_types_agree_snoc_pop c_types_agree_t_list_subtyping_inv
+      by blast
+    then obtain ct' where ct'_def: "ct' = push ct'' (T_num T_i32)" "c_types_agree ct' (ts''@[T_num T_i32])"
+      using push_c_types_agree_snoc by metis
+    then have "check_single \<C> e ct = Some ct'"
+      using ct''_def ct'_def 3 is_ref_type_def t_subtyping_def
+      apply (simp split: option.splits)
+      by fastforce
+    moreover have "c_types_agree ct' ts'"
+      using ct''_def
+      using c_types_agree_t_list_subtyping_inv ct'_def(2) ts''_def(2) by blast
+    ultimately show ?thesis using assms b_e_type_is_null_ref by simp
   next
     case 4
-    then show ?thesis sorry
+    then obtain t where t_def: "[t] _> [] <ti: ts _> ts'"
+      using assms b_e_type_checker_sound b_e_type_drop by blast
+    then obtain ts'' where ts''_def: "ts <ts: ts''@[t]" "ts'' <ts: ts'"
+      using instr_subtyping_def t_list_subtyping_concat t_list_subtyping_refl by fastforce
+    then obtain ct' t' where ct'_def: "pop ct = Some (t', ct')" "t' <t: t" " c_types_agree ct' ts''"
+      using assms(2) c_types_agree_snoc_pop c_types_agree_t_list_subtyping_inv
+      by blast
+    then have "check_single \<C> e ct = Some ct'"
+      using "4" by fastforce
+    moreover have "c_types_agree ct' ts'"
+      using c_types_agree_t_list_subtyping_inv ts''_def(2)
+      using ct'_def(3) by blast
+    ultimately show ?thesis by simp
   next
     case 5
     then obtain prods cons where prods_cons_def: "check_single \<C> e = (\<lambda>ct''. type_update ct'' cons prods)"
@@ -853,7 +882,7 @@ lemma b_e_type_checker_single_subsumption:
   shows
     "b_e_type_checker \<C> [e] (tf1' _> tf2')"
 proof -
-  obtain ts ts' tf1_dom_sub tf1_ran_sub where
+  obtain ts ts' tf1_dom_sub tf1_ran_sub where defs:
     "tf1'= ts @ tf1_dom_sub"
     "tf2' = ts' @ tf1_ran_sub"
     "ts <ts: ts'"
@@ -865,15 +894,23 @@ proof -
   then consider
     (1) "check_single \<C> e = Some" 
   | (2) " (\<exists> t_tag. check_single \<C> e = (\<lambda> ct''. type_update_select ct'' t_tag) \<and> e = Select t_tag)"
-  | (3) "(check_single \<C> e = type_update_is_null_ref)"
-  | (4) "(check_single \<C> e = type_update_drop)"
+  | (3) "(check_single \<C> e = type_update_is_null_ref \<and> e = Is_null_ref)"
+  | (4) "(check_single \<C> e = type_update_drop \<and> e = Drop)"
   | (5) "(\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))"
   | (6) "(\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
     using check_single_imp assms by blast
   then show ?thesis
   proof(cases)
     case 1
-    then show ?thesis sorry
+    then have check_single_type_update: "check_single \<C> e = (\<lambda>ct''. type_update ct'' [] [])"
+      by auto
+    then have "[] _> [] <ti: tf1 _> tf2"
+      using c_types_agree_subtyping ct''_def(1) ct''_def(2) instr_subtyping_def t_list_subtyping_def by fastforce
+    then have "[] _> [] <ti: tf1' _> tf2'" using assms(2) instr_subtyping_trans by blast
+    then obtain ct' where "check_single \<C> e (rev tf1', Reach) = Some ct'" "c_types_agree ct' tf2'"
+      by (metis c_types_agree_type_update check_single_type_update rev_swap types_eq_c_types_agree)
+    then show ?thesis
+      by auto
   next
     case 2
     then obtain t_tag where t_tag_def: "check_single \<C> e = (\<lambda>ct''. type_update_select ct'' t_tag)" "e = Select t_tag" by blast
@@ -938,10 +975,38 @@ proof -
     qed
   next
     case 3
-    then show ?thesis sorry
+    then obtain tr where tr_def: "[T_ref tr] _> [T_num T_i32] <ti: tf1 _> tf2"
+      using assms(1) b_e_type_checker_sound b_e_type_is_null_ref by blast
+    then have "[T_ref tr] _> [T_num T_i32] <ti: tf1' _> tf2'"
+      using assms(2) instr_subtyping_trans by blast
+    then obtain ts'' where ts''_def: "tf1' <ts: ts''@[T_ref tr]" "ts''@[T_num T_i32] <ts: tf2'"
+      using instr_subtyping_def t_list_subtyping_concat t_list_subtyping_refl by fastforce
+    then obtain ct'' t'' where ct''_def: "pop (rev tf1', Reach) = Some (t'', ct'')" "t'' <t: T_ref tr" "c_types_agree ct'' ts''"
+      by (metis (no_types, opaque_lifting) c_types_agree_snoc_pop c_types_agree_t_list_subtyping_inv rev_rev_ident types_eq_c_types_agree)
+    then obtain ct' where ct'_def: "push ct'' (T_num T_i32) = ct'" "c_types_agree ct' (ts''@[T_num T_i32])"
+      using push_c_types_agree_snoc by blast
+    then have "c_types_agree ct' tf2'" using ts''_def
+      using c_types_agree_t_list_subtyping_inv by blast
+    moreover have "check_single \<C> e (rev tf1', Reach) = Some ct'"
+      using ct''_def(1,2) ct'_def(1) 3 is_ref_type_def t_subtyping_def
+      by fastforce    
+    ultimately show ?thesis by simp
   next
     case 4
-    then show ?thesis sorry
+    then obtain t where t_def: "[t] _> [] <ti: tf1 _> tf2"
+      using assms(1) b_e_type_checker_sound b_e_type_drop by blast
+    then have "[t] _> [] <ti: tf1' _> tf2'"
+      using assms(2) instr_subtyping_trans by blast
+    then obtain ts'' where ts''_def: "tf1' <ts: ts''@[t]" "ts'' <ts: tf2'"
+      using instr_subtyping_def t_list_subtyping_concat t_list_subtyping_refl by fastforce
+    then obtain ct' t' where ct'_def: "pop (rev tf1', Reach) = Some (t', ct')" "t' <t: t" "c_types_agree ct' ts''"
+      by (metis (no_types, opaque_lifting) c_types_agree_snoc_pop c_types_agree_t_list_subtyping_inv rev_rev_ident types_eq_c_types_agree)
+    then have "c_types_agree ct' tf2'" using ts''_def
+      using c_types_agree_t_list_subtyping_inv by blast
+    moreover have "check_single \<C> e (rev tf1', Reach) = Some ct'"
+      using ct''_def(1,2) ct'_def(1) 4
+      by fastforce    
+    ultimately show ?thesis by simp
   next
     case 5
     then obtain prods cons where prods_cons_def: "check_single \<C> e = (\<lambda>ct''. type_update ct'' cons prods)"
@@ -955,7 +1020,23 @@ proof -
       by auto
   next
     case 6
-    then show ?thesis sorry
+    then obtain tls where tls_def: "check_single \<C> e =
+          (\<lambda>ct''. if consume ct'' tls \<noteq> None then Some ([], Unreach) else None)" by blast
+    then obtain ct'' where ct''_def: "consume (rev tf1, Reach) tls = Some ct''"
+      using ct''_def(1) by fastforce
+    then have "c_types_agree (rev tf1, Reach) ((rev (fst ct'')) @ tls)"
+      using consume_c_types_agree[OF ct''_def]
+      by (metis prod.collapse types_eq_c_types_agree)
+    then have "tf1 <ts: (rev (fst ct''))@tls"
+      using c_types_agree_subtyping_reach by fastforce
+    then obtain ts'' tls'' where "tf1'=ts''@tls''" "tls'' <ts: tls"
+      using defs(1,4)
+      by (metis append.assoc t_list_subtyping_split2 t_list_subtyping_trans)
+    then have "consume (rev tf1', Reach) tls \<noteq> None"
+      by (metis c_types_agree_consume consume_t_list_subtyping option.distinct(1) rev_rev_ident types_eq_c_types_agree)
+    moreover have "c_types_agree ([], Unreach) tf2'"
+      by (simp add: pop_expect_list_unreach_empty)
+    ultimately show ?thesis using tls_def by simp
   qed
 qed
 
@@ -968,8 +1049,8 @@ proof -
    consider
     (1) "check_single \<C> e = Some" 
   | (2) " (\<exists> t_tag. check_single \<C> e = (\<lambda> ct''. type_update_select ct'' t_tag) \<and> e = Select t_tag)"
-  | (3) "(check_single \<C> e = type_update_is_null_ref)"
-  | (4) "(check_single \<C> e = type_update_drop)"
+  | (3) "(check_single \<C> e = type_update_is_null_ref \<and> e = Is_null_ref)"
+  | (4) "(check_single \<C> e = type_update_drop \<and> e = Drop)"
   | (5) "(\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))"
   | (6) "(\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
     using check_single_imp assms by blast
@@ -1145,10 +1226,44 @@ proof -
     qed
   next
     case 3
-    then show ?thesis sorry
+    then show ?thesis
+    proof(cases cts1)
+      case Nil
+      then have "cts2 = [T_num T_i32]" using 3 assms by simp
+      then have "b_e_type_checker \<C> [e] ([T_bot] _> rev cts2)"
+        using 3 t_subtyping_def by simp
+      then show ?thesis using Nil
+        by (metis append_Nil2 rev.simps(1))
+    next
+      case (Cons t' cts')
+      then have t'_prop: "(is_ref_type t' \<or> t' = T_bot)"
+        using 3 assms by (simp add: handy_if_lemma)
+      then have cts2_is: "cts2 = (T_num T_i32)#cts'" using 3 assms Cons by (auto simp add: handy_if_lemma split: option.splits)
+      then have "check_single \<C> e (cts1, Reach) = Some (cts2, Reach)" using Cons t'_prop 3 by simp
+      then have "b_e_type_checker \<C> [e] (rev cts1 _> rev cts2)"
+        using types_eq_c_types_agree by fastforce
+      then show ?thesis
+        by (metis append_self_conv2)
+    qed
   next
     case 4
-    then show ?thesis sorry
+    then show ?thesis
+    proof(cases cts1)
+      case Nil
+      then have "cts2 = []" using 4 assms by simp
+      then have "b_e_type_checker \<C> [e] ([T_bot] _> rev cts2)"
+        using 4 t_subtyping_def by simp
+      then show ?thesis using Nil
+        by (metis append_Nil2 rev.simps(1))
+    next
+      case (Cons t' cts')
+      then have cts2_is: "cts2 = cts'" using 4 assms Cons by (auto simp add: handy_if_lemma split: option.splits)
+      then have "check_single \<C> e (cts1, Reach) = Some (cts2, Reach)" using Cons 4 by simp
+      then have "b_e_type_checker \<C> [e] (rev cts1 _> rev cts2)"
+        using types_eq_c_types_agree by fastforce
+      then show ?thesis
+        by (metis append_self_conv2)
+    qed
   next
     case 5
     then obtain cons prods where cons_prods_def: "check_single \<C> e = (\<lambda>ct''. type_update ct'' cons prods)"
@@ -1187,7 +1302,38 @@ proof -
     qed
   next
     case 6
-    then show ?thesis sorry
+    then obtain tls where tls_def: "check_single \<C> e =
+        (\<lambda>ct''. if consume ct'' tls \<noteq> None then Some ([], Unreach) else None)" by blast
+    then obtain cts3 where cts3_def: "consume (cts1, Unreach) tls = Some (cts3, Unreach)"
+      using assms
+      by (metis consume_some_reachability_inv option.collapse prod.exhaust_sel snd_conv)
+    have cts2_is: "cts2 = []" using tls_def assms
+      by (metis option.inject option.simps(3) prod.inject)
+    show ?thesis
+    proof(cases cts3)
+      case Nil
+      then have "c_types_agree (cts1, Unreach) tls"
+        using tls_def cts3_def by fastforce
+      then obtain ts' where "ts'@(rev cts1) <ts: tls"
+        using c_types_agree_subtyping_unreach
+        by blast
+      then have "check_single \<C> e (cts1@(rev ts'), Reach) = Some ([], Unreach)"
+        by (metis append_Nil c_types_agree_consume c_types_agree_t_list_subtyping_inv option.distinct(1) rev_append rev_rev_ident tls_def types_eq_c_types_agree)
+      then show ?thesis using cts2_is
+        apply (auto split: option.splits)
+        by (metis Pair_inject  option.inject)
+    next
+      case (Cons a list)
+      then obtain ts' where "rev cts1 = rev cts3 @ ts'" "ts' <ts: tls"
+        using consume_unreach_nonempty cts3_def by blast
+      then have "check_single \<C> e (cts1, Reach) = Some ([], Unreach)"
+        by (metis c_types_agree_consume consume_t_list_subtyping not_Some_eq tls_def types_eq_c_types_agree)
+      moreover have "b_e_type_checker \<C> [e] (rev cts1 _> [])"
+        using calculation by simp
+      ultimately show ?thesis using cts2_is
+        apply (auto split: option.splits)
+        by (metis Pair_inject append_Nil2 option.inject rev.simps(1))
+    qed
   qed
 
 qed
@@ -1461,8 +1607,6 @@ next
   qed
 qed
 
-
-
 lemma b_e_type_checker_complete:
   assumes "\<C> \<turnstile> es : (ts _> ts')"
   shows "b_e_type_checker \<C> es (ts _> ts')"
@@ -1524,7 +1668,6 @@ next
   case (subsumption \<C> es tf1 tf2 tf1' tf2')
   then show ?case using b_e_type_checker_subsumption_complete by blast
 qed (auto simp add: t_subtyping_def is_ref_type_def pop_expect_list_unreach_empty)
-
 
 theorem b_e_typing_equiv_b_e_type_checker:
   shows "(\<C> \<turnstile> es : tf) = (b_e_type_checker \<C> es tf)"
