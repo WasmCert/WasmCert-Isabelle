@@ -1642,25 +1642,57 @@ next
   then show ?case using types_eq_c_types_agree by fastforce
 next
   case (if_wasm \<C> tb tn tm es1 es2)
-  then show ?case sorry
+  obtain ct' ct'' where ct'_def:
+    "check (\<C>\<lparr>label := [tm] @ label \<C>\<rparr>) es1 (rev tn, Reach) = Some ct'"
+    "c_types_agree ct' tm"
+    "check (\<C>\<lparr>label := [tm] @ label \<C>\<rparr>) es2 (rev tn, Reach) = Some ct''"
+    "c_types_agree ct'' tm"
+    using if_wasm(3,5)
+    by (simp del: check.simps split: option.splits)
+  then have 1: "check_single \<C> (If tb es1 es2) (rev (tn @ [T_num T_i32]), Reach) = type_update (rev (tn @ [T_num T_i32]), Reach) (tn @ [T_num T_i32]) tm"
+    using if_wasm check_if by auto
+  have "type_update (rev (tn @ [T_num T_i32]), Reach) (tn @ [T_num T_i32]) tm = Some (rev tm, Reach)"
+    using pop_expect_list_reach_subtypes t_list_subtyping_refl t_subtyping_def
+    by auto
+  then have "check_single \<C> (If tb es1 es2) (rev (tn @ [T_num T_i32]), Reach) = Some (rev tm, Reach)"
+    using 1 by metis
+  then show ?case using types_eq_c_types_agree by fastforce
 next
   case (br i \<C> ts t1s t2s)
-  then show ?case  sorry
+  then have "check_single \<C> (Br i) (rev (t1s @ ts), Reach) = Some ([], Unreach)"
+    apply (simp del: consume.simps)
+    by (metis c_types_agree_append c_types_agree_consume split_pairs types_eq_c_types_agree)
+  moreover have "c_types_agree ([], Unreach) t2s"
+    using pop_expect_list_unreach_empty by fastforce
+  ultimately show ?case by simp
 next
   case (br_if i \<C> ts)
-  then show ?case sorry
+  then have "check_single \<C> (Br_if i) (rev (ts @ [T_num T_i32]), Reach) = type_update (rev (ts @ [T_num T_i32]), Reach) (ts @ [T_num T_i32]) ts"
+    by simp
+  moreover have "type_update (rev (ts @ [T_num T_i32]), Reach) (ts @ [T_num T_i32]) ts = Some (rev ts, Reach)"
+    using pop_expect_list_reach_subtypes t_list_subtyping_refl t_subtyping_def
+    by auto
+  ultimately show ?case using types_eq_c_types_agree by simp
 next
   case (br_table \<C> ts "is" i t1s t2s)
-  then show ?case sorry
+  then show ?case
+    using c_types_agree_cons_prods_same t_subtyping_def pop_expect_list_reach_subtypes pop_expect_list_unreach_empty list_all_conv_same_lab
+    by (fastforce split: option.splits)
 next
   case (return \<C> ts t1s t2s)
-  then show ?case sorry
+  then show ?case
+    using c_types_agree_cons_prods_same t_subtyping_def pop_expect_list_unreach_empty
+    by (fastforce split: option.splits)
 next
   case (call i \<C>)
-  then show ?case sorry
+  then show ?case
+    using c_types_agree_cons_prods_same t_subtyping_def pop_expect_list_reach_subtypes pop_expect_list_unreach_empty t_list_subtyping_refl
+    by (fastforce split: option.splits)
 next
   case (call_indirect i \<C> t1s t2s ti uv)
-  then show ?case sorry
+  then show ?case
+    using c_types_agree_cons_prods_same t_subtyping_def pop_expect_list_reach_subtypes pop_expect_list_unreach_empty t_list_subtyping_refl
+    by (fastforce split: option.splits)
 next
   case (composition \<C> es t1s t2s e t3s)
   then show ?case using b_e_type_checker_composition_complete by blast
