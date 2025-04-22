@@ -103,8 +103,8 @@ and check_single :: "t_context \<Rightarrow>  b_e \<Rightarrow> c_t \<Rightarrow
                                                                then type_update ts [(T_vec T_v128), (T_num (vec_lane_t sv))] ([T_vec T_v128])
                                                                else None)"
   \<comment> \<open>\<open>references\<close>\<close>
-| check_null_ref: "check_single \<C> (Null_ref t) ts = type_update ts [] [T_ref t]"
-| check_is_null_ref: "check_single \<C> (Is_null_ref) ts = type_update_is_null_ref ts"
+| check_ref_null: "check_single \<C> (Ref_null t) ts = type_update ts [] [T_ref t]"
+| check_ref_is_null: "check_single \<C> Ref_is_null ts = type_update_ref_is_null ts"
 | check_ref_func: "check_single \<C> (Ref_func j) ts = (if j < length (func_t \<C>) \<and> j \<in> set (refs \<C>) then type_update ts [] [T_ref T_func_ref] else None)"
 (* convert *)
 | check_convert:"check_single \<C> (Cvtop t1 Convert t2 sat_sx) ts = (if (convert_cond t1 t2 sat_sx)

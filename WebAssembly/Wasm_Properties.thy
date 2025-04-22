@@ -861,12 +861,12 @@ proof -
 qed
 
 lemma types_preserved_null:
-  assumes "\<lparr>[$Null_ref t]\<rparr> \<leadsto> \<lparr>[Ref (ConstNull t)]\<rparr>"
-          "s\<bullet>\<C> \<turnstile> [$Null_ref t] : (ts _> ts')"
+  assumes "\<lparr>[$Ref_null t]\<rparr> \<leadsto> \<lparr>[Ref (ConstNull t)]\<rparr>"
+          "s\<bullet>\<C> \<turnstile> [$Ref_null t] : (ts _> ts')"
         shows "s\<bullet>\<C> \<turnstile> [Ref (ConstNull t)] : (ts _> ts')"
 proof -
   have 2: "([] _> [T_ref t]) <ti: (ts _> ts')"
-    using assms unlift_b_e to_e_list_1 b_e_type_null_ref by metis
+    using assms unlift_b_e to_e_list_1 b_e_type_ref_null by metis
   have 3: "s\<bullet>\<C> \<turnstile> [Ref (ConstNull t)] : ([] _> [T_ref t])"
     by (metis e_typing_l_typing.intros(4) ref_typing.intros(1))
   then have 4: "s\<bullet>\<C> \<turnstile> [Ref (ConstNull t)] : (ts _> ts@[T_ref t])"
@@ -876,17 +876,18 @@ proof -
 qed
 
 lemma types_preserved_is_null:
-  assumes "\<lparr>[$C (V_ref v), $Is_null_ref]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 n)]\<rparr>"
-          "s\<bullet>\<C> \<turnstile> [$C (V_ref v), $Is_null_ref] : (ts _> ts')"
+  assumes "\<lparr>[$C (V_ref v), $Ref_is_null]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 n)]\<rparr>"
+          "s\<bullet>\<C> \<turnstile> [$C (V_ref v), $Ref_is_null] : (ts _> ts')"
         shows "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 n)] : (ts _> ts')"
 proof -
   obtain ts1 where ts1_def: "s\<bullet>\<C> \<turnstile> [$C (V_ref v)] : (ts _> ts1)"
-                            "s\<bullet>\<C> \<turnstile> [$Is_null_ref] : (ts1 _> ts')"
+                            "s\<bullet>\<C> \<turnstile> [$Ref_is_null] : (ts1 _> ts')"
     by (metis append_Cons append_Nil assms(2) e_type_comp)
   then have 1: "([] _> [typeof (V_ref v)]) <ti: (ts _> ts1)"
     by (simp add: type_const_v_typing(1))
   obtain tr where tr_def: "[T_ref tr] _> [T_num T_i32] <ti: ts1 _> ts'"
-    by (metis b_e_type_is_null_ref to_e_list_1 ts1_def(2) unlift_b_e)
+    using b_e_type_ref_is_null to_e_list_1 ts1_def(2) unlift_b_e
+    by (metis b_e_type_ref_is_null to_e_list_1 ts1_def(2) unlift_b_e)
   have "T_ref tr = typeof (V_ref v)" using instr_subtyping_append1_type_eq
     by (metis "1" append_Nil t.distinct(11) tr_def typeof_not_bot)
   then have 2: "([] _> [T_num T_i32]) <ti: (ts _> ts')"
@@ -3660,9 +3661,9 @@ proof -
 qed
 
 
-lemma progress_is_null_ref:
+lemma progress_ref_is_null:
   assumes "s\<bullet>\<C> \<turnstile> $C*vs : ([] _> [T_ref t])"
-          "e = Is_null_ref"
+          "e = Ref_is_null"
         shows "\<exists>a s' f' es'. \<lparr>s;f;($C*vs)@([$e])\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>"
 proof -
   obtain vs' v where vs'_v_def: "vs = vs'@[v]" "typeof v = T_ref t"
@@ -3828,22 +3829,22 @@ next
     using progress_relop
     by fastforce
 next
-  case (null_ref \<C> t)
+  case (ref_null \<C> t)
   then show ?case
     by (metis basic null progress_L0_left to_e_list_1)
 next
-  case (is_null_ref \<C> t)
+  case (ref_is_null \<C> t)
   then show ?case
-    using progress_is_null_ref
+    using progress_ref_is_null
     by fastforce
 next
-  case (func_ref j \<C>)
+  case (ref_func j \<C>)
   then have "j < length (inst.funcs (f_inst f))" by simp
 
   obtain fj fi fj' where f_def:"fi = inst.funcs (f_inst f) ! j" "fj = (take j (inst.funcs (f_inst f)))" "fj' = (drop (j+1) (inst.funcs (f_inst f)))"
     by blast
   have j_def:"j < length (inst.funcs (f_inst f))"
-    using func_ref.hyps func_ref.prems(9) by metis
+    using ref_func.hyps ref_func.prems(9) by metis
   hence fj_len:"length fj = j"
     using f_def(2)
     by fastforce

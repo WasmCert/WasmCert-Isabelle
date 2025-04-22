@@ -10,9 +10,9 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | testop:"is_int_t_num t   \<Longrightarrow> \<C> \<turnstile> [Testop t _]      : ([T_num t]   _> [T_num T_i32])"
 | relop:"relop_t_num_agree op t   \<Longrightarrow> \<C> \<turnstile> [Relop t op] : ([T_num t,T_num t] _> [T_num T_i32])"
   \<comment> \<open>\<open>references\<close>\<close>
-| null_ref:"\<C> \<turnstile> [Null_ref t] :([] _> [T_ref t])"
-| is_null_ref:"\<C> \<turnstile> [Is_null_ref] :([T_ref t] _> [T_num T_i32])"
-| func_ref:"\<lbrakk>j < length (func_t \<C>)\<rbrakk> \<Longrightarrow> j \<in> set (refs \<C>) \<Longrightarrow> \<C> \<turnstile> [Ref_func j] :([] _> [T_ref T_func_ref])"
+| ref_null:"\<C> \<turnstile> [Ref_null t] :([] _> [T_ref t])"
+| ref_is_null:"\<C> \<turnstile> [Ref_is_null] :([T_ref t] _> [T_num T_i32])"
+| ref_func:"\<lbrakk>j < length (func_t \<C>)\<rbrakk> \<Longrightarrow> j \<in> set (refs \<C>) \<Longrightarrow> \<C> \<turnstile> [Ref_func j] :([] _> [T_ref T_func_ref])"
   \<comment> \<open>\<open>vector ops\<close>\<close>
 | unop_vec:"\<C> \<turnstile> [Unop_vec op]  : ([T_vec T_v128]   _> [T_vec T_v128])"
 | binop_vec:"\<lbrakk>binop_vec_wf op\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Binop_vec op]  : ([T_vec T_v128, T_vec T_v128]   _> [T_vec T_v128])"
@@ -232,9 +232,9 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
   \<comment> \<open>\<open>reinterpret\<close>\<close>
 | reinterpret:"(typeof_num v) = t1 \<Longrightarrow> \<lparr>[$(EConstNum v), $(Cvtop t2 Reinterpret t1 None)]\<rparr> \<leadsto> \<lparr>[$(EConstNum (wasm_reinterpret t2 v))]\<rparr>"
   \<comment> \<open>\<open>references\<close>\<close>
-| null: "\<lparr>[$(Null_ref t)]\<rparr> \<leadsto> \<lparr>[Ref (ConstNull t)]\<rparr>"
-| is_null_true: "is_null_ref v_r \<Longrightarrow> \<lparr>[Ref v_r, $Is_null_ref]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 (wasm_bool True))]\<rparr>"
-| is_null_false: "\<not>is_null_ref v_r \<Longrightarrow> \<lparr>[Ref v_r, $Is_null_ref]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 (wasm_bool False))]\<rparr>"
+| null: "\<lparr>[$(Ref_null t)]\<rparr> \<leadsto> \<lparr>[Ref (ConstNull t)]\<rparr>"
+| is_null_true: "is_null_ref v_r \<Longrightarrow> \<lparr>[Ref v_r, $Ref_is_null]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 (wasm_bool True))]\<rparr>"
+| is_null_false: "\<not>is_null_ref v_r \<Longrightarrow> \<lparr>[Ref v_r, $Ref_is_null]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 (wasm_bool False))]\<rparr>"
   \<comment> \<open>\<open>unary vector ops\<close>\<close>
 | unop_vec:"\<lparr>[$EConstVec v, $(Unop_vec op)]\<rparr> \<leadsto> \<lparr>[$EConstVec (app_unop_vec op v)]\<rparr>"
   \<comment> \<open>\<open>binary vector ops\<close>\<close>

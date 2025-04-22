@@ -45,8 +45,8 @@ fun c_types_agree :: "c_t \<Rightarrow> t list \<Rightarrow> bool" where
 fun type_update :: "c_t \<Rightarrow> t list \<Rightarrow> t list \<Rightarrow> c_t option" where
   "type_update ct cons prods = map_option (\<lambda> ct'. produce ct' prods) (consume ct cons)"
 
-fun type_update_is_null_ref :: "c_t \<Rightarrow> c_t option" where
-  "type_update_is_null_ref ct =
+fun type_update_ref_is_null :: "c_t \<Rightarrow> c_t option" where
+  "type_update_ref_is_null ct =
     (case pop ct of
       None \<Rightarrow> None
     | Some (t, ct') \<Rightarrow> if (is_ref_type t \<or> t = T_bot) then Some (push ct' (T_num T_i32)) else None)"

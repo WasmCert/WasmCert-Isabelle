@@ -725,17 +725,17 @@ lemma b_e_type_cvtop:
   apply (auto simp add: instr_subtyping_refl b_e_type_composition_aux_lemma)
   using instr_subtyping_refl instr_subtyping_trans b_e_type_composition_aux_lemma by blast+
 
-lemma b_e_type_null_ref:
+lemma b_e_type_ref_null:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = Null_ref t"
+          "e = Ref_null t"
   shows " instr_subtyping ([] _> [T_ref t]) (ts _> ts')"
   using assms
 proof (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
 qed (auto simp add: instr_subtyping_refl b_e_type_composition_aux_lemma, metis instr_subtyping_trans)
 
-lemma b_e_type_is_null_ref:
+lemma b_e_type_ref_is_null:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = Is_null_ref"
+          "e = Ref_is_null"
   shows "\<exists> tr. instr_subtyping ([T_ref tr] _> [T_num T_i32]) (ts _> ts')"
   using assms
   apply (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)

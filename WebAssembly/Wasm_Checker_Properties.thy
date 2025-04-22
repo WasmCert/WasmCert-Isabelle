@@ -85,17 +85,17 @@ proof -
 qed
 
 lemma b_e_type_checker_is_null_ref_sound:
-  assumes "check_single \<C> Is_null_ref ct = Some ct'"
+  assumes "check_single \<C> Ref_is_null ct = Some ct'"
           "c_types_agree ct' ts'"
-  shows "\<exists>ts. c_types_agree ct ts \<and> \<C> \<turnstile> [Is_null_ref] : ts _> ts'"
+  shows "\<exists>ts. c_types_agree ct ts \<and> \<C> \<turnstile> [Ref_is_null] : ts _> ts'"
 proof -
   obtain t ct'' where t_def:
     "pop ct = Some (t, ct'')" 
-    using assms(1) Wasm_Checker.check_is_null_ref
+    using assms(1) Wasm_Checker.check_ref_is_null
     apply simp
     by (metis (no_types, lifting) option.case_eq_if option.collapse option.discI surj_pair)
   then have 1: "is_ref_type t \<or> t = T_bot" "(push ct'' (T_num T_i32)) = ct'"
-    using assms Wasm_Checker.check_is_null_ref t_def
+    using assms Wasm_Checker.check_ref_is_null t_def
     by (auto simp add: handy_if_lemma split: option.splits prod.splits)
   have "produce ct'' [T_num T_i32] = ct'"
     using 1(2)
@@ -112,8 +112,8 @@ proof -
     by (auto simp add: is_ref_type_def split: t.splits)
   then have "[T_ref tr] _> [T_num T_i32] <ti: [t] _> [T_num T_i32]"
     by (meson instr_subtyping_refl instr_subtyping_replace1 list.rel_intros(2) list_all2_Nil t_list_subtyping_def)
-  then have "\<C> \<turnstile> [Is_null_ref] : [t] _> [T_num T_i32]" using 1 b_e_typing.is_null_ref subsumption by blast
-  then have "\<C> \<turnstile> [Is_null_ref] : ts _> ts'"
+  then have "\<C> \<turnstile> [Ref_is_null] : [t] _> [T_num T_i32]" using 1 b_e_typing.ref_is_null subsumption by blast
+  then have "\<C> \<turnstile> [Ref_is_null] : ts _> ts'"
     using 2 subsumption by blast
   then show ?thesis using ts_def by blast
 qed
@@ -292,14 +292,14 @@ proof -
   next
     case (17 \<C> t ct)
     then show ?case
-      by (metis Wasm_Checker.check_null_ref null_ref subsumption type_update_general)
+      by (metis Wasm_Checker.check_ref_null ref_null subsumption type_update_general)
   next
     case (18 \<C> ct)
     then show ?case using b_e_type_checker_is_null_ref_sound by blast
   next
     case (19 \<C> j ct)
     then show ?case
-      by (metis Wasm_Checker.check_ref_func b_e_typing.func_ref option.simps(3) subsumption type_update_general)
+      by (metis Wasm_Checker.check_ref_func b_e_typing.ref_func option.simps(3) subsumption type_update_general)
   next
     case (20 \<C> t1 t2 sat_sx ct)
     then have "convert_cond t1 t2 sat_sx" "Some ct' = type_update ct [T_num t2] [T_num t1]"
@@ -585,21 +585,21 @@ lemma check_single_imp':
   assumes "check_single \<C> e ct = Some ct'"
   shows " check_single \<C> e = (\<lambda> ct''. Some ct'')
          \<or> (\<exists> t_tag. check_single \<C> e = (\<lambda> ct''. type_update_select ct'' t_tag) \<and> e = Select t_tag)
-         \<or> (check_single \<C> e = type_update_is_null_ref \<and> e = Is_null_ref)
+         \<or> (check_single \<C> e = type_update_ref_is_null \<and> e = Ref_is_null)
          \<or> (check_single \<C> e = type_update_drop \<and> e = Drop)
          \<or> (\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))
          \<or> (\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
   using assms
   apply (cases rule: check_single.cases[of "(\<C>, e, ct)"])
   using check_single_imp_unreach
-  apply (simp_all add: check_single_imp_unreach  del: convert_cond.simps b_e_type_checker.simps c_types_agree.simps type_update.simps type_update_select.simps type_update_is_null_ref.simps consume.simps)
-  (*apply (fastforce simp del: convert_cond.simps b_e_type_checker.simps c_types_agree.simps type_update.simps type_update_select.simps type_update_is_null_ref.simps split: option.splits if_splits tf.splits t_ref.splits tab_t.splits) *)
-  by(fastforce simp del: convert_cond.simps b_e_type_checker.simps c_types_agree.simps type_update.simps type_update_select.simps type_update_is_null_ref.simps split: option.splits if_splits tf.splits t_ref.splits tab_t.splits)+
+  apply (simp_all add: check_single_imp_unreach  del: convert_cond.simps b_e_type_checker.simps c_types_agree.simps type_update.simps type_update_select.simps type_update_ref_is_null.simps consume.simps)
+  (*apply (fastforce simp del: convert_cond.simps b_e_type_checker.simps c_types_agree.simps type_update.simps type_update_select.simps type_update_ref_is_null.simps split: option.splits if_splits tf.splits t_ref.splits tab_t.splits) *)
+  by(fastforce simp del: convert_cond.simps b_e_type_checker.simps c_types_agree.simps type_update.simps type_update_select.simps type_update_ref_is_null.simps split: option.splits if_splits tf.splits t_ref.splits tab_t.splits)+
 
 lemma check_single_imp:
   assumes "check_single \<C> e ct = Some ct'"
   shows   "(check_single \<C> e = (\<lambda> ct''. type_update_select ct'' None ) \<and> e = Select None)
-         \<or> (check_single \<C> e = type_update_is_null_ref \<and> e = Is_null_ref)
+         \<or> (check_single \<C> e = type_update_ref_is_null \<and> e = Ref_is_null)
          \<or> (check_single \<C> e = type_update_drop \<and> e = Drop)
          \<or> (\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))
          \<or> (\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
@@ -607,7 +607,7 @@ proof -
   consider
     (1) "check_single \<C> e = Some" 
   | (2) " (\<exists> t_tag. check_single \<C> e = (\<lambda> ct''. type_update_select ct'' t_tag) \<and> e = Select t_tag)"
-  | (3) "(check_single \<C> e = type_update_is_null_ref) \<and> e = Is_null_ref"
+  | (3) "(check_single \<C> e = type_update_ref_is_null) \<and> e = Ref_is_null"
   | (4) "(check_single \<C> e = type_update_drop) \<and> e = Drop"
   | (5) "(\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))"
   | (6) "(\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
@@ -699,7 +699,7 @@ lemma check_single_unreach_inv:
 proof -
   consider
     (1) " (check_single \<C> e = (\<lambda> ct''. type_update_select ct'' None) \<and> e = Select None)"
-  | (2) "(check_single \<C> e = type_update_is_null_ref) \<and> e = Is_null_ref"
+  | (2) "(check_single \<C> e = type_update_ref_is_null) \<and> e = Ref_is_null"
   | (3) "(check_single \<C> e = type_update_drop)"
   | (4) "(\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))"
   | (5) "(\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
@@ -746,7 +746,7 @@ proof -
     using assms(1) by (auto split: option.splits)
   consider
     (1) " (check_single \<C> e = (\<lambda> ct''. type_update_select ct'' None) \<and> e = Select None)"
-  | (2) "(check_single \<C> e = type_update_is_null_ref) \<and> e = Is_null_ref"
+  | (2) "(check_single \<C> e = type_update_ref_is_null) \<and> e = Ref_is_null"
   | (3) "(check_single \<C> e = type_update_drop) \<and> e = Drop"
   | (4) "(\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))"
   | (5) "(\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
@@ -796,7 +796,7 @@ proof -
   next
     case 2
     then obtain tr where tr_def: "[T_ref tr] _> [T_num T_i32] <ti: ts _> ts'"
-      using assms b_e_type_is_null_ref
+      using assms b_e_type_ref_is_null
       using b_e_type_checker_sound by blast
     then obtain ts'' where ts''_def: "ts <ts: ts''@[T_ref tr]" "ts''@[T_num T_i32] <ts: ts'"
       using instr_subtyping_def t_list_subtyping_concat t_list_subtyping_refl by fastforce
@@ -812,7 +812,7 @@ proof -
     moreover have "c_types_agree ct' ts'"
       using ct''_def
       using c_types_agree_t_list_subtyping_inv ct'_def(2) ts''_def(2) by blast
-    ultimately show ?thesis using assms b_e_type_is_null_ref by simp
+    ultimately show ?thesis using assms b_e_type_ref_is_null by simp
   next
     case 3
     then obtain t where t_def: "[t] _> [] <ti: ts _> ts'"
@@ -876,7 +876,7 @@ proof -
     using assms(1) by (auto split: option.splits)
   then consider
     (1) " (check_single \<C> e = (\<lambda> ct''. type_update_select ct'' None) \<and> e = Select None)"
-  | (2) "(check_single \<C> e = type_update_is_null_ref) \<and> e = Is_null_ref"
+  | (2) "(check_single \<C> e = type_update_ref_is_null) \<and> e = Ref_is_null"
   | (3) "(check_single \<C> e = type_update_drop) \<and> e = Drop"
   | (4) "(\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))"
   | (5) "(\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
@@ -926,7 +926,7 @@ proof -
   next
     case 2
     then obtain tr where tr_def: "[T_ref tr] _> [T_num T_i32] <ti: tf1 _> tf2"
-      using assms(1) b_e_type_checker_sound b_e_type_is_null_ref by blast
+      using assms(1) b_e_type_checker_sound b_e_type_ref_is_null by blast
     then have "[T_ref tr] _> [T_num T_i32] <ti: tf1' _> tf2'"
       using assms(2) instr_subtyping_trans by blast
     then obtain ts'' where ts''_def: "tf1' <ts: ts''@[T_ref tr]" "ts''@[T_num T_i32] <ts: tf2'"
@@ -999,7 +999,7 @@ lemma check_single_unreach_imp_b_e_typing:
 proof -
    consider
     (1) " (check_single \<C> e = (\<lambda> ct''. type_update_select ct'' None) \<and> e = Select None)"
-  | (2) "(check_single \<C> e = type_update_is_null_ref) \<and> e = Is_null_ref"
+  | (2) "(check_single \<C> e = type_update_ref_is_null) \<and> e = Ref_is_null"
   | (3) "(check_single \<C> e = type_update_drop) \<and> e = Drop"
   | (4) "(\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))"
   | (5) "(\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
@@ -1289,7 +1289,7 @@ next
     using snoc.IH snoc.prems(3) by blast
   consider
     (1) " (check_single \<C> x = (\<lambda> ct''. type_update_select ct'' None) \<and> x = Select None)"
-  | (2) "(check_single \<C> x = type_update_is_null_ref) \<and> x = Is_null_ref"
+  | (2) "(check_single \<C> x = type_update_ref_is_null) \<and> x = Ref_is_null"
   | (3) "(check_single \<C> x = type_update_drop) \<and> x = Drop"
   | (4) "(\<exists>cons prods. (check_single \<C> x = (\<lambda> ct''. type_update ct'' cons prods)))"
   | (5) "(\<exists> tls. check_single \<C> x = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
@@ -1351,7 +1351,7 @@ next
     by (metis check_reachability_some_invariant snoc.prems(4))
   consider
     (1) " (check_single \<C> x = (\<lambda> ct''. type_update_select ct'' None) \<and> x = Select None)"
-  | (2) "(check_single \<C> x = type_update_is_null_ref) \<and> x = Is_null_ref"
+  | (2) "(check_single \<C> x = type_update_ref_is_null) \<and> x = Ref_is_null"
   | (3) "(check_single \<C> x = type_update_drop) \<and> x = Drop"
   | (4) "(\<exists>cons prods. (check_single \<C> x = (\<lambda> ct''. type_update ct'' cons prods)))"
   | (5) "(\<exists> tls. check_single \<C> x = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
