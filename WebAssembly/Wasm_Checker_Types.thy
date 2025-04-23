@@ -465,7 +465,7 @@ next
   then show ?case by simp
 qed
 
-lemma pop_c_type_agree_snoc:
+lemma pop_c_type_agrees_snoc:
   assumes
     "pop ct = Some (t', ct')"
     "c_types_agree ct (ts@[t])"
@@ -543,6 +543,7 @@ lemma consume_c_types_agree:
   shows "c_types_agree ct (ts'@ts)"
   using assms c_types_agree_consume consume_some_unsplit
   by (auto split: option.splits)
+
 (*
 datatype ct =
     TAny
