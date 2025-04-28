@@ -297,9 +297,9 @@ next
 next
   case (3 \<S> \<C> tf)
   then show ?case
-    by (metis instr_subtyping_trans tf.exhaust)
+    by (metis instr_subtyping_trans)
 next
-  case (11 \<S> f \<C> rs es ts)
+  case (9 \<S> f \<C> rs es ts)
   then show ?thesis
     by (metis assms(1) assms(2) b_e_type_cnum to_e_list_1 unlift_b_e)
 qed
@@ -334,7 +334,7 @@ next
   then show ?case
     by (metis instr_subtyping_trans)
 next
-  case (11 \<S> f \<C> rs es ts)
+  case (9 \<S> f \<C> rs es ts)
   then show ?thesis
     by (metis (full_types) assms(1) assms(2) b_e_type_cvec t_vec.exhaust to_e_list_1 unlift_b_e)
 qed
@@ -1374,34 +1374,6 @@ next
     using instr_subtyping_refl by blast
 qed blast
 
-lemma e_type_init_mem:
-  assumes "s\<bullet>\<C> \<turnstile> [Init_mem n bs] : (ts _> ts')"
-  shows "instr_subtyping ([] _> []) (ts _> ts') \<and> length (memory \<C>) \<ge> 1 \<and> (s\<bullet>\<C> \<turnstile> [Init_mem n bs] : ([] _> []))"
-  using assms
-proof (induction s \<C> "[Init_mem n bs]" "(ts _> ts')" arbitrary: ts ts')
-  case (2 \<S> \<C> es t1s t2s e t3s)
-  then show ?case
-    using e_type_empty instr_subtyping_empty_comp2 by auto
-next
-  case (3 \<S> \<C> tf1 tf2 tf1' tf2')
-  then show ?case
-    using instr_subtyping_trans by blast
-qed (auto simp add: e_typing_l_typing.intros(9) instr_subtyping_refl)
-
-
-lemma e_type_init_tab:
-  assumes "s\<bullet>\<C> \<turnstile> [Init_tab ti n icls] : (ts _> ts')"
-  shows "instr_subtyping ([] _> []) (ts _> ts') \<and> ti < length (table \<C>) \<and> (list_all (\<lambda>icl. ref_typing s icl (tab_t_reftype (table \<C>!ti))) icls) \<and> (s\<bullet>\<C> \<turnstile> [Init_tab ti n icls] : ([] _> []))"
-  using assms
-proof (induction s \<C> "[Init_tab ti n icls]" "(ts _> ts')" arbitrary: ts ts')
-  case (2 \<S> \<C> es t1s t2s e t3s)
-  then show ?case
-    by (metis append1_eq_conv append_Nil e_type_empty1 instr_subtyping_empty_comp3)
-next
-  case (3 \<S> \<C> tf1 tf2 tf1' tf2')
-  then show ?case using instr_subtyping_trans by blast
-qed (auto simp add: e_typing_l_typing.intros(10) instr_subtyping_refl instr_subtyping_trans)
-
 lemma e_type_memory_init:
   assumes "s\<bullet>\<C> \<turnstile> [$Memory_init x] : (ts _> ts')"
   shows "(([T_num T_i32, T_num T_i32, T_num T_i32] _> []) <ti: (ts _> ts')) \<and> length (memory \<C>) \<ge> 1 \<and> x < length (data \<C>)"
@@ -1419,7 +1391,7 @@ next
   then show ?case
     using instr_subtyping_trans by blast
 next
-  case (11 \<S> f \<C> rs es ts)
+  case (9 \<S> f \<C> rs es ts)
   then show ?thesis
     by (metis assms b_e_type_memory_init to_e_list_1 unlift_b_e)
 qed
@@ -1441,7 +1413,7 @@ next
   then show ?case
     using instr_subtyping_trans by blast
 next
-  case (11 \<S> f \<C> rs es ts)
+  case (9 \<S> f \<C> rs es ts)
   then show ?thesis
     by (metis assms b_e_type_memory_copy to_e_list_1 unlift_b_e)
 qed
@@ -1463,7 +1435,7 @@ next
   then show ?case
     using instr_subtyping_trans by blast
 next
-  case (11 \<S> f \<C> rs es ts)
+  case (9 \<S> f \<C> rs es ts)
   then show ?thesis
     by (metis assms b_e_type_memory_fill to_e_list_1 unlift_b_e)
 qed
@@ -1485,7 +1457,7 @@ next
   then show ?case
     using instr_subtyping_trans by blast
 next
-  case (11 \<S> f \<C> rs es ts)
+  case (9 \<S> f \<C> rs es ts)
   then show ?thesis
     by (metis assms b_e_type_table_init to_e_list_1 unlift_b_e)
 qed
@@ -1507,7 +1479,7 @@ next
   then show ?case
     using instr_subtyping_trans by blast
 next
-  case (11 \<S> f \<C> rs es ts)
+  case (9 \<S> f \<C> rs es ts)
   then show ?thesis
     by (metis assms b_e_type_table_fill to_e_list_1 unlift_b_e)
 qed
@@ -1529,7 +1501,7 @@ next
   then show ?case
     using instr_subtyping_trans by blast
 next
-  case (11 \<S> f \<C> rs es ts)
+  case (9 \<S> f \<C> rs es ts)
   then show ?thesis
     by (metis assms b_e_type_table_copy to_e_list_1 unlift_b_e)
 qed
@@ -1551,7 +1523,7 @@ next
   then show ?case
     using instr_subtyping_trans by blast
 next
-  case (11 \<S> f \<C> rs es ts)
+  case (9 \<S> f \<C> rs es ts)
   then show ?thesis
     by (metis assms b_e_type_elem_drop to_e_list_1 unlift_b_e)
 qed
@@ -1573,7 +1545,7 @@ next
   then show ?case
     using instr_subtyping_trans by blast
 next
-  case (11 \<S> f \<C> rs es ts)
+  case (9 \<S> f \<C> rs es ts)
   then show ?thesis
     by (metis assms b_e_type_data_drop to_e_list_1 unlift_b_e)
 qed
@@ -2695,125 +2667,6 @@ proof -
     unfolding funci_agree_def sfunc_def
     by auto
 qed
-(*
-lemma store_typing_imp_func_agree:
-  assumes "store_typing s"
-          "inst_typing s i \<C>"
-  shows "(sfunc_ind s i j) < length (s_funcs \<S>)"
-        "cl_typing \<S> (sfunc s i j) ((s_funcs \<S>)!(sfunc_ind s i j))"
-        "((s_funcs \<S>)!(sfunc_ind s i j)) = (func_t ((s_inst \<S>)!i))!j"
-proof -
-  have funcs_agree:"list_all2 (cl_typing \<S>) (funcs s) (s_funcs \<S>)"
-    using assms(1)
-    unfolding store_typing.simps
-    by auto
-  have "list_all2 (funci_agree (s_funcs \<S>)) (inst.funcs ((inst s)!i)) (func_t ((s_inst \<S>)!i))"
-    using assms(1,2) store_typing_imp_inst_length_eq store_typing_imp_inst_typing
-    by (fastforce simp add: inst_typing.simps)
-  hence "funci_agree (s_funcs \<S>) ((inst.funcs ((inst s)!i))!j) ((func_t ((s_inst \<S>)!i))!j)"
-    using assms(3) list_all2_nthD2
-    by blast
-  thus "(sfunc_ind s i j) < length (s_funcs \<S>)"
-       "((s_funcs \<S>)!(sfunc_ind s i j)) = (func_t ((s_inst \<S>)!i))!j"
-    unfolding funci_agree_def sfunc_ind_def
-    by auto
-  thus "cl_typing \<S> (sfunc s i j) ((s_funcs \<S>)!(sfunc_ind s i j))"
-    using funcs_agree list_all2_nthD2
-    unfolding sfunc_def
-    by fastforce
-qed
-
-lemma store_typing_imp_glob_agree:
-  assumes "store_typing s \<S>"
-          "i < length (s_inst \<S>)"
-          "j < length (global ((s_inst \<S>)!i))"
-  shows "(sglob_ind s i j) < length (s_globs \<S>)"
-        "glob_agree (sglob s i j) ((s_globs \<S>)!(sglob_ind s i j))"
-        "((s_globs \<S>)!(sglob_ind s i j)) = (global ((s_inst \<S>)!i))!j"
-proof -
-  have globs_agree:"list_all2 glob_agree (globs s) (s_globs \<S>)"
-    using assms(1)
-    unfolding store_typing.simps
-    by auto
-  have "list_all2 (globi_agree (s_globs \<S>)) (inst.globs ((inst s)!i)) (global ((s_inst \<S>)!i))"
-    using assms(1,2) store_typing_imp_inst_length_eq store_typing_imp_inst_typing
-    by (fastforce simp add: inst_typing.simps)
-  hence "globi_agree (s_globs \<S>) ((inst.globs ((inst s)!i))!j) ((global ((s_inst \<S>)!i))!j)"
-    using assms(3) list_all2_nthD2
-    by blast
-  thus "(sglob_ind s i j) < length (s_globs \<S>)"
-       "((s_globs \<S>)!(sglob_ind s i j)) = (global ((s_inst \<S>)!i))!j"
-    unfolding globi_agree_def sglob_ind_def
-    by auto
-  thus "glob_agree (sglob s i j) ((s_globs \<S>)!(sglob_ind s i j))"
-    using globs_agree list_all2_nthD2
-    unfolding sglob_def
-    by fastforce
-qed
-
-lemma store_typing_imp_mem_agree_Some:
-  assumes "store_typing s \<S>"
-          "i < length (s_inst \<S>)"
-          "smem_ind s i = Some j"
-  shows "j < length (s_mem \<S>)"
-        "mem_agree ((mem s)!j) ((s_mem \<S>)!j)"
-        "\<exists>x. ((s_mem \<S>)!j) = x \<and> (memory ((s_inst \<S>)!i)) = Some x"
-proof -
-  have mems_agree:"list_all2 mem_agree (mem s) (s_mem \<S>)"
-  using assms(1)
-  unfolding store_typing.simps
-  by auto
-  hence "memi_agree (s_mem \<S>) ((inst.mem ((inst s)!i))) ((memory ((s_inst \<S>)!i)))"
-    using assms(1,2) store_typing_imp_inst_length_eq store_typing_imp_inst_typing
-    by (fastforce simp add: inst_typing.simps)
-  thus "j < length (s_mem \<S>)"
-       "\<exists>x. ((s_mem \<S>)!j) = x \<and> (memory ((s_inst \<S>)!i)) = Some x"
-    using assms(3)
-    unfolding memi_agree_def smem_ind_def
-    by auto
-  thus "mem_agree ((mem s)!j) ((s_mem \<S>)!j)"
-    using mems_agree list_all2_nthD2
-    unfolding sglob_def
-    by fastforce
-qed
-
-lemma store_typing_imp_mem_agree_None:
-  assumes "store_typing s \<S>"
-          "i < length (s_inst \<S>)"
-          "smem_ind s i = None"
-  shows "(memory ((s_inst \<S>)!i)) = None"
-proof -
-  have mems_agree:"list_all2 mem_agree (mem s) (s_mem \<S>)"
-  using assms(1)
-  unfolding store_typing.simps
-  by auto
-  hence "memi_agree (s_mem \<S>) ((inst.mem ((inst s)!i))) ((memory ((s_inst \<S>)!i)))"
-    using assms(1,2) store_typing_imp_inst_length_eq store_typing_imp_inst_typing
-    by (fastforce simp add: inst_typing.simps)
-  thus ?thesis
-    using assms(3)
-    unfolding memi_agree_def smem_ind_def
-    by auto
-qed
-
-lemma store_mem_exists:
-  assumes "i < length (s_inst \<S>)"
-          "store_typing s \<S>"
-  shows "Option.is_none (memory ((s_inst \<S>)!i)) = Option.is_none (inst.mem ((inst s)!i))"
-proof -
-  obtain j where j_def:"j = (inst.mem ((inst s)!i))"
-    by blast
-  obtain m where m_def:"m = (memory ((s_inst \<S>)!i))"
-    by blast
-  have inst_typ:"inst_typing \<S> ((inst s)!i) ((s_inst \<S>)!i)"
-    using assms
-    unfolding store_typing.simps list_all2_conv_all_nth
-    by auto
-  thus ?thesis
-    unfolding inst_typing.simps memi_agree_def
-    by auto
-qed
-*)
 
 lemma store_mem_exists:
   assumes "inst_typing s i \<C>"
@@ -3286,17 +3139,10 @@ next
     unfolding store_extension.simps
     by (auto simp add: list_all2_lengthD)
 next
-  case (10 ti \<C> tt \<S> vrs n)
-  have "list_all (\<lambda>vr. ref_typing s' vr tt) vrs"
-    using ref_typing_store_extension_inv
-    by (metis "10.hyps"(3) "10.prems" list_all_length)
-  then show ?case
-    by (simp add: "10.hyps"(1) "10.hyps"(2) e_typing_l_typing.intros(10))
-next
-  case (11 \<S> f \<C> rs es ts)
+  case (9 \<S> f \<C> rs es ts)
   thus ?case
     using frame_typing_store_extension_inv
-          e_typing_l_typing.intros(11)
+          e_typing_l_typing.intros(9)
     by blast
 qed (auto simp add: e_typing_l_typing.intros)
 

@@ -100,93 +100,6 @@ next
     using local(2)[OF local(3) tls_def(1,3), of _  "(label \<C>i')"]
     by force
 next
-  case (init_mem_Some f j s m n bs mem')
-  have "mem_subtyping (fst mem') (fst m)"
-    by (metis fst_conv init_mem_Some.hyps(3) limits_compat_refl mem_subtyping_def option.sel option.simps(3) store_def write_bytes_def)
-  then show ?case
-    using store_size[OF init_mem_Some(3)] store_max[OF init_mem_Some(3)]
-          store_typing_in_mem_agree init_mem_Some
-          store_extension_mem_leq[OF init_mem_Some(4,2), of mem']
-          store_mem_agree[OF init_mem_Some(3)]
-    by (metis inst_typing_imp_memi_agree memi_agree_def order_refl)
-next
-  case (init_tab_Some f ti j s t n icls tab')
-  have "tab_subtyping (fst tab') (fst t)"
-    by (metis fst_conv init_tab_Some.hyps(3) option.inject option.simps(3) store_tab_list_def tab_subtyping_refl)
-  have "tab_size t \<le> tab_size tab'"
-    using store_tab_list_size[OF init_tab_Some(3)]
-    by simp
-  moreover
-  have "tab_agree s tab'"
-  proof -
-    have a: "tab_agree s t"
-      using inst_typing_imp_tabi_agree store_typing_in_tab_agree
-      by (metis init_tab_Some(1,2,4,5) tabi_agree_def)
-    hence b: "pred_option ((\<le>) (tab_size tab')) (tab_max tab')"
-      using init_tab_Some(3)
-      unfolding store_tab_list_def tab_agree_def
-      apply (simp split: if_splits)
-      by (metis (mono_tags, lifting) init_tab_Some.hyps(3) split_beta store_tab_list_max store_tab_list_size tab_t.case tab_t.exhaust)
-    
-    have c: "table \<C>i!ti = table \<C>!ti"  by (simp add: init_tab_Some.prems(4))
-
-    have d: "tab_t_reftype (fst t) = tab_t_reftype (table \<C>i!ti)"
-    proof -
-      have "inst_typing s (f_inst f) \<C>i"
-        by (simp add: init_tab_Some.prems(2))
-      then have "list_all2 (tabi_agree (tabs s)) (inst.tabs (f_inst f)) (table \<C>i)"
-        using inst_typing.simps by fastforce
-      show ?thesis by (metis (mono_tags, lifting) case_prod_conv init_tab_Some.hyps(1) init_tab_Some.hyps(2) init_tab_Some.prems(2) inst_typing_imp_tabi_agree split_def tab_t.case tab_t.exhaust tab_t_reftype_def tab_subtyping_def tabi_agree_def)
-    qed
-
-    have e: "tab' = (fst t, ((take n (snd t)) @ icls @ (drop (n + length icls) (snd t))))"
-    proof -
-      have "list_all (\<lambda>icl. ref_typing s icl (tab_t_reftype (table \<C>!ti))) icls"
-        using e_type_init_tab[OF init_tab_Some(6)]
-        by simp
-      then have "list_all (\<lambda>icl. ref_typing s icl (tab_t_reftype (table \<C>i!ti))) icls"
-        using c by simp
-      have "store_tab_list t n icls = Some (fst t, ((take n (snd t)) @ icls @ (drop (n + length icls) (snd t))))"
-        by (metis init_tab_Some.hyps(3) option.simps(3) store_tab_list_def)
-      then show "tab' = (fst t, ((take n (snd t)) @ icls @ (drop (n + length icls) (snd t))))"
-        using init_tab_Some.hyps(3) by auto
-    qed
-
-    have f: "list_all (\<lambda> vr. ref_typing s vr (tab_t_reftype (fst tab'))) (snd tab')"
-    proof -
-      have "table \<C>i!ti = table \<C>!ti"  by (simp add: init_tab_Some.prems(4))
-      have "list_all (\<lambda> vr. ref_typing s vr (tab_t_reftype (table \<C>i!ti))) (snd t)"
-        by (metis (mono_tags, lifting) d a list_all_length split_beta tab_agree_def tab_t.case tab_t.exhaust tab_t_reftype_def)
-      then have  "list_all (\<lambda> vr. ref_typing s vr (tab_t_reftype (table \<C>i!ti))) ((take n (snd t)) @ icls @ (drop (n + length icls) (snd t)))"
-        by (metis append_take_drop_id e_type_init_tab c list_all_append local.init_tab_Some(6))
-      then have "list_all (\<lambda> vr. ref_typing s vr (tab_t_reftype (table \<C>i!ti))) (snd tab')"
-        using e
-        by simp
-      then show "list_all (\<lambda> vr. ref_typing s vr (tab_t_reftype (fst tab'))) (snd tab')"
-        by (simp add: d e)
-    qed
-    then have g: "l_min (tab_t_lim (fst tab')) = tab_size tab'"
-      by (metis (mono_tags, lifting) a case_prod_beta' fst_conv init_tab_Some.hyps(3) store_tab_list_size e tab_agree_def tab_t.case tab_t.exhaust tab_t_lim_def)
-    
-    show ?thesis
-    proof(cases tab')
-      case (Pair a b)
-      then show ?thesis using b d f g tab_agree_def[of s tab']
-        by (metis (mono_tags, lifting) list.pred_mono_strong split_beta tab_t.case tab_t.exhaust tab_t_lim_def tab_t_reftype_def)
-    qed
-  qed
-  moreover
-  have "tab_max t = tab_max tab'"
-    using store_tab_list_max[OF init_tab_Some(3)]
-    by simp
-  moreover
-  have "tab_subtyping  (fst tab') (fst t)"
-    by (metis fst_conv init_tab_Some.hyps(3) option.inject option.simps(3) store_tab_list_def tab_subtyping_refl)
-  ultimately
-  show ?case
-    using store_extension_tab_leq[OF init_tab_Some(4,2), of tab']
-    by blast
-next
   case (table_set f ti a s n vr tabs')
   have  1: "ref_typing s vr (tab_reftype (s.tabs s ! a))"
   proof -
@@ -1271,7 +1184,7 @@ proof -
     using frame_typing.intros ts_c_def(2)
     by fastforce
   then have "s\<bullet>Some t2s \<tturnstile> \<lparr> f_locs=(vs @ zs), f_inst=i \<rparr>;([Label m [] ($*es)]) : t2s"
-    using e_typing_l_typing.intros(11) c''_def 1 
+    using e_typing_l_typing.intros(9) c''_def 1 
     by blast
   thus ?thesis
     using e_typing_l_typing.intros(3,6) ts_c_def t_eqs(1) assms(2,7) instr_subtyping_comp tvs_def(1) by blast
@@ -2485,18 +2398,6 @@ next
   then show ?case
     using e_type_local_shallow local.hyps local.prems(1,3,5) store_preserved v_typing_list_store_extension_inv by blast
 next
-  case (init_mem_Some f j s m n bs mem')
-  have "funcs (s\<lparr>s.mems := (s.mems s)[j := mem']\<rparr>) = funcs s"
-    by simp
-  then show ?case using v_typing_funcs_inv
-    by (metis (mono_tags, lifting) init_mem_Some.prems(5) list_all2_mono)
-next
-  case (init_tab_Some f ti j s t n icls tab')
-  have "funcs (s\<lparr>s.tabs := (s.tabs s)[j := tab']\<rparr>) = funcs s"
-    by simp
-  then show ?case using v_typing_funcs_inv
-    by (metis (mono_tags, lifting) init_tab_Some.prems(5) list_all2_mono)
-next
   case (elem_drop x f a s)
   have "funcs (s\<lparr>s.elems := (s.elems s)[a := (fst (s.elems s ! a), [])]\<rparr>) = funcs s"
     by simp
@@ -2799,29 +2700,11 @@ next
       reduce_locs_type_preserved[OF local.hyps local(3) es_def(1) es_def(4) es_def(3)]
     by auto
   hence 1:"s'\<bullet>(Some tls) \<tturnstile> f';es' : tls"
-    using 0 e_typing_l_typing.intros(11) es_def(1,3) reduce_inst_is[OF local(1)]
+    using 0 e_typing_l_typing.intros(9) es_def(1,3) reduce_inst_is[OF local(1)]
     by fastforce
   show ?case
     using e_typing_l_typing.intros(3) e_typing_l_typing.intros(6)[OF 1 es_def(2)] es_def(5) local(5)
     by (metis e_type_local_shallow local.hyps local.prems(1) local.prems(5) local.prems(6) store_preserved v_typing_list_store_extension_inv)
-next
-case (init_mem_Some f j s m n bs mem')
-  thus ?case
-    using e_type_empty e_type_init_mem
-    by (simp add: list_all2_mono v_typing_funcs_inv)
-next
-  case (init_mem_None f j s m n bs)
-  thus ?case
-    by (simp add: e_typing_l_typing.intros(5))
-next
-  case (init_tab_Some f j s t n icls tab')
-  thus ?case
-    using e_type_empty e_type_init_tab
-    by (simp add: list_all2_mono v_typing_funcs_inv)
-next
-  case (init_tab_None f j s t n icls)
-  thus ?case
-    by (simp add: e_typing_l_typing.intros(5))
 next
   case (table_get f ti a s n val)
   then show ?case using types_preserved_table_get by blast
@@ -3164,7 +3047,7 @@ proof -
     using store_preserved(1)[OF assms] inst_typing_store_extension_inv[OF defs(3)]
     by blast
   show ?thesis
-    using defs e_typing_l_typing.intros(11)
+    using defs e_typing_l_typing.intros(9)
           assms(1) reduce_inst_is 1 2
     unfolding frame_typing.simps
     apply simp
@@ -5426,48 +5309,20 @@ proof -
         by simp
     qed
   next
-    case (9 \<C> \<S> n bs)
-    obtain j m where j_is:"smem_ind (f_inst f) = Some j"
-                          "s.mems \<S> ! j = m"
-      using 9(1,11)
-      unfolding smem_ind_def
-      by (fastforce split: list.splits)
-    thus ?case
-      using progress_L0_left[OF reduce.init_mem_None[OF j_is, of n bs]]
-            progress_L0_left[OF reduce.init_mem_Some[OF j_is, of n bs]]
-            9(3)
-      apply (cases "store m n 0 bs (length bs)")
-      apply blast+
-      done
-  next
-    case (10 ti \<C> tt \<S> vrs n)
-    obtain j t where j_is:"stab_ind (f_inst f) ti = Some j"
-                          "s.tabs \<S> ! j = t"
-      using 10(1,11,13)
-      unfolding stab_ind_def
-      by (simp add: "10.prems"(11))
-    thus ?case
-      using progress_L0_left[OF reduce.init_tab_None[OF j_is, of n vrs]]
-            progress_L0_left[OF reduce.init_tab_Some[OF j_is, of n vrs]]
-            10(4)
-      apply (cases "store_tab_list t n vrs")
-      using "10.prems"(2) apply blast+
-      done
-  next
-    case (11 \<S> f \<C> rs es ts)
+    case (9 \<S> f \<C> rs es ts)
     have "length (local \<C>) = length (f_locs f)"
          "length (memory \<C>) = length (inst.mems (f_inst f))"
          "length (table \<C>) = length (inst.tabs (f_inst f))"
          "types_t \<C> = inst.types (f_inst f)"
          "length (elem \<C>) = length (inst.elems (f_inst f))"
          "length (data \<C>) = length (inst.datas (f_inst f))"
-      using store_local_label_empty 11(1) store_data_exists store_elem_exists store_mem_exists store_tab_exists store_types_exists
+      using store_local_label_empty 9(1) store_data_exists store_elem_exists store_mem_exists store_tab_exists store_types_exists
       unfolding frame_typing.simps
       using list_all2_lengthD by fastforce+
     moreover have "length (func_t \<C>) = length (inst.funcs (f_inst f))"
-      using "11.hyps"(1) frame_typing.simps inst_typing_func_length by force
+      using "9.hyps"(1) frame_typing.simps inst_typing_func_length by force
     ultimately show ?case
-      using 11(3)[OF 11(2) _ _ 11(4) _ 11(6,7,8), of "[]" "[]" f] 11(5)
+      using 9(3)[OF 9(2) _ _ 9(4) _ 9(6,7,8), of "[]" "[]" f] 9(5)
             e_typing_l_typing.intros(1)[OF b_e_typing.empty[of "\<C>\<lparr>return := rs\<rparr>"]]
       unfolding const_list_def
       by simp
@@ -5730,21 +5585,6 @@ next
   then show ?case
   using const_list_no_progress consts_const_list
   by (metis reduce.store_vec_None)
-next
-  case (init_mem_Some f j s m n bs mem')
-  then show ?case
-  using const_list_no_progress consts_const_list
-  by (metis reduce.init_mem_Some)
-next
-  case (init_mem_None f j s m n bs)
-  then show ?case
-  using const_list_no_progress consts_const_list
-  by (metis reduce.init_mem_None)
-next
-  case (init_tab_Some f j s t n icls tab')
-  then show ?case
-  using const_list_no_progress consts_const_list
-  by (metis reduce.init_tab_Some)
 next
   case (table_set f ti a s n vr tabs')
   then show ?case

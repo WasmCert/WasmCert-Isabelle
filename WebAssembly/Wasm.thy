@@ -177,11 +177,6 @@ and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> boo
 | "\<lbrakk>i < length (funcs \<S>); cl_type ((funcs \<S>)!i) = tf\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Invoke i] : tf"
   (* label *)
 | "\<lbrakk>\<S>\<bullet>\<C> \<turnstile> e0s : (ts _> t2s); \<S>\<bullet>\<C>\<lparr>label := ([ts] @ (label \<C>))\<rparr> \<turnstile> es : ([] _> t2s); length ts = n\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Label n e0s es] : ([] _> t2s)"
-  (* Init_mem (instantiation) *)
-| "\<lbrakk>length (memory \<C>) \<ge> 1\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Init_mem n bs] : ([] _> [])"
-  (* Init_tab (instantiation) *)
-  (* TODO: this can be removed *)
-| "\<lbrakk>ti < length (table \<C>); tt = tab_t_reftype (table \<C>!ti); list_all (\<lambda>vr. ref_typing \<S> vr tt) vrs\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Init_tab ti n vrs] : ([] _> [])"
 (* section: l_typing *)
 | "\<lbrakk>frame_typing \<S> f \<C>; \<S>\<bullet>\<C>\<lparr>return := rs\<rparr> \<turnstile> es : ([] _> ts)\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile> f;es : ts"
 
@@ -359,11 +354,6 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
 | label:"\<lbrakk>\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>; Lfilled k lholed es les; Lfilled k lholed es' les'\<rbrakk> \<Longrightarrow> \<lparr>s;f;les\<rparr> \<leadsto> \<lparr>s';f';les'\<rparr>"
   \<comment> \<open>\<open>inductive local reduction\<close>\<close>
 | local:"\<lbrakk>\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>\<rbrakk> \<Longrightarrow> \<lparr>s;f0;[Frame n f es]\<rparr> \<leadsto> \<lparr>s';f0;[Frame n f' es']\<rparr>"
-  (* instantiation helpers *)
-| init_mem_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; store m n 0 bs (length bs) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_mem n bs]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[]\<rparr>"
-| init_mem_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; store m n 0 bs (length bs) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_mem n bs]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
-| init_tab_Some:"\<lbrakk>stab_ind (f_inst f) ti = Some j; ((tabs s)!j) = t; store_tab_list t n icls = Some tab'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_tab ti n icls]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:= ((tabs s)[j := tab'])\<rparr>;f;[]\<rparr>"
-| init_tab_None:"\<lbrakk>stab_ind (f_inst f) ti = Some j; ((tabs s)!j) = t; store_tab_list t n icls = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[Init_tab ti n icls]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>memory init\<close>\<close>
 | memory_init_trap: "\<lbrakk>smem_ind (f_inst f) = Some ma; (mems s)!ma = m; x < length (inst.datas (f_inst f)); da =(inst.datas (f_inst f))!x; dat = (datas s)!da; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc+nn > length dat \<or>  ndest+nn > mem_length m \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
 | memory_init_done: "\<lbrakk>smem_ind (f_inst f) = Some ma; (mems s)!ma = m; x < length (inst.datas (f_inst f)); da =(inst.datas (f_inst f))!x; dat = (datas s)!da; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc+nn \<le> length dat;  ndest+nn \<le> mem_length m; nn = 0 \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"

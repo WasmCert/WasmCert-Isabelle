@@ -487,10 +487,6 @@ datatype e = \<comment> \<open>administrative instruction\<close>
   | Frame nat f "e list"
   | Ref v_ref
 
-  (* only used by instantiation *)
-  | Init_mem nat "byte list"
-  | Init_tab i nat "v_ref list"
-
 datatype Lholed =
     \<comment> \<open>L0 = v* [<hole>] e*\<close>
     LBase "v list" "e list"
