@@ -133,8 +133,8 @@ definition app_v_s_replace_vec :: "shape_vec \<Rightarrow> i \<Rightarrow> v_sta
        (V_num v2)#(V_vec v1)#v_s' \<Rightarrow> ((V_vec (app_replace_vec sv i v1 v2))#v_s', Step_normal)
      | _ \<Rightarrow> (v_s, crash_invalid))"
 
-definition app_v_s_select :: "v_stack \<Rightarrow> (v_stack \<times> res_step)" where
-  "app_v_s_select v_s =
+definition app_v_s_select :: "t option \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_select t_tag v_s =
      (case v_s of
        (V_num (ConstInt32 c))#v2#v1#v_s' \<Rightarrow>
          (if int_eq c 0 then (v2#v_s', Step_normal) else (v1#v_s', Step_normal))
@@ -189,19 +189,25 @@ definition app_v_s_br_table :: "nat list \<Rightarrow> nat \<Rightarrow> v_stack
 definition app_f_call :: "nat \<Rightarrow> f \<Rightarrow> (e list \<times> res_step)" where
   "app_f_call k f = ([Invoke (sfunc_ind (f_inst f) k)], Step_normal)"
 
-definition app_s_f_v_s_call_indirect :: "nat \<Rightarrow> tabinst list \<Rightarrow> cl list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
-  "app_s_f_v_s_call_indirect k tinsts cls f v_s = 
-          (let i = (f_inst f) in
-           case v_s of
-             (V_num (ConstInt32 c))#v_s' \<Rightarrow>
-               (case (inst.tabs i) of
-                  (j#_) => (case (tab_cl_ind tinsts j (nat_of_int c)) of
-                             Some i_cl \<Rightarrow> (if (stypes i k = cl_type (cls!i_cl))
-                                            then  (v_s', [(Invoke i_cl)], Step_normal)
-                                            else (v_s', [], (Res_trap (STR ''call_indirect''))))
-                           | None \<Rightarrow> (v_s', [], (Res_trap (STR ''call_indirect''))))
-                | [] => (v_s, [], crash_invalid))
-           | _ \<Rightarrow> (v_s, [], crash_invalid))"
+(* TODO: review this *)
+definition app_s_f_v_s_call_indirect :: "nat \<Rightarrow> nat \<Rightarrow> tabinst list \<Rightarrow> cl list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
+  "app_s_f_v_s_call_indirect x y tinsts cls f v_s =
+    (let i = f_inst f in 
+      case v_s of
+        (V_num (ConstInt32 c))#v_s' \<Rightarrow>
+          (if (x < length (inst.tabs i)) then
+            (case (tab_cl_ind tinsts (inst.tabs i!x) (nat_of_int c)) of
+              Some v_r \<Rightarrow> (case v_r of
+                ConstRefFunc a \<Rightarrow> (if (stypes i y = cl_type (cls!a))
+                  then (v_s', [(Invoke a)], Step_normal)
+                  else (v_s', [], (Res_trap (STR ''call_indirect''))))
+              | ConstNull t \<Rightarrow> (v_s', [], (Res_trap (STR ''call_indirect'')))
+              | ConstRefExtern a \<Rightarrow> (v_s, [], crash_invalid))
+            | None \<Rightarrow> (v_s, [], crash_invalid))
+          else
+            (v_s', [], (Res_trap (STR ''call_indirect''))))
+      | _ \<Rightarrow> (v_s, [], crash_invalid)
+  )"
 
 definition app_s_f_v_s_get_global :: "nat \<Rightarrow> global list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
   "app_s_f_v_s_get_global k gs f v_s =  ((g_val (gs!(sglob_ind (f_inst f) k)))#v_s, Step_normal)"
@@ -342,6 +348,7 @@ definition app_s_f_init_mem :: "nat \<Rightarrow> byte list \<Rightarrow> mem li
                         (ms, Res_trap (STR ''init_mem''))
       | None => (ms, crash_invalid)))"
 
+(*
 definition app_s_f_init_tab :: "nat \<Rightarrow> i list \<Rightarrow> tabinst list \<Rightarrow> f \<Rightarrow> (tabinst list \<times> res_step)" where
   "app_s_f_init_tab off icls ts f = 
      (let i = (f_inst f) in
@@ -350,6 +357,7 @@ definition app_s_f_init_tab :: "nat \<Rightarrow> i list \<Rightarrow> tabinst l
                         (\<lambda>t'. ((ts[j := t']), Step_normal))
                         (ts, Res_trap (STR ''init_tab''))
       | None => (ts, crash_invalid)))"
+*)
 
 (* 0: local value stack, 1: current redex, 2: tail of redex *)
 datatype redex = Redex v_stack "e list" "b_e list"
@@ -373,18 +381,51 @@ type_synonym res_step_tuple = "config \<times> res_step"
 
 type_synonym res_tuple = "config \<times> res"
 
+fun b_e_to_val:: "b_e \<Rightarrow> v option" where
+  "b_e_to_val (EConstNum n) = Some (V_num n)"
+| "b_e_to_val (EConstVec v) = Some (V_vec v)"
+| "b_e_to_val _ = None"
+
+fun split_vals:: "b_e list \<Rightarrow> v list \<times> b_e list" where
+  "split_vals [] = ([], [])"
+| "split_vals (e#es) = (case (b_e_to_val e) of
+    Some v \<Rightarrow> (let (vs', es') = split_vals es in (v#vs', es'))
+  | None \<Rightarrow> ([], es))"
+
+(*
 fun split_vals :: "b_e list \<Rightarrow> v list \<times> b_e list" where
   "split_vals ((C v)#es) = (let (vs', es') = split_vals es in (v#vs', es'))"
 | "split_vals es = ([], es)"
+*)
 
+fun e_to_v:: "e \<Rightarrow> v option" where
+  "e_to_v ($EConstNum n) = Some (V_num n)"
+| "e_to_v ($EConstVec v) = Some (V_vec v)"
+| "e_to_v (Ref r) = Some (V_ref r)"
+| "e_to_v _ = None"
+
+fun split_vals_e :: "e list \<Rightarrow> v list \<times> e list" where
+  "split_vals_e [] = ([], [])"
+| "split_vals_e (e#es) = (case (e_to_v e) of
+    Some v \<Rightarrow> (let (vs', es') = split_vals_e es in (v#vs', es'))
+  | None \<Rightarrow> ([], (e#es)))"
+
+(*
 fun split_vals_e :: "e list \<Rightarrow> v list \<times> e list" where
   "split_vals_e (($ C v)#es) = (let (vs', es') = split_vals_e es in (v#vs', es'))"
 | "split_vals_e es = ([], es)"
+*)
 
+fun split_v_s_b_s_aux :: "v_stack \<Rightarrow> b_e list \<Rightarrow> v_stack \<times> b_e list" where
+  "split_v_s_b_s_aux v_s ((EConstNum n)#b_es) = split_v_s_b_s_aux ((V_num n)#v_s) b_es"
+| "split_v_s_b_s_aux v_s ((EConstVec v)#b_es) = split_v_s_b_s_aux ((V_vec v)#v_s) b_es"
+| "split_v_s_b_s_aux v_s es = (v_s, es)"
+
+(*
 fun split_v_s_b_s_aux :: "v_stack \<Rightarrow> b_e list \<Rightarrow> v_stack \<times> b_e list" where
   "split_v_s_b_s_aux v_s ((C v)#b_es) = split_v_s_b_s_aux (v#v_s) b_es"
 | "split_v_s_b_s_aux v_s es = (v_s, es)"
-
+*)
 fun split_v_s_b_s :: "b_e list \<Rightarrow> v_stack \<times> b_e list" where
   "split_v_s_b_s es = split_v_s_b_s_aux [] es"
 
@@ -417,12 +458,15 @@ lemma app_conv_split_n:
   unfolding split_n_conv_take_drop
   by auto
 
+(*
 lemma split_vals_const_list: "split_vals (map EConst vs) = (vs, [])"
   by (induction vs, simp_all)
+*)
 
 lemma split_vals_e_const_list: "split_vals_e ($C* vs) = (vs, [])"
-  by (induction vs, simp_all)
-
+  apply(induction vs)
+  using v_to_e_def by (auto split: v.splits)
+(*
 lemma split_v_s_b_s_aux_conv_app:
   assumes "split_v_s_b_s_aux v_s_aux b_es = (v_s, b_es')"
   shows "(map EConst (rev v_s_aux))@b_es = (map EConst (rev v_s))@b_es'"
@@ -434,23 +478,40 @@ lemma split_v_s_b_s_conv_app:
   shows "b_es = (map EConst (rev v_s))@b_es'"
   using assms split_v_s_b_s_aux_conv_app
   by fastforce
+*)
+
+lemma e_to_v_v_to_e:
+  assumes "e_to_v e = Some a"
+  shows "e = $C a"
+  using assms
+proof (cases e rule: e_to_v.cases)
+qed (auto simp add: v_to_e_def)
 
 lemma split_vals_e_conv_app:
   assumes "split_vals_e xs = (as, bs)"
   shows "xs = ($C* as)@bs"
   using assms
 proof (induction xs arbitrary: as rule: split_vals_e.induct)
-  case (1 v es)
-  obtain as' bs' where "split_vals_e es = (as', bs')"
-    by (meson surj_pair)
-  thus ?case
-    using 1
-    by fastforce
-qed simp_all
-
+  case 1
+  then show ?case by simp
+next
+  case (2 e es)
+  then show ?case
+  proof(cases "e_to_v e")
+    case None
+    then show ?thesis using 2 by auto
+  next
+    case (Some a)
+    then obtain a' as' where "split_vals_e (e # es) = (a'#as', bs)" "split_vals_e es = (as', bs)"
+      using 2 apply simp
+      by (metis Pair_inject old.prod.case old.prod.exhaust)
+    then show ?thesis using 2 Some e_to_v_v_to_e by auto
+  qed
+qed
+(*
 abbreviation v_stack_to_b_es :: " v_stack \<Rightarrow> b_e list"
   where "v_stack_to_b_es v \<equiv> map (\<lambda>v. C v) (rev v)"
-
+*)
 definition e_is_trap :: "e \<Rightarrow> bool" where
   "e_is_trap e = (case e of Trap \<Rightarrow> True | _ \<Rightarrow> False)"
 
@@ -586,8 +647,8 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
         let (v_s', res) = (app_v_s_drop v_s) in
         ((Config d s (update_fc_step fc v_s' []) fcs), res)
 
-    | (Select) \<Rightarrow>
-        let (v_s', res) = (app_v_s_select v_s) in
+    | (Select t_tag) \<Rightarrow>
+        let (v_s', res) = (app_v_s_select t_tag v_s) in
         ((Config d s (update_fc_step fc v_s' []) fcs), res)
 
     | (Block tb b_ebs) \<Rightarrow>
@@ -644,8 +705,8 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
         let (es_cont, res) = (app_f_call k f) in
         (Config d s (update_fc_step fc v_s es_cont) fcs, res)
 
-    | (Call_indirect k) \<Rightarrow>
-        let (v_s', es_cont, res) = (app_s_f_v_s_call_indirect k (tabs s) (funcs s) f v_s) in
+    | (Call_indirect x y) \<Rightarrow>
+        let (v_s', es_cont, res) = (app_s_f_v_s_call_indirect x y (tabs s) (funcs s) f v_s) in
         (Config d s (update_fc_step fc v_s' es_cont) fcs, res)
 
     | (Return) \<Rightarrow>
@@ -714,21 +775,23 @@ fun run_step_e :: "e \<Rightarrow> config \<Rightarrow> res_step_tuple" where
      | Invoke i_cl \<Rightarrow>
          (case (funcs s!i_cl) of
              Func_native i' (t1s _> t2s) ts es_f \<Rightarrow>
-               (case d of
-                 Suc d' \<Rightarrow>
-                   (let n = length t1s in
-                    let m = length t2s in
-                    if (length v_s \<ge> n) then
-                      let (v_fs, v_s') = split_n v_s n in
-                      let fc' = Frame_context (Redex v_s' es b_es) lcs nf f in
-                      let zs = n_zeros ts in
-                      let ff = \<lparr> f_locs = ((rev v_fs)@zs), f_inst = i'\<rparr> in
-                      let lc = Label_context [] [] m [] in 
-                      let fcf = Frame_context (Redex [] [] es_f) [lc] m ff in
-                      (Config d' s fcf (fc'#fcs), Step_normal)
-                    else
-                      (Config d s fc fcs, crash_invalid))
-               | 0 \<Rightarrow> (Config d s fc fcs, crash_exhaustion))
+               (case n_zeros ts of
+                 None \<Rightarrow> (Config d s fc fcs, crash_invalid)
+               | Some zs \<Rightarrow>
+                 (case d of
+                   Suc d' \<Rightarrow>
+                     (let n = length t1s in
+                      let m = length t2s in
+                      if (length v_s \<ge> n) then
+                        let (v_fs, v_s') = split_n v_s n in
+                        let fc' = Frame_context (Redex v_s' es b_es) lcs nf f in
+                        let ff = \<lparr> f_locs = ((rev v_fs)@zs), f_inst = i'\<rparr> in
+                        let lc = Label_context [] [] m [] in 
+                        let fcf = Frame_context (Redex [] [] es_f) [lc] m ff in
+                        (Config d' s fcf (fc'#fcs), Step_normal)
+                      else
+                        (Config d s fc fcs, crash_invalid))
+               | 0 \<Rightarrow> (Config d s fc fcs, crash_exhaustion)))
            | Func_host (t1s _> t2s) h \<Rightarrow>
                let n = length t1s in
                let m = length t2s in
@@ -745,14 +808,14 @@ fun run_step_e :: "e \<Rightarrow> config \<Rightarrow> res_step_tuple" where
                            (Config d s' fc fcs, crash_invalid)
                    | None \<Rightarrow> (Config d s (Frame_context (Redex v_s' es b_es) lcs nf f) fcs, Res_trap (STR ''host_apply''))
                  else
-                    (Config d s fc fcs, crash_invalid))
-     | Init_mem n bs \<Rightarrow>
+                    (Config d s fc fcs, crash_invalid))))"
+ (*    | Init_mem n bs \<Rightarrow>
         let (ms', res) = (app_s_f_init_mem n bs (mems s) f) in
         (Config d (s\<lparr>mems:=ms'\<rparr>) fc fcs, res)
      | Init_tab n icls \<Rightarrow>
         let (ts', res) = (app_s_f_init_tab n icls (tabs s) f) in
         (Config d (s\<lparr>tabs:=ts'\<rparr>) fc fcs, res)
-     | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))"
+     | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))" *)
 (* should never produce Label, Frame, or Trap *)
 
 function(sequential) run_iter :: "fuel \<Rightarrow> config \<Rightarrow> res_tuple" where
@@ -815,8 +878,6 @@ lemma run_invoke_v_alt:
       case cfg' of (Config d s fc fcs) \<Rightarrow> (s,res))"
   by (simp add: make_invoke_config_def)
       
-abbreviation "empty_store \<equiv> \<lparr>s.funcs = [], tabs = [], mems = [], globs = []\<rparr>"
-
-      
+abbreviation "empty_store \<equiv> \<lparr>s.funcs = [], tabs = [], mems = [], globs = [], elems = [], datas = []\<rparr>"
       
 end
