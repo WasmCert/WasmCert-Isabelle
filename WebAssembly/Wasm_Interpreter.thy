@@ -133,11 +133,21 @@ definition app_v_s_replace_vec :: "shape_vec \<Rightarrow> i \<Rightarrow> v_sta
        (V_num v2)#(V_vec v1)#v_s' \<Rightarrow> ((V_vec (app_replace_vec sv i v1 v2))#v_s', Step_normal)
      | _ \<Rightarrow> (v_s, crash_invalid))"
 
+fun select_types_agree :: "t option \<Rightarrow> v \<Rightarrow> v \<Rightarrow> bool" where
+  "select_types_agree None v1 v2 = (typeof v1 = typeof v2)"
+| "select_types_agree (Some t) v1 v2 = (typeof v1 = t \<and> typeof v2 = t)"
+
 definition app_v_s_select :: "t option \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
   "app_v_s_select t_tag v_s =
-     (case v_s of
-       (V_num (ConstInt32 c))#v2#v1#v_s' \<Rightarrow>
-         (if int_eq c 0 then (v2#v_s', Step_normal) else (v1#v_s', Step_normal))
+    (case v_s of
+      (V_num (ConstInt32 c))#v2#v1#v_s' \<Rightarrow>
+        (if select_types_agree t_tag v1 v2 then
+          (if int_eq c 0 then
+            (v2#v_s', Step_normal)
+          else
+            (v1#v_s', Step_normal))
+        else
+          (v_s, crash_invalid))
      | _ \<Rightarrow> (v_s, crash_invalid))"
 
 definition app_f_v_s_get_local :: "nat \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
@@ -203,11 +213,10 @@ definition app_s_f_v_s_call_indirect :: "nat \<Rightarrow> nat \<Rightarrow> tab
                   else (v_s', [], (Res_trap (STR ''call_indirect''))))
               | ConstNull t \<Rightarrow> (v_s', [], (Res_trap (STR ''call_indirect'')))
               | ConstRefExtern a \<Rightarrow> (v_s, [], crash_invalid))
-            | None \<Rightarrow> (v_s, [], crash_invalid))
+            | None \<Rightarrow> (v_s', [], (Res_trap (STR ''call_indirect''))))
           else
-            (v_s', [], (Res_trap (STR ''call_indirect''))))
-      | _ \<Rightarrow> (v_s, [], crash_invalid)
-  )"
+            (v_s, [], crash_invalid))
+        | _ \<Rightarrow> (v_s, [], crash_invalid))"
 
 definition app_s_f_v_s_get_global :: "nat \<Rightarrow> global list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
   "app_s_f_v_s_get_global k gs f v_s =  ((g_val (gs!(sglob_ind (f_inst f) k)))#v_s, Step_normal)"
@@ -466,19 +475,19 @@ lemma split_vals_const_list: "split_vals (map EConst vs) = (vs, [])"
 lemma split_vals_e_const_list: "split_vals_e ($C* vs) = (vs, [])"
   apply(induction vs)
   using v_to_e_def by (auto split: v.splits)
-(*
+
 lemma split_v_s_b_s_aux_conv_app:
   assumes "split_v_s_b_s_aux v_s_aux b_es = (v_s, b_es')"
-  shows "(map EConst (rev v_s_aux))@b_es = (map EConst (rev v_s))@b_es'"
-  using assms
+  shows "($C* (rev v_s_aux))@($* b_es) = ($C* (rev v_s))@($* b_es')"
+  using assms v_to_e_def
   by (induction v_s_aux b_es rule: split_v_s_b_s_aux.induct) auto
 
 lemma split_v_s_b_s_conv_app:
   assumes "split_v_s_b_s b_es = (v_s, b_es')"
-  shows "b_es = (map EConst (rev v_s))@b_es'"
+  shows "$* b_es = ($C* (rev v_s))@($* b_es')"
   using assms split_v_s_b_s_aux_conv_app
   by fastforce
-*)
+
 
 lemma e_to_v_v_to_e:
   assumes "e_to_v e = Some a"
@@ -808,7 +817,10 @@ fun run_step_e :: "e \<Rightarrow> config \<Rightarrow> res_step_tuple" where
                            (Config d s' fc fcs, crash_invalid)
                    | None \<Rightarrow> (Config d s (Frame_context (Redex v_s' es b_es) lcs nf f) fcs, Res_trap (STR ''host_apply''))
                  else
-                    (Config d s fc fcs, crash_invalid))))"
+                    (Config d s fc fcs, crash_invalid))
+            | Ref vr \<Rightarrow> (Config d s fc fcs, crash_invalid)
+            | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))
+" (* TODO: fix this *)
  (*    | Init_mem n bs \<Rightarrow>
         let (ms', res) = (app_s_f_init_mem n bs (mems s) f) in
         (Config d (s\<lparr>mems:=ms'\<rparr>) fc fcs, res)

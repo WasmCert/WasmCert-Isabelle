@@ -775,23 +775,13 @@ definition is_some_const_ref_func :: "v_ref option \<Rightarrow> bool" where
 definition stab_cl_ind :: "s \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> v_ref option" where
   "stab_cl_ind s i j = tab_cl_ind (tabs s) i j"
 
-(* TODO: deprecate this *)
-(*
-definition stab :: "s \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v_ref option" where
-  "stab s i j = (case (inst.tabs i) of (k#_) => stab_cl_ind s k j | [] => None)"
-*)
 definition stab:: "s \<Rightarrow> inst \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> v_ref option" where
   "stab s i ti j = (if ti < length (inst.tabs i) then stab_cl_ind s ((inst.tabs i)!ti) j
                         else None)"
-(* TODO: deprecate this *)
-(*
-definition stab_ind :: "inst \<Rightarrow> nat option" where
-  "stab_ind i = (case (inst.tabs i) of (n#_) \<Rightarrow> Some n | [] \<Rightarrow> None)"
-*)
+
 definition stab_ind :: "inst \<Rightarrow> i \<Rightarrow> nat option" where
   "stab_ind i ti = (if ti < length (inst.tabs i) then Some ((inst.tabs i)!ti)
                         else None)"
-
 
 definition update_glob :: "global list \<Rightarrow> inst \<Rightarrow> nat \<Rightarrow> v \<Rightarrow> global list" where
   "update_glob gs i j v =  (let k = sglob_ind i j in gs[k:=(gs!k)\<lparr>g_val := v\<rparr>])"
