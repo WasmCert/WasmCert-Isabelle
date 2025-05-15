@@ -121,7 +121,8 @@ next
     then show "ref_typing s vr (tab_reftype (s.tabs s ! a))"
       using t1 types_preserved_table_set_aux(2)[OF table_set(5)] by auto
   qed
-  show ?case using store_tabs1_store_extension[OF table_set(2) table_set.prems(1) 1] by simp
+  show ?case using store_tabs1_store_extension[OF table_set(2) _ table_set.prems(1) 1]
+    using inst_typing_imp_tabi_agree tabi_agree_def table_set.hyps(1) table_set.prems(2) by blast
 next
   case (table_grow f ti a s tab sz n vr tab')
   let ?len = "(tab_size tab) + (nat_of_int n)"
@@ -2145,8 +2146,10 @@ proof -
   proof -
     have "list_all (tab_agree s) (tabs s)"
       using assms(4) store_typing.simps by blast
+    moreover have "a < length (tabs s)"
+      using assms(2) assms(5) inst_typing_imp_tabi_agree tabi_agree_def by blast
     then show "tab_agree s ((s.tabs s)!a)"
-      by (metis assms(3) handy_if_lemma list_all_length load_tabs1_def)
+      using assms(4) store_typing_in_tab_agree by blast
   qed
   then have "list_all (\<lambda> vr. ref_typing s vr (tab_t_reftype (fst ((s.tabs s)!a)))) (snd ((s.tabs s)!a))"
     by (metis (mono_tags, lifting) case_prod_beta' list_all_length tab_agree_def tab_t.case tab_t.exhaust tab_t_reftype_def)
@@ -2773,9 +2776,10 @@ next
   then show ?case
     using e_typing_l_typing.intros(5) by blast
 next
-  case (table_init_done f x ta s tab y ea el ndest dest nsrc src nn n)
+
+  case (table_init_done f x ta s tab ea y el ndest dest nsrc src nn n)
   have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n)] @
-          [$Table_init x y] : (ts _> ts')" using table_init_done(16) by auto
+          [$Table_init x y] : (ts _> ts')" using table_init_done(15) by auto
   obtain ts'' vs where ts''_def:
     "vs = [V_num (ConstInt32 dest), V_num (ConstInt32 src), V_num (ConstInt32 n)]"
     "($C* vs) = [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n)]"
@@ -2788,9 +2792,9 @@ next
   ultimately show ?case
     using e_type_empty instr_subtyping_comp table_init_done.prems(3) table_init_done.prems(6) by blast
 next
-  case (table_init f x ta s tab y ea el ndest dest nsrc src nn n n' val)
+  case (table_init f x ta s tab ea y el ndest dest nsrc src nn n nn_pred val)
   have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n)] @
-          [$Table_init x y] : (ts _> ts')" using table_init(17) by auto
+          [$Table_init x y] : (ts _> ts')" using table_init(16) by auto
   obtain ts'' vs where ts''_def:
     "vs = [V_num (ConstInt32 dest), V_num (ConstInt32 src), V_num (ConstInt32 n)]"
     "($C* vs) = [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n)]"
@@ -2809,27 +2813,31 @@ next
     using "2" "3" instr_subtyping_comp by blast
   have 5: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 dest), $C V_ref val, $Table_set x] : (ts _> ts)"
   proof -
-    have "ea < length (elems s)"
-    proof -
-      have "list_all2 (elemi_agree s (s.elems s)) (inst.elems (f_inst f)) (elem \<C>i)"
-        using table_init.prems(2) inst_typing.simps by fastforce
-      then show ?thesis using elemi_agree_def list_all2_nthD table_init.hyps(3,4)
-        by fastforce
-    qed
-    then have el_agree: "elem_agree s el" using store_typing_in_elem_agree[OF table_init(13)]
-      using table_init.hyps(5) by blast
+    have y1: "y < length (elem \<C>)"
+      using ts''_def e_type_table_init[OF ts''_def(4)] by simp
+    then have y2: "y < length (elem \<C>i)"
+      using table_init(15) by simp
+    then have y3: "y < length (inst.elems (f_inst f))"
+      using ts''_def e_type_table_init[OF ts''_def(4)]
+      using store_elem_exists table_init.prems(2) by auto
+    moreover have y4: "list_all2 (elemi_agree s (s.elems s)) (inst.elems (f_inst f)) (elem \<C>i)"
+      using table_init.prems(2) inst_typing.simps by fastforce
+    ultimately have y5: "ea < length (elems s)" using elemi_agree_def list_all2_nthD table_init.hyps(3,4)
+      by fastforce
+    then have el_agree: "elem_agree s el" using store_typing_in_elem_agree[OF table_init(12)]
+      using table_init.hyps(4) by blast
     then have h_y: "fst el = (elem \<C> ! y)"
     proof -
       have "elemi_agree s (s.elems s) ((inst.elems (f_inst f))!y) (elem \<C>i!y)"
-        using table_init.prems(2) inst_typing.simps list_all2_nthD table_init.hyps(3) by fastforce
+        using table_init.prems(2) inst_typing.simps list_all2_nthD table_init.hyps(2) y3 y4 by fastforce
       then show ?thesis
-        using table_init.prems(2) inst_typing.simps list_all2_nthD table_init.hyps(3,4,5) table_init(16) elem_typing_def elemi_agree_def
+        using table_init.prems(2) inst_typing.simps list_all2_nthD table_init.hyps(3,4,5) table_init(15) elem_typing_def elemi_agree_def
         by fastforce
     qed
     have "nsrc < length (snd el)"
-      using table_init.hyps(11,9) by auto
+      using table_init.hyps(10,8) by auto
     then have h_ref: "ref_typing s val (fst el)"
-      by (metis el_agree elem_agree_def list_all_length table_init.hyps(12))
+      by (metis el_agree elem_agree_def list_all_length table_init.hyps(11))
     have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (dest))] : (ts _> ts@[T_num T_i32])"
       by (metis append.right_neutral const_num e_typing_l_typing.intros(1) e_weakening to_e_list_1 typeof_num_def v_num.case(1))
     moreover
@@ -2843,7 +2851,7 @@ next
     show ?thesis
       by (metis append.left_neutral append_Cons e_type_comp_conc)
   qed
-  have 6: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ndest + 1))), $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))), $EConstNum (ConstInt32 (int_of_nat n')), $Table_init x y] : (ts _> ts)"
+  have 6: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ndest + 1))), $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_init x y] : (ts _> ts)"
   proof -
     have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ndest + 1)))] : (ts _> ts@[T_num T_i32])"
       by (metis append.right_neutral const_num e_typing_l_typing.intros(1) e_weakening to_e_list_1 typeof_num_def v_num.case(1))
@@ -2852,7 +2860,7 @@ next
       using const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1) e_weakening
       by (metis append.left_neutral append_Cons)
     moreover
-    have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (n')))] : (ts@[T_num T_i32, T_num T_i32] _> ts@[T_num T_i32, T_num T_i32, T_num T_i32])"
+    have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (nn_pred)))] : (ts@[T_num T_i32, T_num T_i32] _> ts@[T_num T_i32, T_num T_i32, T_num T_i32])"
       using const_num e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) to_e_list_1 typeof_num_def v_num.case(1) e_weakening
       by (metis append.left_neutral append_Cons)
     moreover
@@ -4292,8 +4300,8 @@ next
     then show ?thesis
     proof(cases "load_tabs1 (tabs s) a (nat_of_int n)")
       case None
-      then show ?thesis using table_get_fail h1
-        using n_def v_to_e_def by fastforce
+      then show ?thesis
+        using n_def v_to_e_def reduce.table_get_fail[OF h1 None] by fastforce
     next
       case (Some val)
       then show ?thesis using reduce.table_get h1
@@ -4719,7 +4727,7 @@ next
     case True
     then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
         $Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
-      using reduce.table_init_trap[OF tab_defs _ el_defs n_defs True] table_init.hyps(2) table_init.prems(10)
+      using reduce.table_init_trap[OF tab_defs  el_defs n_defs True] table_init.hyps(2) table_init.prems(10)
       by metis
     then have "\<lparr>s;f;($C* vs) @ [$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
       using v_defs
@@ -4735,7 +4743,7 @@ next
       case 0
       then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
         $Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
-        using reduce.table_init_done[OF tab_defs _ el_defs n_defs h_bounds 0] table_init.hyps(2) table_init.prems(10)
+        using reduce.table_init_done[OF tab_defs  el_defs n_defs h_bounds 0] table_init.hyps(2) table_init.prems(10)
         by metis
       then have "\<lparr>s;f;($C* vs) @ [$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
         using v_defs
@@ -4750,8 +4758,8 @@ next
             y]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $C V_ref val, $Table_set x,
                          $EConstNum (ConstInt32 (int_of_nat (ndest + 1))), $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))),
                          $EConstNum (ConstInt32 (int_of_nat n')), $Table_init x y]\<rparr>"
-        using reduce.table_init[OF tab_defs _ el_defs n_defs h_bounds _ val_def] Suc
-        by (metis Suc_eq_plus1 table_init.hyps(2) table_init.prems(10))
+        using reduce.table_init[OF tab_defs el_defs n_defs h_bounds _ val_def] Suc
+        by (metis Suc_eq_plus1 table_init.hyps(1) table_init.prems(9))
       then have "\<lparr>s;f;($C* vs) @ [$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $C V_ref val, $Table_set x,
                          $EConstNum (ConstInt32 (int_of_nat (ndest + 1))), $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))),
                          $EConstNum (ConstInt32 (int_of_nat n')), $Table_init x y]\<rparr>"
@@ -5785,6 +5793,20 @@ proof -
     using assms converse_rtranclp_into_rtranclp
     unfolding reduce_trans_def
     by (metis (no_types, lifting))
+qed
+
+lemma reduce_irrtrans_app:
+  assumes "\<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s'';f'';es''\<rparr>"
+          "reduce_irrtrans (s'',f'',es'') (s',f',es')"
+  shows "reduce_irrtrans (s,f,es) (s',f',es')"
+proof -
+  have 1:"(\<lambda>(s,f,es) (s',f',es'). \<lparr>s;f;es\<rparr> \<leadsto> \<lparr>s';f';es'\<rparr>) (s,f,es) (s'',f'',es'')"
+    using assms
+    by auto
+  thus ?thesis
+    using assms
+    unfolding reduce_irrtrans_def
+    by (meson tranclp_into_tranclp2)
 qed
 
 lemma reduce_length_locals:

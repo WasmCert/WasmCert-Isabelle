@@ -3685,9 +3685,10 @@ proof -
 qed
 
 lemma store_tabs1_store_extension:
-    assumes "store_tabs1 (s.tabs s) a k vr = Some tabs'"
-            "store_typing s"
-            "ref_typing s vr (tab_reftype (tabs s!a))"
+  assumes "store_tabs1 (s.tabs s) a k vr = Some tabs'"
+          "a < length (s.tabs s)"
+          "store_typing s"
+          "ref_typing s vr (tab_reftype (tabs s!a))"
     shows
           "store_typing (s\<lparr>s.tabs := tabs'\<rparr>)"
           "store_extension s (s\<lparr>s.tabs := tabs'\<rparr>)"
@@ -3698,10 +3699,9 @@ proof -
     "Some tab' = (store_tab1 ((tabs s)!a) k vr)" 
     "tabs' = (take a (tabs s)) @ [tab'] @ (drop (a+1) (tabs s))"
       using assms(1) unfolding store_tabs1_def
-      apply (simp split: option.splits)
-      by (metis Suc_eq_plus1 append_Cons append_Nil handy_if_lemma)
+      by (simp split: option.splits)
     have 0: "tab_agree s (tabs s!a)"
-      by (metis assms(1) assms(2) option.simps(3) store_tabs1_def store_typing_in_tab_agree)
+      by (metis assms(1,2,3) option.simps(3) store_tabs1_def store_typing_in_tab_agree)
     have 1: "snd tab' = (snd (tabs s!a))[k := vr]"
       by (metis Suc_eq_plus1 append_Cons append_Nil option.inject option.simps(3) snd_conv store_tab1_def tab'_def(1) upd_conv_take_nth_drop)
     have 2: "fst tab' = fst (tabs s!a)"
@@ -3741,7 +3741,7 @@ proof -
       moreover have "ref_typing s vr tr"
       proof -
         have "tr = tab_reftype (tabs s!a)" using defs(1) tab_reftype_def by simp
-        then show ?thesis using assms(3) by simp
+        then show ?thesis using assms(4) by simp
       qed
       moreover have "list_all (\<lambda>vr. ref_typing s vr tr) elems'"
         by (metis calculation(1) calculation(2) defs_props(3) length_list_update list_all_length nth_list_update_eq nth_list_update_neq)
@@ -3752,6 +3752,7 @@ proof -
       have "tab_extension (?tab) tab'"
         by (simp add: "1" "2" case_prod_beta' tab_extension_def tab_max_def tab_subtyping_refl)
       then show "list_all2 tab_extension (tabs s) tabs'"
+        using assms(2)
         by (metis (no_types, opaque_lifting) Suc_eq_plus1 append_Cons append_Nil assms(1) list_all2_refl list_all2_update_cong list_update_id not_None_eq store_tabs1_def tab'_def(2) tab_extension_refl upd_conv_take_nth_drop)
     qed
     then have "store_extension s (s\<lparr>s.tabs := tabs'\<rparr>)"
@@ -3784,11 +3785,11 @@ proof -
       by (simp add: "2" case_prod_beta' tab_max_def)
     then have "tab_agree (s\<lparr>s.tabs := tabs'\<rparr>) tab'" using t1 tab_agree_update_store by auto
     then have "list_all (tab_agree (s\<lparr>s.tabs := tabs'\<rparr>)) tabs'"
-      by (metis (mono_tags, lifting) assms(2) atd_lem list.pred_inject(2) list_all_append list_all_length list_all_simps(2) s.select_convs(1) s.surjective s.update_convs(2) store_typing.cases tab'_def(2) tab_agree_update_store)
+      by (metis (mono_tags, lifting) assms(3) atd_lem list.pred_inject(2) list_all_append list_all_length list_all_simps(2) s.select_convs(1) s.surjective s.update_convs(2) store_typing.cases tab'_def(2) tab_agree_update_store)
     show "store_typing (s\<lparr>s.tabs := tabs'\<rparr>)"
          "store_extension s (s\<lparr>s.tabs := tabs'\<rparr>)"
-      using store_extension_tab_leq[OF assms(2) _ t3 t1 t4 t2, of a]
-      apply (metis Suc_eq_plus1 append.simps(1) append.simps(2) assms(1) option.simps(3) store_tabs1_def tab'_def(2) upd_conv_take_nth_drop)
+      using store_extension_tab_leq[OF assms(3) _ t3 t1 t4 t2, of a]
+      apply (metis Suc_eq_plus1 append.simps(1) append.simps(2) assms(2) tab'_def(2) upd_conv_take_nth_drop)
       by (simp add: \<open>store_extension s (s\<lparr>s.tabs := tabs'\<rparr>)\<close>)
 qed
 

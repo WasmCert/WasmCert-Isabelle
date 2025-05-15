@@ -639,6 +639,140 @@ next
   qed
 qed
 
+lemma app_s_f_v_s_table_set_is:
+  assumes "app_s_f_v_s_table_set x tabinsts f v_s = (tabinsts', v_s', res)"
+  shows "res = Step_normal \<and> ((tabs s = tabinsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Table_set x]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:=tabinsts'\<rparr>;f;(v_stack_to_es v_s')\<rparr>) \<or>
+         (\<exists>str. res = Res_trap str \<and> tabinsts = tabinsts' \<and> ((tabs s = tabinsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Table_set x]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@[Trap]\<rparr>)) \<or>
+         res = crash_invalid"
+  using progress_L0_left[OF reduce.table_set] progress_L0_left[OF reduce.table_set_fail] assms v_to_e_def
+  unfolding app_s_f_v_s_table_set_def
+  apply (simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits v_vec.splits)
+  by metis
+
+lemma app_s_f_v_s_table_get_is:
+  assumes "app_s_f_v_s_table_get x tabinsts f v_s = (v_s', res)"
+  shows "res = Step_normal \<and> ((tabs s = tabinsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Table_get x]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>) \<or>
+         (\<exists>str. res = Res_trap str \<and> ((tabs s = tabinsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Table_get x]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@[Trap]\<rparr>)) \<or>
+         res = crash_invalid"
+  using progress_L0_left[OF reduce.table_get] progress_L0_left[OF reduce.table_get_fail] assms
+  unfolding app_s_f_v_s_table_get_def v_to_e_def
+  by (auto  split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits v_vec.splits)
+
+lemma app_s_f_v_s_table_init_is:
+  assumes "app_s_f_v_s_table_init x y tabinsts eleminsts f v_s = (tabinsts', v_s', es, res)"
+  shows "res = Step_normal \<and> ((tabs s = tabinsts \<and> elems s = eleminsts) \<longrightarrow> reduce_trans (s,f,(v_stack_to_es v_s)@[$Table_init x y]) (s\<lparr>tabs:=tabinsts'\<rparr>,f,(v_stack_to_es v_s')@es) )  \<or>
+         (\<exists>str. res = Res_trap str \<and> tabinsts = tabinsts' \<and> ((tabs s = tabinsts \<and> elems s = eleminsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Table_init x y]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:=tabinsts'\<rparr>;f;(v_stack_to_es v_s')@es@[Trap]\<rparr>)) \<or>
+         res = crash_invalid"
+proof(cases "res = crash_invalid")
+  case True
+  then show ?thesis by simp
+next
+  case False
+  then have h_res: "res \<noteq> crash_invalid " by simp
+  then obtain i n src dest v_s'' where v_s''_def:
+    "f_inst f = i"
+    "v_s = (V_num (ConstInt32 n))#(V_num (ConstInt32 src))#(V_num (ConstInt32 dest))#v_s''"
+    using assms app_s_f_v_s_table_init_def by (auto split: list.splits v.splits v_num.splits)
+  then obtain ta ndest nsrc nn tab ea el where ta_is:
+    "(stab_ind (f_inst f) x) = Some ta"
+    "ndest = nat_of_int dest"
+    "nsrc = nat_of_int src"
+    "nn = nat_of_int n"
+    "tab = (tabinsts)!ta"
+    "ea = (inst.elems (f_inst f))!y"
+    "el = eleminsts!ea"
+    using assms False app_s_f_v_s_table_init_def by (auto split: option.splits list.splits v.splits v_num.splits)
+  then show ?thesis
+  proof(cases "(nsrc+nn > length (snd el) \<or> ndest+nn > length (snd tab))")
+    case True
+    then have "app_s_f_v_s_table_init x y tabinsts eleminsts f v_s = (tabinsts, v_s'', [], Res_trap (STR ''table_init''))"
+      using ta_is v_s''_def assms app_s_f_v_s_table_init_def[of x y tabinsts eleminsts f v_s]  False
+      by (auto simp add: False Let_def split:  if_splits v_num.splits option.splits )
+    then have "tabinsts = tabinsts'" "v_s'' = v_s'" "es = []" "res = Res_trap STR ''table_init''"
+      using assms by auto
+    moreover have "((tabs s = tabinsts \<and> elems s = eleminsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Table_init x y]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:=tabinsts'\<rparr>;f;(v_stack_to_es v_s')@es@[Trap]\<rparr>)"
+      using calculation v_s''_def progress_L0_left[OF reduce.table_init_trap[OF ta_is(1)], of s tab y ea el ndest dest nsrc src nn n] ta_is
+      apply (auto simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits v_vec.splits)
+      by (metis True progress_L0_left table_init_trap v.simps(10) v_to_e_def)
+    ultimately show ?thesis by auto
+
+  next
+    case False
+    then show ?thesis
+    proof(cases nn)
+      case 0
+      then have h_n: "nsrc \<le> length (snd el)" "ndest \<le> tab_size tab"
+        using False by simp_all
+      then have "app_s_f_v_s_table_init x y tabinsts eleminsts f v_s = (tabinsts, v_s'', [], Step_normal)"
+        using ta_is v_s''_def assms app_s_f_v_s_table_init_def[of x y tabinsts eleminsts f v_s]  False 0
+        by (auto simp add: False Let_def split:  if_splits v_num.splits option.splits)
+      then have "tabinsts = tabinsts'" "v_s'' = v_s'" "es = []" "res = Step_normal"
+        using assms by auto
+      moreover have "((tabs s = tabinsts \<and> elems s = eleminsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Table_init x y]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:=tabinsts'\<rparr>;f;(v_stack_to_es v_s')@es\<rparr>)"
+        using calculation v_s''_def progress_L0_left[OF reduce.table_init_done[OF ta_is(1)], of s tab y ea el ndest dest nsrc src nn n] ta_is 0 h_n
+        apply (auto simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits v_vec.splits)
+        using v_to_e_def
+        by (metis add.right_neutral append.right_neutral progress_L0_left table_init_done v.simps(10))
+      ultimately show ?thesis
+        by (metis (no_types, lifting) reduce_trans_app_end reduce_trans_def rtranclp.rtrancl_refl)
+    next
+      case (Suc nn_pred)
+      then have h_n: "nsrc < length (snd el)" "ndest < tab_size tab" "nsrc \<le> length (snd el)" "ndest \<le> tab_size tab"
+        using False by simp_all
+      obtain val where val_is: "val = (snd el)!nsrc"
+        by fastforce
+      obtain tabinsts'' where tabinsts''_is:
+        "store_tabs1 tabinsts ta (nat_of_int dest) val = Some tabinsts''"
+        using h_n
+        by (simp add: store_tab1_def store_tabs1_def ta_is(2) ta_is(5))
+      then have tabinsts''_prop1:
+        "(tabinsts'', v_s'', Step_normal) = app_s_f_v_s_table_set x tabinsts f ((V_ref val)#(V_num (ConstInt32 dest))#v_s'')"
+        
+        using app_s_f_v_s_table_set_def ta_is(1) by (auto split: prod.splits list.splits v.splits v_num.splits)
+      then have tabinsts''_prop2: "app_s_f_v_s_table_init x y tabinsts eleminsts f v_s = (tabinsts'', (V_num (ConstInt32 (int_of_nat nn_pred)))#(V_num (ConstInt32 (int_of_nat (nsrc+1))))#(V_num (ConstInt32 (int_of_nat (ndest+1))))#v_s'', [$Table_init x y], Step_normal)"
+        using ta_is v_s''_def assms app_s_f_v_s_table_init_def[of x y tabinsts eleminsts f v_s]  False h_n Suc
+        apply (auto simp add: False Let_def split: nat.splits if_splits v_num.splits option.splits )
+        using val_is
+        by (metis (no_types, lifting) old.prod.case)
+      let ?c_table_set = "[$EConstNum (ConstInt32 dest), $C V_ref val, $Table_set x]"
+      let ?c_table_init2 = "[$EConstNum (ConstInt32 (int_of_nat (ndest + 1))), $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))),
+                       $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_init x y]"
+     have a:
+        "tabinsts' = tabinsts''"
+        "v_s' = (V_num (ConstInt32 (int_of_nat nn_pred)))#(V_num (ConstInt32 (int_of_nat (nsrc+1))))#(V_num (ConstInt32 (int_of_nat (ndest+1))))#v_s''"
+        "es = [$Table_init x y]"
+        "res = Step_normal"
+        using assms tabinsts''_prop2 by fastforce+
+      moreover have
+        "(s.tabs s = tabinsts \<and> s.elems s = eleminsts \<longrightarrow> \<lparr>s;f;v_stack_to_es v_s @ [$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;v_stack_to_es v_s'' @ ?c_table_set @ ?c_table_init2\<rparr>)"
+        using progress_L0_left[OF reduce.table_init[OF ta_is(1)], of s tab ea y el ndest dest nsrc src nn n nn_pred val] 
+        ta_is val_is v_s''_def h_n False local.Suc v_to_e_def by force
+      moreover have
+        "(s.tabs s = tabinsts \<longrightarrow> \<lparr>s;f;v_stack_to_es v_s'' @  ?c_table_set\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:=tabinsts''\<rparr>;f;v_stack_to_es v_s''\<rparr>)"
+        using progress_L0_left[OF reduce.table_set[OF ta_is(1)], of s dest val tabinsts''] tabinsts''_is v_to_e_def calculation(2)
+        by auto
+      moreover have
+        "(s.tabs s = tabinsts \<and> s.elems s = eleminsts \<longrightarrow> \<lparr>s;f;v_stack_to_es v_s'' @ ?c_table_set @ ?c_table_init2\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:=tabinsts''\<rparr>;f;v_stack_to_es v_s'' @ ?c_table_init2\<rparr>)"
+        using progress_L0[of s f "v_stack_to_es v_s'' @  ?c_table_set"  "s\<lparr>tabs:=tabinsts''\<rparr>" f "v_stack_to_es v_s''" "[]" ?c_table_init2]
+        calculation
+        by simp
+      moreover have "(s.tabs s = tabinsts \<and> s.elems s = eleminsts \<longrightarrow> reduce_trans (s,f,v_stack_to_es v_s @ [$Table_init x y]) (s\<lparr>tabs:=tabinsts''\<rparr>,f,v_stack_to_es v_s'' @?c_table_init2))"
+        using calculation(5,7) v_s''_def(2)
+         by (metis (no_types, lifting) reduce_trans_app_end reduce_trans_def rtranclp.rtrancl_refl)
+      then show ?thesis
+        using a v_s''_def v_to_e_def
+        by auto
+    qed
+  qed
+qed
+
+(*
+  \<comment> \<open>\<open>table set\<close>\<close>
+| table_set: "\<lbrakk>stab_ind (f_inst f) ti = Some a; store_tabs1 (tabs s) a (nat_of_int n) vr = Some tabs'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(EConstNum (ConstInt32 n)), Ref vr, $(Table_set ti)]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:= tabs'\<rparr>;f;[]\<rparr>"
+  \<comment> \<open>\<open>table set fail\<close>\<close>
+| table_set_fail: "\<lbrakk>(stab_ind (f_inst f) ti = None) \<or> (stab_ind (f_inst f) ti = Some a \<and> store_tabs1 (tabs s) a (nat_of_int n) vr = None)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(EConstNum (ConstInt32 n)), Ref vr, $(Table_set ti)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+*)
+
 (*
 lemma app_s_f_init_mem_is:
   assumes "app_s_f_init_mem off bs ms f = (ms', res)"
@@ -1179,6 +1313,11 @@ lemma run_step_b_e_sound:
             es_frame_contexts_to_config ([$b_e]) fc fcs = (f,esfc) \<and>
             es_frame_contexts_to_config [] fc' fcs' = (f',esfc') \<and>
             \<lparr>s;f;esfc\<rparr> \<leadsto> \<lparr>s';f';esfc'\<rparr>) \<or>
+         (\<exists>f esfc f' esfc'.
+            res = Step_normal \<and>
+            es_frame_contexts_to_config ([$b_e]) fc fcs = (f,esfc) \<and>
+            es_frame_contexts_to_config [] fc' fcs' = (f',esfc') \<and>
+            \<lparr>s;f;esfc\<rparr> \<leadsto> \<lparr>s';f';esfc'\<rparr>) \<or>
          (\<exists>str f esfc f' esfc'.
             res = Res_trap str \<and>
             es_frame_contexts_to_config ([$b_e]) fc fcs = (f,esfc) \<and>
@@ -1672,10 +1811,66 @@ proof -
     qed auto
   next
     case (Table_get x19)
-    then show ?thesis sorry
+    then obtain v_s' where v_s'_is:
+      "fcs' = fcs"
+      "fc' = (update_fc_step fc v_s' [])"
+      "app_s_f_v_s_table_get x19 (tabs s) f  v_s = (v_s', res)"
+      "s' = s"
+      using Cons assms fc_is
+      by (fastforce split: prod.splits)
+    consider
+      (a) "res = Step_normal" "(\<lparr>s;f;(v_stack_to_es v_s)@[$Table_get x19]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+    | (b) "(\<exists>str. res = Res_trap str \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Table_get x19]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@[Trap]\<rparr>))"
+    | (c) "res = crash_invalid"
+      using app_s_f_v_s_table_get_is[OF v_s'_is(3), of s] by blast
+    thus ?thesis
+    proof(cases)
+      case a
+      then show ?thesis using es_frame_contexts_to_config_ctx2[OF a(2)] v_s'_is fc_is Table_get 0
+        by fastforce
+    next
+      case b
+      then show ?thesis
+        by (metis "0" Table_get es_frame_contexts_to_config_trap_ctx fc_is(1) fc_is(2) update_fc_step.simps v_s'_is(1) v_s'_is(2) v_s'_is(4))
+    next
+      case c
+      then show ?thesis
+        by simp
+    qed
   next
     case (Table_set x20)
-    then show ?thesis sorry
+    obtain tabinsts' v_s' x where tabinsts'_is:
+      "fcs' = fcs"
+      "fc' = (update_fc_step fc v_s' [])"
+      "app_s_f_v_s_table_set x (tabs s) f  v_s = (tabinsts', v_s', res)"
+      "s' = s\<lparr>tabs:=tabinsts'\<rparr>"
+      using Table_set Cons assms fc_is
+      by (fastforce split: prod.splits)
+    consider
+      (a) "res = Step_normal"
+          "(\<lparr>s;f;(v_stack_to_es v_s)@[$Table_set x20]\<rparr> \<leadsto> \<lparr>s';f;(v_stack_to_es v_s')\<rparr>)"
+    | (b) str where 
+          "res = Res_trap str"
+          "\<lparr>s;f;(v_stack_to_es v_s)@[$Table_set x20]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@[Trap]\<rparr>"
+    | (c) "res = crash_invalid"
+      using app_s_f_v_s_table_set_is[OF tabinsts'_is(3), of s] assms Table_set tabinsts'_is fc_is
+      using app_s_f_v_s_table_set_is by (fastforce split: prod.splits)
+    thus ?thesis
+    proof(cases)
+      case a
+      then show ?thesis
+        by (metis "0" Table_set es_frame_contexts_to_config_ctx2 fc_is(1) fc_is(2) tabinsts'_is(1) tabinsts'_is(2) update_fc_step.simps)
+    next
+      case b
+      then have "s = s'"
+        using tabinsts'_is app_s_f_v_s_table_set_is
+        by fastforce
+      then show ?thesis
+        by (metis "0" Table_set b(1) b(2) es_frame_contexts_to_config_trap_ctx fc_is(1) fc_is(2) tabinsts'_is(1) tabinsts'_is(2) update_fc_step.simps)
+    next
+      case c
+      then show ?thesis by simp
+    qed   
   next
     case (Table_size x21)
     then show ?thesis sorry
@@ -1879,31 +2074,30 @@ proof -
         using es_frame_contexts_to_config_ctx2[OF a(6)] Grow_memory fc_is 0
         by simp blast
     qed auto
-    next
-      case (Memory_init x30)
-      then show ?thesis sorry
-    next
-      case Memory_fill
-      then show ?thesis sorry
-    next
-      case Memory_copy
-      then show ?thesis sorry
-    next
-      case (Table_init x331 x332)
-      then show ?thesis sorry
-    next
-      case (Table_copy x341 x342)
-      then show ?thesis sorry
-    next
-      case (Table_fill x35)
-      then show ?thesis sorry
-    next
-      case (Elem_drop x36)
-      then show ?thesis sorry
-    next
-      case (Data_drop x37)
+  next
+    case (Memory_init x30)
     then show ?thesis sorry
   next
+    case Memory_fill
+    then show ?thesis sorry
+  next
+    case Memory_copy
+    then show ?thesis sorry
+  next
+    case (Table_init x331 x332)
+    then show ?thesis sorry
+  next
+    case (Table_copy x341 x342)
+    then show ?thesis sorry
+  next
+    case (Table_fill x35)
+    then show ?thesis sorry
+  next
+    case (Elem_drop x36)
+    then show ?thesis sorry
+  next
+    case (Data_drop x37)
+  then show ?thesis sorry
   next
     case (EConstNum n)
     thus ?thesis
@@ -1911,7 +2105,9 @@ proof -
       by fastforce
   next
     case (EConstVec x39)
-    then show ?thesis sorry
+    thus ?thesis
+      using assms fc_is
+      by fastforce
   next
     case (Unop t op)
     consider
@@ -2328,24 +2524,10 @@ proof -
             by simp blast
         qed
       qed
-    qed
-  next
-
-    case Trap
-    then show ?thesis
-      using assms apply (simp split: e.splits frame_context.splits)
-     sorry
-  next
-    case (Label x41 x42 x43)
-    then show ?thesis sorry
-  next
-    case (Frame x51 x52 x53)
-    then show ?thesis sorry
-  next
-    case (Ref x6)
-    then show ?thesis sorry
-  qed
+    qed  
+   qed auto
 qed
+
 
 theorem run_iter_sound:
   assumes "run_iter fuel (Config d s fc fcs) = ((Config d' s' fc' fcs'), res)"

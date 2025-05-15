@@ -357,6 +357,73 @@ definition app_s_f_init_mem :: "nat \<Rightarrow> byte list \<Rightarrow> mem li
                         (ms, Res_trap (STR ''init_mem''))
       | None => (ms, crash_invalid)))"
 
+definition app_s_f_v_s_table_set :: "i \<Rightarrow> tabinst list  \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (tabinst list \<times> v_stack \<times> res_step)" where
+  "app_s_f_v_s_table_set x tabinsts f v_s = 
+    (let i = (f_inst f) in
+      case v_s of
+        (V_ref v_r)#(V_num (ConstInt32 c))#v_s' \<Rightarrow>
+          (case stab_ind i x of
+            Some a => expect (store_tabs1 tabinsts a (nat_of_int c) v_r)
+                              (\<lambda>tabinsts'. (tabinsts', v_s', Step_normal))
+                              (tabinsts, v_s', Res_trap (STR ''table_set''))
+          | None => (tabinsts, v_s, crash_invalid))
+      | _ \<Rightarrow> (tabinsts, v_s, crash_invalid))"
+
+definition app_s_f_v_s_table_get :: "i \<Rightarrow> tabinst list  \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_s_f_v_s_table_get x tabinsts f v_s =
+    (let i = f_inst f in
+      case v_s of
+        V_num (ConstInt32 c)#v_s' \<Rightarrow>
+        (case stab_ind i x of
+          Some a \<Rightarrow>
+            expect (load_tabs1 tabinsts a (nat_of_int c))
+              (\<lambda> val. ((V_ref val)#v_s', Step_normal))
+              (v_s', Res_trap (STR ''table_get''))
+        | None \<Rightarrow> (v_s, crash_invalid))
+      | _ \<Rightarrow> (v_s, crash_invalid))"
+
+(*
+  \<comment> \<open>\<open>table init\<close>\<close>
+| table_init_trap: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; y < length (inst.elems (f_inst f));  ea = (inst.elems (f_inst f))!y; el = (elems s)!ea; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc+nn > length (snd el) \<or> ndest+nn > length (snd tab)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| table_init_done: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; y < length (inst.elems (f_inst f)); ea = (inst.elems (f_inst f))!y; el = (elems s)!ea; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc + nn \<le> length (snd el); ndest + nn  \<le> length (snd tab); nn = 0\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+| table_init: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; y < length (inst.elems (f_inst f)); ea = (inst.elems (f_inst f))!y; el = (elems s)!ea; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc + nn \<le> length (snd el); ndest + nn  \<le> length (snd tab); nn = nn_pred+1; val = (snd el)!nsrc\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $C (V_ref val), $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_init x y]\<rparr>"
+*)
+
+definition app_s_f_v_s_table_init :: "i \<Rightarrow> i \<Rightarrow> tabinst list \<Rightarrow> eleminst list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (tabinst list \<times> v_stack \<times> e list \<times> res_step)" where
+  "app_s_f_v_s_table_init x y tabinsts eleminsts f v_s =
+    (let i = f_inst f in
+      case v_s of
+        (V_num (ConstInt32 n))#(V_num (ConstInt32 src))#(V_num (ConstInt32 dest))#v_s' \<Rightarrow> 
+          (case (stab_ind (f_inst f) x) of
+            Some ta \<Rightarrow>
+            let
+              ndest = nat_of_int dest;
+              nsrc = nat_of_int src;
+              nn = nat_of_int n;
+              tab = (tabinsts)!ta;
+              ea = (inst.elems (f_inst f))!y;
+              el = eleminsts!ea
+              in
+                if (nsrc+nn > length (snd el) \<or> ndest+nn > length (snd tab)) then
+                  (tabinsts, v_s', [], Res_trap (STR ''table_init''))
+                else
+                  (case nn of
+                    0 \<Rightarrow> (tabinsts, v_s', [], Step_normal)
+                  | Suc nn_pred \<Rightarrow>
+                    let val = (snd el)!nsrc in
+                    let (tabinsts', v_s', res') = app_s_f_v_s_table_set x tabinsts f ((V_ref val)#(V_num (ConstInt32 dest))#v_s') in
+                     (tabinsts', 
+                     (V_num (ConstInt32 (int_of_nat nn_pred)))#
+                       (V_num (ConstInt32 (int_of_nat (nsrc+1))))#
+                       (V_num (ConstInt32 (int_of_nat (ndest+1))))#v_s',
+                     [$Table_init x y],
+                     Step_normal))
+          | None \<Rightarrow> (tabinsts, v_s, [], crash_invalid))
+      |  _ \<Rightarrow>
+    (tabinsts, v_s, [], crash_invalid))"
+
+
+
 (*
 definition app_s_f_init_tab :: "nat \<Rightarrow> i list \<Rightarrow> tabinst list \<Rightarrow> f \<Rightarrow> (tabinst list \<times> res_step)" where
   "app_s_f_init_tab off icls ts f = 
@@ -437,6 +504,15 @@ fun split_v_s_b_s_aux :: "v_stack \<Rightarrow> b_e list \<Rightarrow> v_stack \
 *)
 fun split_v_s_b_s :: "b_e list \<Rightarrow> v_stack \<times> b_e list" where
   "split_v_s_b_s es = split_v_s_b_s_aux [] es"
+
+fun split_v_s_es_aux :: "v_stack \<Rightarrow> e list \<Rightarrow> v_stack \<times> e list" where
+  "split_v_s_es_aux v_s (($EConstNum n)#es) = split_v_s_es_aux ((V_num n)#v_s) es"
+| "split_v_s_es_aux v_s (($EConstVec v)#es) = split_v_s_es_aux ((V_vec v)#v_s) es"
+| "split_v_s_es_aux v_s ((Ref r)#es) = split_v_s_es_aux ((V_ref r)#v_s) es"
+| "split_v_s_es_aux v_s es = (v_s, es)"
+
+fun split_v_s_es :: "e list \<Rightarrow> v_stack \<times> e list" where
+  "split_v_s_es es = split_v_s_es_aux [] es"
 
 fun split_n :: "v list \<Rightarrow> nat \<Rightarrow> v list \<times> v list" where
   "split_n [] n = ([], [])"
@@ -774,61 +850,68 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
         let (ms', v_s', res) = (app_s_f_v_s_mem_grow (mems s) f v_s) in
         (Config d (s\<lparr>mems:=ms'\<rparr>) (update_fc_step fc v_s' []) fcs, res)
 
+    | (Table_set x) \<Rightarrow>
+      let (tabinsts', v_s', res) = (app_s_f_v_s_table_set x (tabs s) f v_s) in
+      ((Config d (s\<lparr>tabs:=tabinsts'\<rparr>)) (update_fc_step fc v_s' []) fcs, res)
+
+    | (Table_get x) \<Rightarrow>
+      let (v_s', res) = (app_s_f_v_s_table_get x (tabs s) f v_s) in
+      ((Config d s) (update_fc_step fc v_s' []) fcs, res)
+
+    | (Table_init x y) \<Rightarrow>
+      let (tabinsts', v_s', es, res) = (app_s_f_v_s_table_init x y (tabs s) (elems s) f v_s) in
+      ((Config d s) (update_fc_step fc v_s' es) fcs, res)
+
     | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))"
 
 fun run_step_e :: "e \<Rightarrow> config \<Rightarrow> res_step_tuple" where
   "run_step_e e (Config d s fc fcs) =
     (case fc of Frame_context (Redex v_s es b_es) lcs nf f \<Rightarrow>
-    (case e of
-       Basic b_e \<Rightarrow> run_step_b_e b_e (Config d s fc fcs)
-     | Invoke i_cl \<Rightarrow>
-         (case (funcs s!i_cl) of
-             Func_native i' (t1s _> t2s) ts es_f \<Rightarrow>
-               (case n_zeros ts of
-                 None \<Rightarrow> (Config d s fc fcs, crash_invalid)
-               | Some zs \<Rightarrow>
-                 (case d of
-                   Suc d' \<Rightarrow>
-                     (let n = length t1s in
-                      let m = length t2s in
-                      if (length v_s \<ge> n) then
-                        let (v_fs, v_s') = split_n v_s n in
-                        let fc' = Frame_context (Redex v_s' es b_es) lcs nf f in
-                        let ff = \<lparr> f_locs = ((rev v_fs)@zs), f_inst = i'\<rparr> in
-                        let lc = Label_context [] [] m [] in 
-                        let fcf = Frame_context (Redex [] [] es_f) [lc] m ff in
-                        (Config d' s fcf (fc'#fcs), Step_normal)
-                      else
-                        (Config d s fc fcs, crash_invalid))
-               | 0 \<Rightarrow> (Config d s fc fcs, crash_exhaustion)))
-           | Func_host (t1s _> t2s) h \<Rightarrow>
-               let n = length t1s in
-               let m = length t2s in
-               if length v_s \<ge> n
-                 then
-                   let (v_fs, v_s') = split_n v_s n in
-                   case host_apply_impl s (t1s _> t2s) h (rev v_fs) of
-                     Some (s',rvs) \<Rightarrow> 
-                       if list_all2 (\<lambda>t v. typeof v = t) t2s rvs
-                         then
-                           let fc' = Frame_context (Redex ((rev rvs)@v_s') es b_es) lcs nf f in
-                           (Config d s' fc' fcs, Step_normal)
-                         else
-                           (Config d s' fc fcs, crash_invalid)
-                   | None \<Rightarrow> (Config d s (Frame_context (Redex v_s' es b_es) lcs nf f) fcs, Res_trap (STR ''host_apply''))
-                 else
+      (case e of
+        Basic b_e \<Rightarrow> run_step_b_e b_e (Config d s fc fcs)
+      | Invoke i_cl \<Rightarrow>
+        (case (funcs s!i_cl) of
+          Func_native i' (t1s _> t2s) ts es_f \<Rightarrow>
+            (case n_zeros ts of
+              None \<Rightarrow> (Config d s fc fcs, crash_invalid)
+            | Some zs \<Rightarrow>
+              (case d of
+                Suc d' \<Rightarrow>
+                 (let n = length t1s in
+                  let m = length t2s in
+                  if (length v_s \<ge> n) then
+                    let (v_fs, v_s') = split_n v_s n in
+                    let fc' = Frame_context (Redex v_s' es b_es) lcs nf f in
+                    let ff = \<lparr> f_locs = ((rev v_fs)@zs), f_inst = i'\<rparr> in
+                    let lc = Label_context [] [] m [] in 
+                    let fcf = Frame_context (Redex [] [] es_f) [lc] m ff in
+                    (Config d' s fcf (fc'#fcs), Step_normal)
+                  else
                     (Config d s fc fcs, crash_invalid))
-            | Ref vr \<Rightarrow> (Config d s fc fcs, crash_invalid)
-            | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))
-" (* TODO: fix this *)
- (*    | Init_mem n bs \<Rightarrow>
-        let (ms', res) = (app_s_f_init_mem n bs (mems s) f) in
-        (Config d (s\<lparr>mems:=ms'\<rparr>) fc fcs, res)
-     | Init_tab n icls \<Rightarrow>
-        let (ts', res) = (app_s_f_init_tab n icls (tabs s) f) in
-        (Config d (s\<lparr>tabs:=ts'\<rparr>) fc fcs, res)
-     | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))" *)
+             | 0 \<Rightarrow> (Config d s fc fcs, crash_exhaustion)))
+           | Func_host (t1s _> t2s) h \<Rightarrow>
+             let n = length t1s in
+             let m = length t2s in
+             if length v_s \<ge> n
+               then
+                 let (v_fs, v_s') = split_n v_s n in
+                 case host_apply_impl s (t1s _> t2s) h (rev v_fs) of
+                   Some (s',rvs) \<Rightarrow> 
+                     if list_all2 (\<lambda>t v. typeof v = t) t2s rvs
+                       then
+                         let fc' = Frame_context (Redex ((rev rvs)@v_s') es b_es) lcs nf f in
+                         (Config d s' fc' fcs, Step_normal)
+                       else
+                         (Config d s' fc fcs, crash_invalid)
+                 | None \<Rightarrow> (Config d s (Frame_context (Redex v_s' es b_es) lcs nf f) fcs, Res_trap (STR ''host_apply''))
+               else
+                  (Config d s fc fcs, crash_invalid))
+            | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))"
+         (* | Ref v_r \<Rightarrow>
+              let fc' = Frame_context (Redex (V_ref v_r#v_s) es b_es) lcs nf f in
+              (Config d s fc' fcs, Step_normal) *)
 (* should never produce Label, Frame, or Trap *)
+(* should never produce Ref as well, as produced references are pushed to stack *)
 
 function(sequential) run_iter :: "fuel \<Rightarrow> config \<Rightarrow> res_tuple" where
   "run_iter (Suc n) cfg =

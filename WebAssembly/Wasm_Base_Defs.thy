@@ -254,17 +254,15 @@ definition store_tab1 :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref \<Righta
 
 definition load_tabs1 :: "tabinst list \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> v_ref option" where
   "load_tabs1 tables ti n = 
-    (if (ti < length tables \<and> n < tab_size (tables!ti))
+    (if (n < tab_size (tables!ti))
      then Some ((snd ((tables!ti)))!n)
      else None)"
 
 definition store_tabs1 :: "tabinst list \<Rightarrow> i \<Rightarrow> nat \<Rightarrow> v_ref \<Rightarrow> (tabinst list) option" where
   "store_tabs1 tables ti n vr = 
-    (if (ti < length tables)
-     then (case (store_tab1 (tables!ti) n vr) of
+    (case (store_tab1 (tables!ti) n vr) of
         Some tab' \<Rightarrow> Some ((take ti tables) @ [tab'] @ (drop (ti+1) tables))
-      | None \<Rightarrow> None)
-     else None)"
+      | None \<Rightarrow> None)"
 
 definition grow_tab :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref \<Rightarrow> tabinst option" where
   "grow_tab t n vr = (let len = (tab_size t) + n;
