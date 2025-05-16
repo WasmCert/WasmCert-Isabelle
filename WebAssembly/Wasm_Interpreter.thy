@@ -389,8 +389,8 @@ definition app_s_f_v_s_table_get :: "i \<Rightarrow> tabinst list  \<Rightarrow>
 | table_init: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; y < length (inst.elems (f_inst f)); ea = (inst.elems (f_inst f))!y; el = (elems s)!ea; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc + nn \<le> length (snd el); ndest + nn  \<le> length (snd tab); nn = nn_pred+1; val = (snd el)!nsrc\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $C (V_ref val), $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_init x y]\<rparr>"
 *)
 
-definition app_s_f_v_s_table_init :: "i \<Rightarrow> i \<Rightarrow> tabinst list \<Rightarrow> eleminst list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (tabinst list \<times> v_stack \<times> e list \<times> res_step)" where
-  "app_s_f_v_s_table_init x y tabinsts eleminsts f v_s =
+definition app_s_f_v_s_table_init_old :: "i \<Rightarrow> i \<Rightarrow> tabinst list \<Rightarrow> eleminst list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (tabinst list \<times> v_stack \<times> e list \<times> res_step)" where
+  "app_s_f_v_s_table_init_old x y tabinsts eleminsts f v_s =
     (let i = f_inst f in
       case v_s of
         (V_num (ConstInt32 n))#(V_num (ConstInt32 src))#(V_num (ConstInt32 dest))#v_s' \<Rightarrow> 
@@ -423,6 +423,33 @@ definition app_s_f_v_s_table_init :: "i \<Rightarrow> i \<Rightarrow> tabinst li
     (tabinsts, v_s, [], crash_invalid))"
 
 
+definition app_s_f_v_s_table_init :: "i \<Rightarrow> i \<Rightarrow> tabinst list \<Rightarrow> eleminst list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
+  "app_s_f_v_s_table_init x y tabinsts eleminsts f v_s =
+    (let i = f_inst f in
+      case v_s of
+        (V_num (ConstInt32 n))#(V_num (ConstInt32 src))#(V_num (ConstInt32 dest))#v_s' \<Rightarrow> 
+          (case (stab_ind (f_inst f) x) of
+            Some ta \<Rightarrow>
+            let
+              ndest = nat_of_int dest;
+              nsrc = nat_of_int src;
+              nn = nat_of_int n;
+              tab = (tabinsts)!ta;
+              ea = (inst.elems (f_inst f))!y;
+              el = eleminsts!ea
+              in
+                if (nsrc+nn > length (snd el) \<or> ndest+nn > length (snd tab)) then
+                  (v_s', [], Res_trap (STR ''table_init''))
+                else
+                  (case nn of
+                    0 \<Rightarrow> (v_s', [], Step_normal)
+                  | Suc nn_pred \<Rightarrow>
+                    let val = (snd el)!nsrc in
+                     (v_s', [$EConstNum (ConstInt32 dest), $C (V_ref val), $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_init x y],
+                     Step_normal))
+          | None \<Rightarrow> (v_s, [], crash_invalid))
+      |  _ \<Rightarrow>
+    (v_s, [], crash_invalid))"
 
 (*
 definition app_s_f_init_tab :: "nat \<Rightarrow> i list \<Rightarrow> tabinst list \<Rightarrow> f \<Rightarrow> (tabinst list \<times> res_step)" where
@@ -859,7 +886,7 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
       ((Config d s) (update_fc_step fc v_s' []) fcs, res)
 
     | (Table_init x y) \<Rightarrow>
-      let (tabinsts', v_s', es, res) = (app_s_f_v_s_table_init x y (tabs s) (elems s) f v_s) in
+      let (v_s', es, res) = (app_s_f_v_s_table_init x y (tabs s) (elems s) f v_s) in
       ((Config d s) (update_fc_step fc v_s' es) fcs, res)
 
     | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))"
@@ -916,9 +943,11 @@ fun run_step_e :: "e \<Rightarrow> config \<Rightarrow> res_step_tuple" where
 function(sequential) run_iter :: "fuel \<Rightarrow> config \<Rightarrow> res_tuple" where
   "run_iter (Suc n) cfg =
      (case cfg of
-        (Config d s (Frame_context (Redex v_s es b_es) lcs nf f) fcs) \<Rightarrow>
-     (case es of
-        [] \<Rightarrow> (case b_es of
+        (Config d s (Frame_context (Redex v_s'' es b_es) lcs nf f) fcs) \<Rightarrow>
+     (case split_v_s_es es of
+        (v_s''', []) \<Rightarrow>
+          let v_s = v_s'''@v_s'' in
+             (case b_es of
                  [] \<Rightarrow> (case lcs of
                           [] \<Rightarrow> (case fcs of
 \<comment> \<open> stack values in the outermost frame \<close>
@@ -937,7 +966,8 @@ function(sequential) run_iter :: "fuel \<Rightarrow> config \<Rightarrow> res_tu
                                                  | Res_trap str \<Rightarrow> (cfg', RTrap str)
                                                  | Res_crash str \<Rightarrow> (cfg', RCrash str)))))
 \<comment> \<open> run a step of the intermediate reduct \<close>
-      | e#es' \<Rightarrow> (let (cfg', res) = run_step_e e (Config d s (Frame_context (Redex v_s es' b_es) lcs nf f) fcs) in
+      | (v_s''', e#es') \<Rightarrow> let v_s = v_s'''@v_s'' in
+          (let (cfg', res) = run_step_e e (Config d s (Frame_context (Redex v_s es' b_es) lcs nf f) fcs) in
                       (case res of
                          Step_normal \<Rightarrow> run_iter n cfg'
                        | Res_trap str \<Rightarrow> (cfg', RTrap str)
