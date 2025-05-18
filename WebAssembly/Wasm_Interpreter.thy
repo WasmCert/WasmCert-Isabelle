@@ -457,16 +457,24 @@ definition app_s_f_v_s_table_copy :: "i \<Rightarrow> i \<Rightarrow> tabinst li
         | (_, _) \<Rightarrow> (v_s, [], crash_invalid))
     |  _ \<Rightarrow> (v_s, [], crash_invalid))"
 
-(*
-definition app_s_f_init_tab :: "nat \<Rightarrow> i list \<Rightarrow> tabinst list \<Rightarrow> f \<Rightarrow> (tabinst list \<times> res_step)" where
-  "app_s_f_init_tab off icls ts f = 
-     (let i = (f_inst f) in
-     (case stab_ind i of
-        Some j => expect (store_tab (ts!j) off icls)
-                        (\<lambda>t'. ((ts[j := t']), Step_normal))
-                        (ts, Res_trap (STR ''init_tab''))
-      | None => (ts, crash_invalid)))"
-*)
+definition app_s_f_v_s_table_size :: "i \<Rightarrow> tabinst list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_s_f_v_s_table_size x tabinsts f v_s = 
+          (case stab_ind (f_inst f) x of
+             Some a => (((V_num (ConstInt32 (int_of_nat (tab_size (tabinsts!a)))))#v_s), Step_normal)
+           | None => (v_s, crash_invalid))"
+
+definition app_s_f_v_s_table_grow :: "i \<Rightarrow> tabinst list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (tabinst list \<times> v_stack \<times> res_step)" where
+  "app_s_f_v_s_table_grow ti tabinsts f v_s = 
+          (case v_s of
+             (V_num (ConstInt32 n))#(V_ref vr)#v_s' \<Rightarrow>
+               (case stab_ind (f_inst f) ti of
+                  Some a => let tab = tabinsts!a; sz = tab_size tab in
+                    expect (grow_tab tab (nat_of_int n) vr)
+                    (\<lambda>tab'. ((tabinsts[a := tab']), (V_num (ConstInt32 (int_of_nat sz)))#v_s', Step_normal))
+                    (tabinsts, (V_num (ConstInt32 int32_minus_one))#v_s', Step_normal)
+
+                | None => (tabinsts, v_s, crash_invalid))
+           | _ \<Rightarrow> (tabinsts, v_s, crash_invalid))"
 
 (* 0: local value stack, 1: current redex, 2: tail of redex *)
 datatype redex = Redex v_stack "e list" "b_e list"
@@ -902,6 +910,14 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
     | (Table_fill x) \<Rightarrow>
       let (v_s', es, res) = (app_s_f_v_s_table_fill x (tabs s) f v_s) in
       ((Config d s) (update_fc_step fc v_s' es) fcs, res)
+
+    | (Table_grow x) \<Rightarrow>
+      let (tabinsts', v_s', res) = (app_s_f_v_s_table_grow x (tabs s) f v_s) in
+      ((Config d (s\<lparr>tabs:=tabinsts'\<rparr>)) (update_fc_step fc v_s' []) fcs, res)
+
+    | (Table_size x) \<Rightarrow>
+        let (v_s', res) = (app_s_f_v_s_table_size x (tabs s) f v_s) in
+        (Config d s (update_fc_step fc v_s' []) fcs, res)
 
     | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))"
 
