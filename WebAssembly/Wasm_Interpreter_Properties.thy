@@ -782,6 +782,67 @@ next
   qed
 qed
 
+lemma app_s_f_v_s_table_copy_is:
+  assumes "app_s_f_v_s_table_copy x y tabinsts f v_s = (v_s', es, res)"
+  shows "res = Step_normal \<and> ((tabs s = tabinsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@es\<rparr>)  \<or>
+         (\<exists>str. res = Res_trap str \<and> es = [] \<and> ((tabs s = tabinsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@es@[Trap]\<rparr>)) \<or>
+         res = crash_invalid"
+proof(cases "res = crash_invalid")
+  case True
+  then show ?thesis by simp
+next
+  case False
+  then have h_res: "res \<noteq> crash_invalid " by simp
+  then obtain n src dest v_s'' where v_s''_def:
+    "v_s = (V_num (ConstInt32 n))#(V_num (ConstInt32 src))#(V_num (ConstInt32 dest))#v_s''"
+    using assms app_s_f_v_s_table_copy_def by (auto split: list.splits v.splits v_num.splits)
+  then obtain tax tay ndest nsrc nn tabx taby where defs:
+    "stab_ind (f_inst f) x =  Some tax"
+    "stab_ind (f_inst f) y =  Some tay"
+    "ndest = nat_of_int dest"
+    "nsrc = nat_of_int src"
+    "nn = nat_of_int n"
+    "tabx = (tabinsts)!tax"
+    "taby = (tabinsts)!tay"
+    using assms False app_s_f_v_s_table_copy_def by (auto split: option.splits list.splits v.splits v_num.splits)
+  then show ?thesis
+  proof(cases "nsrc+nn > length (snd tabx) \<or> ndest+nn > length (snd taby)")
+    case True
+    then show ?thesis
+      using progress_L0_left[OF reduce.table_copy_trap] assms False defs v_s''_def v_to_e_def
+      unfolding app_s_f_v_s_table_copy_def
+      by (auto simp add: Let_def split: v_num.splits nat.splits list.splits cvtop.splits if_splits option.splits v.splits)
+  next
+    case False
+    then have h_n: "nsrc + nn \<le> tab_size tabx" "ndest + nn \<le> tab_size taby"
+      by auto
+    then show ?thesis
+    proof(cases nn)
+      case 0
+      then show ?thesis
+        using progress_L0_left[OF reduce.table_copy_done[ OF defs(1) _ defs(2) _ defs(3,4,5) h_n(1,2) 0]] assms False defs v_s''_def v_to_e_def
+        unfolding app_s_f_v_s_table_copy_def
+        by (auto simp add: Let_def split: v_num.splits nat.splits list.splits cvtop.splits if_splits option.splits v.splits)
+    next
+      case (Suc nn_pred)
+      then show ?thesis
+      proof(cases "ndest \<le> nsrc")
+        case True
+        then show ?thesis
+          using progress_L0_left[OF reduce.table_copy_1[ OF defs(1) _ defs(2) _ defs(3,4,5) h_n(1,2)]] Suc assms h_n defs v_s''_def v_to_e_def
+          unfolding app_s_f_v_s_table_copy_def
+          by (auto simp add: Let_def split: v_num.splits nat.splits list.splits cvtop.splits if_splits option.splits v.splits)
+      next
+        case False
+        then show ?thesis
+          using progress_L0_left[OF reduce.table_copy_2[ OF defs(1) _ defs(2) _ defs(3,4,5) h_n(1,2)]] Suc assms h_n defs v_s''_def v_to_e_def
+          unfolding app_s_f_v_s_table_copy_def
+          by (auto simp add: Let_def split: v_num.splits nat.splits list.splits cvtop.splits if_splits option.splits v.splits)
+      qed
+    qed
+  qed
+qed
+
 (*
   \<comment> \<open>\<open>table set\<close>\<close>
 | table_set: "\<lbrakk>stab_ind (f_inst f) ti = Some a; store_tabs1 (tabs s) a (nat_of_int n) vr = Some tabs'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(EConstNum (ConstInt32 n)), Ref vr, $(Table_set ti)]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:= tabs'\<rparr>;f;[]\<rparr>"
@@ -2138,10 +2199,77 @@ proof -
     qed
   next
     case (Table_copy x341 x342)
-    then show ?thesis sorry
+    consider
+        (a)v_s' es' where
+            "app_s_f_v_s_table_copy x341 x342 (tabs s) f v_s = (v_s', es', res)"
+            "\<lparr>s;f;v_stack_to_es v_s @ [$Table_copy x341 x342]\<rparr> \<leadsto> \<lparr>s;f;v_stack_to_es v_s' @ es'\<rparr>"
+            "res = Step_normal"
+            "fcs' = fcs"
+            "fc' = (update_fc_step fc v_s' es')"
+            "s' = s"
+      | (b) str v_s' es' where
+            "app_s_f_v_s_table_copy x341 x342 (tabs s) f v_s = (v_s', es', res)"
+            "\<lparr>s;f;v_stack_to_es v_s @ [$Table_copy x341 x342]\<rparr> \<leadsto> \<lparr>s;f;v_stack_to_es v_s' @ es' @ [Trap]\<rparr>"
+            "es' = []"
+            "res = Res_trap str"
+            "fcs' = fcs"
+            "fc' = (update_fc_step fc v_s' es')"
+            "s' = s"
+      | (c) "res = crash_invalid"
+      
+      using assms app_s_f_v_s_table_copy_is[] Table_copy fc_is
+      by (fastforce split: prod.splits)
+    then show ?thesis
+    proof(cases)
+      case a
+      then show ?thesis
+        using es_frame_contexts_to_config_ctx1[OF a(2)] Table_copy fc_is 0
+        apply simp
+        by blast
+    next
+      case b
+      then show ?thesis using es_frame_contexts_to_config_ctx1[OF b(2)] Table_copy fc_is 0
+        apply simp
+        by (metis es_frame_contexts_to_config_e_one)
+    next
+      case c
+      then show ?thesis by auto
+    qed
   next
     case (Table_fill x35)
-    then show ?thesis sorry
+    consider
+        (a)v_s' es' where
+            "app_s_f_v_s_table_fill x35 (tabs s) f v_s = (v_s', es', res)"
+            "\<lparr>s;f;v_stack_to_es v_s @ [$Table_fill x35]\<rparr> \<leadsto> \<lparr>s;f;v_stack_to_es v_s' @ es'\<rparr>"
+            "res = Step_normal"
+            "fcs' = fcs"
+            "fc' = (update_fc_step fc v_s' es')"
+            "s' = s"
+      | (b) str v_s' es' where
+            "app_s_f_v_s_table_fill x35 (tabs s) f v_s = (v_s', es', res)"
+            "\<lparr>s;f;v_stack_to_es v_s @ [$Table_fill x35]\<rparr> \<leadsto> \<lparr>s;f;v_stack_to_es v_s' @ es' @ [Trap]\<rparr>"
+            "es' = []"
+            "res = Res_trap str"
+            "fcs' = fcs"
+            "fc' = (update_fc_step fc v_s' es')"
+            "s' = s"
+      | (c) "res = crash_invalid"
+      
+      using assms app_s_f_v_s_table_fill_is[] Table_fill fc_is
+      by (fastforce split: prod.splits)
+    then show ?thesis
+     proof(cases)
+      case a
+      then show ?thesis
+        using es_frame_contexts_to_config_ctx1[OF a(2)] Table_fill fc_is 0
+        apply simp
+        by blast
+    next
+      case b
+      then show ?thesis using es_frame_contexts_to_config_ctx1[OF b(2)] Table_fill fc_is 0
+        apply simp
+        by (metis es_frame_contexts_to_config_e_one)
+    qed auto
   next
     case (Elem_drop x36)
     then show ?thesis sorry

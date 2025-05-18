@@ -382,106 +382,80 @@ definition app_s_f_v_s_table_get :: "i \<Rightarrow> tabinst list  \<Rightarrow>
         | None \<Rightarrow> (v_s, crash_invalid))
       | _ \<Rightarrow> (v_s, crash_invalid))"
 
-(*
-  \<comment> \<open>\<open>table init\<close>\<close>
-| table_init_trap: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; y < length (inst.elems (f_inst f));  ea = (inst.elems (f_inst f))!y; el = (elems s)!ea; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc+nn > length (snd el) \<or> ndest+nn > length (snd tab)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
-| table_init_done: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; y < length (inst.elems (f_inst f)); ea = (inst.elems (f_inst f))!y; el = (elems s)!ea; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc + nn \<le> length (snd el); ndest + nn  \<le> length (snd tab); nn = 0\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
-| table_init: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; y < length (inst.elems (f_inst f)); ea = (inst.elems (f_inst f))!y; el = (elems s)!ea; ndest = nat_of_int dest; nsrc = nat_of_int src; nn = nat_of_int n; nsrc + nn \<le> length (snd el); ndest + nn  \<le> length (snd tab); nn = nn_pred+1; val = (snd el)!nsrc\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $C (V_ref val), $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_init x y]\<rparr>"
-*)
-
-definition app_s_f_v_s_table_init_old :: "i \<Rightarrow> i \<Rightarrow> tabinst list \<Rightarrow> eleminst list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (tabinst list \<times> v_stack \<times> e list \<times> res_step)" where
-  "app_s_f_v_s_table_init_old x y tabinsts eleminsts f v_s =
-    (let i = f_inst f in
-      case v_s of
-        (V_num (ConstInt32 n))#(V_num (ConstInt32 src))#(V_num (ConstInt32 dest))#v_s' \<Rightarrow> 
-          (case (stab_ind (f_inst f) x) of
-            Some ta \<Rightarrow>
-            let
-              ndest = nat_of_int dest;
-              nsrc = nat_of_int src;
-              nn = nat_of_int n;
-              tab = (tabinsts)!ta;
-              ea = (inst.elems (f_inst f))!y;
-              el = eleminsts!ea
-              in
-                if (nsrc+nn > length (snd el) \<or> ndest+nn > length (snd tab)) then
-                  (tabinsts, v_s', [], Res_trap (STR ''table_init''))
-                else
-                  (case nn of
-                    0 \<Rightarrow> (tabinsts, v_s', [], Step_normal)
-                  | Suc nn_pred \<Rightarrow>
-                    let val = (snd el)!nsrc in
-                    let (tabinsts', v_s', res') = app_s_f_v_s_table_set x tabinsts f ((V_ref val)#(V_num (ConstInt32 dest))#v_s') in
-                     (tabinsts', 
-                     (V_num (ConstInt32 (int_of_nat nn_pred)))#
-                       (V_num (ConstInt32 (int_of_nat (nsrc+1))))#
-                       (V_num (ConstInt32 (int_of_nat (ndest+1))))#v_s',
-                     [$Table_init x y],
-                     Step_normal))
-          | None \<Rightarrow> (tabinsts, v_s, [], crash_invalid))
-      |  _ \<Rightarrow>
-    (tabinsts, v_s, [], crash_invalid))"
-
-
 definition app_s_f_v_s_table_init :: "i \<Rightarrow> i \<Rightarrow> tabinst list \<Rightarrow> eleminst list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
   "app_s_f_v_s_table_init x y tabinsts eleminsts f v_s =
-    (let i = f_inst f in
-      case v_s of
-        (V_num (ConstInt32 n))#(V_num (ConstInt32 src))#(V_num (ConstInt32 dest))#v_s' \<Rightarrow> 
-          (case (stab_ind (f_inst f) x) of
-            Some ta \<Rightarrow>
-            let
-              ndest = nat_of_int dest;
-              nsrc = nat_of_int src;
-              nn = nat_of_int n;
-              tab = (tabinsts)!ta;
-              ea = (inst.elems (f_inst f))!y;
-              el = eleminsts!ea
-              in
-                if (nsrc+nn > length (snd el) \<or> ndest+nn > length (snd tab)) then
-                  (v_s', [], Res_trap (STR ''table_init''))
-                else
-                  (case nn of
-                    0 \<Rightarrow> (v_s', [], Step_normal)
-                  | Suc nn_pred \<Rightarrow>
-                    let val = (snd el)!nsrc in
-                     (v_s', [$EConstNum (ConstInt32 dest), $C (V_ref val), $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_init x y],
-                     Step_normal))
-          | None \<Rightarrow> (v_s, [], crash_invalid))
-      |  _ \<Rightarrow>
-    (v_s, [], crash_invalid))"
-
-
-(*
-| table_fill_trap: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; ni = nat_of_int i; nn = nat_of_int n; ni+nn > length (snd tab) \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32  n),$Table_fill x]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
-| table_fill_done: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; ni = nat_of_int i; nn = nat_of_int n; ni+nn \<le> length (snd tab); nn = 0 \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32 n),$Table_fill x]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
-| table_fill: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; ni = nat_of_int i; nn = nat_of_int n; ni+nn \<le> length (snd tab); nn = nn_pred+1 \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32 n),$Table_fill x]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ni+1))), $C (V_ref vr), $EConstNum (ConstInt32 (int_of_nat n_pred)), $Table_fill x]\<rparr>"
-*)
+    (case v_s of
+      (V_num (ConstInt32 n))#(V_num (ConstInt32 src))#(V_num (ConstInt32 dest))#v_s' \<Rightarrow> 
+        (case (stab_ind (f_inst f) x) of
+          Some ta \<Rightarrow>
+          let
+            ndest = nat_of_int dest;
+            nsrc = nat_of_int src;
+            nn = nat_of_int n;
+            tab = (tabinsts)!ta;
+            ea = (inst.elems (f_inst f))!y;
+            el = eleminsts!ea
+            in
+              if (nsrc+nn > length (snd el) \<or> ndest+nn > length (snd tab)) then
+                (v_s', [], Res_trap (STR ''table_init''))
+              else
+                (case nn of
+                  0 \<Rightarrow> (v_s', [], Step_normal)
+                | Suc nn_pred \<Rightarrow>
+                  let val = (snd el)!nsrc in
+                   (v_s', [$EConstNum (ConstInt32 dest), $C (V_ref val), $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_init x y],
+                   Step_normal))
+        | None \<Rightarrow> (v_s, [], crash_invalid))
+    |  _ \<Rightarrow> (v_s, [], crash_invalid))"
 
 definition app_s_f_v_s_table_fill :: "i \<Rightarrow>  tabinst list  \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
   "app_s_f_v_s_table_fill x  tabinsts f v_s =
-    (let i = f_inst f in
-      case v_s of
-        (V_num (ConstInt32 n))#(V_ref vr)#(V_num (ConstInt32 i))#v_s' \<Rightarrow> 
-          (case (stab_ind (f_inst f) x) of
-            Some ta \<Rightarrow>
-            let
-              ni = nat_of_int i;
-              nn = nat_of_int n;
-              tab = (tabinsts)!ta
-              in
-                if (ni+nn > length (snd tab)) then
-                  (v_s', [], Res_trap (STR ''table_fill''))
-                else
-                  (case nn of
-                    0 \<Rightarrow> (v_s', [], Step_normal)
-                  | Suc nn_pred \<Rightarrow>
-                    
-                     (v_s', [$EConstNum (ConstInt32 i), $C (V_ref vr), $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ni+1))), $C (V_ref vr), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_fill x],
-                     Step_normal))
-          | None \<Rightarrow> (v_s, [], crash_invalid))
-      |  _ \<Rightarrow>
-    (v_s, [], crash_invalid))"
+    (case v_s of
+      (V_num (ConstInt32 n))#(V_ref vr)#(V_num (ConstInt32 i))#v_s' \<Rightarrow> 
+        (case (stab_ind (f_inst f) x) of
+          Some ta \<Rightarrow>
+          let
+            ni = nat_of_int i;
+            nn = nat_of_int n;
+            tab = (tabinsts)!ta
+            in
+              if (ni+nn > length (snd tab)) then
+                (v_s', [], Res_trap (STR ''table_fill''))
+              else
+                (case nn of
+                  0 \<Rightarrow> (v_s', [], Step_normal)
+                | Suc nn_pred \<Rightarrow>
+                  
+                   (v_s', [$EConstNum (ConstInt32 i), $C (V_ref vr), $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ni+1))), $C (V_ref vr), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_fill x],
+                   Step_normal))
+        | None \<Rightarrow> (v_s, [], crash_invalid))
+    |  _ \<Rightarrow> (v_s, [], crash_invalid))"
+
+definition app_s_f_v_s_table_copy :: "i \<Rightarrow> i \<Rightarrow> tabinst list  \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
+  "app_s_f_v_s_table_copy x y tabinsts f v_s =
+    (case v_s of
+      (V_num (ConstInt32 n))#(V_num (ConstInt32 src))#(V_num (ConstInt32 dest))#v_s' \<Rightarrow> 
+        (case (stab_ind (f_inst f) x, stab_ind (f_inst f) y) of
+          (Some tax, Some tay) \<Rightarrow>
+          let
+            ndest = nat_of_int dest;
+            nsrc = nat_of_int src;
+            nn = nat_of_int n;
+            tabx = (tabinsts)!tax;
+            taby = (tabinsts)!tay
+            in
+              if (nsrc+nn > length (snd tabx) \<or> ndest+nn > length (snd taby)) then
+                (v_s', [], Res_trap (STR ''table_copy''))
+              else
+                (case nn of
+                  0 \<Rightarrow> (v_s', [], Step_normal)
+                | Suc nn_pred \<Rightarrow>
+                  (if ndest \<le> nsrc then
+                    (v_s', [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $Table_get y, $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_copy x y], Step_normal)
+                  else
+                    (v_s', [$EConstNum (ConstInt32 (int_of_nat (ndest+nn_pred))), $EConstNum (ConstInt32 (int_of_nat (nsrc+nn))), $Table_get y, $Table_set x, $EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_copy x y], Step_normal)))
+        | (_, _) \<Rightarrow> (v_s, [], crash_invalid))
+    |  _ \<Rightarrow> (v_s, [], crash_invalid))"
 
 (*
 definition app_s_f_init_tab :: "nat \<Rightarrow> i list \<Rightarrow> tabinst list \<Rightarrow> f \<Rightarrow> (tabinst list \<times> res_step)" where
@@ -919,6 +893,14 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
 
     | (Table_init x y) \<Rightarrow>
       let (v_s', es, res) = (app_s_f_v_s_table_init x y (tabs s) (elems s) f v_s) in
+      ((Config d s) (update_fc_step fc v_s' es) fcs, res)
+
+    | (Table_copy x y) \<Rightarrow>
+      let (v_s', es, res) = (app_s_f_v_s_table_copy x y (tabs s) f v_s) in
+      ((Config d s) (update_fc_step fc v_s' es) fcs, res)
+
+    | (Table_fill x) \<Rightarrow>
+      let (v_s', es, res) = (app_s_f_v_s_table_fill x (tabs s) f v_s) in
       ((Config d s) (update_fc_step fc v_s' es) fcs, res)
 
     | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))"
