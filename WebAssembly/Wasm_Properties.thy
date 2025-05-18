@@ -4485,7 +4485,7 @@ next
     case True
     then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
         $Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
-        using reduce.memory_init_trap[OF m_defs _ dat_defs n_defs True] memory_init.hyps(2) memory_init.prems(11)
+        using reduce.memory_init_trap[OF m_defs dat_defs n_defs True] memory_init.hyps(2) memory_init.prems(11)
       by metis
     then have "\<lparr>s;f;($C* vs) @ [$Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
       using v_defs
@@ -4501,7 +4501,7 @@ next
       case 0
       then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
         $Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
-        using reduce.memory_init_done[OF m_defs _ dat_defs n_defs h_bounds 0] memory_init.hyps(2) memory_init.prems(11)
+        using reduce.memory_init_done[OF m_defs dat_defs n_defs h_bounds 0] memory_init.hyps(2) memory_init.prems(11)
         by metis
       then have "\<lparr>s;f;($C* vs) @ [$Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
         using v_defs
@@ -4517,7 +4517,7 @@ next
                          $EConstNum (ConstInt32 (int_of_nat (ndest + 1))),
                          $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))),
                          $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Memory_init x]\<rparr>"
-        using reduce.memory_init[OF m_defs _ dat_defs n_defs h_bounds _, of nn_pred "nat_of_uint8 (dat ! nsrc)"] Suc memory_init.hyps(2) memory_init.prems(11)
+        using reduce.memory_init[OF m_defs dat_defs n_defs h_bounds _, of nn_pred "nat_of_uint8 (dat ! nsrc)"] Suc memory_init.hyps(2) memory_init.prems(11)
         by fastforce
       then have "\<lparr>s;f;($C* vs) @ [$Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat (ndest + 1))),
                          $EConstNum (ConstInt32 (int_of_nat (nat_of_uint8 (dat ! nsrc)))),

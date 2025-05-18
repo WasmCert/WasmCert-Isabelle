@@ -639,6 +639,165 @@ next
   qed
 qed
 
+lemma app_s_f_v_s_memory_init_is:
+  assumes "app_s_f_v_s_memory_init x meminsts datainsts f v_s = (v_s', es, res)"
+  shows "res = Step_normal \<and> ((mems s = meminsts  \<and> datas s = datainsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@es\<rparr>)  \<or>
+         (\<exists>str. res = Res_trap str \<and> es = [] \<and> ((mems s = meminsts \<and> datas s = datainsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@es@[Trap]\<rparr>)) \<or>
+         res = crash_invalid"
+proof(cases "res = crash_invalid")
+  case True
+  then show ?thesis by simp
+next
+  case False
+  then have h_res: "res \<noteq> crash_invalid " by simp
+  then obtain i n src dest v_s'' where v_s''_def:
+    "f_inst f = i"
+    "v_s = (V_num (ConstInt32 n))#(V_num (ConstInt32 src))#(V_num (ConstInt32 dest))#v_s''"
+    using assms app_s_f_v_s_memory_init_def by (auto split: list.splits v.splits v_num.splits)
+  then obtain ndest nsrc nn m ma da dat b where defs:
+    "smem_ind (f_inst f) = Some ma"
+    "ndest = nat_of_int dest"
+    "nsrc = nat_of_int src"
+    "nn = nat_of_int n"
+    "m = (meminsts)!ma"
+    "da = (inst.datas (f_inst f))!x"
+    "dat = datainsts!da"
+    "b = nat_of_uint8 (dat ! nsrc)"
+    using assms False app_s_f_v_s_memory_init_def by (auto split: option.splits list.splits v.splits v_num.splits)
+  then show ?thesis
+  proof(cases "(nsrc+nn > length dat \<or> ndest+nn > mem_length m)")
+    case True
+    then show ?thesis
+      using defs h_res  assms progress_L0_left[OF reduce.memory_init_trap[OF defs(1) _ defs(6)  _ defs(2,3,4), of s m dat]]
+            v_s''_def(2) v_to_e_def 
+      unfolding app_s_f_v_s_memory_init_def 
+      by (auto simp add: Let_def split: nat.splits list.splits if_splits option.splits v.splits v_num.splits v_vec.splits)
+  next
+    case False
+    then show ?thesis
+    proof(cases nn)
+      case 0
+      then show ?thesis
+        using defs h_res  assms progress_L0_left[OF reduce.memory_init_done[]]
+            v_s''_def(2) v_to_e_def False
+        unfolding app_s_f_v_s_memory_init_def 
+        by (auto simp add: Let_def split: nat.splits list.splits if_splits option.splits v.splits v_num.splits v_vec.splits)
+    next
+      case (Suc nn_pred)
+      then show ?thesis
+        using defs h_res  assms progress_L0_left[OF reduce.memory_init[OF defs(1) _ defs(6) _ defs(2,3,4), of s m dat nn_pred]]
+            v_s''_def(2) v_to_e_def False
+        unfolding app_s_f_v_s_memory_init_def 
+        by (auto simp add: Let_def split: nat.splits list.splits if_splits option.splits v.splits v_num.splits v_vec.splits)
+    qed
+  qed
+qed
+
+lemma app_s_f_v_s_memory_copy_is:
+  assumes "app_s_f_v_s_memory_copy meminsts f v_s = (v_s', es, res)"
+  shows "res = Step_normal \<and> ((mems s = meminsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Memory_copy]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@es\<rparr>)  \<or>
+         (\<exists>str. res = Res_trap str \<and> es = [] \<and> ((mems s = meminsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Memory_copy]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@es@[Trap]\<rparr>)) \<or>
+         res = crash_invalid"
+proof(cases "res = crash_invalid")
+  case True
+  then show ?thesis by simp
+next
+  case False
+  then have h_res: "res \<noteq> crash_invalid " by simp
+  then obtain n src dest v_s'' where v_s''_def:
+    "v_s = (V_num (ConstInt32 n))#(V_num (ConstInt32 src))#(V_num (ConstInt32 dest))#v_s''"
+    using assms app_s_f_v_s_memory_copy_def by (auto split: list.splits v.splits v_num.splits)
+  then obtain ndest nsrc nn ma m where defs:
+    "smem_ind (f_inst f) = Some ma"
+    "ndest = nat_of_int dest"
+    "nsrc = nat_of_int src"
+    "nn = nat_of_int n"
+    "m = (meminsts)!ma"
+    using assms False app_s_f_v_s_memory_copy_def by (auto split: option.splits list.splits v.splits v_num.splits)
+  then show ?thesis
+  proof(cases "nsrc+nn > mem_length m \<or> ndest+nn > mem_length m")
+    case True
+    then show ?thesis
+      using progress_L0_left[OF reduce.memory_copy_trap] assms False defs v_s''_def v_to_e_def
+      unfolding app_s_f_v_s_memory_copy_def
+      by (auto simp add: Let_def split: v_num.splits nat.splits list.splits cvtop.splits if_splits option.splits v.splits)
+  next
+    case False
+    then have h_n: "nsrc + nn \<le> mem_length m" "ndest + nn \<le> mem_length m"
+      by auto
+    then show ?thesis
+    proof(cases nn)
+      case 0
+      then show ?thesis
+        using progress_L0_left[OF reduce.memory_copy_done] assms False defs v_s''_def v_to_e_def
+        unfolding app_s_f_v_s_memory_copy_def
+        by (auto simp add: Let_def split: v_num.splits nat.splits list.splits cvtop.splits if_splits option.splits v.splits)
+    next
+      case (Suc nn_pred)
+      then show ?thesis
+      proof(cases "ndest \<le> nsrc")
+        case True
+        then show ?thesis
+          using progress_L0_left[OF reduce.memory_copy_1[OF defs(1) _ defs(2,3,4)]] Suc assms h_n defs v_s''_def v_to_e_def
+          unfolding app_s_f_v_s_memory_copy_def
+          by (auto simp add: Let_def split: v_num.splits nat.splits list.splits cvtop.splits if_splits option.splits v.splits)
+      next
+        case False
+        then show ?thesis
+          using progress_L0_left[OF reduce.memory_copy_2[OF defs(1) _ defs(2,3,4), of s m nn_pred]] Suc assms h_n defs v_s''_def v_to_e_def
+          unfolding app_s_f_v_s_memory_copy_def
+          by (auto simp add: Let_def split: v_num.splits nat.splits list.splits cvtop.splits if_splits option.splits v.splits)
+      qed
+    qed
+  qed
+qed
+
+lemma app_s_f_v_s_memory_fill_is:
+  assumes "app_s_f_v_s_memory_fill meminsts f v_s = (v_s', es, res)"
+  shows "res = Step_normal \<and> ((mems s = meminsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Memory_fill]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@es\<rparr>)  \<or>
+         (\<exists>str. res = Res_trap str \<and> es = [] \<and> ((mems s = meminsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Memory_fill]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@es@[Trap]\<rparr>)) \<or>
+         res = crash_invalid"
+proof(cases "res = crash_invalid")
+  case True
+  then show ?thesis by simp
+next
+  case False
+  then have h_res: "res \<noteq> crash_invalid " by simp
+  then obtain n val dest v_s'' where v_s''_def:
+    "v_s = (V_num (ConstInt32 n))#(V_num (ConstInt32 val))#(V_num (ConstInt32 dest))#v_s''"
+    using assms app_s_f_v_s_memory_fill_def by (auto split: list.splits v.splits v_num.splits)
+  then obtain ndest nsrc nn ma m where defs:
+    "smem_ind (f_inst f) = Some ma"
+    "ndest = nat_of_int dest"
+    "nn = nat_of_int n"
+    "m = (meminsts)!ma"
+    using assms False app_s_f_v_s_memory_fill_def by (auto split: option.splits list.splits v.splits v_num.splits)
+  then show ?thesis
+  proof(cases "ndest+nn > mem_length m")
+    case True
+    then show ?thesis
+      using progress_L0_left[OF reduce.memory_fill_trap] assms False defs v_s''_def v_to_e_def
+      unfolding app_s_f_v_s_memory_fill_def
+      by (auto simp add: Let_def split: v_num.splits nat.splits list.splits cvtop.splits if_splits option.splits v.splits)
+  next
+    case False
+    then show ?thesis
+    proof(cases nn)
+      case 0
+      then show ?thesis
+        using progress_L0_left[OF reduce.memory_fill_done] assms False defs v_s''_def v_to_e_def
+        unfolding app_s_f_v_s_memory_fill_def
+        by (auto simp add: Let_def split: v_num.splits nat.splits list.splits cvtop.splits if_splits option.splits v.splits)
+    next
+      case (Suc nn_pred)
+      then show ?thesis
+        using progress_L0_left[OF reduce.memory_fill[OF defs(1) _ defs(2,3), of s m nn_pred]] assms False defs v_s''_def v_to_e_def
+        unfolding app_s_f_v_s_memory_fill_def
+        by (auto simp add: Let_def split: v_num.splits nat.splits list.splits cvtop.splits if_splits option.splits v.splits)
+    qed
+  qed
+qed
+
 lemma app_s_f_v_s_table_set_is:
   assumes "app_s_f_v_s_table_set x tabinsts f v_s = (tabinsts', v_s', res)"
   shows "res = Step_normal \<and> ((tabs s = tabinsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Table_set x]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:=tabinsts'\<rparr>;f;(v_stack_to_es v_s')\<rparr>) \<or>
@@ -2204,13 +2363,108 @@ proof -
     qed auto
   next
     case (Memory_init x30)
-    then show ?thesis sorry
+    consider
+        (a)v_s' es' where
+            "app_s_f_v_s_memory_init x30 (mems s) (datas s) f v_s = (v_s', es', res)"
+            "\<lparr>s;f;v_stack_to_es v_s @ [$Memory_init x30]\<rparr> \<leadsto> \<lparr>s;f;v_stack_to_es v_s' @ es'\<rparr>"
+            "res = Step_normal"
+            "fcs' = fcs"
+            "fc' = (update_fc_step fc v_s' es')"
+            "s' = s"
+      | (b) str v_s' es' where
+            "app_s_f_v_s_memory_init x30 (mems s) (datas s) f v_s = (v_s', es', res)"
+            "\<lparr>s;f;v_stack_to_es v_s @ [$Memory_init x30]\<rparr> \<leadsto> \<lparr>s;f;v_stack_to_es v_s' @ es' @ [Trap]\<rparr>"
+            "es' = []"
+            "res = Res_trap str"
+            "fcs' = fcs"
+            "fc' = (update_fc_step fc v_s' es')"
+            "s' = s"
+      | (c) "res = crash_invalid"
+      using assms app_s_f_v_s_memory_init_is Memory_init fc_is
+      by (fastforce split: prod.splits)
+    then show ?thesis
+    proof(cases)
+      case a
+      then show ?thesis
+        using es_frame_contexts_to_config_ctx1[OF a(2)] Memory_init fc_is 0
+        apply simp
+        by blast
+    next
+      case b
+      then show ?thesis using es_frame_contexts_to_config_ctx1[OF b(2)] Memory_init fc_is 0
+        apply simp
+        by (metis es_frame_contexts_to_config_e_one)
+    qed auto
   next
     case Memory_fill
-    then show ?thesis sorry
+    consider
+        (a)v_s' es' where
+            "app_s_f_v_s_memory_fill (mems s) f v_s = (v_s', es', res)"
+            "\<lparr>s;f;v_stack_to_es v_s @ [$Memory_fill]\<rparr> \<leadsto> \<lparr>s;f;v_stack_to_es v_s' @ es'\<rparr>"
+            "res = Step_normal"
+            "fcs' = fcs"
+            "fc' = (update_fc_step fc v_s' es')"
+            "s' = s"
+      | (b) str v_s' es' where
+            "app_s_f_v_s_memory_fill (mems s) f v_s = (v_s', es', res)"
+            "\<lparr>s;f;v_stack_to_es v_s @ [$Memory_fill]\<rparr> \<leadsto> \<lparr>s;f;v_stack_to_es v_s' @ es' @ [Trap]\<rparr>"
+            "es' = []"
+            "res = Res_trap str"
+            "fcs' = fcs"
+            "fc' = (update_fc_step fc v_s' es')"
+            "s' = s"
+      | (c) "res = crash_invalid"
+      
+      using assms app_s_f_v_s_memory_fill_is Memory_fill fc_is
+      by (fastforce split: prod.splits)
+    then show ?thesis
+     proof(cases)
+      case a
+      then show ?thesis
+        using es_frame_contexts_to_config_ctx1[OF a(2)] Memory_fill fc_is 0
+        apply simp
+        by blast
+    next
+      case b
+      then show ?thesis using es_frame_contexts_to_config_ctx1[OF b(2)] Memory_fill fc_is 0
+        apply simp
+        by (metis es_frame_contexts_to_config_e_one)
+    qed auto
   next
     case Memory_copy
-    then show ?thesis sorry
+    consider
+        (a)v_s' es' where
+            "app_s_f_v_s_memory_copy (mems s) f v_s = (v_s', es', res)"
+            "\<lparr>s;f;v_stack_to_es v_s @ [$Memory_copy]\<rparr> \<leadsto> \<lparr>s;f;v_stack_to_es v_s' @ es'\<rparr>"
+            "res = Step_normal"
+            "fcs' = fcs"
+            "fc' = (update_fc_step fc v_s' es')"
+            "s' = s"
+      | (b) str v_s' es' where
+            "app_s_f_v_s_memory_copy (mems s) f v_s = (v_s', es', res)"
+            "\<lparr>s;f;v_stack_to_es v_s @ [$Memory_copy]\<rparr> \<leadsto> \<lparr>s;f;v_stack_to_es v_s' @ es' @ [Trap]\<rparr>"
+            "es' = []"
+            "res = Res_trap str"
+            "fcs' = fcs"
+            "fc' = (update_fc_step fc v_s' es')"
+            "s' = s"
+      | (c) "res = crash_invalid"
+      
+      using assms app_s_f_v_s_memory_copy_is Memory_copy fc_is
+      by (fastforce split: prod.splits)
+    then show ?thesis
+     proof(cases)
+      case a
+      then show ?thesis
+        using es_frame_contexts_to_config_ctx1[OF a(2)] Memory_copy fc_is 0
+        apply simp
+        by blast
+    next
+      case b
+      then show ?thesis using es_frame_contexts_to_config_ctx1[OF b(2)] Memory_copy fc_is 0
+        apply simp
+        by (metis es_frame_contexts_to_config_e_one)
+    qed auto
   next
     case (Table_init x331 x332)
     consider

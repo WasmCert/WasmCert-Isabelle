@@ -357,6 +357,79 @@ definition app_s_f_init_mem :: "nat \<Rightarrow> byte list \<Rightarrow> mem li
                         (ms, Res_trap (STR ''init_mem''))
       | None => (ms, crash_invalid)))"
 
+definition app_s_f_v_s_memory_init :: "i \<Rightarrow>  mem list \<Rightarrow> datainst list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
+  "app_s_f_v_s_memory_init x meminsts datainsts f v_s =
+    (case v_s of
+      (V_num (ConstInt32 n))#(V_num (ConstInt32 src))#(V_num (ConstInt32 dest))#v_s' \<Rightarrow> 
+        (case (smem_ind (f_inst f)) of
+          Some ma \<Rightarrow>
+          let
+            ndest = nat_of_int dest;
+            nsrc = nat_of_int src;
+            nn = nat_of_int n;
+            m = (meminsts)!ma;
+            da = (inst.datas (f_inst f))!x;
+            dat = datainsts!da
+            in
+              if (nsrc+nn > length dat \<or> ndest+nn > mem_length m) then
+                (v_s', [], Res_trap (STR ''memory_init''))
+              else
+                (case nn of
+                  0 \<Rightarrow> (v_s', [], Step_normal)
+                | Suc nn_pred \<Rightarrow>
+                  let b = nat_of_uint8 (dat!nsrc) in
+                   (v_s', [$EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat b)), $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 (int_of_nat (nn_pred))) ,$Memory_init x],
+                   Step_normal))
+        | None \<Rightarrow> (v_s, [], crash_invalid))
+    |  _ \<Rightarrow> (v_s, [], crash_invalid))"
+
+definition app_s_f_v_s_memory_fill :: "mem list  \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
+  "app_s_f_v_s_memory_fill  meminsts f v_s =
+    (case v_s of
+      (V_num (ConstInt32 n))#(V_num (ConstInt32 val))#(V_num (ConstInt32 dest))#v_s' \<Rightarrow> 
+        (case (smem_ind (f_inst f)) of
+          Some ma \<Rightarrow>
+          let
+            m = (meminsts)!ma;
+            ndest = nat_of_int dest;
+            nn = nat_of_int n
+            in
+              if (ndest+nn > mem_length m) then
+                (v_s', [], Res_trap (STR ''memory_fill''))
+              else
+                (case nn of
+                  0 \<Rightarrow> (v_s', [], Step_normal)
+                | Suc nn_pred \<Rightarrow>
+                  
+                   (v_s', [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $EConstNum (ConstInt32 (int_of_nat nn_pred)) ,$Memory_fill],
+                   Step_normal))
+        | None \<Rightarrow> (v_s, [], crash_invalid))
+    |  _ \<Rightarrow> (v_s, [], crash_invalid))"
+
+definition app_s_f_v_s_memory_copy :: "mem list  \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
+  "app_s_f_v_s_memory_copy meminsts f v_s =
+    (case v_s of
+      (V_num (ConstInt32 n))#(V_num (ConstInt32 src))#(V_num (ConstInt32 dest))#v_s' \<Rightarrow> 
+        (case smem_ind (f_inst f) of
+          (Some ma) \<Rightarrow>
+          let
+            ndest = nat_of_int dest;
+            nsrc = nat_of_int src;
+            nn = nat_of_int n;
+            m = (meminsts)!ma in
+              if (nsrc+nn > mem_length m \<or> ndest+nn > mem_length m) then
+                (v_s', [], Res_trap (STR ''memory_copy''))
+              else
+                (case nn of
+                  0 \<Rightarrow> (v_s', [], Step_normal)
+                | Suc nn_pred \<Rightarrow>
+                  (if ndest \<le> nsrc then
+                    (v_s', [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $Load T_i32 (Some (Tp_i8, U)) 0 0, $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 n), $Memory_copy], Step_normal)
+                  else
+                    (v_s', [$EConstNum (ConstInt32 (int_of_nat (ndest+nn_pred))), $EConstNum (ConstInt32 (int_of_nat (nsrc+nn_pred))), $Load T_i32 (Some (Tp_i8, U)) 0 0, $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Memory_copy], Step_normal)))
+        | None \<Rightarrow> (v_s, [], crash_invalid))
+    |  _ \<Rightarrow> (v_s, [], crash_invalid))"
+
 definition app_s_f_v_s_table_set :: "i \<Rightarrow> tabinst list  \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (tabinst list \<times> v_stack \<times> res_step)" where
   "app_s_f_v_s_table_set x tabinsts f v_s = 
     (let i = (f_inst f) in
@@ -669,14 +742,7 @@ next
       by auto
   qed
 qed
-(*
-definition mem_grow_impl:: "mem \<Rightarrow> nat \<Rightarrow> mem option" where
-  "mem_grow_impl m n = Some (mem_grow m n)"
 
-lemma mem_grow_impl_correct:
-  "(mem_grow_impl m n = Some m') \<Longrightarrow> (mem_grow m n = m')"
-  unfolding mem_grow_impl_def
-*)
 axiomatization 
   host_apply_impl:: "s \<Rightarrow> tf \<Rightarrow> host \<Rightarrow> v list \<Rightarrow> (s \<times> v list) option" where
   host_apply_impl_correct:"(host_apply_impl s tf h vs = Some m') \<Longrightarrow> (\<exists>hs. host_apply s tf h vs hs (Some m'))"
@@ -890,6 +956,18 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
     | (Grow_memory) \<Rightarrow>
         let (ms', v_s', res) = (app_s_f_v_s_mem_grow (mems s) f v_s) in
         (Config d (s\<lparr>mems:=ms'\<rparr>) (update_fc_step fc v_s' []) fcs, res)
+    
+    | (Memory_init x) \<Rightarrow>
+      let (v_s', es, res) = (app_s_f_v_s_memory_init x (mems s) (datas s) f v_s) in
+      ((Config d s) (update_fc_step fc v_s' es) fcs, res)
+
+    | (Memory_copy) \<Rightarrow>
+      let (v_s', es, res) = (app_s_f_v_s_memory_copy (mems s) f v_s) in
+      ((Config d s) (update_fc_step fc v_s' es) fcs, res)
+
+    | (Memory_fill) \<Rightarrow>
+      let (v_s', es, res) = (app_s_f_v_s_memory_fill (mems s) f v_s) in
+      ((Config d s) (update_fc_step fc v_s' es) fcs, res)
 
     | (Table_set x) \<Rightarrow>
       let (tabinsts', v_s', res) = (app_s_f_v_s_table_set x (tabs s) f v_s) in
