@@ -451,6 +451,38 @@ definition app_s_f_v_s_table_init :: "i \<Rightarrow> i \<Rightarrow> tabinst li
       |  _ \<Rightarrow>
     (v_s, [], crash_invalid))"
 
+
+(*
+| table_fill_trap: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; ni = nat_of_int i; nn = nat_of_int n; ni+nn > length (snd tab) \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32  n),$Table_fill x]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
+| table_fill_done: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; ni = nat_of_int i; nn = nat_of_int n; ni+nn \<le> length (snd tab); nn = 0 \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32 n),$Table_fill x]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
+| table_fill: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; ni = nat_of_int i; nn = nat_of_int n; ni+nn \<le> length (snd tab); nn = nn_pred+1 \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32 n),$Table_fill x]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ni+1))), $C (V_ref vr), $EConstNum (ConstInt32 (int_of_nat n_pred)), $Table_fill x]\<rparr>"
+*)
+
+definition app_s_f_v_s_table_fill :: "i \<Rightarrow>  tabinst list  \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
+  "app_s_f_v_s_table_fill x  tabinsts f v_s =
+    (let i = f_inst f in
+      case v_s of
+        (V_num (ConstInt32 n))#(V_ref vr)#(V_num (ConstInt32 i))#v_s' \<Rightarrow> 
+          (case (stab_ind (f_inst f) x) of
+            Some ta \<Rightarrow>
+            let
+              ni = nat_of_int i;
+              nn = nat_of_int n;
+              tab = (tabinsts)!ta
+              in
+                if (ni+nn > length (snd tab)) then
+                  (v_s', [], Res_trap (STR ''table_fill''))
+                else
+                  (case nn of
+                    0 \<Rightarrow> (v_s', [], Step_normal)
+                  | Suc nn_pred \<Rightarrow>
+                    
+                     (v_s', [$EConstNum (ConstInt32 i), $C (V_ref vr), $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ni+1))), $C (V_ref vr), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_fill x],
+                     Step_normal))
+          | None \<Rightarrow> (v_s, [], crash_invalid))
+      |  _ \<Rightarrow>
+    (v_s, [], crash_invalid))"
+
 (*
 definition app_s_f_init_tab :: "nat \<Rightarrow> i list \<Rightarrow> tabinst list \<Rightarrow> f \<Rightarrow> (tabinst list \<times> res_step)" where
   "app_s_f_init_tab off icls ts f = 

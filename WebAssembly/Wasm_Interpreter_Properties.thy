@@ -658,114 +658,6 @@ lemma app_s_f_v_s_table_get_is:
   unfolding app_s_f_v_s_table_get_def v_to_e_def
   by (auto  split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits v_vec.splits)
 
-lemma app_s_f_v_s_table_init_old_is:
-  assumes "app_s_f_v_s_table_init_old x y tabinsts eleminsts f v_s = (tabinsts', v_s', es, res)"
-  shows "res = Step_normal \<and> ((tabs s = tabinsts \<and> elems s = eleminsts) \<longrightarrow> reduce_trans (s,f,(v_stack_to_es v_s)@[$Table_init x y]) (s\<lparr>tabs:=tabinsts'\<rparr>,f,(v_stack_to_es v_s')@es) )  \<or>
-         (\<exists>str. res = Res_trap str \<and> tabinsts = tabinsts' \<and> ((tabs s = tabinsts \<and> elems s = eleminsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Table_init x y]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:=tabinsts'\<rparr>;f;(v_stack_to_es v_s')@es@[Trap]\<rparr>)) \<or>
-         res = crash_invalid"
-proof(cases "res = crash_invalid")
-  case True
-  then show ?thesis by simp
-next
-  case False
-  then have h_res: "res \<noteq> crash_invalid " by simp
-  then obtain i n src dest v_s'' where v_s''_def:
-    "f_inst f = i"
-    "v_s = (V_num (ConstInt32 n))#(V_num (ConstInt32 src))#(V_num (ConstInt32 dest))#v_s''"
-    using assms app_s_f_v_s_table_init_old_def by (auto split: list.splits v.splits v_num.splits)
-  then obtain ta ndest nsrc nn tab ea el where ta_is:
-    "(stab_ind (f_inst f) x) = Some ta"
-    "ndest = nat_of_int dest"
-    "nsrc = nat_of_int src"
-    "nn = nat_of_int n"
-    "tab = (tabinsts)!ta"
-    "ea = (inst.elems (f_inst f))!y"
-    "el = eleminsts!ea"
-    using assms False app_s_f_v_s_table_init_old_def by (auto split: option.splits list.splits v.splits v_num.splits)
-  then show ?thesis
-  proof(cases "(nsrc+nn > length (snd el) \<or> ndest+nn > length (snd tab))")
-    case True
-    then have "app_s_f_v_s_table_init_old x y tabinsts eleminsts f v_s = (tabinsts, v_s'', [], Res_trap (STR ''table_init''))"
-      using ta_is v_s''_def assms app_s_f_v_s_table_init_old_def[of x y tabinsts eleminsts f v_s]  False
-      by (auto simp add: False Let_def split:  if_splits v_num.splits option.splits )
-    then have "tabinsts = tabinsts'" "v_s'' = v_s'" "es = []" "res = Res_trap STR ''table_init''"
-      using assms by auto
-    moreover have "((tabs s = tabinsts \<and> elems s = eleminsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Table_init x y]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:=tabinsts'\<rparr>;f;(v_stack_to_es v_s')@es@[Trap]\<rparr>)"
-      using calculation v_s''_def progress_L0_left[OF reduce.table_init_trap[OF ta_is(1)], of s tab y ea el ndest dest nsrc src nn n] ta_is
-      apply (auto simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits v_vec.splits)
-      by (metis True progress_L0_left table_init_trap v.simps(10) v_to_e_def)
-    ultimately show ?thesis by auto
-
-  next
-    case False
-    then show ?thesis
-    proof(cases nn)
-      case 0
-      then have h_n: "nsrc \<le> length (snd el)" "ndest \<le> tab_size tab"
-        using False by simp_all
-      then have "app_s_f_v_s_table_init_old x y tabinsts eleminsts f v_s = (tabinsts, v_s'', [], Step_normal)"
-        using ta_is v_s''_def assms app_s_f_v_s_table_init_old_def[of x y tabinsts eleminsts f v_s]  False 0
-        by (auto simp add: False Let_def split:  if_splits v_num.splits option.splits)
-      then have "tabinsts = tabinsts'" "v_s'' = v_s'" "es = []" "res = Step_normal"
-        using assms by auto
-      moreover have "((tabs s = tabinsts \<and> elems s = eleminsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Table_init x y]\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:=tabinsts'\<rparr>;f;(v_stack_to_es v_s')@es\<rparr>)"
-        using calculation v_s''_def progress_L0_left[OF reduce.table_init_done[OF ta_is(1)], of s tab y ea el ndest dest nsrc src nn n] ta_is 0 h_n
-        apply (auto simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits v_vec.splits)
-        using v_to_e_def
-        by (metis add.right_neutral append.right_neutral progress_L0_left table_init_done v.simps(10))
-      ultimately show ?thesis
-        by (metis (no_types, lifting) reduce_trans_app_end reduce_trans_def rtranclp.rtrancl_refl)
-    next
-      case (Suc nn_pred)
-      then have h_n: "nsrc < length (snd el)" "ndest < tab_size tab" "nsrc \<le> length (snd el)" "ndest \<le> tab_size tab"
-        using False by simp_all
-      obtain val where val_is: "val = (snd el)!nsrc"
-        by fastforce
-      obtain tabinsts'' where tabinsts''_is:
-        "store_tabs1 tabinsts ta (nat_of_int dest) val = Some tabinsts''"
-        using h_n
-        by (simp add: store_tab1_def store_tabs1_def ta_is(2) ta_is(5))
-      then have tabinsts''_prop1:
-        "(tabinsts'', v_s'', Step_normal) = app_s_f_v_s_table_set x tabinsts f ((V_ref val)#(V_num (ConstInt32 dest))#v_s'')"
-        
-        using app_s_f_v_s_table_set_def ta_is(1) by (auto split: prod.splits list.splits v.splits v_num.splits)
-      then have tabinsts''_prop2: "app_s_f_v_s_table_init_old x y tabinsts eleminsts f v_s = (tabinsts'', (V_num (ConstInt32 (int_of_nat nn_pred)))#(V_num (ConstInt32 (int_of_nat (nsrc+1))))#(V_num (ConstInt32 (int_of_nat (ndest+1))))#v_s'', [$Table_init x y], Step_normal)"
-        using ta_is v_s''_def assms app_s_f_v_s_table_init_old_def[of x y tabinsts eleminsts f v_s]  False h_n Suc
-        apply (auto simp add: False Let_def split: nat.splits if_splits v_num.splits option.splits )
-        using val_is
-        by (metis (no_types, lifting) old.prod.case)
-      let ?c_table_set = "[$EConstNum (ConstInt32 dest), $C V_ref val, $Table_set x]"
-      let ?c_table_init2 = "[$EConstNum (ConstInt32 (int_of_nat (ndest + 1))), $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))),
-                       $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_init x y]"
-     have a:
-        "tabinsts' = tabinsts''"
-        "v_s' = (V_num (ConstInt32 (int_of_nat nn_pred)))#(V_num (ConstInt32 (int_of_nat (nsrc+1))))#(V_num (ConstInt32 (int_of_nat (ndest+1))))#v_s''"
-        "es = [$Table_init x y]"
-        "res = Step_normal"
-        using assms tabinsts''_prop2 by fastforce+
-      moreover have
-        "(s.tabs s = tabinsts \<and> s.elems s = eleminsts \<longrightarrow> \<lparr>s;f;v_stack_to_es v_s @ [$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;v_stack_to_es v_s'' @ ?c_table_set @ ?c_table_init2\<rparr>)"
-        using progress_L0_left[OF reduce.table_init[OF ta_is(1)], of s tab ea y el ndest dest nsrc src nn n nn_pred val] 
-        ta_is val_is v_s''_def h_n False local.Suc v_to_e_def by force
-      moreover have
-        "(s.tabs s = tabinsts \<longrightarrow> \<lparr>s;f;v_stack_to_es v_s'' @  ?c_table_set\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:=tabinsts''\<rparr>;f;v_stack_to_es v_s''\<rparr>)"
-        using progress_L0_left[OF reduce.table_set[OF ta_is(1)], of s dest val tabinsts''] tabinsts''_is v_to_e_def calculation(2)
-        by auto
-      moreover have
-        "(s.tabs s = tabinsts \<and> s.elems s = eleminsts \<longrightarrow> \<lparr>s;f;v_stack_to_es v_s'' @ ?c_table_set @ ?c_table_init2\<rparr> \<leadsto> \<lparr>s\<lparr>tabs:=tabinsts''\<rparr>;f;v_stack_to_es v_s'' @ ?c_table_init2\<rparr>)"
-        using progress_L0[of s f "v_stack_to_es v_s'' @  ?c_table_set"  "s\<lparr>tabs:=tabinsts''\<rparr>" f "v_stack_to_es v_s''" "[]" ?c_table_init2]
-        calculation
-        by simp
-      moreover have "(s.tabs s = tabinsts \<and> s.elems s = eleminsts \<longrightarrow> reduce_trans (s,f,v_stack_to_es v_s @ [$Table_init x y]) (s\<lparr>tabs:=tabinsts''\<rparr>,f,v_stack_to_es v_s'' @?c_table_init2))"
-        using calculation(5,7) v_s''_def(2)
-         by (metis (no_types, lifting) reduce_trans_app_end reduce_trans_def rtranclp.rtrancl_refl)
-      then show ?thesis
-        using a v_s''_def v_to_e_def
-        by auto
-    qed
-  qed
-qed
-
 lemma app_s_f_v_s_table_init_is:
   assumes "app_s_f_v_s_table_init x y tabinsts eleminsts f v_s = (v_s', es, res)"
   shows "res = Step_normal \<and> ((tabs s = tabinsts \<and> elems s = eleminsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Table_init x y]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@es\<rparr>)  \<or>
@@ -844,6 +736,51 @@ next
   qed
 qed
 
+lemma app_s_f_v_s_table_fill_is:
+  assumes "app_s_f_v_s_table_fill x tabinsts f v_s = (v_s', es, res)"
+  shows "res = Step_normal \<and> ((tabs s = tabinsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Table_fill x]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@es\<rparr>)  \<or>
+         (\<exists>str. res = Res_trap str \<and> es = [] \<and> ((tabs s = tabinsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Table_fill x]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@es@[Trap]\<rparr>)) \<or>
+         res = crash_invalid"
+proof(cases "res = crash_invalid")
+  case True
+  then show ?thesis by simp
+next
+  case False
+  then have h_res: "res \<noteq> crash_invalid " by simp
+  then obtain i n vr v_s'' where v_s''_def:
+    "v_s = (V_num (ConstInt32 n))#(V_ref vr)#(V_num (ConstInt32 i))#v_s''"
+    using assms app_s_f_v_s_table_fill_def by (auto split: list.splits v.splits v_num.splits)
+  then obtain ta nn ni tab where ta_is:
+    "(stab_ind (f_inst f) x) = Some ta"
+    "ni = nat_of_int i"
+    "nn = nat_of_int n"
+    "tab = (tabinsts)!ta"
+    using assms False app_s_f_v_s_table_fill_def by (auto split: option.splits list.splits v.splits v_num.splits)
+  then show ?thesis
+  proof(cases "ni+nn > length (snd tab)")
+    case True
+    then show ?thesis
+      using progress_L0_left[OF reduce.table_fill_trap] assms False ta_is v_s''_def v_to_e_def v_to_e_def
+      unfolding app_s_f_v_s_table_fill_def
+      by (auto simp add: Let_def split: v_num.splits nat.splits list.splits cvtop.splits if_splits option.splits v.splits)
+  next
+    case False
+    then show ?thesis
+    proof(cases nn)
+      case 0
+      then show ?thesis
+        using progress_L0_left[OF reduce.table_fill_done] assms False ta_is v_s''_def v_to_e_def v_to_e_def
+        unfolding app_s_f_v_s_table_fill_def
+        by (auto simp add: Let_def split: v_num.splits nat.splits list.splits cvtop.splits if_splits option.splits v.splits)
+    next
+      case (Suc nn_pred)
+      then show ?thesis
+        using progress_L0_left[OF reduce.table_fill, of f x ta s tab ni i nn n nn_pred _ vr] assms False ta_is v_s''_def v_to_e_def v_to_e_def
+        unfolding app_s_f_v_s_table_fill_def
+        by (auto simp add: Let_def split: v_num.splits nat.splits list.splits cvtop.splits if_splits option.splits v.splits)
+    qed
+  qed
+qed
 
 (*
   \<comment> \<open>\<open>table set\<close>\<close>

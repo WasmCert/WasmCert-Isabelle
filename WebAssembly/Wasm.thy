@@ -95,9 +95,9 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | memory_fill: "\<lbrakk>length (memory \<C>) \<ge> 1\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Memory_fill] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
 \<comment> \<open>\<open>table_init\<close>\<close>
 | table_init: "\<lbrakk>x < length (table \<C>); y < length (elem \<C>); tr = tab_t_reftype (table \<C>!x); tr = elem \<C>!y\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Table_init x y] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
-\<comment> \<open>\<open>memory_copy\<close>\<close>
+\<comment> \<open>\<open>table_copy\<close>\<close>
 | table_copy: "\<lbrakk>x < length (table \<C>); tr = tab_t_reftype (table \<C>!x); y < length (table \<C>); tr = tab_t_reftype (table \<C>!y)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Table_copy x y] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
-\<comment> \<open>\<open>memory_fill\<close>\<close>
+\<comment> \<open>\<open>table_fill\<close>\<close>
 | table_fill: "\<lbrakk>x < length (table \<C>); tr = tab_t_reftype (table \<C>!x)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Table_fill x ] : ([T_num T_i32, T_ref tr, T_num T_i32] _> [])"
 \<comment> \<open>\<open>elem_drop\<close>\<close>
 | elem_drop: "x < length (elem \<C>) \<Longrightarrow> \<C> \<turnstile> [Elem_drop x] : ([] _> [])"
@@ -375,7 +375,7 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
   \<comment> \<open>\<open>table fill\<close>\<close>
 | table_fill_trap: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; ni = nat_of_int i; nn = nat_of_int n; ni+nn > length (snd tab) \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32  n),$Table_fill x]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
 | table_fill_done: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; ni = nat_of_int i; nn = nat_of_int n; ni+nn \<le> length (snd tab); nn = 0 \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32 n),$Table_fill x]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"
-| table_fill: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; ni = nat_of_int i; nn = nat_of_int n; ni+nn \<le> length (snd tab); nn = nn_pred+1 \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32 n),$Table_fill x]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ni+1))), $C (V_ref vr), $EConstNum (ConstInt32 (int_of_nat n_pred)), $Table_fill x]\<rparr>"
+| table_fill: "\<lbrakk>stab_ind (f_inst f) x = Some ta; (tabs s)!ta = tab; ni = nat_of_int i; nn = nat_of_int n; ni+nn \<le> length (snd tab); nn = nn_pred+1 \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32 n),$Table_fill x]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 i), $C (V_ref vr), $Table_set x, $EConstNum (ConstInt32 (int_of_nat (ni+1))), $C (V_ref vr), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_fill x]\<rparr>"
   \<comment> \<open>\<open>table copy\<close>\<close>
 | table_copy_trap: "\<lbrakk>stab_ind (f_inst f) x = Some tax; (tabs s)!tax = tabx; stab_ind (f_inst f) y = Some tay; (tabs s)!ty = taby; ndest = nat_of_int dest; nrsc = nat_of_int src; nn = nat_of_int n; nsrc+nn > length (snd tabx) \<or> ndest + nn > length (snd taby) \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
 | table_copy_done: "\<lbrakk>stab_ind (f_inst f) x = Some tax; (tabs s)!tax = tabx; stab_ind (f_inst f) y = Some tay; (tabs s)!ty = taby; ndest = nat_of_int dest; nrsc = nat_of_int src; nn = nat_of_int n; nsrc+nn \<le> length (snd tabx); ndest+nn \<le> length (snd taby); nn = 0 \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),$Table_copy x y]\<rparr> \<leadsto> \<lparr>s;f;[]\<rparr>"

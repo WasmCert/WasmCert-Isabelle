@@ -2898,7 +2898,7 @@ next
     using 1 2 e_type_empty table_fill_done.prems(3) table_fill_done.prems(6)
     by (metis instr_subtyping_comp)
 next
-  case (table_fill f x ta s tab ni i nn n nn_pred vr n_pred)
+  case (table_fill f x ta s tab ni i nn n nn_pred vr)
   then have 1: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 i), $C (V_ref vr), $EConstNum (ConstInt32 n)] @
           [$Table_fill x] : (ts _> ts')" by auto
   obtain ts'' vs where ts''_def:
@@ -2949,15 +2949,15 @@ next
       by (metis append_Cons append_Nil e_type_comp_conc)
   qed
   have 8: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ni + 1))), $C V_ref vr,
-           $EConstNum (ConstInt32 (int_of_nat n_pred)), $Table_fill x] : (ts _> ts)"
+           $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_fill x] : (ts _> ts)"
   proof -
     have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ni + 1)))] : [] _> [T_num T_i32]"
       by (metis const_num e_typing_l_typing.intros(1) to_e_list_1 typeof_num_def v_num.case(1))
     then have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ni + 1))), $C V_ref vr] : [] _> [T_num T_i32, T_ref (typeof_ref vr)]"
       using 6(2) e_type_comp_conc e_typing_l_typing.intros(3) self_append_conv2 e_weakening append_Cons by metis
-    then have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ni + 1))), $C V_ref vr, $EConstNum (ConstInt32 (int_of_nat n_pred))] : [] _> [T_num T_i32, T_ref (typeof_ref vr), T_num T_i32]"
+    then have "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ni + 1))), $C V_ref vr, $EConstNum (ConstInt32 (int_of_nat nn_pred))] : [] _> [T_num T_i32, T_ref (typeof_ref vr), T_num T_i32]"
       by (metis e_weakening append_Cons const_num e_type_comp_conc e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) eq_Nil_appendI to_e_list_1 typeof_num_def v_num.case(1))
-    then have a: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ni + 1))), $C V_ref vr, $EConstNum (ConstInt32 (int_of_nat n_pred))] : ts _> ts@[T_num T_i32, T_ref (typeof_ref vr), T_num T_i32]"
+    then have a: "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 (int_of_nat (ni + 1))), $C V_ref vr, $EConstNum (ConstInt32 (int_of_nat nn_pred))] : ts _> ts@[T_num T_i32, T_ref (typeof_ref vr), T_num T_i32]"
       using e_typing_l_typing.intros(3) e_weakening by fastforce
     moreover have b: "s\<bullet>\<C> \<turnstile> [$Table_fill x] : (ts@[T_num T_i32, T_ref (typeof_ref vr), T_num T_i32] _> ts)"
       using "2" "4" ts''_def(4)
