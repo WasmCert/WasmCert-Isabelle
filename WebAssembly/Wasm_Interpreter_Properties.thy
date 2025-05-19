@@ -3231,7 +3231,7 @@ proof (induction fuel "(Config d s fc fcs)" arbitrary: d s fc fcs rule: run_iter
       by (metis (no_types, lifting) append_Nil2 es_frame_contexts_to_config_v_s map_append reduce_trans_app rev_append)
   next
     case d
-    obtain v_s' b_es' where b_es'_is:"split_v_s_b_s (b_e#b_es) = (v_s', b_es')" "(v_s', b_es') = split_v_s_b_s (b_e#b_es)"
+    obtain v_s' b_es' where b_es'_is:"split_v_s_b_s (b_e#b_es) = (v_s', b_es')"
       by (metis prod.exhaust)
     
     show ?thesis
@@ -3263,21 +3263,24 @@ proof (induction fuel "(Config d s fc fcs)" arbitrary: d s fc fcs rule: run_iter
           using Res_trap res_step.distinct(5) res_step.simps(4) run_step_b_e_is run_step_b_e_sound by meson
         moreover have defs2:
           "es_frame_contexts_to_config [] (Frame_context (Redex (v_s''' @ v_s'') (v_stack_to_es v_s') (b_e'' # b_es'')) lcs nf f) fcs = (fa, esfc)"
-          using calculation res_step.distinct(5) res_step.simps(4) run_step_b_e_is run_step_b_e_sound
-                Res_trap Cons d es_frame_contexts_to_config_b_e_one  es_frame_contexts_to_config_b_es
-                b_es'_is  es_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
+          using calculation Cons d 
+                 es_frame_contexts_to_config_b_e_step 
           by (auto simp del: run_step_b_e.simps split_v_s_b_s.simps split: prod.splits res_step.splits)
         show ?thesis
-          using  1(6) Cons d Res_trap
-                b_es'_is  es_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
-                es_frame_contexts_to_config_trap_reduce_trans reduce_trans_app split_v_s_es_aux_is[of "[]" es "v_s'''" "[]"]
-                run_step_b_e_is es_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
-            reduce_trans_app 
-            es_frame_contexts_to_config_b_es es_frame_contexts_to_config_v_s
-          apply (auto simp del: run_step_b_e.simps split_v_s_b_s.simps )
-          using defs defs2
-          (* TODO: fix this *)
-          by (metis \<open>\<And>thesis. (\<And>fa esfc f' esfc'. \<lbrakk>es_frame_contexts_to_config [$b_e''] (Frame_context (Redex (v_s' @ v_s) [] b_es'') lcs nf f) fcs = (fa, esfc); es_frame_contexts_to_config [Trap] fc_step fcs_step = (f', esfc'); \<lparr>s;fa;esfc\<rparr> \<leadsto> \<lparr>s_step;f';esfc'\<rparr>\<rbrakk> \<Longrightarrow> thesis) \<Longrightarrow> thesis\<close> \<open>\<And>thesis. (\<And>v_s' b_es'. \<lbrakk>split_v_s_b_s (b_e # b_es) = (v_s', b_es'); (v_s', b_es') = split_v_s_b_s (b_e # b_es)\<rbrakk> \<Longrightarrow> thesis) \<Longrightarrow> thesis\<close> append.left_neutral d(1) es_frame_contexts_to_config_b_e_one es_frame_contexts_to_config_b_e_step es_frame_contexts_to_config_e_one es_frame_contexts_to_config_trap_reduce_trans reduce_trans_app split_v_s_b_s.simps) 
+          using 
+            1(6)
+            Cons d Res_trap
+            reduce_trans_app[OF defs(3)] split_v_s_es_aux_is[of "[]" es "v_s'''" "[]"]
+            defs defs2 
+            run_step_b_e_is b_es'_is
+            split_v_s_b_s_conv_app
+            es_frame_contexts_to_config_b_es
+            es_frame_contexts_to_config_v_s
+            es_frame_contexts_to_config_b_e_one
+            es_frame_contexts_to_config_b_e_step
+            es_frame_contexts_to_config_trap_reduce_trans 
+          apply (auto simp add: Let_def simp del: run_step_b_e.simps)
+          by (metis b_es'_is[symmetric] append.left_neutral) 
       next
         case Step_normal
         then obtain fa esfc f' esfc' where defs:
@@ -3286,16 +3289,15 @@ proof (induction fuel "(Config d s fc fcs)" arbitrary: d s fc fcs rule: run_iter
           "\<lparr>s;fa;esfc\<rparr> \<leadsto> \<lparr>s_step;f';esfc'\<rparr>"
           using run_step_b_e_sound[OF run_step_b_e_is]
           by (metis res_step.distinct(3) res_step.distinct(5))
-        thus ?thesis        
+        thus ?thesis
           apply (cases res)
-          using 1(4,6) es_frame_contexts_to_config_trap_reduce_trans reduce_trans_app  Cons d b_es'_is
-            run_step_b_e_is es_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app
-            reduce_trans_app Step_normal
-            es_frame_contexts_to_config_b_es es_frame_contexts_to_config_v_s split_v_s_es_aux_is[of "[]" es "v_s'''" "[]"]
-          apply (auto simp del: run_step_b_e.simps split_v_s_b_s.simps)
-          using  append.left_neutral append_assoc map_append rev_append
-          (* TODO: fix this *)
-          by (smt (verit))+ 
+          using
+            Cons d Step_normal
+            1(4)[OF _ d(1) _ d(2)[symmetric] _ _ _ _ Cons run_step_b_e_is[symmetric] _ Step_normal] 1(6)
+            reduce_trans_app[OF defs(3)]
+            b_es'_is run_step_b_e_is
+          apply (simp_all del: run_step_b_e.simps split_v_s_b_s.simps)
+          by (metis (no_types, lifting)  es_frame_contexts_to_config_b_e_step split_v_s_b_s_conv_app split_v_s_es_aux_is[of "[]" es "v_s'''" "[]"] es_frame_contexts_to_config_b_es es_frame_contexts_to_config_b_es_v_s append_Nil2)+
       qed
     qed
   next
