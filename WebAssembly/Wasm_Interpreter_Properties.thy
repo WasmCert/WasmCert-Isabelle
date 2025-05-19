@@ -1072,6 +1072,21 @@ lemma app_f_v_s_ref_func_is:
   unfolding app_f_v_s_ref_func_def
   by (auto split: v.splits list.splits)
 
+lemma app_v_s_ref_null_is:
+  assumes "app_v_s_ref_null t v_s = (v_s',res)"
+  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Ref_null t]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>))"
+  using progress_L0_left[OF reduce.basic[OF reduce_simple.null]] assms v_to_e_def
+  unfolding app_v_s_ref_null_def
+  by (auto split: v.splits list.splits)
+
+lemma app_v_s_ref_is_null_is:
+  assumes "app_v_s_ref_is_null v_s = (v_s',res)"
+  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Ref_is_null]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+         (res = crash_invalid)"
+  using progress_L0_left[OF reduce.basic[OF reduce_simple.is_null_true]] progress_L0_left[OF reduce.basic[OF reduce_simple.is_null_false]] assms v_to_e_def
+  unfolding app_v_s_ref_is_null_def
+  by (auto split: if_splits v.splits list.splits)
+
 fun es_redex_to_es :: "e list \<Rightarrow> redex \<Rightarrow> e list" where
   "es_redex_to_es es (Redex v_sr esr b_esr) = v_stack_to_es v_sr @ es @ esr @ ($*b_esr)"
 
@@ -2738,10 +2753,33 @@ proof -
     qed auto
   next
     case (Ref_null x45)
-    then show ?thesis sorry
+    then obtain v_s' where "(\<lparr>s;f;(v_stack_to_es v_s)@[$Ref_null x45]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+      using assms app_v_s_ref_null_is fc_is app_f_v_s_ref_func_def[]
+      by (simp add: Let_def split: prod.splits, blast)
+    then show ?thesis
+      using assms app_v_s_ref_null_is fc_is Ref_null 0
+      apply (simp split: prod.splits)
+      by (metis append_Nil es_frame_contexts_to_config_ctx2 update_redex_step.simps)
   next
     case Ref_is_null
-    then show ?thesis sorry
+    then consider
+      (a) v_s' where "app_v_s_ref_is_null v_s = (v_s', res)" "res = Step_normal" "(\<lparr>s;f;(v_stack_to_es v_s)@[$Ref_is_null]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+    | (b) "res = crash_invalid"
+      using assms fc_is app_v_s_ref_is_null_is app_v_s_ref_is_null_def
+      by (fastforce split: prod.splits)
+    then show ?thesis
+    proof(cases)
+      case a
+      then show ?thesis
+        using assms fc_is app_v_s_ref_is_null_is app_v_s_ref_is_null_def Ref_is_null
+              es_frame_contexts_to_config_ctx2[OF a(3)] 0
+        apply (simp split : v.splits if_splits list.splits prod.splits)
+        by blast+
+    next
+      case b
+      then show ?thesis  by auto
+    qed
+   
   next
     case (Ref_func x47)
     then obtain v_s' where "(\<lparr>s;f;(v_stack_to_es v_s)@[$Ref_func x47]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"

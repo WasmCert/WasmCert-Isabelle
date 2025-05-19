@@ -557,19 +557,23 @@ definition app_s_f_data_drop :: "i \<Rightarrow> datainst list \<Rightarrow> f  
   "app_s_f_data_drop x datainsts f = 
     (let a = (inst.datas (f_inst f))!x in (datainsts[a :=  []], Step_normal))"
 
-(*
-  \<comment> \<open>\<open>references\<close>\<close>
-| null: "\<lparr>[$(Ref_null t)]\<rparr> \<leadsto> \<lparr>[Ref (ConstNull t)]\<rparr>"
-| is_null_true: "is_null_ref v_r \<Longrightarrow> \<lparr>[Ref v_r, $Ref_is_null]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 (wasm_bool True))]\<rparr>"
-| is_null_false: "\<not>is_null_ref v_r \<Longrightarrow> \<lparr>[Ref v_r, $Ref_is_null]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 (wasm_bool False))]\<rparr>"
-
-  \<comment> \<open>\<open>references\<close>\<close>
-| ref_func: "\<lbrakk>length fi = j; (inst.funcs (f_inst f)) = (fi @ [fa] @ fas)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(Ref_func j)]\<rparr> \<leadsto> \<lparr>s;f;[Ref (ConstRefFunc (fa))]\<rparr>"
-*)
-
 definition app_f_v_s_ref_func :: "i \<Rightarrow> f \<Rightarrow> v_stack  \<Rightarrow> (v_stack \<times> res_step)" where
   "app_f_v_s_ref_func x f v_s = 
     (let fa = (inst.funcs (f_inst f))!x in ((V_ref (ConstRefFunc fa))#v_s, Step_normal))"
+
+definition app_v_s_ref_null :: "t_ref  \<Rightarrow> v_stack  \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_ref_null t v_s = 
+     ((V_ref (ConstNull t))#v_s, Step_normal)"
+
+definition app_v_s_ref_is_null :: "v_stack  \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_v_s_ref_is_null v_s =
+    (case v_s of
+      (V_ref v_r)#v_s' \<Rightarrow>
+        if is_null_ref v_r then
+          ((V_num (ConstInt32 (wasm_bool True)))#v_s', Step_normal)
+        else
+          ((V_num (ConstInt32 (wasm_bool False)))#v_s', Step_normal)
+    | _ \<Rightarrow> (v_s, crash_invalid))"
 
 (* 0: local value stack, 1: current redex, 2: tail of redex *)
 datatype redex = Redex v_stack "e list" "b_e list"
@@ -1029,6 +1033,14 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
 
     | (Ref_func x) \<Rightarrow>
         let (v_s', res) = (app_f_v_s_ref_func x f v_s) in
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
+    
+    | (Ref_null t) \<Rightarrow>
+        let (v_s', res) = (app_v_s_ref_null t v_s) in
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
+
+    | Ref_is_null \<Rightarrow>
+        let (v_s', res) = (app_v_s_ref_is_null v_s) in
         ((Config d s (update_fc_step fc v_s' []) fcs), res)
 
     | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))"
