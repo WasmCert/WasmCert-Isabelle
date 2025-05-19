@@ -12,7 +12,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
   \<comment> \<open>\<open>references\<close>\<close>
 | ref_null:"\<C> \<turnstile> [Ref_null t] :([] _> [T_ref t])"
 | ref_is_null:"\<C> \<turnstile> [Ref_is_null] :([T_ref t] _> [T_num T_i32])"
-| ref_func:"\<lbrakk>j < length (func_t \<C>)\<rbrakk> \<Longrightarrow> j \<in> set (refs \<C>) \<Longrightarrow> \<C> \<turnstile> [Ref_func j] :([] _> [T_ref T_func_ref])"
+| ref_func:"\<lbrakk>j < length (func_t \<C>); j \<in> set (refs \<C>)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Ref_func j] :([] _> [T_ref T_func_ref])"
   \<comment> \<open>\<open>vector ops\<close>\<close>
 | unop_vec:"\<C> \<turnstile> [Unop_vec op]  : ([T_vec T_v128]   _> [T_vec T_v128])"
 | binop_vec:"\<lbrakk>binop_vec_wf op\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Binop_vec op]  : ([T_vec T_v128, T_vec T_v128]   _> [T_vec T_v128])"
@@ -295,7 +295,7 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
 | invoke_host_Some:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m; host_apply s (t1s _> t2s) h vcs hs (Some (s', vcs'))\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f;($C* vcs')\<rparr>"
 | invoke_host_None:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>references\<close>\<close>
-| func_ref: "\<lbrakk>length fi = j; (inst.funcs (f_inst f)) = (fi @ [fa] @ fas)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(Ref_func j)]\<rparr> \<leadsto> \<lparr>s;f;[Ref (ConstRefFunc (fa))]\<rparr>"
+| ref_func: "fa = (inst.funcs (f_inst f))!j \<Longrightarrow> \<lparr>s;f;[$(Ref_func j)]\<rparr> \<leadsto> \<lparr>s;f;[Ref (ConstRefFunc (fa))]\<rparr>"
   \<comment> \<open>\<open>get_local\<close>\<close>
 | get_local:"\<lbrakk>length vi = j; f_locs f = (vi @ [v] @ vs)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(Get_local j)]\<rparr> \<leadsto> \<lparr>s;f;[$C v]\<rparr>"
   \<comment> \<open>\<open>set_local\<close>\<close>

@@ -557,6 +557,20 @@ definition app_s_f_data_drop :: "i \<Rightarrow> datainst list \<Rightarrow> f  
   "app_s_f_data_drop x datainsts f = 
     (let a = (inst.datas (f_inst f))!x in (datainsts[a :=  []], Step_normal))"
 
+(*
+  \<comment> \<open>\<open>references\<close>\<close>
+| null: "\<lparr>[$(Ref_null t)]\<rparr> \<leadsto> \<lparr>[Ref (ConstNull t)]\<rparr>"
+| is_null_true: "is_null_ref v_r \<Longrightarrow> \<lparr>[Ref v_r, $Ref_is_null]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 (wasm_bool True))]\<rparr>"
+| is_null_false: "\<not>is_null_ref v_r \<Longrightarrow> \<lparr>[Ref v_r, $Ref_is_null]\<rparr> \<leadsto> \<lparr>[$EConstNum (ConstInt32 (wasm_bool False))]\<rparr>"
+
+  \<comment> \<open>\<open>references\<close>\<close>
+| ref_func: "\<lbrakk>length fi = j; (inst.funcs (f_inst f)) = (fi @ [fa] @ fas)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(Ref_func j)]\<rparr> \<leadsto> \<lparr>s;f;[Ref (ConstRefFunc (fa))]\<rparr>"
+*)
+
+definition app_f_v_s_ref_func :: "i \<Rightarrow> f \<Rightarrow> v_stack  \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_f_v_s_ref_func x f v_s = 
+    (let fa = (inst.funcs (f_inst f))!x in ((V_ref (ConstRefFunc fa))#v_s, Step_normal))"
+
 (* 0: local value stack, 1: current redex, 2: tail of redex *)
 datatype redex = Redex v_stack "e list" "b_e list"
 
@@ -1012,6 +1026,10 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
     | (Data_drop x) \<Rightarrow>
       let (datainsts', res) = (app_s_f_data_drop x (datas s) f) in
       ((Config d (s\<lparr>datas:=datainsts'\<rparr>)) fc fcs, res)
+
+    | (Ref_func x) \<Rightarrow>
+        let (v_s', res) = (app_f_v_s_ref_func x f v_s) in
+        ((Config d s (update_fc_step fc v_s' []) fcs), res)
 
     | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))"
 

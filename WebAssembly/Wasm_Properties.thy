@@ -828,8 +828,8 @@ qed
 
 lemma types_preserved_ref_func:
   assumes
-    "length fi = j"
-    "(inst.funcs (f_inst f)) = (fi @ [fa] @ fas)"
+    "j < length (inst.funcs (f_inst f))"
+    "(inst.funcs (f_inst f))!j = fa"
     "\<lparr>s;f;[$(Ref_func j)]\<rparr> \<leadsto> \<lparr>s;f;[Ref (ConstRefFunc (fa))]\<rparr>"
     "s\<bullet>\<C> \<turnstile> [$(Ref_func j)] : (ts _> ts')"
     "list_all2 (funci_agree (funcs s)) (inst.funcs (f_inst f)) (func_t \<C>)"
@@ -2490,14 +2490,21 @@ next
     using e_typing_l_typing.intros(5)
     by blast
 next
-  case (func_ref fi j f fa fas s)
-  then have "list_all2 (funci_agree (funcs s)) (inst.funcs (f_inst f)) (func_t \<C>i)"
-    using inst_typing.simps by fastforce
-  then have "list_all2 (funci_agree (funcs s)) (inst.funcs (f_inst f)) (func_t \<C>)"
-    using func_ref(6) by fastforce
+  case (ref_func fa f j s)
+  then have 1: "\<C> \<turnstile> [Ref_func j] : ts _> ts'"
+
+    by (metis to_e_list_1 unlift_b_e)
+  then have 2: "j < length (func_t \<C>)"
+    by (simp add: b_e_type_ref_func(2))
+  have 3: "list_all2 (funci_agree (funcs s)) (inst.funcs (f_inst f)) (func_t \<C>i)"
+    using ref_func inst_typing.simps by fastforce
+  then have 4: "list_all2 (funci_agree (funcs s)) (inst.funcs (f_inst f)) (func_t \<C>)"
+    using ref_func(5) by fastforce
+  then have 5: "j < length (inst.funcs (f_inst f))"
+    by (simp add: "2" list_all2_lengthD)
   then show ?case using
-      types_preserved_ref_func[OF func_ref(1) func_ref(2) _ func_ref(7) _ func_ref(3)]
-      reduce.func_ref[OF func_ref(1) func_ref(2), of s] func_ref.prems(3,6)
+      types_preserved_ref_func[OF 5 ref_func(1)[symmetric] _ ref_func(6) 4]
+      reduce.ref_func[OF ref_func(1), of s] ref_func.prems
       by fastforce
 next
   case (get_local vi j i v vs s)
@@ -3754,8 +3761,10 @@ next
     by fastforce
   hence 1: "inst.funcs (f_inst f) = fj @ [fi] @ fj'"
     by (metis Cons_eq_appendI Suc_eq_plus1 append_eq_conv_conj append_self_conv2 drop_Suc_nth f_def(1) f_def(2) f_def(3) j_def)
+  hence 2: "fi = inst.funcs (f_inst f) ! j"
+    using f_def(1) by blast
   then have "\<lparr>s;f;[$Ref_func j]\<rparr>  \<leadsto> \<lparr>s;f;[Ref (ConstRefFunc fi)]\<rparr>"
-    using reduce.func_ref[OF fj_len 1] by simp
+    using reduce.ref_func[OF 2] by simp
   then show ?case
     by (metis progress_L0_left to_e_list_1)
 next

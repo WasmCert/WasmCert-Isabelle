@@ -1065,6 +1065,13 @@ lemma app_s_f_data_drop_is:
   unfolding app_s_f_data_drop_def
   by (auto simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits v_vec.splits)
 
+lemma app_f_v_s_ref_func_is:
+  assumes "app_f_v_s_ref_func x f v_s = (v_s',res)"
+  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Ref_func x]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>))"
+  using progress_L0_left[OF reduce.ref_func] assms v_to_e_def
+  unfolding app_f_v_s_ref_func_def
+  by (auto split: v.splits list.splits)
+
 fun es_redex_to_es :: "e list \<Rightarrow> redex \<Rightarrow> e list" where
   "es_redex_to_es es (Redex v_sr esr b_esr) = v_stack_to_es v_sr @ es @ esr @ ($*b_esr)"
 
@@ -2737,7 +2744,13 @@ proof -
     then show ?thesis sorry
   next
     case (Ref_func x47)
-    then show ?thesis sorry
+    then obtain v_s' where "(\<lparr>s;f;(v_stack_to_es v_s)@[$Ref_func x47]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+      using assms app_f_v_s_ref_func_is fc_is app_f_v_s_ref_func_def[of x47 f v_s]
+      by (simp add: Let_def split: prod.splits, blast)
+    then show ?thesis
+      using assms app_s_f_elem_drop_is fc_is Ref_func 0
+      apply (simp split: prod.splits)
+      by (metis app_f_v_s_ref_func_is append_Nil es_frame_contexts_to_config_ctx2 update_redex_step.simps)
   next
     case (Unop_vec op)
     consider
