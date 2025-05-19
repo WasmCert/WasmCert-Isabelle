@@ -194,21 +194,34 @@ next
   qed
   show ?case using store_extension_tab_leq[OF table_grow.prems(1) 6 1 7 2 3]by blast
 next
-  case (elem_drop x f a s)
+  case (elem_drop a f x s)
+  then have 1: "\<C> \<turnstile> [Elem_drop x] : ts _> ts'"
+    using b_e_typing.elem_drop e_type_elem_drop subsumption by blast
+  then have 2: "x < length (elem \<C>)" using  b_e_type_elem_drop[OF 1,of x]
+    by simp
+  then have 3: "x < length (elem \<C>i)" using  elem_drop(5)
+    by simp
   have "list_all2 (elemi_agree s (elems s)) (inst.elems (f_inst f)) (elem \<C>i)"
-    using elem_drop(4) unfolding inst_typing.simps
+    using elem_drop(3) unfolding inst_typing.simps
     by fastforce
-  then have "a < length (elems s)" using elem_drop(1) elemi_agree_def
-    by (simp add: elem_drop.hyps(2) list_all2_conv_all_nth)
-  then show ?case using elem_drop_store_extension[OF _ elem_drop(3)] by simp
+  then have "a < length (elems s)" using elem_drop elemi_agree_def[of s "elems s"]
+    using 3
+    using list_all2_nthD2 by blast
+  then show ?case using elem_drop_store_extension[OF _ elem_drop(2)] by simp
 next
-  case (data_drop x f a s)
+  case (data_drop a f x s)
+  then have 1: "\<C> \<turnstile> [Data_drop x] : ts _> ts'"
+    using b_e_typing.data_drop e_type_data_drop subsumption by blast
+  then have 2: "x < length (data \<C>)" using  b_e_type_data_drop[OF 1,of x]
+    by simp
+  then have 3: "x < length (data \<C>i)" using  data_drop(5)
+    by simp
   have "list_all2 (datai_agree (datas s)) (inst.datas (f_inst f)) (data \<C>i)"
-    using data_drop(4) unfolding inst_typing.simps
+    using data_drop(3) unfolding inst_typing.simps
     by fastforce
-  then have "a < length (datas s)" using data_drop(1) datai_agree_def
-    by (simp add: data_drop.hyps(2) list_all2_conv_all_nth)
-  then show ?case using data_drop_store_extension[OF _ data_drop(3)] by simp
+  then have "a < length (datas s)" using data_drop(1) datai_agree_def 3
+    by (simp add: list_all2_conv_all_nth)
+  then show ?case using data_drop_store_extension[OF _ data_drop(2)] by simp
 qed (auto simp add: store_extension_refl store_extension.intros)+
 
 lemma store_preserved:
@@ -2401,13 +2414,13 @@ next
   then show ?case
     using e_type_local_shallow local.hyps local.prems(1,3,5) store_preserved v_typing_list_store_extension_inv by blast
 next
-  case (elem_drop x f a s)
+  case (elem_drop a f x s)
   have "funcs (s\<lparr>s.elems := (s.elems s)[a := (fst (s.elems s ! a), [])]\<rparr>) = funcs s"
     by simp
   then show ?case using v_typing_funcs_inv
     by (metis (mono_tags, lifting) elem_drop.prems(5) list_all2_mono)
 next
-  case (data_drop x f a s)
+  case (data_drop a f x s)
  have "funcs (s\<lparr>s.datas := (s.datas s)[a := []]\<rparr>) = funcs s"
     by simp
   then show ?case using v_typing_funcs_inv
@@ -2978,17 +2991,17 @@ next
   case (table_copy_2 f x tax s tabx y tay ty taby ndest dest nrsc src nn n nsrc nn_pred)
   then show ?case using types_preserved_table_copy by metis
 next
-  case (elem_drop x f a s)
+  case (elem_drop a f x s)
   then have "([] _> []) <ti: (ts _> ts')" using e_type_elem_drop by blast
   moreover have "list_all2 (v_typing (s\<lparr>s.elems := (s.elems s)[a := (fst (s.elems s ! a), [])]\<rparr>)) (f_locs f) tvs"
-    by (metis elem_drop.hyps(1) elem_drop.hyps(2) elem_drop.prems(1) elem_drop.prems(2) elem_drop.prems(3) elem_drop.prems(4) elem_drop.prems(5) elem_drop.prems(6) reduce.elem_drop reduce_locs_type_preserved)
+    by (metis elem_drop.hyps(1) elem_drop.hyps elem_drop.prems  reduce.elem_drop reduce_locs_type_preserved)
   ultimately show ?case
     using e_type_empty elem_drop.prems(3) by blast
 next
-  case (data_drop x f a s)
+  case (data_drop a f x s)
   then have "([] _> []) <ti: (ts _> ts')" using e_type_data_drop by blast
   moreover have "list_all2 (v_typing (s\<lparr>s.datas := (s.datas s)[a := []]\<rparr>)) (f_locs f) tvs"
-    by (metis data_drop.hyps(1) data_drop.hyps(2) data_drop.prems(1) data_drop.prems(2) data_drop.prems(3) data_drop.prems(4) data_drop.prems(5) data_drop.prems(6) reduce.data_drop reduce_locs_type_preserved)
+    by (metis data_drop.hyps(1) data_drop.hyps data_drop.prems(1) data_drop.prems(2) data_drop.prems(3) data_drop.prems(4) data_drop.prems(5) data_drop.prems(6) reduce.data_drop reduce_locs_type_preserved)
   ultimately show ?case
     using e_type_empty data_drop.prems(3) by blast
 qed 

@@ -549,6 +549,14 @@ definition app_s_f_v_s_table_grow :: "i \<Rightarrow> tabinst list \<Rightarrow>
                 | None => (tabinsts, v_s, crash_invalid))
            | _ \<Rightarrow> (tabinsts, v_s, crash_invalid))"
 
+definition app_s_f_elem_drop :: "i \<Rightarrow> eleminst list \<Rightarrow> f  \<Rightarrow> (eleminst list \<times> res_step)" where
+  "app_s_f_elem_drop x eleminsts f = 
+    (let a = (inst.elems (f_inst f))!x in (eleminsts[a := (fst (eleminsts!a), [])], Step_normal))"
+
+definition app_s_f_data_drop :: "i \<Rightarrow> datainst list \<Rightarrow> f  \<Rightarrow> (datainst list \<times> res_step)" where
+  "app_s_f_data_drop x datainsts f = 
+    (let a = (inst.datas (f_inst f))!x in (datainsts[a :=  []], Step_normal))"
+
 (* 0: local value stack, 1: current redex, 2: tail of redex *)
 datatype redex = Redex v_stack "e list" "b_e list"
 
@@ -996,6 +1004,14 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
     | (Table_size x) \<Rightarrow>
         let (v_s', res) = (app_s_f_v_s_table_size x (tabs s) f v_s) in
         (Config d s (update_fc_step fc v_s' []) fcs, res)
+    
+    | (Elem_drop x) \<Rightarrow>
+      let (eleminsts', res) = (app_s_f_elem_drop x (elems s) f) in
+      ((Config d (s\<lparr>elems:=eleminsts'\<rparr>)) fc fcs, res)    
+
+    | (Data_drop x) \<Rightarrow>
+      let (datainsts', res) = (app_s_f_data_drop x (datas s) f) in
+      ((Config d (s\<lparr>datas:=datainsts'\<rparr>)) fc fcs, res)
 
     | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))"
 

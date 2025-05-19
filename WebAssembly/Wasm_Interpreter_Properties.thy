@@ -1051,6 +1051,20 @@ lemma app_s_f_v_s_table_size_is:
   apply (auto  split: list.splits cvtop.splits if_splits option.splits v.splits)
   by (meson eq_snd_iff)
 
+lemma app_s_f_elem_drop_is:
+  assumes "app_s_f_elem_drop x eleminsts f = (eleminsts', res)"
+  shows "res = Step_normal \<and> ((elems s = eleminsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Elem_drop x]\<rparr> \<leadsto> \<lparr>s\<lparr>elems:=eleminsts'\<rparr>;f;(v_stack_to_es v_s)\<rparr>)"
+  using progress_L0_left[OF reduce.elem_drop]  assms
+  unfolding app_s_f_elem_drop_def
+  by (auto simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits v_vec.splits)
+
+lemma app_s_f_data_drop_is:
+  assumes "app_s_f_data_drop x datainsts f = (datainsts', res)"
+  shows "res = Step_normal \<and> ((datas s = datainsts) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Data_drop x]\<rparr> \<leadsto> \<lparr>s\<lparr>datas:=datainsts'\<rparr>;f;(v_stack_to_es v_s)\<rparr>)"
+  using progress_L0_left[OF reduce.data_drop]  assms
+  unfolding app_s_f_data_drop_def
+  by (auto simp add: Let_def split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits v_vec.splits)
+
 fun es_redex_to_es :: "e list \<Rightarrow> redex \<Rightarrow> e list" where
   "es_redex_to_es es (Redex v_sr esr b_esr) = v_stack_to_es v_sr @ es @ esr @ ($*b_esr)"
 
@@ -1561,11 +1575,6 @@ qed
 lemma run_step_b_e_sound:
   assumes "run_step_b_e b_e (Config d s fc fcs) = ((Config d' s' fc' fcs'), res)"
   shows "(\<exists>f esfc f' esfc'.
-            res = Step_normal \<and>
-            es_frame_contexts_to_config ([$b_e]) fc fcs = (f,esfc) \<and>
-            es_frame_contexts_to_config [] fc' fcs' = (f',esfc') \<and>
-            \<lparr>s;f;esfc\<rparr> \<leadsto> \<lparr>s';f';esfc'\<rparr>) \<or>
-         (\<exists>f esfc f' esfc'.
             res = Step_normal \<and>
             es_frame_contexts_to_config ([$b_e]) fc fcs = (f,esfc) \<and>
             es_frame_contexts_to_config [] fc' fcs' = (f',esfc') \<and>
@@ -2577,10 +2586,22 @@ proof -
     qed auto
   next
     case (Elem_drop x36)
-    then show ?thesis sorry
+    then have 1: "(\<lparr>s;f;(v_stack_to_es v_s)@[$Elem_drop x36]\<rparr> \<leadsto> \<lparr>s';f;(v_stack_to_es v_s)\<rparr>)"
+      using assms app_s_f_elem_drop_is fc_is app_s_f_elem_drop_def[of x36 "elems s" f]
+      by (simp split: prod.splits, blast)
+    then show ?thesis
+      using es_frame_contexts_to_config_ctx1[of s f v_s "[$Elem_drop x36]" s' f v_s "[]"]
+      using assms app_s_f_elem_drop_is fc_is Elem_drop 0
+      by (simp split: prod.splits, metis)
   next
     case (Data_drop x37)
-  then show ?thesis sorry
+    then have 1: "(\<lparr>s;f;(v_stack_to_es v_s)@[$Data_drop x37]\<rparr> \<leadsto> \<lparr>s';f;(v_stack_to_es v_s)\<rparr>)"
+      using assms app_s_f_data_drop_is fc_is app_s_f_data_drop_def[of x37 "datas s" f]
+      by (simp, blast)
+    then show ?thesis
+      using es_frame_contexts_to_config_ctx1[of s f v_s "[$Data_drop x37]" s' f v_s "[]"]
+      using assms app_s_f_data_drop_is fc_is Data_drop 0
+      by (simp split: prod.splits, metis)
   next
     case (EConstNum n)
     thus ?thesis
