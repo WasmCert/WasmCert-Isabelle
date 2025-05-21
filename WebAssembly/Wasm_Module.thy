@@ -149,8 +149,8 @@ record m = \<comment> \<open>module\<close>
   m_tabs :: "tab_t list"
   m_mems :: "mem_t list"
   m_globs :: "module_glob list"
-  m_elem :: "module_elem list"
-  m_data :: "module_data list"
+  m_elems :: "module_elem list"
+  m_datas :: "module_data list"
   m_start :: "i option"
   m_imports :: "module_import list"
   m_exports :: "module_export list"
@@ -183,8 +183,8 @@ fun collect_funcidxs_module :: "m \<Rightarrow> i list" where
       from_start = (case (m_start module) of
           Some x \<Rightarrow> [x]
         | None \<Rightarrow> []);
-      from_elems = concat (map collect_funcidxs_module_elem (m_elem module));
-      from_datas = concat (map collect_funcidxs_module_data (m_data module))
+      from_elems = concat (map collect_funcidxs_module_elem (m_elems module));
+      from_datas = concat (map collect_funcidxs_module_data (m_datas module))
     in remdups (concat [from_funcs, from_start, from_elems, from_datas]))"
 
 inductive module_typing :: "m \<Rightarrow> extern_t list \<Rightarrow> extern_t list \<Rightarrow> bool" where
@@ -221,8 +221,8 @@ inductive module_typing :: "m \<Rightarrow> extern_t list \<Rightarrow> extern_t
                      m_tabs = ts,
                      m_mems = ms,
                      m_globs = gs,
-                     m_elem = els,
-                     m_data = ds,
+                     m_elems = els,
+                     m_datas = ds,
                      m_start = i_opt,
                      m_imports = imps,
                      m_exports = exps\<rparr>

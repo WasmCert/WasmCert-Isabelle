@@ -230,8 +230,8 @@ fun module_type_checker :: "m \<Rightarrow> (extern_t list \<times> extern_t lis
                         m_tabs = ts,
                         m_mems = ms,
                         m_globs = gs,
-                        m_elem = els,
-                        m_data = ds,
+                        m_elems = els,
+                        m_datas = ds,
                         m_start = i_opt,
                         m_imports = imps,
                         m_exports = exps\<rparr> =
@@ -242,8 +242,8 @@ fun module_type_checker :: "m \<Rightarrow> (extern_t list \<times> extern_t lis
                         m_tabs = ts,
                         m_mems = ms,
                         m_globs = gs,
-                        m_elem = els,
-                        m_data = ds,
+                        m_elems = els,
+                        m_datas = ds,
                         m_start = i_opt,
                         m_imports = imps,
                         m_exports = exps\<rparr> in
@@ -283,8 +283,8 @@ proof -
          m_tabs = ts,
          m_mems = ms,
          m_globs = gs,
-         m_elem = els,
-         m_data = ds,
+         m_elems = els,
+         m_datas = ds,
          m_start = i_opt,
          m_imports = imps,
          m_exports = exps\<rparr>"
@@ -379,8 +379,8 @@ proof -
          m_tabs = ts,
          m_mems = ms,
          m_globs = gs,
-         m_elem = els,
-         m_data = ds,
+         m_elems = els,
+         m_datas = ds,
          m_start = i_opt,
          m_imports = imps,
          m_exports = exps\<rparr>"
