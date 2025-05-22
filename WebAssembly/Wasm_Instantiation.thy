@@ -1181,37 +1181,34 @@ lemma interp_instantiate_imp_instantiate:
   assumes "(interp_instantiate s m v_imps = (s', RI_res inst v_exps init_es))"
   shows "(instantiate s m v_imps ((s', inst, v_exps), init_es))"
 proof -
-  obtain t_imps t_exps g_inits e_offs d_offs inst' start e_init_tabs e_init_mems where s_end_is:
+  obtain t_imps t_exps inst_init_funcs inst_init g_inits el_inits start  where s_end_is:
     "module_type_checker m = Some (t_imps, t_exps)"
     "(list_all2 (external_typing s) v_imps t_imps)"
-    "g_inits = map (\<lambda>g. interp_get_v s inst' (g_init g)) (m_globs m)"
-    "(s', inst, v_exps) = interp_alloc_module s m v_imps g_inits"
-    "e_offs = map (\<lambda>e. interp_get_i32 s' inst (e_off e)) (m_elem m)"
-    "d_offs = map (\<lambda>d. interp_get_i32 s' inst (d_off d)) (m_data m)"
-    "list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m)"
-    "list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs (m_data m)"
+    "inst_init_funcs = (ext_funcs v_imps)@[length (funcs s) ..< (length (funcs s) + length (m_funcs m))]"
+    "inst_init = \<lparr>types=[],funcs=inst_init_funcs,tabs=[],mems=[],globs=ext_globs v_imps, elems=[], datas=[]\<rparr>"
+    "g_inits = map (\<lambda>g. interp_get_v s inst_init (g_init g)) (m_globs m)"
+    "el_inits = map (\<lambda> el. interp_get_v_refs s inst_init (e_init el)) (m_elems m)"
+    "(s', inst, v_exps) = interp_alloc_module s m v_imps g_inits el_inits"
     "start = (case (m_start m) of None \<Rightarrow> [] | Some i_s \<Rightarrow> [Invoke ((inst.funcs inst)!i_s)])"
-    "e_init_tabs = List.map2 (\<lambda>n e. Init_tab n (map (\<lambda>i. (inst.funcs inst)!i) (e_init e))) (map nat_of_int e_offs) (m_elem m)"
-    "e_init_mems = List.map2 (\<lambda>n d. Init_mem n (d_init d)) (map nat_of_int d_offs) (m_data m)"
-    "inst' = \<lparr>types=[],funcs=[],tabs=[],mems=[],globs=ext_globs v_imps\<rparr>"
-    "init_es = e_init_tabs@e_init_mems@start"
+    "init_es = ((run_elems (m_elems m))@(run_datas (m_datas m))@start)"
     using assms
     by (fastforce simp add: Let_def split: if_splits option.splits prod.splits)
 
   have 1:"module_typing m t_imps t_exps"
     using s_end_is(1) module_type_checker_imp_module_typing
     by blast
-  have 2:"alloc_module s m v_imps g_inits (s', inst, v_exps)"
-    using s_end_is(4) interp_alloc_module_imp_alloc_module
+  have 2:"alloc_module s m v_imps g_inits el_inits (s', inst, v_exps)"
+    using s_end_is(7) interp_alloc_module_imp_alloc_module
     by metis
 
-  obtain fs fts ts ms gs gts els ds i_opt imps exps tfs ifts itts imts igts \<C> \<C>' where m_is:
+  obtain fs fts ts ms gs gts els rts ds dts i_opt imps exps tfs ifts itts imts igts \<C> \<C>' where m_is:
     "list_all2 (module_func_typing \<C>) fs fts"
     "list_all (module_tab_typing) ts"
     "list_all (module_mem_typing) ms"
     "list_all2 (module_glob_typing \<C>') gs gts"
-    "list_all (module_elem_typing \<C>) els"
-    "list_all (module_data_typing \<C>) ds"
+    "list_all2 (module_elem_typing \<C>') els rts"
+    "list_all (module_data_typing \<C>') ds"
+    "length dts = length ds"
     "pred_option (module_start_typing \<C>) i_opt"
     "list_all2 (\<lambda>imp. module_import_typing \<C> (I_desc imp)) imps t_imps"
     "list_all2 (\<lambda>exp. module_export_typing \<C> (E_desc exp)) exps t_exps"
@@ -1219,15 +1216,25 @@ proof -
     "itts = ext_t_tabs t_imps"
     "imts = ext_t_mems t_imps"
     "igts = ext_t_globs t_imps"
-    "\<C> = \<lparr>types_t=tfs, func_t=ifts@fts, global=igts@gts, table=itts@ts, memory=imts@ms, local=[], label=[], return=None\<rparr>"
-    "\<C>' = \<lparr>types_t=[], func_t=[], global=igts, table=[], memory=[], local=[], label=[], return=None\<rparr>"
+    "\<C> = \<lparr>types_t=tfs,
+       func_t=ifts@fts,
+       global=igts@gts,
+       elem=rts,
+       data=dts,
+       table=itts@ts,
+       memory=imts@ms,
+       local=[],
+       label=[],
+       return=None,
+       refs=collect_funcidxs_module (m\<lparr>m_funcs := [], m_start := None\<rparr>)\<rparr>"
+    "\<C>' = \<C>\<lparr>global := igts\<rparr>"
     "m = \<lparr>m_types = tfs,
           m_funcs = fs,
           m_tabs = ts,
           m_mems = ms,
           m_globs = gs,
-          m_elem = els,
-          m_data = ds,
+          m_elems = els,
+          m_datas = ds,
           m_start = i_opt,
           m_imports = imps,
           m_exports = exps\<rparr>"
@@ -1235,47 +1242,51 @@ proof -
     unfolding module_typing.simps
     by blast
 
-  obtain s1 s2 s3 i_fs i_ts i_ms i_gs where inst_is:
+  obtain s1 s2 s3 s4 s5 i_fs i_ts i_ms i_gs i_es i_ds where inst_is:
     "inst = \<lparr>types=(m_types m),
            funcs=(ext_funcs v_imps)@i_fs,
            tabs=(ext_tabs v_imps)@i_ts,
            mems=(ext_mems v_imps)@i_ms,
-           globs=(ext_globs v_imps)@i_gs\<rparr>"
+           globs=(ext_globs v_imps)@i_gs,
+           elems=i_es,
+           datas=i_ds\<rparr>"
     "alloc_funcs s (m_funcs m) inst = (s1,i_fs)"
     "alloc_tabs s1 (m_tabs m) = (s2,i_ts)"
     "alloc_mems s2 (m_mems m) = (s3,i_ms)"
-    "alloc_globs s3 (m_globs m) g_inits = (s',i_gs)"
+    "alloc_globs s3 (m_globs m) g_inits = (s4,i_gs)"
+    "alloc_elems s4 (map module_elem.e_type (m_elems m)) el_inits = (s5, i_es)"
+    "alloc_datas s5 (map module_data.d_init (m_datas m)) = (s', i_ds)"
     "v_exps = map (\<lambda>m_exp. \<lparr>E_name=(E_name m_exp), E_desc=(export_get_v_ext inst (E_desc m_exp))\<rparr>) (m_exports m)"
     using 2
     unfolding alloc_module.simps
     by blast
 
-  have 12:"list_all2 (\<lambda>ig tg. external_typing s (Ext_glob ig) (Te_glob tg)) (inst.globs inst') (global \<C>')"
-    using s_end_is(2,12) m_is(13,15) ext_globs_ind list_all2_external_typing_glob_alloc
+  have 12:"list_all2 (\<lambda>ig tg. external_typing s (Ext_glob ig) (Te_glob tg)) (inst.globs inst_init) (global \<C>')"
+    using s_end_is m_is ext_globs_ind list_all2_external_typing_glob_alloc
     by simp
   have 11:"list_all2 (\<lambda>ig tg. external_typing s' (Ext_glob ig) (Te_glob tg)) (inst.globs inst) (global \<C>)"
   proof -
-    have "list_all2 (\<lambda>ig tg. external_typing s' (Ext_glob ig) (Te_glob tg)) (inst.globs inst') (global \<C>')"
+    have "list_all2 (\<lambda>ig tg. external_typing s' (Ext_glob ig) (Te_glob tg)) (inst.globs inst_init) (global \<C>')"
       using alloc_module_external_typing_preserved[OF 2] 12
       unfolding list_all2_conv_all_nth
       by fastforce
     moreover
     have 111:"list_all2 (\<lambda>v m_g. typeof v = tg_t (g_type m_g)) g_inits (m_globs m)"
-      using s_end_is(3)[symmetric] g_init_type_interp[OF _ _ _ 12, of inst' _ _ \<C>' _ "[]"] m_is(4,16)
+      using s_end_is(5)[symmetric] g_init_type_interp[OF _ _ _ 12, of inst_init _ _ \<C>' _ "[]"] m_is(4,17)
       by (auto simp add: list_all2_conv_all_nth)
     have "(gather_m_g_types (m_globs m)) = gts"
-      using m_is(4,16)
+      using m_is(4,17)
       unfolding list_all2_conv_all_nth module_glob_typing.simps
       apply simp
       apply (metis length_map module_glob.select_convs(1) nth_equalityI nth_map)
       done
     hence "list_all2 (\<lambda>ig tg. external_typing s' (Ext_glob ig) (Te_glob tg)) i_gs gts"
       using alloc_globs_ext_typing[OF inst_is(5) 111]
-      by blast
+      using alloc_datas_range alloc_elems_range external_typing.simps inst_is(6) inst_is(7) by fastforce
     ultimately
     show ?thesis
       using list_all2_appendI
-      by (fastforce simp add: m_is(14,15) inst_is(1) s_end_is(12))
+      by (fastforce simp add: m_is inst_is(1) s_end_is)
   qed
 
   have 3:"list_all2 (\<lambda>g v. reduce_trans (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,$*(g_init g)) (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,[$C v])) (m_globs m) g_inits"
@@ -1283,36 +1294,37 @@ proof -
     { fix i
       assume local_assms:"length (m_globs m) = length g_inits" "i<length (m_globs m)"
       hence l1:"const_exprs \<C>' (g_init (m_globs m ! i))"
-        using m_is(4,16)
+        using m_is(4,17)
         unfolding list_all2_conv_all_nth module_glob_typing.simps
         by auto
       obtain t where l2:"\<C>' \<turnstile> (g_init (m_globs m ! i)) : ([] _> [t])"
-        using local_assms m_is(4,16)
+        using local_assms m_is(4,17)
         unfolding list_all2_conv_all_nth module_glob_typing.simps
         by auto
-      obtain v_r where "run_v 2 0 (s, \<lparr> f_locs=[], f_inst=inst' \<rparr>, (g_init (m_globs m ! i))) =  (s, RValue [v_r])"
-        using const_exprs_run_v[OF l1 l2 _ 12, of inst']
+      obtain v_r where "run_v 2 0 (s, \<lparr> f_locs=[], f_inst=inst_init \<rparr>, (g_init (m_globs m ! i))) =  (s, RValue [v_r])"
+        using const_exprs_run_v[OF l1 l2 _ 12, of inst_init]
         by auto
-      hence a_runv:"run_v 2 0 (s,\<lparr> f_locs=[], f_inst=inst'\<rparr>,(g_init ((m_globs m)!i))) = (s,RValue [(g_inits!i)])"
-        using s_end_is(3) local_assms
+      hence a_runv:"run_v 2 0 (s,\<lparr> f_locs=[], f_inst=inst_init\<rparr>,(g_init ((m_globs m)!i))) = (s,RValue [(g_inits!i)])"
+        using s_end_is(5) local_assms
         by (simp add: interp_get_v_def split: v.splits)
       obtain f_temp where f_temp_is:
-        "reduce_trans (s, \<lparr>f_locs = [], f_inst = inst'\<rparr>, $* g_init (m_globs m ! i)) (s, f_temp, $C* [g_inits ! i])"
+        "reduce_trans (s, \<lparr>f_locs = [], f_inst = inst_init\<rparr>, $* g_init (m_globs m ! i)) (s, f_temp, $C* [g_inits ! i])"
         using run_v_sound[OF a_runv]
         by fastforce
-      hence l3:"reduce_trans (s,\<lparr> f_locs=[], f_inst=inst' \<rparr>,$*(g_init ((m_globs m)!i))) (s,\<lparr> f_locs=[], f_inst=inst' \<rparr>,[$C (g_inits!i)])"
+      hence l3:"reduce_trans (s,\<lparr> f_locs=[], f_inst=inst_init \<rparr>,$*(g_init ((m_globs m)!i))) (s,\<lparr> f_locs=[], f_inst=inst_init \<rparr>,[$C (g_inits!i)])"
         using reduce_trans_length_locals[OF f_temp_is] reduce_trans_inst_is[OF f_temp_is]
         apply simp
         apply (metis (full_types) f.surjective unit.exhaust)
         done
       obtain arbg arbi where arbgi:"(globs s)@arbg = (globs s')"
-                                   "inst.globs inst = inst.globs inst' @ arbi"
-        using alloc_module_ext_arb[OF 2] 2 s_end_is(12)
+                                   "inst.globs inst = inst.globs inst_init @ arbi"
+        using alloc_module_ext_arb[OF 2] 2 s_end_is(4)
         unfolding alloc_module.simps
         by auto
       have run_v_is:"run_v 2 0 (s', \<lparr> f_locs=[], f_inst=inst \<rparr>, g_init (m_globs m ! i)) = (s', RValue [g_inits ! i])"
-        using const_exprs_reduce_trans[OF l1 l2 l3] _ 12 _ arbgi(1)[symmetric] _ arbgi(2)
-        by fastforce
+        using const_exprs_reduce_trans[OF l1 l2 l3] _ 12  _ arbgi(1)[symmetric] _ arbgi(2)
+        sorry
+        
       obtain f_temp where  "reduce_trans (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,$*(g_init ((m_globs m)!i))) (s',f_temp,[$C (g_inits!i)])"
         using run_v_sound[OF run_v_is]
         by auto
@@ -1321,12 +1333,21 @@ proof -
         by (metis (full_types) f.select_convs(1) f.surjective length_greater_0_conv unit.exhaust)
     }
     thus ?thesis
-      using s_end_is(3)
+      using s_end_is(5)
       unfolding list_all2_conv_all_nth
       by fastforce
   qed
 
-  have 4:"list_all2 (\<lambda>e c. reduce_trans (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,$*(e_off e)) (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,[$C\<^sub>n (ConstInt32 c)])) (m_elem m) e_offs"
+  have 4: "list_all2
+     (\<lambda>el. list_all2
+            (\<lambda>el_init v.
+                reduce_trans (s', \<lparr>f_locs = [], f_inst = inst\<rparr>, $* el_init) (s', \<lparr>f_locs = [], f_inst = inst\<rparr>, [$C V_ref v]))
+            (e_init el))
+     (m_elems m) el_inits"
+    sorry
+
+(*
+  have 4:"list_all2 (\<lambda>e c. reduce_trans (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,$*(e_off e)) (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,[$EConstNum (ConstInt32 c)])) (m_elem m) e_offs"
   proof -
     { fix i
       assume local_assms:"length (m_elem m) = length e_offs" "i<length (m_elem m)"
@@ -1385,12 +1406,10 @@ proof -
       using s_end_is(6)
       unfolding list_all2_conv_all_nth
       by fastforce
-   qed
+   qed *)
    show ?thesis
-     using instantiate.intros
-           1 s_end_is(2) 2 3 4 5 s_end_is(7,8) s_end_is(9,10,11)[symmetric]
-           s_end_is(13)
-     by blast
+     using instantiate.intros[OF 1 s_end_is(2) 2 _ 3 4 s_end_is(8)[symmetric]] s_end_is(9)
+     by simp
 qed
 
 lemma map_intro_length:
