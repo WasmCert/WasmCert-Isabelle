@@ -992,6 +992,165 @@ proof -
   qed
 qed
 
+lemma const_exprs_reduce_trans2:
+  assumes "const_exprs \<C> b_es"
+          "\<C> \<turnstile> b_es : ([] _> [t])"
+          "reduce_trans (s_r,f,$*b_es) (s',f',[$C v])"
+          "global \<C> = tgs"
+          "list_all2 (\<lambda>ig tg. external_typing s (Ext_glob ig) (Te_glob tg)) igs tgs"
+          "globs s_r = (globs s)@arbg1"
+          "globs s_v = (globs s)@arbg2"
+          "inst.globs (f_inst f) = igs@arbi1"
+          "inst.globs inst_v = igs@arbi2"
+          "func_t \<C> = tfs"
+          "list_all2 (\<lambda> i tf. i < length (funcs s_r) \<and> cl_type ((funcs s_r)!i) = tf) fis tfs"
+          "funcs  s_r = (funcs s)@arbf1"
+          "funcs s_v = (funcs s)@arbf2"
+          "inst.funcs (f_inst f) = fis@arbfi1"
+          "inst.funcs inst_v = fis@arbfi2"
+  shows "s_r = s' \<and> f = f' \<and> typeof v = t \<and> run_v 2 0 (s_v,\<lparr> f_locs=vs_arb, f_inst=inst_v\<rparr>,b_es) = (s_v, RValue [v])"
+proof -
+  consider
+      (1) v' where "$* b_es = [$C v'] \<and> typeof v' = t"
+    | (2) j t' where "t' <t: t"
+                     "b_es = [Get_global j]"
+                     "j < length (global \<C>)"
+                     "tg_mut (global \<C> ! j) = T_immut"
+                     "tg_t (global \<C> ! j) = t'"
+   | (3) j where "b_es = [Ref_func j] \<and> j < length (func_t \<C>) \<and> t = T_ref T_func_ref"
+   | (4) t_r where "b_es = [Ref_null t_r] \<and> t = T_ref t_r"
+    using const_exprs_is[OF assms(1,2)]
+    by auto
+  thus ?thesis
+  proof (cases)
+    case 1
+    consider (a) v_n where "b_es = [EConstNum v_n]" "v' = V_num v_n" | (b)  v_v where "b_es = [EConstVec v_v]" "v' = V_vec v_v"
+      using 1 typeof_def v_to_e_def
+      by (auto split: v_num.splits v.splits)
+    thus ?thesis
+    proof(cases)
+      case a
+      then show ?thesis
+        using 1 assms(3)  reduce_trans_consts[of s_r f "[v']" s' f' "[v]"] v_to_e_def typeof_num_def
+        by (simp add: Let_def const_list_def is_const_def Suc_1[symmetric])
+    next
+      case b
+      then show ?thesis
+        using 1 assms(3)  reduce_trans_consts[of s_r f "[v']" s' f' "[v]"] v_to_e_def typeof_num_def
+        by (simp add: Let_def const_list_def is_const_def Suc_1[symmetric])
+    qed
+  next
+    case 2
+    have type_is:"typeof (sglob_val s (f_inst f) j) = t'" "j < length igs" "(igs!j) < length (globs s)" "t' = t"
+      using assms(4,5,6,8) 2(1,2,3,4,5) typeof_not_bot t_subtyping_def
+      unfolding list_all2_conv_all_nth external_typing.simps
+      by (auto simp add: glob_typing_def nth_append sglob_def sglob_ind_def sglob_val_def)
+    show ?thesis
+      using assms(3)
+      unfolding reduce_trans_def
+    proof (cases rule: converse_rtranclpE)
+      case base
+      thus ?thesis
+        using 2(2) v_to_e_def
+        by (auto split: v.splits)
+    next
+      case (step y)
+      then obtain s_y f_y es_y where y_is:"\<lparr>s_r;f;[$Get_global j]\<rparr> \<leadsto> \<lparr>s_y;f_y;es_y\<rparr>" "y = (s_y, f_y, es_y)"
+        using 2
+        by fastforce
+      hence s_y_is:"s_y = s_r \<and> f_y = f \<and> es_y = [$C sglob_val s (f_inst f) j]"
+        using assms(6,8)
+      proof (induction s_r f "[$Get_global j]" s_y f_y es_y arbitrary: y rule: reduce.induct)
+        case (basic e' s vs i)
+        thus ?case
+          using lfilled_single
+          apply cases
+          apply auto
+          done
+      next
+        case (get_global s vs i)
+        thus ?case
+          using type_is(2,3)
+          by (simp_all add: sglob_def sglob_ind_def sglob_val_def nth_append)
+      next
+        case (label s vs es i s' vs' es' k lholed les')
+        thus ?case
+          using lfilled_single[OF label(3)]
+          by (metis Lfilled_exact.L0 Lfilled_exact_imp_Lfilled e.distinct(5) lfilled_eq reduce_not_nil)
+      qed auto
+      thus ?thesis
+        using step(2) y_is reduce_trans_consts[of s_y f_y "[sglob_val s (f_inst f) j]" s' f' "[v]"] 2 type_is s_y_is v_to_e_def assms(8)
+        by (simp add: Let_def assms nth_append sglob_def sglob_ind_def sglob_val_def reduce_trans_def const_list_def is_const_def Suc_1[symmetric] app_s_f_v_s_get_global_def split: prod.splits v.splits)
+    qed
+  next
+    case 3
+    have "list_all2 (\<lambda> i tf. i < length (funcs s_r) \<and> cl_type ((funcs s_r)!i) = tf) fis tfs"
+      using assms(11) by blast
+    then have "external_typing s_r (Ext_func (fis!j)) (Te_func (func_t \<C>!j))"
+      unfolding external_typing.simps
+      using "3" assms(10) list_all2_nthD2 by auto
+    then have a: "(fis!j) < length (funcs s_r)" "cl_type ((funcs s_r)!(fis!j)) = (func_t \<C>!j)"
+      by (auto simp add: external_typing.simps)
+    then have b: "(inst.funcs inst_v)!j < length (funcs s_r)"  "cl_type ((funcs s_r)!((inst.funcs inst_v)!j)) = (func_t \<C>!j)"
+      apply (metis (no_types, lifting) "3" assms(10) assms(11) assms(15) list_all2_lengthD nth_append)
+      by (metis (no_types, lifting) "3" a(2) assms(10) assms(11) assms(15) list_all2_lengthD nth_append)
+    then have c: "(inst.funcs (f_inst f))!j < length (funcs s_r)"  "cl_type ((funcs s_r)!((inst.funcs (f_inst f))!j)) = (func_t \<C>!j)" "j < length fis"
+      using a
+      apply (metis (no_types, lifting) "3" assms(10) assms(11) assms(14) list_all2_lengthD nth_append)
+      apply (metis (no_types, lifting) "3" a(2) assms(10) assms(11) assms(14) list_all2_lengthD nth_append)
+      using "3" assms(10) assms(11) assms(14) list_all2_lengthD by fastforce
+
+    show ?thesis
+      using assms(3) 
+      unfolding reduce_trans_def
+    proof (cases rule: converse_rtranclpE)
+      case base
+      then show ?thesis
+        using 3 v_to_e_def
+        by (auto split: v.splits)
+    next
+      case (step y)
+      then obtain s_y f_y es_y where y_is:"\<lparr>s_r;f;[$Ref_func j]\<rparr> \<leadsto> \<lparr>s_y;f_y;es_y\<rparr>" "y = (s_y, f_y, es_y)"
+        using 3
+        by fastforce
+      hence s_y_is:"s_y = s_r \<and> f_y = f \<and> es_y = [$C (V_ref (ConstRefFunc (inst.funcs (f_inst f) ! j)))]"
+        using assms(6,8) c
+      proof (induction s_r f "[$Ref_func j]" s_y f_y es_y arbitrary: y rule: reduce.induct)
+        case (basic e' s f)
+        then show ?case
+          using lfilled_single
+          apply cases
+          by auto
+      next
+        case (ref_func fa f s)
+        then show ?case using v_to_e_def by simp
+      next
+        case (label s vs es i s' vs' es' k lholed les')
+        thus ?case
+          using lfilled_single[OF label(3)]
+          by (metis Lfilled_exact.L0 Lfilled_exact_imp_Lfilled e.distinct(5) lfilled_eq reduce_not_nil)
+      qed auto
+      moreover have "s_r = s' \<and> f = f' \<and> v = V_ref (ConstRefFunc (inst.funcs (f_inst f) ! j))"
+        using  step(1,2)
+        s_y_is y_is  3 c(1,2,3) split_vals_e_conv_app
+        reduce_trans_consts[of s f "[(V_ref (ConstRefFunc (inst.funcs (f_inst f) ! j)))]" s_y f_y "[v]"]
+        reduce_trans_consts[of s_r f "[(V_ref (ConstRefFunc (inst.funcs (f_inst f) ! j)))]" s' f']
+        apply (auto simp add: Let_def assms nth_append reduce_trans_def  const_list_def is_const_def Suc_1[symmetric] app_f_v_s_ref_func_def  split: list.splits v_num.splits v_ref.splits  v.splits)
+        apply (metis (no_types, lifting) Nil_is_map_conv list.simps(9))
+        apply (metis (no_types, lifting) Nil_is_map_conv list.simps(9))
+        by (metis (no_types, lifting) Nil_is_map_conv list.inject list.simps(9) local.step(2))
+      ultimately show ?thesis
+        using  step(1,2)  v_to_e_def typeof_def typeof_ref_def s_y_is y_is  3 c
+        by(auto simp add: Let_def assms nth_append reduce_trans_def  const_list_def is_const_def Suc_1[symmetric] app_f_v_s_ref_func_def  split: list.splits v_num.splits v_ref.splits  v.splits)
+    qed
+  next
+    case 4
+    thus ?thesis
+      using assms
+      by (auto simp add: const_expr.simps const_expr.cases Let_def const_list_def is_const_def Suc_1[symmetric] app_v_s_ref_null_def)
+  qed
+qed
+
 lemma ext_globs_ind:
   assumes "i<length (ext_globs v_imps)"
   shows "\<exists>j. j < length v_imps \<and> Ext_glob ((ext_globs v_imps) ! i) = v_imps!j"
@@ -1562,9 +1721,8 @@ proof -
       hence "reduce_trans (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,$*((e_init m_el!j))) (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,[$C (V_ref (el_inits!i!j))])"
         using reduce_trans_length_locals reduce_trans_inst_is
         by (metis (full_types) f.select_convs(1) f.surjective length_greater_0_conv unit.exhaust)
-
-
-      have "reduce_trans (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,$*(((e_init ((m_elems m)!i)))!j)) (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,[$C V_ref ((el_inits!i)!j)])" sorry
+      hence "reduce_trans (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,$*(((e_init ((m_elems m)!i)))!j)) (s',\<lparr> f_locs=[], f_inst=inst \<rparr>,[$C V_ref ((el_inits!i)!j)])"
+        using m_el_def by fastforce
     }
     then show ?thesis using s_end_is(6)
       unfolding list_all2_conv_all_nth
@@ -1593,43 +1751,40 @@ proof -
           m_tabs = ts,
           m_mems = ms,
           m_globs = gs,
-          m_elem = els,
-          m_data = ds,
+          m_elems = els,
+          m_datas = ds,
           m_start = i_opt,
           m_imports = imps,
           m_exports = exps\<rparr>"
     using m.cases
     by blast
-  obtain inst' where inst'_is:
-    "inst' = \<lparr>types=[],funcs=[],tabs=[],mems=[],globs=ext_globs v_imps\<rparr>"
+  obtain inst_init inst_init_funcs where inst_init_is:
+    "inst_init = \<lparr>types=[],funcs=inst_init_funcs,tabs=[],mems=[],globs=ext_globs v_imps, elems=[], datas=[]\<rparr>"
+    "inst_init_funcs = (ext_funcs v_imps)@[length (funcs s) ..< (length (funcs s) + length (m_funcs m))]"
     using inst.cases
     by blast
 
-  obtain t_imps t_exps g_inits e_offs d_offs f start e_init_tabs e_init_mems where s_end_is:
+  obtain t_imps t_exps g_inits el_inits f start where s_end_is:
     "module_typing m t_imps t_exps"
     "list_all2 (external_typing s) v_imps t_imps"
-    "alloc_module s m v_imps g_inits (s', inst, v_exps)"
+    "alloc_module s m v_imps g_inits el_inits (s', inst, v_exps)"
     "list_all2 (\<lambda>g v. reduce_trans (s',f,$*(g_init g)) (s',f,[$C v])) gs g_inits"
-    "list_all2 (\<lambda>e c. reduce_trans (s',f,$*(e_off e)) (s',f,[$C\<^sub>n (ConstInt32 c)])) els e_offs"
-    "list_all2 (\<lambda>d c. reduce_trans (s',f,$*(d_off d)) (s',f,[$C\<^sub>n (ConstInt32 c)])) ds d_offs"
-    "list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs els"
-    "list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs ds"
+    "list_all2 (\<lambda>el vs. list_all2 (\<lambda> el_init v. reduce_trans (s',f,$*(el_init)) (s',f,[$C (V_ref v)])) (e_init el) vs) els el_inits"
     "(case (m_start m) of None \<Rightarrow> [] | Some i_s \<Rightarrow> [Invoke ((inst.funcs inst)!i_s)]) = start"
-    "List.map2 (\<lambda>n e. Init_tab n (map (\<lambda>i. (inst.funcs inst)!i) (e_init e))) (map nat_of_int e_offs) (m_elem m) = e_init_tabs"
-    "List.map2 (\<lambda>n d. Init_mem n (d_init d)) (map nat_of_int d_offs) (m_data m) = e_init_mems"
     "f = \<lparr> f_locs=[], f_inst=inst \<rparr>"
-    "init_es = e_init_tabs@e_init_mems@start"
+    "init_es = (run_elems (m_elems m))@(run_datas (m_datas m))@start"
     using assms m_is
     unfolding instantiate.simps
     by fastforce
 
-  obtain fts gts ifts itts imts igts \<C> \<C>' where m_is_2:
+  obtain fts gts rts dts ifts itts imts igts \<C> \<C>' where m_is_2:
     "list_all2 (module_func_typing \<C>) fs fts"
     "list_all (module_tab_typing) ts"
     "list_all (module_mem_typing) ms"
     "list_all2 (module_glob_typing \<C>') gs gts"
-    "list_all (module_elem_typing \<C>) els"
-    "list_all (module_data_typing \<C>) ds"
+    "list_all2 (module_elem_typing \<C>') els rts"
+    "list_all (module_data_typing \<C>') ds"
+    "length dts = length ds"
     "pred_option (module_start_typing \<C>) i_opt"
     "list_all2 (\<lambda>imp. module_import_typing \<C> (I_desc imp)) imps t_imps"
     "list_all2 (\<lambda>exp. module_export_typing \<C> (E_desc exp)) exps t_exps"
@@ -1637,33 +1792,80 @@ proof -
     "itts = ext_t_tabs t_imps"
     "imts = ext_t_mems t_imps"
     "igts = ext_t_globs t_imps"
-    "\<C> = \<lparr>types_t=tfs, func_t=ifts@fts, global=igts@gts, table=itts@ts, memory=imts@ms, local=[], label=[], return=None\<rparr>"
-    "\<C>' = \<lparr>types_t=[], func_t=[], global=igts, table=[], memory=[], local=[], label=[], return=None\<rparr>"
+    "\<C> = \<lparr>types_t=tfs, func_t=ifts@fts, global=igts@gts, elem=rts, data=dts, table=itts@ts, memory=imts@ms, local=[], label=[], return=None,
+       refs=collect_funcidxs_module (m\<lparr>m_funcs := [], m_start := None\<rparr>)\<rparr>"
+    "\<C>' = \<C>\<lparr>global := igts\<rparr>"
     using s_end_is(1) m_is
     unfolding module_typing.simps
     by blast
 
-  obtain s1 s2 s3 i_fs i_ts i_ms i_gs where inst_is:
+  obtain s1 s2 s3 s4 s5 i_fs i_ts i_ms i_gs i_es i_ds where inst_is:
     "inst = \<lparr>types=(m_types m),
            funcs=(ext_funcs v_imps)@i_fs,
            tabs=(ext_tabs v_imps)@i_ts,
            mems=(ext_mems v_imps)@i_ms,
-           globs=(ext_globs v_imps)@i_gs\<rparr>"
+           globs=(ext_globs v_imps)@i_gs,
+           elems=i_es,
+           datas=i_ds\<rparr>"
     "alloc_funcs s fs inst = (s1,i_fs)"
     "alloc_tabs s1 ts = (s2,i_ts)"
     "alloc_mems s2 ms = (s3,i_ms)"
-    "alloc_globs s3 gs g_inits = (s',i_gs)"
+    "alloc_globs s3 gs g_inits = (s4,i_gs)"
+    "alloc_elems s4 (map module_elem.e_type (m_elems m)) el_inits = (s5, i_es)"
+    "alloc_datas s5 (map module_data.d_init (m_datas m)) = (s', i_ds)"
     "v_exps = map (\<lambda>m_exp. \<lparr>E_name=(E_name m_exp), E_desc=(export_get_v_ext inst (E_desc m_exp))\<rparr>) (m_exports m)"
     using s_end_is(3) m_is
     unfolding alloc_module.simps
     by fastforce
 
-  have 12:"list_all2 (\<lambda>ig tg. external_typing s (Ext_glob ig) (Te_glob tg)) (inst.globs inst') (global \<C>')"
+
+
+  have fs_prop1: "func_t \<C>' = ifts@fts"
+    by (simp add: m_is_2(15) m_is_2(16))
+  have fs_prop2: "inst.funcs inst_init = ext_funcs v_imps @ [length (s.funcs s)..<length (s.funcs s) + length (m_funcs m)]"
+    by (simp add: inst_init_is(1) inst_init_is(2))
+  then have fs_prop3: "inst.funcs inst = ext_funcs v_imps @ [length (s.funcs s)..<length (s.funcs s) + length (m_funcs m)]"
+    using inst_is inst_init_is alloc_funcs_range
+    by (simp add: m_is)
+  have "list_all2 (\<lambda> i tf. i < length (funcs s) \<and> cl_type ((funcs s)!i) = tf) ((ext_funcs v_imps)) (ifts)"
+    using m_is_2(11) list_all2_external_typing_funcs[OF s_end_is(2)] external_typing.simps
+    by auto
+  then have fs_prop4: "list_all2 (\<lambda> i tf. i < length (funcs s') \<and> cl_type ((funcs s')!i) = tf) ((ext_funcs v_imps)) (ifts)"
+    using  alloc_module_ext_arb[OF  s_end_is(3)]
+    by (metis (no_types, lifting) length_append list_all2_mono nth_append trans_less_add1)
+  have 13: "list_all2 (\<lambda> i tf. i < length (funcs s') \<and> cl_type ((funcs s')!i) = tf) ((ext_funcs v_imps)@[length (funcs s) ..< (length (funcs s) + length (m_funcs m))]) (ifts@fts)"
+  proof -
+    have "alloc_funcs s (m_funcs m) inst = (s1,i_fs)"
+      by (simp add: inst_is(2) m_is)
+    have a: "list_all2 (module_func_typing \<C>) (m_funcs m) fts"
+      by (simp add: m_is m_is_2(1))
+    have "types_t \<C>  = tfs"
+      by (simp add: m_is_2(15))
+    then have "(m_types m) = tfs"
+      using m_is by auto
+    then have "list_all2 (\<lambda>m_f. (=) (types inst ! fst m_f)) (m_funcs m) fts"
+      using inst_is(1) a
+      by (metis (mono_tags, lifting) \<open>types_t \<C> = tfs\<close> inst.select_convs(1) list_all2_mono module_func_typing_equiv_module_func_type_checker)
+    then have "list_all2 (\<lambda> i tf. i < length (funcs s1) \<and> cl_type ((funcs s1)!i) = tf) i_fs (fts)"
+      using inst_is(2) alloc_funcs_typing[OF _ a] m_is by simp
+    then show ?thesis
+      using
+        fs_prop4
+        alloc_funcs_range[OF inst_is(2)]
+        alloc_tabs_range[OF inst_is(3)]
+        alloc_mems_range[OF inst_is(4)]
+        alloc_globs_range[OF inst_is(5)]
+        alloc_elems_range[OF inst_is(6)]
+        alloc_datas_range[OF inst_is(7)]
+      by (metis (no_types, lifting) list_all2_append1 list_all2_lengthD list_all2_mono m.select_convs(2) m_is)
+  qed
+
+  have 12:"list_all2 (\<lambda>ig tg. external_typing s (Ext_glob ig) (Te_glob tg)) (inst.globs inst_init) (global \<C>')"
     using ext_globs_ind list_all2_external_typing_glob_alloc
-    by (simp add: inst'_is m_is_2(13,15) s_end_is(2))
+    by (simp add: inst_init_is m_is_2(14,16) s_end_is(2))
   have 11:"list_all2 (\<lambda>ig tg. external_typing s' (Ext_glob ig) (Te_glob tg)) (inst.globs inst) (global \<C>)"
   proof -
-    have "list_all2 (\<lambda>ig tg. external_typing s' (Ext_glob ig) (Te_glob tg)) (inst.globs inst') (global \<C>')"
+    have "list_all2 (\<lambda>ig tg. external_typing s' (Ext_glob ig) (Te_glob tg)) (inst.globs inst_init) (global \<C>')"
       using alloc_module_external_typing_preserved[OF s_end_is(3)] 12
       unfolding list_all2_conv_all_nth
       by fastforce
@@ -1681,13 +1883,18 @@ proof -
           using s_end_is(4) local_assms
           unfolding list_all2_conv_all_nth
           by blast
+
+        obtain arbg arbi where arbgi:"(globs s)@arbg = (globs s')"
+                                   "inst.globs inst = inst.globs inst_init @ arbi"
+          using alloc_module_ext_arb[OF s_end_is(3)]  s_end_is(3,4)
+          unfolding alloc_module.simps
+          using inst_init_is(1) by fastforce
         have "typeof (g_inits!i) = tg_t (g_type (gs!i))"
-          using local_assms const_exprs_reduce_trans[OF l2(2,1) l1 _ 12]
-              alloc_module_ext_arb[OF s_end_is(3)] s_end_is(3)
-          unfolding alloc_module.simps s_end_is(12)
+          using local_assms const_exprs_reduce_trans[OF l2(2,1) l1 _ 12 arbgi(1)[symmetric] arbgi(1)[symmetric] _ _ fs_prop1 13] fs_prop2 fs_prop3
+              alloc_module_ext_arb[OF s_end_is(3)] s_end_is(4)
+          unfolding alloc_module.simps
           apply simp
-          apply (metis (mono_tags, lifting) inst'_is inst.select_convs(5))
-          done
+          by (metis append_Nil2 arbgi(2) f.select_convs(2) s_end_is(7))
       }
       thus ?thesis
         using s_end_is(4)
@@ -1701,19 +1908,19 @@ proof -
       apply (metis length_map module_glob.select_convs(1) nth_equalityI nth_map)
       done
     hence "list_all2 (\<lambda>ig tg. external_typing s' (Ext_glob ig) (Te_glob tg)) i_gs gts"
-      using alloc_globs_ext_typing[OF inst_is(5) 111]
-      by blast
+      using alloc_globs_ext_typing[OF inst_is(5) 111] alloc_elems_range[OF inst_is(6)] alloc_datas_range[OF inst_is(7)]
+        external_typing.simps by auto
     ultimately
     show ?thesis
-      using list_all2_appendI inst'_is
-      by (fastforce simp add: m_is_2(14,15) inst_is(1) s_end_is(11))
+      using list_all2_appendI inst_init_is
+      by (fastforce simp add: m_is_2(15,16) inst_is(1) s_end_is(8))
   qed
 
   have "(module_type_checker m) = Some (t_imps, t_exps)"
     using s_end_is(1) module_typing_equiv_module_type_checker
     by blast
   moreover
-  have "g_inits = map (\<lambda>g. interp_get_v s inst' (g_init g)) gs"
+  have "g_inits = map (\<lambda>g. interp_get_v s inst_init (g_init g)) gs"
   proof -
     { fix i
       assume local_assms: "i < length gs"
@@ -1726,82 +1933,85 @@ proof -
         using s_end_is(4) local_assms
         unfolding list_all2_conv_all_nth
         by blast
-      have "run_v 2 0 (s,\<lparr> f_locs=[], f_inst=inst' \<rparr>,(g_init (gs!i))) = (s,RValue [g_inits!i])"
-        using const_exprs_reduce_trans[OF l2(2,1) l1 _ 12, of _ s "[]" _ inst' "[]"]
-              alloc_module_ext_arb[OF s_end_is(3)] s_end_is(3)
-        unfolding alloc_module.simps s_end_is(12)
-        apply (simp split: prod.splits del: run_v.simps)
-        apply (metis (mono_tags, lifting) inst'_is inst.select_convs(5))
-        done
-      hence "interp_get_v s inst' (g_init (gs!i)) = g_inits!i"
+      obtain arbg arbi where arbgi:"(globs s)@arbg = (globs s')"
+                                   "inst.globs inst = inst.globs inst_init @ arbi"
+                                   "inst.globs (f_inst f) = inst.globs inst_init @ arbi"
+          using alloc_module_ext_arb[OF s_end_is(3)]  s_end_is(3,4) inst_init_is(1) inst_is(1)
+          unfolding alloc_module.simps
+          using inst_init_is(1)
+          using s_end_is(7) by fastforce
+      obtain arbf where arbf_def: "funcs s' = funcs s@arbf"
+        by (metis s_end_is(3) alloc_module_ext_arb)
+      have "run_v 2 0 (s,\<lparr> f_locs=[], f_inst=inst_init \<rparr>,(g_init (gs!i))) = (s,RValue [g_inits!i])"
+        using const_exprs_reduce_trans2[OF l2(2,1) l1 _ 12 arbgi(1)[symmetric] _ arbgi(3)  _ fs_prop1 13 arbf_def, of s "[]" inst_init "[]" "[]"] fs_prop2 fs_prop3
+              alloc_module_ext_arb[OF s_end_is(3)] s_end_is(3) s_end_is(7)
+        unfolding alloc_module.simps
+        using inst_init_is
+        by (simp split: prod.splits del: run_v.simps)
+      hence "interp_get_v s inst_init (g_init (gs!i)) = g_inits!i"
         unfolding interp_get_v_def
         by fastforce
     }
     thus ?thesis
-      using map_intro_length[symmetric, of gs "(\<lambda>g. interp_get_v s inst' (g_init g))" g_inits]
+      using map_intro_length[symmetric, of gs "(\<lambda>g. interp_get_v s inst_init (g_init g))" g_inits]
             list_all2_lengthD[OF s_end_is(4)]
       by fastforce
   qed
   moreover
-  have "interp_alloc_module s m v_imps g_inits = (s', inst, v_exps)"
+  have "interp_alloc_module s m v_imps g_inits el_inits = (s', inst, v_exps)"
     using s_end_is(3) alloc_module_equiv_interp_alloc_module
     by blast
   moreover
-  have "e_offs = map (\<lambda>e. interp_get_i32 s' inst (e_off e)) els"
+  have "el_inits = map (\<lambda> el. interp_get_v_refs s inst_init (e_init el)) els"
   proof -
     { fix i
-      assume local_assms: "i < length els"
-      have l2:"const_exprs \<C> (e_off (els ! i))"
-              "\<C> \<turnstile> e_off (els ! i) : ([] _> [T_num T_i32])"
-        using m_is_2(5)
-        by (metis list_all_length local_assms module_elem.select_convs(2) module_elem_typing.cases)+
-      have l1:"reduce_trans (s',f,$*(e_off (els!i))) (s',f,[$C\<^sub>n (ConstInt32 (e_offs!i))])"
-        using s_end_is(5) local_assms
-        unfolding list_all2_conv_all_nth
-        by blast
-      have "run_v 2 0 (s',f,(e_off (els!i))) = (s',RValue [V_num (ConstInt32 (e_offs!i))])"
-        using const_exprs_reduce_trans[OF l2(1,2) l1 _ 11]
-        unfolding s_end_is(12)
-        by fastforce
-      hence "interp_get_i32 s' inst (e_off (els!i)) = e_offs!i"
-        unfolding interp_get_i32_def interp_get_v_def s_end_is(12)
-        by fastforce
+      assume local_assms1: "i < length els"
+      
+      have "interp_get_v_refs s inst_init (e_init (els ! i)) = el_inits ! i"
+      proof -
+        { fix j
+          assume local_assms2: "j < length (e_init (els!i))"
+          obtain tr where l2:"\<C>' \<turnstile> (e_init (els ! i))!j : ([] _> [T_ref tr])"
+                            "const_exprs \<C>' ((e_init (els ! i))!j)"
+            using local_assms1 local_assms2  m_is_2(5,15,16)
+            unfolding list_all2_conv_all_nth  module_elem_typing.simps
+            by (metis list_all_length module_elem.select_convs(2))
+          have l1:"reduce_trans (s',f,$*((e_init (els ! i))!j)) (s',f,[$C (V_ref (el_inits!i!j))])"
+            using s_end_is(5) local_assms1 local_assms2
+            unfolding list_all2_conv_all_nth
+            by blast
+          obtain arbg arbi where arbgi:"(globs s)@arbg = (globs s')"
+                                       "inst.globs inst = inst.globs inst_init @ arbi"
+                                       "inst.globs (f_inst f) = inst.globs inst_init @ arbi"
+              using alloc_module_ext_arb[OF s_end_is(3)]  s_end_is(3,4) inst_init_is(1) inst_is(1)
+              unfolding alloc_module.simps
+              using inst_init_is(1)
+              using s_end_is(7) by fastforce
+          obtain arbf where arbf_def: "funcs s' = funcs s@arbf"
+            by (metis s_end_is(3) alloc_module_ext_arb)
+          have "run_v 2 0 (s,\<lparr> f_locs=[], f_inst=inst_init \<rparr>,((e_init (els ! i))!j)) = (s,RValue [V_ref (el_inits!i!j)])"
+            using const_exprs_reduce_trans2[OF l2(2,1) l1 _ 12 arbgi(1)[symmetric] _ arbgi(3)  _ fs_prop1 13 arbf_def, of s "[]" inst_init "[]" "[]"] fs_prop2 fs_prop3
+                  alloc_module_ext_arb[OF s_end_is(3)] s_end_is(3) s_end_is(7)
+            unfolding alloc_module.simps
+            using inst_init_is
+            by (simp split: prod.splits del: run_v.simps)
+
+          hence "interp_get_v_ref s inst_init ((e_init (els ! i))!j) = el_inits ! i ! j"
+            unfolding interp_get_v_ref_def interp_get_v_def
+            using const_exprs_run_v[OF l2(2,1) _ 12, of inst_init "[]"]
+            by(auto split: v.splits) 
+        }
+        then show ?thesis using map_intro_length[symmetric, of "(e_init (els ! i))" "interp_get_v_ref s inst_init" "el_inits ! i" ]
+          by (metis (no_types, lifting) interp_get_v_refs_def list_all2_conv_all_nth local_assms1 s_end_is(5)) 
+      qed
     }
     thus ?thesis
-      using map_intro_length[symmetric, of els "(\<lambda>e. interp_get_i32 s' inst (e_off e))" e_offs]
+      using map_intro_length[symmetric, of els "(\<lambda>el. interp_get_v_refs s inst_init (e_init el))" el_inits]
             list_all2_lengthD[OF s_end_is(5)]
       by fastforce
   qed
-  moreover
-  have "d_offs = map (\<lambda>d. interp_get_i32 s' inst (d_off d)) ds"
-  proof -
-    { fix i
-      assume local_assms: "i < length ds"
-      have l2:"const_exprs \<C> (d_off (ds ! i))"
-              "\<C> \<turnstile> d_off (ds ! i) : ([] _> [T_num T_i32])"
-        using m_is_2(6)
-        by (metis list_all_length local_assms module_data.select_convs(2) module_data_typing.cases)+
-      have l1:"reduce_trans (s',f,$*(d_off (ds!i))) (s',f,[$C\<^sub>n (ConstInt32 (d_offs!i))])"
-        using s_end_is(6) local_assms
-        unfolding list_all2_conv_all_nth
-        by blast
-      have "run_v 2 0 (s',f,(d_off (ds!i))) = (s',RValue [V_num (ConstInt32 (d_offs!i))])"
-        using const_exprs_reduce_trans[OF l2(1,2) l1 _ 11]
-        unfolding s_end_is(12)
-        by fastforce
-      hence "interp_get_i32 s' inst (d_off (ds!i)) = d_offs!i"
-        unfolding interp_get_i32_def interp_get_v_def s_end_is(12)
-        by fastforce
-    }
-    thus ?thesis
-      using map_intro_length[symmetric, of ds "(\<lambda>e. interp_get_i32 s' inst (d_off e))" d_offs]
-            list_all2_lengthD[OF s_end_is(6)]
-      by fastforce
-  qed
-  ultimately
-  show ?thesis
-    using s_end_is(2,7,8,9,10,11,13) m_is inst'_is
-    by simp
+  ultimately show ?thesis using s_end_is m_is inst_init_is
+    by (auto simp add: Let_def)
 qed
 
 theorem instantiate_equiv_interp_instantiate:
