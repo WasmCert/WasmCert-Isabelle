@@ -1812,14 +1812,12 @@ definition run_fuzz' :: "fuel \<Rightarrow> depth \<Rightarrow> s \<Rightarrow> 
      (s', RI_res inst v_exps init_es) \<Rightarrow>
      (case (List.find (\<lambda>exp. case (E_desc exp) of Ext_func i \<Rightarrow> True | _ \<Rightarrow> False) v_exps) of
         Some exp \<Rightarrow> (case (E_desc exp) of Ext_func i \<Rightarrow> (
-                       let cl = nth (s.funcs s') i in
-                       case (cl_type cl) of
-                         (t1 _> t2) \<Rightarrow>
-                           let params = case opt_vs of Some vs \<Rightarrow> (rev vs) | None \<Rightarrow> (map bitzero t1) in
-                           run_invoke_v n d (s', params, i) ))
+                       case make_params s' i opt_vs of
+                          Some params \<Rightarrow>  run_invoke_v n d (s', params, i)
+                       |  None \<Rightarrow> (s', RCrash (Error_invariant (STR ''could not make parameters for a function with given type signature'')))))
       | None \<Rightarrow> (s', RCrash (Error_invariant (STR ''no import to invoke''))))
   | (s', RI_crash res) \<Rightarrow> (s', RCrash res)
-  | (s', RI_trap msg) \<Rightarrow> (s', RTrap msg) )"
+  | (s', RI_trap msg) \<Rightarrow> (s', RTrap msg))"
 
 definition run_fuzz_entry' :: "fuel \<Rightarrow> m \<Rightarrow> (v list) option \<Rightarrow> s \<times> res" where
   "run_fuzz_entry' n m vs_opt = run_fuzz' n 300 empty_store m [] vs_opt"
