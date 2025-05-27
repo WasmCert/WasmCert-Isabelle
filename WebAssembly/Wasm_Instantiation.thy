@@ -1148,11 +1148,13 @@ qed
 
 lemma alloc_module_ext_arb:
   assumes "alloc_module s m imps gvs els (s',inst,exps)"
-  shows "\<exists>farbs tarbs marbs garbs.
+  shows "\<exists>farbs tarbs marbs garbs elarbs darbs.
            (funcs s)@farbs = funcs s' \<and>
            (tabs s)@tarbs = tabs s' \<and>
            (mems s)@marbs = mems s' \<and>
-           (globs s)@garbs = globs s'"
+           (globs s)@garbs = globs s' \<and>
+           (elems s)@elarbs = elems s' \<and>
+           (datas s)@darbs = datas s'"
 proof -
   obtain s1 s2 s3 s4 s5 i_fs i_ts i_ms i_gs i_es i_ds where inst_is:
     "inst = \<lparr>types=(m_types m),

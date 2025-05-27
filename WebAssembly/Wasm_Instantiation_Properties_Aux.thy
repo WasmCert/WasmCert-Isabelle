@@ -1,6 +1,6 @@
 theory Wasm_Instantiation_Properties_Aux imports Wasm_Instantiation Wasm_Properties begin
 
-
+(*
 definition element_in_bounds where 
 "element_in_bounds s inst e_ind e \<equiv>
    let i = inst.tabs inst ! e_tab e 
@@ -13,11 +13,13 @@ definition data_in_bounds where
 
 abbreviation "element_funcs_in_bounds s inst e 
 \<equiv>list_all (\<lambda>i. (inst.funcs inst)!i < length (s.funcs s)) (e_init e)" 
+*)
 
+(*
 lemma tab_extension_trans:"tab_extension a b \<Longrightarrow> tab_extension b c \<Longrightarrow> tab_extension a c" 
   unfolding tab_extension_def by auto
 lemma mem_extension_trans:"mem_extension a b \<Longrightarrow> mem_extension b c \<Longrightarrow> mem_extension a c" 
-  unfolding mem_extension_def by auto
+  unfolding mem_extension_def by auto *)
 
 (* while mathematically superfluous, this form makes the following lemmas easier to prove *)
 lemma store_extension_intros_with_refl: 
@@ -25,6 +27,8 @@ lemma store_extension_intros_with_refl:
   "tabs s = tabs s' \<or> (\<exists> t1 t2. t1 @ t2 = tabs s' \<and> list_all2 tab_extension (tabs s) t1)"
   "mems s = mems s' \<or> (\<exists> m1 m2. m1 @ m2 = mems s' \<and> list_all2 mem_extension (mems s) m1)" 
   "globs s = globs s' \<or> (\<exists> g1 g2. g1 @ g2 = globs s' \<and> list_all2 global_extension (globs s) g1)" 
+  "elems s = elems s' \<or> (\<exists> el1 el2. el1 @ el2 = elems s' \<and> list_all2 elem_extension (elems s) el1)"
+  "datas s = datas s' \<or> (\<exists> d1 d2. d1 @ d2 = datas s' \<and> list_all2 data_extension (datas s) d1)"
   shows "store_extension s s'"
 proof -         
   have funcs:"\<exists> fs. funcs s @ fs = funcs s'" using assms(1) by auto
@@ -34,15 +38,19 @@ proof -
     using assms(3) mem_extension_refl list_all2_refl by (metis append_Nil2) 
   have globs: "\<exists> g1 g2. g1 @ g2 = globs s' \<and> list_all2 global_extension (globs s) g1"  
     using assms(4) global_extension_refl list_all2_refl by (metis append_Nil2) 
-  show ?thesis using funcs mems tabs globs unfolding store_extension.simps
+  have elems: "\<exists> el1 el2. el1 @ el2 = elems s' \<and> list_all2 elem_extension (elems s) el1"  
+    using assms(5) elem_extension_refl list_all2_refl by (metis append_Nil2) 
+  have datas: "\<exists> d1 d2. d1 @ d2 = datas s' \<and> list_all2 data_extension (datas s) d1"  
+    using assms(6) data_extension_refl list_all2_refl by (metis append_Nil2) 
+  show ?thesis using funcs mems tabs globs elems datas unfolding store_extension.simps
     by (metis (full_types) unit.exhaust s.surjective) 
 qed
 
 lemma alloc_module_preserve_store_extension:
-  assumes "alloc_module s m imps gvs (s',inst,exps)" 
+  assumes "alloc_module s m imps gvs el_inits (s',inst,exps)" 
   shows "store_extension s s'"
   using alloc_module_ext_arb[OF assms] 
-  store_extension_intros_with_refl list_all2_refl tab_extension_refl mem_extension_refl global_extension_refl
+  store_extension_intros_with_refl list_all2_refl tab_extension_refl mem_extension_refl global_extension_refl elem_extension_refl data_extension_refl
   by metis
 
 definition alloc_func_simple :: "module_func \<Rightarrow> inst \<Rightarrow> cl" where
@@ -54,7 +62,7 @@ lemma alloc_func_equiv:"fst (alloc_func s m_f i) = s\<lparr>funcs := funcs s @ [
   unfolding alloc_func_def alloc_func_simple_def by(simp split:prod.splits)
 
 definition alloc_tab_simple :: "tab_t \<Rightarrow> tabinst" where
-  "alloc_tab_simple m_t = (replicate (l_min m_t) None, (l_max m_t))"
+  "alloc_tab_simple t_t = (t_t, (replicate (l_min (tab_t_lim t_t)) (ConstNull (tab_t_reftype t_t))))"
 
 lemma alloc_tab_equiv:"fst (alloc_tab s m_t) = s\<lparr>tabs := tabs s @ [alloc_tab_simple m_t]\<rparr>"
   unfolding alloc_tab_def alloc_tab_simple_def by simp
@@ -156,7 +164,7 @@ lemma alloc_globs_store_agnostic:
 
 
 lemma alloc_module_allocated_form: 
-  assumes "alloc_module s m imps gvs (s',inst,exps)"
+  assumes "alloc_module s m imps gvs elvs (s',inst,exps)"
   shows "alloc_funcs s (m_funcs m) inst = (ss,i_fs) 
 \<Longrightarrow> funcs s' = funcs ss \<and> inst.funcs inst = (ext_funcs imps)@i_fs"
   "alloc_tabs s (m_tabs m) = (ss,i_ts) 
@@ -166,38 +174,46 @@ lemma alloc_module_allocated_form:
   "alloc_globs s (m_globs m) gvs = (ss,i_gs) 
 \<Longrightarrow> globs s' = globs ss \<and> inst.globs inst = (ext_globs imps)@i_gs"
 proof -
-  obtain s1 s2 s3 i_fs' i_ts' i_ms' i_gs' where
+  obtain s1 s2 s3 s4 s5 i_fs' i_ts' i_ms' i_gs' i_es' i_ds' where
     inst:"inst = \<lparr>types=(m_types m), 
             funcs=(ext_funcs imps)@i_fs', 
            tabs=(ext_tabs imps)@i_ts',
            mems=(ext_mems imps)@i_ms',
-           globs=(ext_globs imps)@i_gs'\<rparr>" 
+           globs=(ext_globs imps)@i_gs',
+           elems=i_es',
+           datas=i_ds'\<rparr>" 
     and funcs:"alloc_funcs s (m_funcs m) inst = (s1,i_fs')" 
     and tabs:"alloc_tabs s1 (m_tabs m) = (s2,i_ts')" 
     and mems:"alloc_mems s2 (m_mems m) = (s3,i_ms')" 
-    and globs:"alloc_globs s3 (m_globs m) gvs = (s',i_gs')" 
+    and globs:"alloc_globs s3 (m_globs m) gvs = (s4,i_gs')" 
+    and elems:"alloc_elems s4 (map module_elem.e_type (m_elems m)) elvs = (s5, i_es')"
+    and datas:"alloc_datas s5 (map d_init (m_datas m)) = (s', i_ds')"
     using assms unfolding alloc_module.simps by auto
 
   show "alloc_funcs s (m_funcs m) inst = (ss,i_fs) 
   \<Longrightarrow> funcs s' = funcs ss \<and> inst.funcs inst = (ext_funcs imps)@i_fs" 
     using funcs alloc_tabs_range[OF tabs] 
-      alloc_mems_range[OF mems] alloc_globs_range[OF globs] inst by force
+      alloc_mems_range[OF mems] alloc_globs_range[OF globs] alloc_elems_range[OF elems] alloc_datas_range[OF datas] inst
+    by force
 
   show "alloc_tabs s (m_tabs m) = (ss,i_ts) 
   \<Longrightarrow> tabs s' = tabs ss \<and> inst.tabs inst = (ext_tabs imps)@i_ts" 
     using alloc_funcs_range[OF funcs] alloc_tabs_store_agnostic tabs
-      alloc_mems_range[OF mems] alloc_globs_range[OF globs] inst 
+      alloc_mems_range[OF mems] alloc_globs_range[OF globs]
+      alloc_elems_range[OF elems] alloc_datas_range[OF datas] inst 
     by (metis inst.select_convs(3)) 
 
   show "alloc_mems s (m_mems m) = (ss,i_ms) 
   \<Longrightarrow> mems s' = mems ss \<and> inst.mems inst = (ext_mems imps)@i_ms"
-    using alloc_funcs_range[OF funcs] alloc_tabs_range[OF tabs] alloc_mems_store_agnostic mems
+    using alloc_funcs_range[OF funcs] alloc_tabs_range[OF tabs]
+      alloc_elems_range[OF elems] alloc_datas_range[OF datas] alloc_mems_store_agnostic mems
       alloc_globs_range[OF globs] inst
     by (metis inst.select_convs(4)) 
 
   show "alloc_globs s (m_globs m) gvs = (ss,i_gs) 
   \<Longrightarrow> globs s' = globs ss \<and> inst.globs inst = (ext_globs imps)@i_gs"
     using alloc_funcs_range[OF funcs] alloc_tabs_range[OF tabs] alloc_mems_range[OF mems]
+    alloc_elems_range[OF elems] alloc_datas_range[OF datas]
       alloc_globs_store_agnostic globs inst
     by (metis inst.select_convs(5))
 qed
@@ -205,7 +221,7 @@ qed
 
 
 lemma alloc_module_funcs_form:
-  assumes "alloc_module s m v_imps g_inits (s', inst, v_exps)" 
+  assumes "alloc_module s m v_imps g_inits el_inits (s', inst, v_exps)" 
         "funcs s' = funcs s @ fs"
   shows "fs = alloc_funcs_simple (m_funcs m) inst"
 proof -
@@ -218,7 +234,7 @@ proof -
 qed
 
 lemma alloc_module_tabs_form: 
-  assumes "alloc_module s m v_imps g_inits (s', inst, v_exps)" 
+  assumes "alloc_module s m v_imps g_inits el_inits (s', inst, v_exps)" 
           "tabs s' = tabs s @ ts" 
   shows "ts = alloc_tabs_simple (m_tabs m)"
 proof - 
@@ -229,7 +245,7 @@ proof -
 qed
 
 lemma alloc_module_mems_form: 
-  assumes "alloc_module s m v_imps g_inits (s', inst, v_exps)" 
+  assumes "alloc_module s m v_imps g_inits el_inits (s', inst, v_exps)" 
           "mems s' = mems s @ ms" 
   shows "ms = alloc_mems_simple (m_mems m)"
 proof - 
@@ -240,7 +256,7 @@ proof -
 qed
 
 lemma alloc_module_globs_form: 
-  assumes "alloc_module s m v_imps g_inits (s', inst, v_exps)" 
+  assumes "alloc_module s m v_imps g_inits el_inits (s', inst, v_exps)" 
           "globs s' = globs s @ gs" 
   shows "gs = alloc_globs_simple (m_globs m) g_inits"
 proof - 
