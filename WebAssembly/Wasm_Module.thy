@@ -90,7 +90,8 @@ inductive limit_typing :: "limit_t \<Rightarrow> nat \<Rightarrow> bool" where
 inductive module_func_typing :: "t_context \<Rightarrow> module_func \<Rightarrow> tf \<Rightarrow> bool" where
   "\<lbrakk>i < length (types_t \<C>);
     (types_t \<C>)!i = (tn _> tm);
-    \<C>\<lparr>local := tn @ t_locs, label := ([tm] @ (label \<C>)), return := Some tm\<rparr> \<turnstile> b_es : ([] _> tm)\<rbrakk>
+    \<C>\<lparr>local := tn @ t_locs, label := ([tm] @ (label \<C>)), return := Some tm\<rparr> \<turnstile> b_es : ([] _> tm);
+    n_zeros t_locs \<noteq> None\<rbrakk>
      \<Longrightarrow> module_func_typing \<C> (i, t_locs, b_es) (tn _> tm)"
 
 inductive module_tab_typing :: "tab_t \<Rightarrow> bool" where

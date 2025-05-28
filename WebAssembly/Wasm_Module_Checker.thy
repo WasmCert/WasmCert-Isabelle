@@ -7,14 +7,16 @@ fun module_func_type_checker :: "t_context \<Rightarrow> module_func \<Rightarro
   ((i < length (types_t \<C>)) \<and>
      (case (types_t \<C>)!i of
        (tn _> tm) \<Rightarrow>
-         b_e_type_checker (\<C>\<lparr>local := tn @ t_locs, label := ([tm] @ (label \<C>)), return := Some tm\<rparr>) b_es ([] _> tm)))"
+          if n_zeros t_locs = None then
+            False
+          else
+            b_e_type_checker (\<C>\<lparr>local := tn @ t_locs, label := ([tm] @ (label \<C>)), return := Some tm\<rparr>) b_es ([] _> tm)))"
 
 lemma module_func_typing_equiv_module_func_type_checker:
   "module_func_typing \<C> m_f tf = (module_func_type_checker \<C> m_f \<and>
                                    ((types_t \<C>)!(fst m_f) = tf))"
   apply (cases m_f)
-  apply (auto simp add: module_func_typing.simps b_e_typing_equiv_b_e_type_checker split: tf.splits)
-  done
+  by (auto simp add: module_func_typing.simps b_e_typing_equiv_b_e_type_checker split: if_splits tf.splits)
 
 abbreviation "module_tab_type_checker \<equiv> module_tab_typing"
 abbreviation "module_mem_type_checker \<equiv> module_mem_typing"
