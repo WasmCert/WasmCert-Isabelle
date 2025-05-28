@@ -523,7 +523,7 @@ definition run_elems :: "module_elem list \<Rightarrow> e list" where
 definition run_data :: "module_data \<Rightarrow> i \<Rightarrow> b_e list" where
 "run_data m_d i = (case (d_mode m_d) of
   Dm_passive \<Rightarrow> []
-| Dm_active x b_es \<Rightarrow> b_es@[EConstNum (ConstInt32 0), EConstNum (ConstInt32 (int_of_nat (length b_es))), Table_init x i, Elem_drop i])"
+| Dm_active x offset \<Rightarrow> offset@[EConstNum (ConstInt32 0), EConstNum (ConstInt32 (int_of_nat (length (d_init m_d)))), Memory_init i, Data_drop i])"
 
 definition run_datas :: "module_data list \<Rightarrow> e list" where
 "run_datas m_ds = $* concat (map2 run_data (m_ds) [0 ..< length m_ds])"

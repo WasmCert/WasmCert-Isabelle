@@ -866,98 +866,241 @@ proof -
         using e_typing_l_typing.intros(7) Some
         by simp
     qed
-    moreover have "s'\<bullet>\<C>'' \<turnstile> run_elems (m_elems m) : ([] _> [])" sorry
-    moreover have "s'\<bullet>\<C>'' \<turnstile> run_datas (m_datas m) : ([] _> [])" sorry
-      (*moreover have "s'\<bullet>\<C>'' \<turnstile> run_elems (m_elems m) : ([] _> [])"
-      proof -
-        have "length e_offs = length (m_elem m)"
-          using s_element_in_bounds list_all2_lengthD
-          by auto
-        thus ?thesis
-          using c_is(3) s_init_tabs
-        proof (induction "m_elem m" arbitrary: e_offs e_init_tabs m rule: list.induct)
-          case Nil
-          thus ?case
-            by (simp add: e_type_empty)
+    moreover have "s'\<bullet>\<C>'' \<turnstile> run_elems (m_elems m) : ([] _> [])"
+    proof -
+      have "list_all2 (module_elem_typing \<C>') (m_elems m) rts"
+        using c_is(3) by blast
+      { fix i
+        assume local_assms: "i < length (m_elems m)"
+        have i_elem_length: "i < length (elem \<C>)"
+          by (metis c_is(3) c_is(8) list_all2_lengthD local_assms t_context.simps(4))
+        have "module_elem_typing \<C>' ((m_elems m)!i) (rts!i)"
+          using c_is(3) list_all2_nthD local_assms by blast
+        then have elem_mode_typing: "elem_mode_typing \<C>' (e_mode ((m_elems m)!i)) (rts!i)"
+          using module_elem_typing.simps by fastforce
+        then have "\<C>'' \<turnstile> run_elem ((m_elems m)!i) i : [] _> []"
+        proof(cases "(e_mode ((m_elems m)!i))")
+          case Em_passive
+          then show ?thesis using run_elem_def empty by auto
         next
-          case (Cons a x)
-          obtain e_off e_offs' where
-            e_off_is:"e_off#e_offs' = e_offs" "length e_offs' = length x"
-            using Cons(3) Cons(2)[symmetric] 
-            by (metis length_Suc_conv)
-          then obtain e_init_tab e_init_tabs' where
-            e_init_tab_is:"e_init_tab#e_init_tabs' = e_init_tabs"
-                          "length x = length e_init_tabs'"
-                          "(Init_tab (nat_of_int e_off) (map (\<lambda>i. (inst.funcs inst)!i) (e_init a))) = e_init_tab"
-                          "map2 (\<lambda>x y. Init_tab x (map (\<lambda>i. (inst.funcs inst)!i) (e_init y))) (map nat_of_int e_offs') x = e_init_tabs'"
-            using Cons(5) Cons(2)[symmetric]
-            by fastforce
-          have "(module_elem_typing \<C> a)"
-            using Cons(2,4)
-            by (metis list_all_simps(1))
-          hence len_tab_c:"length (table \<C>) > 0"
-                          "list_all (\<lambda>ti. ti < length (s.funcs s')) (map (\<lambda>i. (inst.funcs inst)!i) (e_init a))"
-            using c_is(7) funci_agree_s' inst_typing_func_length s'_inst_t
-            unfolding funci_agree_def list_all2_conv_all_nth list_all_length module_elem_typing.simps
-            by fastforce+
-          hence "s'\<bullet>\<C> \<turnstile> [e_init_tab] : ([] _> [])"
-            using e_init_tab_is(3) e_typing_l_typing.intros(9) len_tab_c(1)
-            by (metis le_refl less_one nat_less_le nat_neq_iff)
-          moreover
-          have "s'\<bullet>\<C> \<turnstile> e_init_tabs' : ([] _> [])"
-            using Cons(1)[of "\<lparr>m_types=[], m_funcs=[],m_tabs=[], m_mems=[], m_globs=[], m_elem=x, m_data=[],m_start=None,m_imports=[],m_exports=[]\<rparr>" "e_offs'" "e_init_tabs'"]
-                  Cons(2,3,4) e_off_is e_init_tab_is
-            by simp (metis list_all_simps(1))
-          ultimately
-          show ?case
-            using e_init_tab_is(1) e_type_comp_conc
-            by fastforce
+          case (Em_active x offset)
+          then have defs: "x < length (table \<C>')" "rts!i = tab_t_reftype (table \<C>'!x)" "\<C>' \<turnstile> offset : ([] _> [T_num T_i32])" "const_exprs \<C>' offset"
+            using elem_mode_typing c_is(9) unfolding elem_mode_typing.simps const_expr.simps tab_t_reftype_def
+            by (auto split: tab_t.splits)
+          have h1: "const_exprs \<C>'' offset"
+            using defs(4)
+            apply(induction offset)
+            using const_expr.simps c_is(9) c_is(8) context_def
+            apply (auto )
+            by (metis nth_append)
+          consider
+              (a) v where "$* offset = [$C v]"
+                          "typeof v = T_num T_i32"
+            | (b) j t' where "t' <t: T_num T_i32"
+                             "offset = [Get_global j]"
+                             "j < length (global \<C>')"
+                             "tg_mut (global \<C>' ! j) = T_immut"
+                             "tg_t (global \<C>' ! j) = t'"
+            | (c) j where "offset = [Ref_func j]" "j < length (func_t \<C>')" "T_num T_i32 = T_ref T_func_ref"
+            | (d) t_r where " offset = [Ref_null t_r]" "T_num T_i32 = T_ref t_r"
+            using const_exprs_is[OF defs(4,3)] by auto
+          then have h2: "\<C>'' \<turnstile> offset : ([] _> [T_num T_i32])"
+          proof(cases)
+            case a
+            then show ?thesis using context_def v_to_e_def typeof_def typeof_num_def const_num apply (auto split: v_num.splits v.splits)
+              by (metis v_num.simps(17))
+          next
+            case b
+            then have "\<C> \<turnstile> [Get_global j] : [] _> [t']"
+              using b_e_typing.get_global[of j \<C> t'] c_is(8) c_is(9)
+              by (auto simp add: nth_append)
+            then have "\<C>'' \<turnstile> [Get_global j] : [] _> [t']"
+              using context_def b_e_type_preserved_refs funcs_inst_context_length by simp
+            then show ?thesis
+              using b(1,2) t_subtyping_def t_list_subtyping_def
+                    instr_subtyping_def subsumption[of \<C>'' offset "[]" "[t']" "[]" "[T_num T_i32]"]
+              by auto
+          next
+            case c
+            then show ?thesis
+              by blast
+          next
+            case d
+            then show ?thesis using b_e_typing.ref_null by simp
+          qed
+ 
+          have h3: "\<C>'' \<turnstile> [EConstNum (ConstInt32 0), EConstNum (ConstInt32 (int_of_nat (length (e_init (m_elems m ! i)))))] : ([T_num T_i32] _> [T_num T_i32, T_num T_i32, T_num T_i32])"
+          proof -
+            have "\<C>'' \<turnstile> [EConstNum (ConstInt32 0)] : ([T_num T_i32] _> [T_num T_i32, T_num T_i32])"
+              by (metis append_Cons append_Nil b_e_weakening const_num typeof_num_def v_num.simps(17))
+            moreover have "\<C>'' \<turnstile> [ EConstNum (ConstInt32 (int_of_nat (length (e_init (m_elems m ! i)))))] : ([T_num T_i32, T_num T_i32] _> [T_num T_i32, T_num T_i32, T_num T_i32])"
+              by (metis append_Cons append_Nil b_e_weakening const_num typeof_num_def v_num.simps(17))
+            then show ?thesis using b_e_type_comp_conc[OF calculation] by auto
+          qed
+          have "x < length (table \<C>'')" using defs(1) c_is(8,9) context_def by auto
+          moreover have "i < length (elem \<C>'')" using local_assms
+            by (metis elemi_agree_s' i_elem_length list_all2_lengthD s'_inst_t store_elem_exists)
+          moreover have "rts ! i = tab_t_reftype (table \<C>'' ! x)" using defs(2) c_is(8,9) context_def by auto
+          moreover have "rts ! i = elem \<C>'' ! i" using c_is(8,9) context_def by auto
+          ultimately have h4: "\<C>'' \<turnstile> [Table_init x i] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
+            using b_e_typing.table_init[of x \<C>'' i "rts!i"] by simp
+          have h5: "\<C>'' \<turnstile> [Elem_drop i] : ([] _> [])"
+            using \<open>i < length (elem \<C>'')\<close> b_e_typing.elem_drop by blast
+          then show ?thesis using Em_active unfolding run_elem_def
+            using b_e_type_comp_conc[OF b_e_type_comp_conc[OF b_e_type_comp_conc[OF h2 h3] h4] h5]
+            by simp
+        next
+          case Em_declarative
+          then show ?thesis using run_elem_def i_elem_length b_e_typing.elem_drop context_def by auto
         qed
-      qed
-    moreover have "s'\<bullet>\<C> \<turnstile> e_init_mems : ([] _> [])"
-      proof -
-        have "length d_offs = length (m_data m)"
-          using s_data_in_bounds list_all2_lengthD
-          by auto
-        thus ?thesis
-          using c_is(4) s_init_mems
-        proof (induction "m_data m" arbitrary: d_offs e_init_mems m rule: list.induct)
-          case Nil
-          thus ?case
-            by (simp add: e_type_empty)
+        then have "s'\<bullet>\<C>'' \<turnstile> $* run_elem ((m_elems m)!i) i : [] _> []"
+          using e_typing_l_typing.intros(1) by auto 
+      }
+      then have run_elem_t_type: "\<And> i. i < length (m_elems m) \<Longrightarrow> s'\<bullet>\<C>'' \<turnstile> $* run_elem ((m_elems m)!i) i : [] _> []"
+        by simp
+      { fix j
+        assume local_assms: "j \<le> length (m_elems m)"
+        then have "s'\<bullet>\<C>'' \<turnstile> $* concat (map2 run_elem (take j (m_elems m)) [0..<j]) : [] _> []"
+        proof(induction j)
+          case 0
+          then show ?case
+            by (simp add: e_type_empty instr_subtyping_refl)
         next
-          case (Cons a x)
-          obtain d_off d_offs' where
-            e_off_is:"d_off#d_offs' = d_offs" "length d_offs' = length x"
-            using Cons(3) Cons(2)[symmetric] 
-            by (metis length_Suc_conv)
-          then obtain e_init_mem e_init_mems' where
-            e_init_mem_is:"e_init_mem#e_init_mems' = e_init_mems"
-                          "length x = length e_init_mems'"
-                          "(Init_mem (nat_of_int d_off) (d_init a)) = e_init_mem"
-                          "map2 (\<lambda>x y. Init_mem x (d_init y)) (map nat_of_int d_offs') x = e_init_mems'"
-            using Cons(5) Cons(2)[symmetric]
-            by fastforce
-          have "(module_data_typing \<C> a)"
-            using Cons(2,4)
-            by (metis list_all_simps(1))
-          hence len_tab_c:"length (memory \<C>) > 0"
-            unfolding module_data_typing.simps
+          case (Suc j)
+          then have j_l: "j < length (m_elems m)" by auto
+          then have "(map2 run_elem (take (Suc j) (m_elems m)) [0..<Suc j]) = ((map2 run_elem (take j (m_elems m)) [0..< j])@[run_elem (m_elems m!j) j])"
+            using take_Suc_conv_app_nth[OF j_l]
             by auto
-          hence "s'\<bullet>\<C> \<turnstile> [e_init_mem] : ([] _> [])"
-            using e_init_mem_is(3) e_typing_l_typing.intros(8)
-            by (metis le_refl less_one nat_less_le nat_neq_iff)
-          moreover
-          have "s'\<bullet>\<C> \<turnstile> e_init_mems' : ([] _> [])"
-            using Cons(1)[of "\<lparr>m_types=[], m_funcs=[],m_tabs=[], m_mems=[], m_globs=[], m_elem=[], m_data=x,m_start=None,m_imports=[],m_exports=[]\<rparr>" "d_offs'" "e_init_mems'"]
-                  Cons(2,3,4) e_off_is e_init_mem_is
-            by simp (metis list_all_simps(1))
-          ultimately
-          show ?case
-            using e_init_mem_is(1) e_type_comp_conc
-            by fastforce
+          then have j_suc_concat_map: "$* concat (map2 run_elem (take (Suc j) (m_elems m)) [0..<Suc j]) = ($* concat (map2 run_elem (take (j) (m_elems m)) [0..<j])) @ ($* run_elem ((m_elems m)!j) j)"
+            by auto
+          have "s'\<bullet>\<C>'' \<turnstile> ($* concat (map2 run_elem (take (j) (m_elems m)) [0..<j])) : ([] _> [])"
+            using Suc by auto
+          moreover have "s'\<bullet>\<C>'' \<turnstile> ($* run_elem ((m_elems m)!j) j) : ([] _> [])"
+            using run_elem_t_type[OF j_l] by auto
+          moreover show ?case
+            using e_type_comp_conc[OF calculation] using j_suc_concat_map  by simp
         qed
-      qed *)
+      }
+      then show ?thesis unfolding run_elems_def by fastforce
+       
+    qed
+    
+    moreover have "s'\<bullet>\<C>'' \<turnstile> run_datas (m_datas m) : ([] _> [])"
+    proof -
+      have "list_all (module_data_typing \<C>') (m_datas m)"
+        using c_is(4) by blast
+      { fix i
+        assume local_assms: "i < length (m_datas m)"
+        have i_data_length: "i < length (data \<C>)"
+          by (simp add: c_is(10) c_is(8) local_assms)
+        have "module_data_typing \<C>' ((m_datas m)!i)"
+          using c_is(4) list_all2_nthD local_assms
+          by (simp add: list_all_length)
+        then have data_mode_typing: "data_mode_typing \<C>' (d_mode ((m_datas m)!i)) "
+          using module_data_typing.simps by fastforce
+        then have "\<C>'' \<turnstile> run_data ((m_datas m)!i) i : [] _> []"
+        proof(cases "(d_mode ((m_datas m)!i))")
+          case Dm_passive
+          then show ?thesis using run_data_def empty by auto
+        next
+          case (Dm_active x offset)
+          then have defs: "x < length (memory \<C>')"  "\<C>' \<turnstile> offset : ([] _> [T_num T_i32])" "const_exprs \<C>' offset"
+            using data_mode_typing c_is(9) unfolding data_mode_typing.simps const_expr.simps
+            by (auto split: tab_t.splits)
+          have h1: "const_exprs \<C>'' offset"
+            using defs(3)
+            apply(induction offset)
+            using const_expr.simps c_is(9) c_is(8) context_def
+            apply (auto )
+            by (metis nth_append)
+          consider
+              (a) v where "$* offset = [$C v]"
+                          "typeof v = T_num T_i32"
+            | (b) j t' where "t' <t: T_num T_i32"
+                             "offset = [Get_global j]"
+                             "j < length (global \<C>')"
+                             "tg_mut (global \<C>' ! j) = T_immut"
+                             "tg_t (global \<C>' ! j) = t'"
+            | (c) j where "offset = [Ref_func j]" "j < length (func_t \<C>')" "T_num T_i32 = T_ref T_func_ref"
+            | (d) t_r where " offset = [Ref_null t_r]" "T_num T_i32 = T_ref t_r"
+            using const_exprs_is[OF defs(3,2)] by auto
+          then have h2: "\<C>'' \<turnstile> offset : ([] _> [T_num T_i32])"
+          proof(cases)
+            case a
+            then show ?thesis using context_def v_to_e_def typeof_def typeof_num_def const_num apply (auto split: v_num.splits v.splits)
+              by (metis v_num.simps(17))
+          next
+            case b
+            then have "\<C> \<turnstile> [Get_global j] : [] _> [t']"
+              using b_e_typing.get_global[of j \<C> t'] c_is(8) c_is(9)
+              by (auto simp add: nth_append)
+            then have "\<C>'' \<turnstile> [Get_global j] : [] _> [t']"
+              using context_def b_e_type_preserved_refs funcs_inst_context_length by simp
+            then show ?thesis
+              using b(1,2) t_subtyping_def t_list_subtyping_def
+                    instr_subtyping_def subsumption[of \<C>'' offset "[]" "[t']" "[]" "[T_num T_i32]"]
+              by auto
+          next
+            case c
+            then show ?thesis
+              by blast
+          next
+            case d
+            then show ?thesis using b_e_typing.ref_null by simp
+          qed
+ 
+          have h3: "\<C>'' \<turnstile> [EConstNum (ConstInt32 0), EConstNum (ConstInt32 (int_of_nat (length (d_init (m_datas m ! i)))))] : ([T_num T_i32] _> [T_num T_i32, T_num T_i32, T_num T_i32])"
+          proof -
+            have "\<C>'' \<turnstile> [EConstNum (ConstInt32 0)] : ([T_num T_i32] _> [T_num T_i32, T_num T_i32])"
+              by (metis append_Cons append_Nil b_e_weakening const_num typeof_num_def v_num.simps(17))
+            moreover have "\<C>'' \<turnstile> [ EConstNum (ConstInt32 (int_of_nat (length (d_init (m_datas m ! i)))))] : ([T_num T_i32, T_num T_i32] _> [T_num T_i32, T_num T_i32, T_num T_i32])"
+              by (metis append_Cons append_Nil b_e_weakening const_num typeof_num_def v_num.simps(17))
+            then show ?thesis using b_e_type_comp_conc[OF calculation] by auto
+          qed
+          have "1 \<le> length (memory \<C>'')" 
+            using defs(1) defs(2) c_is(8,9) context_def
+            by auto
+          moreover have "i < length (data \<C>'')" using local_assms
+            by (metis datai_agree_s' i_data_length list_all2_lengthD s'_inst_t store_data_exists)
+          moreover have h4: "\<C>'' \<turnstile> [Memory_init i] : ([T_num T_i32, T_num T_i32, T_num T_i32] _> [])"
+            using b_e_typing.memory_init[OF calculation] by simp
+          moreover have h5: "\<C>'' \<turnstile> [Data_drop i] : ([] _> [])"
+            using calculation(2) b_e_typing.data_drop by blast
+          then show ?thesis using Dm_active unfolding run_data_def
+            using b_e_type_comp_conc[OF b_e_type_comp_conc[OF b_e_type_comp_conc[OF h2 h3] h4] h5]
+            by simp
+        qed
+        then have "s'\<bullet>\<C>'' \<turnstile> $* run_data ((m_datas m)!i) i : [] _> []"
+          using e_typing_l_typing.intros(1) by auto 
+      }
+      then have run_data_t_type: "\<And> i. i < length (m_datas m) \<Longrightarrow> s'\<bullet>\<C>'' \<turnstile> $* run_data ((m_datas m)!i) i : [] _> []"
+        by simp
+      { fix j
+        assume local_assms: "j \<le> length (m_datas m)"
+        then have "s'\<bullet>\<C>'' \<turnstile> $* concat (map2 run_data (take j (m_datas m)) [0..<j]) : [] _> []"
+        proof(induction j)
+          case 0
+          then show ?case
+            by (simp add: e_type_empty instr_subtyping_refl)
+        next
+          case (Suc j)
+          then have j_l: "j < length (m_datas m)" by auto
+          then have "(map2 run_data (take (Suc j) (m_datas m)) [0..<Suc j]) = ((map2 run_data (take j (m_datas m)) [0..< j])@[run_data (m_datas m!j) j])"
+            using take_Suc_conv_app_nth[OF j_l]
+            by auto
+          then have j_suc_concat_map: "$* concat (map2 run_data (take (Suc j) (m_datas m)) [0..<Suc j]) = ($* concat (map2 run_data (take (j) (m_datas m)) [0..<j])) @ ($* run_data ((m_datas m)!j) j)"
+            by auto
+          have "s'\<bullet>\<C>'' \<turnstile> ($* concat (map2 run_data (take (j) (m_datas m)) [0..<j])) : ([] _> [])"
+            using Suc by auto
+          moreover have "s'\<bullet>\<C>'' \<turnstile> ($* run_data ((m_datas m)!j) j) : ([] _> [])"
+            using run_data_t_type[OF j_l] by auto
+          moreover show ?case
+            using e_type_comp_conc[OF calculation] using j_suc_concat_map  by simp
+        qed
+      }
+      then show ?thesis unfolding run_datas_def by fastforce
+       
+    qed
     ultimately have "(s'\<bullet>\<C>'' \<turnstile> init_es : ([] _> []))"
       using e_type_comp_conc init_es_is s_start
       by fastforce 
@@ -966,7 +1109,6 @@ proof -
     by auto
   qed
 qed
-
   
 theorem run_instantiate_sound:
   assumes "run_instantiate n d (s,inst,es) = (s',RValue vs)"

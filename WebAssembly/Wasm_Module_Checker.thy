@@ -54,7 +54,7 @@ lemma module_elem_typing_equiv_module_elem_type_checker:
   done
 
 fun data_mode_type_checker :: "t_context \<Rightarrow> data_mode \<Rightarrow> bool" where
-  "data_mode_type_checker \<C> (Dm_active x es) = (x = 0 \<and> x < length (data \<C>) \<and> b_e_type_checker \<C> es ([] _> [T_num T_i32]) \<and> const_exprs \<C> es)"
+  "data_mode_type_checker \<C> (Dm_active x es) = (x < length (memory \<C>) \<and> b_e_type_checker \<C> es ([] _> [T_num T_i32]) \<and> const_exprs \<C> es)"
 | "data_mode_type_checker _ Dm_passive = True"
 
 lemma data_mode_typing_equiv_data_mode_type_checker:

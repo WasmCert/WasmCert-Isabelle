@@ -114,7 +114,7 @@ inductive module_elem_typing :: "t_context \<Rightarrow> module_elem \<Rightarro
 
 inductive data_mode_typing :: "t_context \<Rightarrow> data_mode \<Rightarrow> bool" where
   pasive: "data_mode_typing \<C> Dm_passive"
-| active: "\<lbrakk>x = 0; x < length (data \<C>); lims = data \<C>!x; \<C> \<turnstile> es : ([] _> [T_num T_i32]); const_exprs \<C> es\<rbrakk> \<Longrightarrow> data_mode_typing \<C> (Dm_active x es)"
+| active: "\<lbrakk>x < length (memory \<C>); lims = memory \<C>!x; \<C> \<turnstile> es : ([] _> [T_num T_i32]); const_exprs \<C> es\<rbrakk> \<Longrightarrow> data_mode_typing \<C> (Dm_active x es)"
 
 inductive module_data_typing :: "t_context \<Rightarrow> module_data \<Rightarrow> bool" where
   "data_mode_typing \<C> dm \<Longrightarrow> module_data_typing \<C> \<lparr>d_init=es, d_mode=dm\<rparr>"
