@@ -27,12 +27,12 @@ lemma list_all2_forget:
 lemma limits_compat_refl:"limits_compat l l" 
   unfolding limits_compat_def by(simp add: pred_option_def)
 
-lemma tab_typing_exists:"\<exists>tt. tab_typing t tt" 
-  using limits_compat_refl tab_typing_def
+lemma tab_subtyping_exists:"\<exists>tt. tab_subtyping t tt" 
+  using tab_subtyping_refl tab_subtyping_def
   by (metis limit_t.select_convs(1,2) limits_compat_def) 
 
-lemma mem_typing_exists:"\<exists>mt. mem_typing m mt" 
-  using limits_compat_refl mem_typing_def
+lemma mem_subtyping_exists:"\<exists>mt. mem_subtyping m mt" 
+  using limits_compat_refl mem_subtyping_def
   by (metis limit_t.select_convs(1,2) limits_compat_def) 
 
 lemma glob_typing_exists:"\<exists>gt. glob_typing g gt" 
@@ -40,7 +40,7 @@ lemma glob_typing_exists:"\<exists>gt. glob_typing g gt"
   by (metis tg.select_convs(1,2))
 
 lemma instantiation_external_typing:
-  assumes "alloc_module s m v_imps g_inits (s1, inst, v_exps)"
+  assumes "alloc_module s m v_imps g_inits el_inits (s1, inst, v_exps)"
           "inst_typing s' inst \<C>" 
           "list_all2 (\<lambda>exp. module_export_typing \<C> (E_desc exp)) (m_exports m) t_exps"
   shows "\<exists>tes. list_all2 (\<lambda>v_exp te. external_typing s' (E_desc v_exp) te) v_exps tes"
@@ -87,7 +87,7 @@ proof -
     ultimately have "i < length (tabs s')" using \<open>i = inst.tabs inst ! j\<close>
       unfolding list_all_length by auto
     then have "\<exists> tt. external_typing s' (Ext_tab i) tt" 
-      unfolding external_typing.simps by (simp add: tab_typing_exists)  
+      unfolding external_typing.simps by (simp add: tab_subtyping_exists)  
   }
   moreover {
     have memi_agree_s':"list_all2 (memi_agree (mems s')) (inst.mems inst) (memory \<C>)"
@@ -108,7 +108,7 @@ proof -
     ultimately have "i < length (mems s')" using \<open>i = inst.mems inst ! j\<close>
       unfolding list_all_length by auto
     then have "\<exists> tm. external_typing s' (Ext_mem i) tm" 
-      unfolding external_typing.simps by (simp add: mem_typing_exists)  
+      unfolding external_typing.simps by (simp add: mem_subtyping_exists)  
   }
   moreover {
     have globi_agree_s':"list_all2 (globi_agree (globs s')) (inst.globs inst) (global \<C>)"
@@ -136,6 +136,251 @@ proof -
   then show ?thesis by (simp add: ex_list_all2) 
 qed
 
+
+lemma b_e_type_preserved_refs:
+  assumes "\<C> \<turnstile> b_es : (tn _> tm)"
+          "\<C>'=\<C>\<lparr>refs := [0..< length (func_t \<C>)] \<rparr>"
+        shows "\<C>' \<turnstile> b_es : (tn _> tm)"
+  using assms
+proof -
+  have refs_subset_helper:
+    "types_t \<C>' = types_t \<C>"
+    "func_t \<C>' = func_t \<C>"
+    "elem \<C>' = elem \<C>"
+    "data \<C>' = data \<C>"
+    "table \<C>' = table \<C>"
+    "memory \<C>' = memory \<C>"
+    "local \<C>' = local \<C>"
+    "label \<C>' = label \<C>"
+    "return \<C>' = return \<C>"
+    using assms by auto
+  show ?thesis
+    using assms refs_subset_helper
+  proof(induction \<C> b_es "tn _> tm" arbitrary: tn tm \<C>' rule: b_e_typing.induct)
+    case (const_num \<C> v)
+    then show ?case using b_e_typing.const_num by metis
+  next
+    case (const_vec \<C> v)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (unop op t \<C>)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (binop op t \<C>)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (testop t \<C> uu)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (relop op t \<C>)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (ref_null \<C> t)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (ref_is_null \<C> t)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (ref_func j \<C>)
+    have "j \<in> set (refs \<C>')" "j < length (func_t \<C>')" using ref_func(1,2,3,4)
+      by auto
+    then show ?case using b_e_typing.ref_func[of j \<C>'] by auto
+  next
+    case (unop_vec \<C> op)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (binop_vec op \<C>)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (ternop_vec \<C> op)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (test_vec \<C> op)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (shift_vec \<C> op)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (splat_vec \<C> sv)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (extract_vec i sv sx \<C>)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (replace_vec i sv \<C>)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (convert t1 t2 sat_sx \<C>)
+    then show ?case using b_e_typing.convert by metis
+  next
+    case (reinterpret t1 t2 \<C>)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (unreachable \<C>)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (nop \<C>)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (drop \<C> t)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (select t_tag t \<C>)
+    then show ?case using b_e_typing.select by metis
+  next
+    case (block \<C> tb tn tm es)
+    then show ?case using b_e_typing.block tb_tf_t_def
+      apply (cases \<C> rule:t_context.cases)
+      by (auto split: tb.splits)
+  next
+    case (loop \<C> tb es)
+    then show ?case using b_e_typing.loop tb_tf_t_def
+      apply (cases \<C> rule:t_context.cases)
+      by (auto split: tb.splits)
+  next
+    case (if_wasm \<C> tb tn es1 es2)
+    then show ?case using b_e_typing.if_wasm tb_tf_t_def
+      apply (cases \<C> rule:t_context.cases)
+      by (auto split: tb.splits)
+  next
+    case (br i \<C> ts t1s)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (br_if i \<C>)
+    then show ?case using b_e_typing.br_if by metis
+  next
+    case (br_table \<C> ts "is" i t1s)
+    then show ?case using b_e_typing.br_table by metis
+  next
+    case (return \<C> ts t1s)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (call i \<C>)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (call_indirect i \<C> t1s ti uv)
+    then show ?case using b_e_typing.call_indirect by metis
+  next
+    case (get_local i \<C> t)
+    then show ?case using b_e_typing.get_local by metis
+  next
+    case (set_local i \<C> t)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (tee_local i \<C> t)
+    then show ?case using b_e_typing.intros by metis
+  next
+    case (get_global i \<C> t)
+    then show ?case using b_e_typing.get_global by auto
+  next
+    case (set_global i \<C> t)
+    then show ?case using b_e_typing.set_global by auto
+  next
+    case (load \<C> a tp_sx t off)
+    then show ?case using b_e_typing.load by simp
+  next
+    case (store \<C> a tp t off)
+    then show ?case using b_e_typing.store by simp
+  next
+    case (load_vec \<C> lvop a off)
+    then show ?case using b_e_typing.load_vec by simp
+  next
+    case (load_lane_vec \<C> i svi a off)
+    then show ?case using b_e_typing.load_lane_vec by simp
+  next
+    case (store_vec \<C> svop a off)
+    then show ?case using b_e_typing.store_vec by simp
+  next
+    case (current_memory \<C>)
+    then show ?case using b_e_typing.current_memory by simp
+  next
+    case (grow_memory \<C>)
+    then show ?case using b_e_typing.grow_memory by simp
+  next
+    case (table_set ti \<C> tr)
+    then show ?case using b_e_typing.table_set by simp
+  next
+    case (table_get ti \<C> tr)
+    then show ?case using b_e_typing.table_get by simp
+  next
+    case (table_size ti \<C>)
+    then show ?case using b_e_typing.table_size by simp
+  next
+    case (table_grow ti \<C> tr)
+    then show ?case using b_e_typing.table_grow by simp
+  next
+    case (empty \<C>)
+    then show ?case using b_e_typing.empty by blast
+  next
+    case (composition \<C> es t2s e)
+    then show ?case using b_e_typing.composition by auto
+  next
+    case (subsumption \<C> es tf1 tf2)
+    then show ?case using b_e_typing.subsumption by auto
+  next
+    case (memory_init \<C> i)
+    then show ?case using b_e_typing.memory_init by metis
+  next
+    case (memory_copy \<C>)
+    then show ?case using b_e_typing.memory_copy by metis
+  next
+    case (memory_fill \<C>)
+    then show ?case using b_e_typing.memory_fill by metis
+  next
+    case (table_init x \<C> y tr)
+    then show ?case using b_e_typing.table_init by metis
+  next
+    case (table_copy x \<C> tr y)
+    then show ?case using b_e_typing.table_copy by metis
+  next
+    case (table_fill x \<C> tr)
+    then show ?case using b_e_typing.table_fill by metis
+  next
+    case (elem_drop x \<C>)
+    then show ?case using b_e_typing.elem_drop by simp
+  next
+    case (data_drop x \<C>)
+    then show ?case using b_e_typing.data_drop by simp
+  qed
+qed
+
+(*
+lemma alloc_module_helper:
+  assumes
+    "alloc_module s m v_imps g_inits el_inits (s', inst, v_exps)"
+    "module_typing m t_imps t_exps"
+    "x \<in> set (collect_funcidxs_module (m\<lparr>m_funcs := [], m_start := None\<rparr>))"
+  shows
+    "x < length (inst.funcs inst)"
+proof -
+  obtain from_elems from_datas where defs:
+    "from_elems = concat (map collect_funcidxs_module_elem (m_elems m))"
+    "from_datas = concat (map collect_funcidxs_module_data (m_datas m))"
+    "(collect_funcidxs_module (m\<lparr>m_funcs := [], m_start := None\<rparr>)) = remdups (concat [from_elems, from_datas])"
+    by auto
+  consider
+      (a) "x \<in> set from_elems"
+    | (b) "x \<in> set from_datas"
+    using defs(3) assms(3) by auto
+  thus ?thesis
+  proof(cases)
+    case a
+    then show ?thesis sorry
+  next
+    case b
+    then show ?thesis sorry
+  qed
+qed
+
+
+lemma alloc_module_prop:
+  assumes
+    "alloc_module s m v_imps g_inits el_inits (s', inst, v_exps)"
+      "module_typing m t_imps t_exps"
+    shows
+     "set (collect_funcidxs_module (module\<lparr>m_funcs := [], m_start := None\<rparr>)) \<le> set ([0..< length (inst.funcs inst)])"
+  sorry *)
+
 theorem instantiation_sound:
   assumes "store_typing s"
           "(instantiate s m v_imps ((s', inst, v_exps), init_es))"
@@ -144,54 +389,55 @@ theorem instantiation_sound:
         "\<exists>tes. list_all2 (\<lambda>v_exp te. external_typing s' (E_desc v_exp) te) v_exps tes"
         "store_extension s s'"
 proof -
-  obtain t_imps t_exps g_inits f e_offs d_offs start e_init_tabs e_init_mems where 
-    "module_typing m t_imps t_exps"  
+  obtain t_imps t_exps g_inits el_inits f start where 
+    m_typing:"module_typing m t_imps t_exps"  
     and s_ext_typing:"list_all2 (external_typing s) v_imps t_imps"
-    and s_alloc_module:"alloc_module s m v_imps g_inits (s', inst, v_exps)"
+    and s_alloc_module:"alloc_module s m v_imps g_inits el_inits (s', inst, v_exps)"
     and f_def:"f = \<lparr> f_locs = [], f_inst = inst \<rparr>"
     and g_inits_def:
     "list_all2 (\<lambda>g v. reduce_trans (s',f,$*(g_init g)) (s',f,[$C v])) (m_globs m) g_inits"
-    and "list_all2 (\<lambda>e c. reduce_trans (s',f,$*(e_off e)) (s',f,[$C\<^sub>n (ConstInt32 c)])) (m_elem m) e_offs"
-    "list_all2 (\<lambda>d c. reduce_trans (s',f,$*(d_off d)) (s',f,[$C\<^sub>n (ConstInt32 c)])) (m_data m) d_offs"
-    and s_element_in_bounds:
-    "list_all2 (\<lambda>e_off e. ((nat_of_int e_off) + (length (e_init e))) \<le> length (fst ((tabs s')!((inst.tabs inst)!(e_tab e))))) e_offs (m_elem m)"
-    and s_data_in_bounds:
-    "list_all2 (\<lambda>d_off d. ((nat_of_int d_off) + (length (d_init d))) \<le> mem_length ((mems s')!((inst.mems inst)!(d_data d)))) d_offs (m_data m)"
+    and el_inits_def:
+    "list_all2 (\<lambda>el vs. list_all2 (\<lambda> el_init v. reduce_trans (s',f,$*(el_init)) (s',f,[$C (V_ref v)])) (e_init el) vs) (m_elems m) el_inits"
     and s_start:"(case (m_start m) of None \<Rightarrow> [] | Some i_s \<Rightarrow> [Invoke ((inst.funcs inst)!i_s)]) = start"
-    and s_init_tabs:"List.map2 (\<lambda>n e. Init_tab n (map (\<lambda>i. (inst.funcs inst)!i) (e_init e))) (map nat_of_int e_offs) (m_elem m) = e_init_tabs"
-    and s_init_mems:"List.map2 (\<lambda>n d. Init_mem n (d_init d)) (map nat_of_int d_offs) (m_data m) = e_init_mems"
-    and init_es_is:"init_es = e_init_tabs@e_init_mems@start"
+    and init_es_is:"init_es = (run_elems (m_elems m))@(run_datas (m_datas m))@start"
     using assms(2) instantiate.simps by auto
 
   show "store_extension s s'"
     using alloc_module_preserve_store_extension s_alloc_module
     by auto
 
-  obtain \<C> \<C>' fts gts 
+  obtain \<C> \<C>' fts gts rts dts
     where c_is:"list_all2 (module_func_typing \<C>) (m_funcs m) fts"
     "list_all (module_tab_typing) (m_tabs m)"
-    "list_all (module_elem_typing \<C>) (m_elem m)"
-    "list_all (module_data_typing \<C>) (m_data m)"
+    "list_all2 (module_elem_typing \<C>') (m_elems m) rts"
+    "list_all (module_data_typing \<C>') (m_datas m)"
+    "list_all2 (module_glob_typing \<C>') (m_globs m) gts"
     "list_all2 (\<lambda>exp. module_export_typing \<C> (E_desc exp)) (m_exports m) t_exps"
     "pred_option (module_start_typing \<C>) (m_start m)"
-    "\<C> = \<lparr>types_t=(m_types m), 
-          func_t=ext_t_funcs t_imps @ fts, 
-          global=ext_t_globs t_imps @ gts, 
-          table=ext_t_tabs t_imps @ (m_tabs m), 
-          memory=ext_t_mems t_imps @ (m_mems m), 
-          local=[], label=[], return=None\<rparr>"
-    "list_all2 (module_glob_typing \<C>') (m_globs m) gts"
-    "\<C>' = \<lparr>types_t=[], func_t=[], global=ext_t_globs t_imps, table=[], memory=[], 
-        local=[], label=[], return=None\<rparr>"
+    "\<C> = \<lparr>types_t=(m_types m),
+       func_t=ext_t_funcs t_imps @ fts,
+       global=ext_t_globs t_imps @ gts,
+       elem=rts,
+       data=dts,
+       table=ext_t_tabs t_imps @ (m_tabs m),
+       memory=ext_t_mems t_imps @ (m_mems m),
+       local=[],
+       label=[],
+       return=None,
+       refs=collect_funcidxs_module (m\<lparr>m_funcs := [], m_start := None\<rparr>)\<rparr>"
+    "\<C>' = \<C>\<lparr>global := ext_t_globs t_imps\<rparr>"
+    "length dts = length (m_datas m)"
     "list_all (module_mem_typing) (m_mems m)"
-    using \<open>module_typing m t_imps t_exps\<close> module_typing.simps
+    using m_typing module_typing.simps
     by auto 
 
-  obtain fs ts ms gs where s'_is:
+  obtain fs ts ms gs els ds where s'_is:
     "funcs s' = funcs s @ fs" 
     "tabs s' = tabs s @ ts"
     "mems s' = mems s @ ms"
     "globs s' = globs s @ gs"
+    "elems s' = elems s @ els"
+    "datas s' = datas s @ ds"
     using alloc_module_ext_arb[OF s_alloc_module]
     by metis
 
@@ -220,9 +466,9 @@ proof -
       then have allocd_interval:"allocd_tabs = [length (tabs s) ..< (length (tabs s) + length ts)]" 
         using allocd_tabs_def alloc_tabs_range surjective_pairing by metis  
 
-      have "list_all2 tab_typing ts (m_tabs m)" 
-        unfolding ts_alloc alloc_tab_simple_def tab_typing_def list.rel_map(1) limits_compat_def
-        by(simp add:list_all2_refl pred_option_def)
+      have "list_all2 tab_subtyping (map fst ts) (m_tabs m)" 
+        unfolding ts_alloc alloc_tab_simple_def list.rel_map(1) limits_compat_def
+        by(simp add:list_all2_refl tab_subtyping_refl pred_option_def)
 
       then have "list_all2 (tabi_agree (tabs s@ts)) allocd_tabs (m_tabs m)" 
         unfolding tabi_agree_def allocd_interval 
@@ -254,8 +500,8 @@ proof -
       then have allocd_interval:"allocd_mems = [length (mems s) ..< (length (mems s) + length ms)]" 
         using allocd_mems_def alloc_mems_range surjective_pairing by metis  
 
-      have "list_all2 mem_typing ms (m_mems m)" 
-        unfolding ms_alloc alloc_mem_simple_def mem_typing_def list.rel_map(1) limits_compat_def
+      have "list_all2 mem_subtyping (map fst ms) (m_mems m)" 
+        unfolding ms_alloc alloc_mem_simple_def mem_subtyping_def list.rel_map(1) limits_compat_def
           mem_mk_def mem_rep_mk_def mem_size_def mem_length_def mem_rep_length_def bytes_replicate_def
           mem_max_def 
         by(rule list_all2_refl, simp add: pred_option_def mem_rep.Abs_mem_rep_inverse Ki64_def)        
@@ -269,7 +515,7 @@ proof -
       using c_is by(simp add: list_all2_appendI)
   qed
 
-  have "types inst = types_t \<C>" 
+  have types_inst_context: "types inst = types_t \<C>" 
   proof -
     have "types inst = m_types m" using s_alloc_module unfolding alloc_module.simps 
       by(auto)
@@ -363,8 +609,9 @@ proof -
         by (metis min.idem)   
 
       have "list_all2 (\<lambda>g gt. gt = g_type g) (m_globs m) gts" 
-        unfolding module_glob_typing.simps 
-        by (metis (mono_tags, lifting) c_is(8) list_all2_mono module_glob_typing_equiv_module_glob_type_checker)
+        unfolding module_glob_typing.simps
+        using c_is(5)
+        by (metis (mono_tags, lifting) list_all2_mono module_glob_typing_equiv_module_glob_type_checker)
       then have "gts = map g_type (m_globs m)"
         unfolding list_all2_conv_all_nth 
         by (metis map_intro_length) 
@@ -375,21 +622,24 @@ proof -
           fix g v
           assume assm:"(g, v) \<in> set (zip (m_globs m) g_inits)"
 
-          have 1:"const_exprs \<C>' (g_init g)" using c_is(8) zip_agree assm
+          have 1:"const_exprs \<C>' (g_init g)" using c_is(5) zip_agree assm
             unfolding module_glob_typing.simps list_all2_conv_all_nth
             by (metis in_set_conv_nth module_glob.select_convs(2) set_zip_leftD) 
-          have 2:"\<C>' \<turnstile> g_init g : ([] _> [tg_t (g_type g)])" using c_is(8) zip_agree assm
+          have 2:"\<C>' \<turnstile> g_init g : ([] _> [tg_t (g_type g)])" using c_is(5) zip_agree assm
             unfolding module_glob_typing.simps list_all2_conv_all_nth
             by (metis in_set_conv_nth module_glob.select_convs(1,2) set_zip_leftD) 
           have 3:"reduce_trans (s',f,$*(g_init g)) (s',f,[$C v])" 
             using g_inits_def assm zip_agree unfolding list_all2_conv_all_nth in_set_conv_nth
             by fastforce 
           have 4:"global \<C>' = ext_t_globs t_imps" unfolding c_is(9) by simp 
-
+          have 5: "length (inst.funcs inst) =length (func_t \<C>')"
+            using funci_agree_s' c_is(9)
+            by (simp add: list_all2_lengthD)
           have "tg_t (g_type g) = typeof v"
             using const_exprs_reduce_trans[OF 1 2 3 4
-                list_all2_external_typing_glob_alloc[OF s_ext_typing] s'_is(4)]
-            \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close> f_def by force 
+                list_all2_external_typing_glob_alloc[OF s_ext_typing] s'_is(4) _ _ \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close> _ 5]
+                \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close>
+                f_def by force
         }
         then have "list_all2 (\<lambda>g g_init. tg_t (g_type g) = typeof g_init) (m_globs m) g_inits"
           using \<open>length (m_globs m) = length g_inits\<close> unfolding list_all2_conv_all_nth 
@@ -423,14 +673,28 @@ proof -
     qed 
     ultimately show ?thesis using c_is by (simp add: list_all2_appendI) 
   qed
-  moreover have "local \<C> = [] \<and> label \<C> = [] \<and> return \<C> = None" using c_is by auto
-  ultimately have s'_inst_t:"inst_typing s' inst \<C>" using inst_typing.simps
+  moreover have elemi_agree_s': "list_all2 (elemi_agree s' (s.elems s')) (inst.elems inst) (elem \<C>)" sorry
+  moreover have datai_agree_s': "list_all2 (datai_agree (s.datas s')) (inst.datas inst) (data \<C>)" sorry
+
+  moreover have "local \<C> = [] \<and> label \<C> = [] \<and> return \<C> = None" using c_is(8) by auto
+  moreover have funcs_inst_context_length: "length (inst.funcs inst) = length (func_t \<C>)"
+    using funci_agree_s' list_all2_lengthD by blast
+  moreover obtain \<C>'' where context_def: "\<C>'' = \<C>\<lparr>refs := [0..<length (inst.funcs inst)]\<rparr>" by simp
+  ultimately have
+    "types inst = types_t \<C>''"
+    "list_all2 (funci_agree (s.funcs s')) (inst.funcs inst) (func_t \<C>'')"
+    "list_all2 (tabi_agree (tabs s')) (inst.tabs inst) (table \<C>'')"
+    "list_all2 (memi_agree (s.mems s')) (inst.mems inst) (memory \<C>'')"
+    "list_all2 (globi_agree (s.globs s')) (inst.globs inst) (global \<C>'')"
+    "list_all2 (elemi_agree s' (s.elems s')) (inst.elems inst) (elem \<C>'')"
+    "list_all2 (datai_agree (s.datas s')) (inst.datas inst) (data \<C>'')"
+    "local \<C>'' = [] \<and> label \<C>'' = [] \<and> return \<C>'' = None"
+    "refs \<C>'' = [0..<length (inst.funcs inst)]"
+    by auto
+  then have s'_inst_t:"inst_typing s' inst \<C>''" using  inst_typing.intros
     by (metis (full_types) inst.surjective old.unit.exhaust t_context.surjective) 
-
-
   have "length (inst.mems inst) = length (memory \<C>)" using memi_agree_s1 
     unfolding list_all2_conv_all_nth by simp
-
 
   show "store_typing s'"
   proof -
@@ -451,19 +715,32 @@ proof -
             "f = Func_native inst ((types inst)!i_t) loc_ts b_es"  
             "(i_t, loc_ts, b_es) \<in> set (m_funcs m)"
             unfolding alloc_module_funcs_form[OF s_alloc_module s'_is(1)]
-             alloc_func_simple_def by fastforce 
+             alloc_func_simple_def by fastforce
           obtain tn tm where 2:
             "i_t < length (types_t \<C>)"
             "(types_t \<C>)!i_t = (tn _> tm)"
             "\<C>\<lparr>local := tn @ loc_ts, label := ([tm] @ (label \<C>)), return := Some tm\<rparr> \<turnstile> b_es : ([] _> tm)"
+            "n_zeros loc_ts \<noteq> None"
             using list_all2_in_set[OF 1(2) c_is(1)]
             unfolding module_func_typing.simps by auto 
           have 3:"(types_t \<C>)!i_t = (types inst)!i_t"
-            using store_typing_imp_types_eq[OF \<open>inst_typing s' inst \<C>\<close> 2(1)] by -
+            using types_inst_context by auto
 
           have "cl_typing s' f (tn _> tm)" 
-            using cl_typing.intros(1)[OF \<open>inst_typing s' inst \<C>\<close> 2(2) 2(3)]
-            unfolding 1(1) 3 by -
+          proof -
+            have 4: "i_t < length (types_t \<C>'')"
+                    "(types_t \<C>'')!i_t = (tn _> tm)"
+              using 2 context_def by auto
+            have "\<C>''\<lparr>local := tn @ loc_ts, label := [tm] @ label \<C>'', return := Some tm\<rparr> = \<C>\<lparr>local := tn @ loc_ts, label := ([tm] @ (label \<C>)), return := Some tm\<rparr> \<lparr> refs := [0..< length (func_t (\<C>''\<lparr>local := tn @ loc_ts, label := [tm] @ label \<C>'', return := Some tm\<rparr>))]\<rparr>"
+              using context_def funcs_inst_context_length by auto
+            then have 5: "\<C>''\<lparr>local := tn @ loc_ts, label := ([tm] @ (label \<C>'')), return := Some tm\<rparr> \<turnstile> b_es : ([] _> tm)"
+              using  b_e_type_preserved_refs[OF 2(3)]
+              using funcs_inst_context_length inst_typing_func_length s'_inst_t
+              by auto
+            have 32: "(types_t \<C>'')!i_t = (types inst)!i_t" using 3 context_def by simp
+            then show ?thesis using cl_typing.intros(1)[OF \<open>inst_typing s' inst \<C>''\<close> 4(2) 5]
+              using 1(1) "2"(4) by metis 
+          qed
           then have "\<exists>tf. cl_typing s' f tf" by auto
         }
         then show ?thesis by (simp add: list_all_iff) 
@@ -476,10 +753,10 @@ proof -
       have 1:"list_all (\<lambda>i. i< length (funcs s')) (inst.funcs inst)" 
         using funci_agree_s' s'_is(1) unfolding funci_agree_def
         by (simp add: list_all2_conv_all_nth list_all_length) 
-      {
+      (*{
         fix e 
-        assume "e \<in> set (m_elem m)" 
-        then have "module_elem_typing \<C> e" using \<open>list_all (module_elem_typing \<C>) (m_elem m)\<close>
+        assume "e \<in> set (m_elems m)" 
+        then have "module_elem_typing \<C> e" using \<open>list_all (module_elem_typing \<C>') (m_elems m)\<close>
           by (metis list_all_iff) 
         then have "list_all (\<lambda>i. i < length (func_t \<C>)) (e_init e)"  
           unfolding module_elem_typing.simps by auto 
@@ -504,7 +781,7 @@ proof -
         ultimately show ?thesis using s_element_in_bounds
           unfolding element_in_bounds_def list_all2_conv_all_nth list_all_length
           by auto
-      qed
+      qed*)
       have "list_all (tab_agree s) (tabs s)" using assms(1) unfolding store_typing.simps by auto
       then have "list_all (tab_agree s') (tabs s)" 
         using tab_agree_store_extension_inv[OF \<open>store_extension s s'\<close>] 
@@ -513,14 +790,18 @@ proof -
         using \<open>list_all (module_tab_typing) (m_tabs m)\<close> 
         unfolding ts_alloc alloc_tab_simple_def tab_agree_def list.pred_map(1) comp_def 
         limit_typing.simps
-        by(simp add:list.pred_set, auto)
+        apply (auto simp add:  tab_t_reftype_def tab_max_def tab_t_lim_def list.pred_set split: tab_t.splits)
+        using module_tab_typing.simps
+        
+        using limit_typing.simps apply auto[1]
+        using ref_typing.intros(1) by blast
       ultimately show "list_all (tab_agree s') (tabs s')"
         using s'_is(2)
         by simp 
     qed
     have 3:"list_all mem_agree (mems s')"
     proof -
-      have "list_all2 (data_in_bounds s' inst) (map nat_of_int d_offs) (m_data m)"
+     (* have "list_all2 (data_in_bounds s' inst) (map nat_of_int d_offs) (m_data m)"
       proof -
         have "list_all (\<lambda>i. i < length (mems s')) (inst.mems inst)" 
           using list_all2_forget[OF memi_agree_s1] list.pred_mono_strong unfolding memi_agree_def
@@ -533,7 +814,7 @@ proof -
       qed
       then have 1:"list_all2 (data_in_bounds s' inst) (map nat_of_int d_offs) (m_data m)" 
         unfolding data_in_bounds_def
-        by auto
+        by auto *)
 
       have "list_all mem_agree (mems s)" using assms(1) unfolding store_typing.simps by auto
       moreover have "list_all mem_agree ms" 
@@ -547,37 +828,47 @@ proof -
         unfolding s'_is(3)
         by simp
     qed
+    have 4: "list_all (glob_agree s') (s.globs s')" sorry
+    have 5: "list_all (elem_agree s') (s.elems s')" sorry
+    have 6: "list_all (data_agree s') (s.datas s')" sorry
     show ?thesis
-      using 1 2 3 store_typing.intros
+      using 1 2 3 4 5 6 store_typing.intros
       by blast
   qed
 
   show "\<exists>tes. list_all2 (\<lambda>v_exp te. external_typing s' (E_desc v_exp) te) v_exps tes"
-    using instantiation_external_typing[OF s_alloc_module \<open>inst_typing s' inst \<C>\<close> c_is(5)] by -
+    using instantiation_external_typing[OF s_alloc_module \<open>inst_typing s' inst \<C>''\<close> ] c_is(6)
+          context_def
+    unfolding module_export_typing.simps
+    by auto
 
 
   show "\<exists>\<C>. (inst_typing s' inst \<C> \<and> (s'\<bullet>\<C> \<turnstile> init_es : ([] _> [])))"
   proof -
-    have "s'\<bullet>\<C> \<turnstile> (case (m_start m) of None \<Rightarrow> [] | Some i_s \<Rightarrow> [Invoke ((inst.funcs inst)!i_s)]) : ([] _> [])"
+    have "s'\<bullet>\<C>'' \<turnstile> (case (m_start m) of None \<Rightarrow> [] | Some i_s \<Rightarrow> [Invoke ((inst.funcs inst)!i_s)]) : ([] _> [])"
     proof (cases "m_start m")
       case None
       thus ?thesis
-        by (simp add: e_type_empty)
+        by (simp add: e_type_empty instr_subtyping_refl)
     next
       case (Some a)
       have a_type:"a < length (inst.funcs inst)"
-                  "(func_t \<C>)!a = ([] _> [])" using c_is(6) Some funci_agree_s' 
-          unfolding module_start_typing.simps list_all2_conv_all_nth by simp_all
-        then have "inst.funcs inst ! a < length (funcs s')" using list_all2_forget[OF funci_agree_s']
-          unfolding funci_agree_def list_all_length by simp
-        moreover have "cl_type ((funcs s')!(inst.funcs inst ! a)) = ([] _> [])"
-          using a_type(1,2) c_is(7)
-          by (metis funci_agree_def funci_agree_s' list_all2_conv_all_nth)
-        ultimately show ?thesis
-          using e_typing_l_typing.intros(6) Some
-          by simp
-      qed
-      moreover have "s'\<bullet>\<C> \<turnstile> e_init_tabs : ([] _> [])"
+                  "(func_t \<C>'')!a = ([] _> [])" using c_is(6) Some funci_agree_s' 
+        unfolding module_start_typing.simps list_all2_conv_all_nth
+        using c_is(7) module_start_typing.simps context_def by auto
+      then have "inst.funcs inst ! a < length (funcs s')" using list_all2_forget[OF funci_agree_s']
+        unfolding funci_agree_def list_all_length by simp
+      moreover have "cl_type ((funcs s')!(inst.funcs inst ! a)) = ([] _> [])"
+        using a_type(1,2) c_is(7) context_def funci_agree_def funci_agree_s'
+        unfolding module_start_typing.simps
+        by (simp add: list_all2_conv_all_nth)
+      ultimately show ?thesis
+        using e_typing_l_typing.intros(7) Some
+        by simp
+    qed
+    moreover have "s'\<bullet>\<C>'' \<turnstile> run_elems (m_elems m) : ([] _> [])" sorry
+    moreover have "s'\<bullet>\<C>'' \<turnstile> run_datas (m_datas m) : ([] _> [])" sorry
+      (*moreover have "s'\<bullet>\<C>'' \<turnstile> run_elems (m_elems m) : ([] _> [])"
       proof -
         have "length e_offs = length (m_elem m)"
           using s_element_in_bounds list_all2_lengthD
@@ -666,10 +957,10 @@ proof -
             using e_init_mem_is(1) e_type_comp_conc
             by fastforce
         qed
-      qed
-    ultimately have "(s'\<bullet>\<C> \<turnstile> init_es : ([] _> []))"
+      qed *)
+    ultimately have "(s'\<bullet>\<C>'' \<turnstile> init_es : ([] _> []))"
       using e_type_comp_conc init_es_is s_start
-      by fastforce
+      by fastforce 
     thus ?thesis
       using  s'_inst_t
     by auto

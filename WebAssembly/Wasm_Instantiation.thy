@@ -598,12 +598,6 @@ datatype res_inst =
   | RI_trap String.literal
   | RI_res inst "module_export list" "e list"
 
-(*
-funcs=(ext_funcs v_imps)@[length (funcs s) ..< (length (funcs s) + length (m_funcs m))]
-i_fs = [length (funcs s) ..< (length (funcs s) + length (m_funcs m))]
-*)
-
-
 fun interp_instantiate :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarrow> (s \<times> res_inst)" where
   "interp_instantiate s m v_imps =
      (case (module_type_checker m) of
