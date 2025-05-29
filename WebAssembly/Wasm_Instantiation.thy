@@ -32,13 +32,13 @@ definition alloc_glob :: "s \<Rightarrow> (module_glob \<times> v) \<Rightarrow>
 
 abbreviation "alloc_globs s m_gs vs \<equiv> alloc_Xs alloc_glob s (zip m_gs vs)"
 
-definition alloc_elem :: "s \<Rightarrow> (t_ref \<times> v_ref list) => (s \<times> i)" where
-  "alloc_elem s t_r_v_rs = (s\<lparr>s.elems := (elems s)@[(t_r_v_rs)]\<rparr>,length (elems s))"
+definition alloc_elem :: "s \<Rightarrow> (module_elem \<times> v_ref list) => (s \<times> i)" where
+  "alloc_elem s m_el_v_rs = (case m_el_v_rs of (m_el, v_rs) \<Rightarrow> (s\<lparr>s.elems := (elems s)@[(e_type m_el, v_rs)]\<rparr>,length (elems s)))"
 
 abbreviation "alloc_elems s t_rs v_rs \<equiv> alloc_Xs alloc_elem s (zip t_rs v_rs)"
 
-definition alloc_data :: "s \<Rightarrow> bytes => (s \<times> i)" where
-  "alloc_data s bs = (s\<lparr>s.datas := (datas s)@[bs]\<rparr>,length (datas s))"
+definition alloc_data :: "s \<Rightarrow> module_data => (s \<times> i)" where
+  "alloc_data s m_d = (s\<lparr>s.datas := (datas s)@[d_init m_d]\<rparr>,length (datas s))"
 
 abbreviation "alloc_datas \<equiv> alloc_Xs alloc_data"
 
@@ -99,21 +99,21 @@ lemma alloc_glob_length:
   by (simp_all split: prod.splits)
 
 lemma alloc_elem_length:
-  assumes "alloc_elem s t_r_v_rs = (s', i_e)"
+  assumes "alloc_elem s (m_el, v_rs) = (s', i_e)"
   shows "length (elems s) = i_e"
         "length (elems s') = Suc i_e"
         "(funcs s) = (funcs s')"
         "(tabs s) = (tabs s')"
         "(mems s) = (mems s')"
         "(globs s) = (globs s')"
-        "(elems s)@[t_r_v_rs] = (elems s')"
+        "(elems s)@[(e_type m_el, v_rs)] = (elems s')"
         "(datas s) = (datas s')"
   using assms[symmetric]
   unfolding alloc_elem_def
   by (simp_all split: prod.splits)
 
 lemma alloc_data_length:
-  assumes "alloc_data s bs = (s', i_d)"
+  assumes "alloc_data s m_d = (s', i_d)"
   shows "length (datas s) = i_d"
         "length (datas s') = Suc i_d"
         "(funcs s) = (funcs s')"
@@ -121,7 +121,7 @@ lemma alloc_data_length:
         "(mems s) = (mems s')"
         "(globs s) = (globs s')"
         "(elems s) = (elems s')"
-        "(datas s)@[bs] = (datas s')"
+        "(datas s)@[d_init m_d] = (datas s')"
   using assms[symmetric]
   unfolding alloc_data_def
   by (simp_all split: prod.splits)
@@ -249,21 +249,21 @@ next
 qed
 
 lemma alloc_elems_range:
-  assumes "alloc_elems s t_rs v_rss  = (s', i_es)"
-  shows "i_es = [length (elems s) ..< length (elems s) + min (length (t_rs)) (length v_rss)] \<and>
+  assumes "alloc_elems s m_els v_rss  = (s', i_es)"
+  shows "i_es = [length (elems s) ..< length (elems s) + min (length (m_els)) (length v_rss)] \<and>
          (funcs s) = (funcs s') \<and>
          (tabs s) = (tabs s') \<and>
          (mems s) = (mems s') \<and>
          (globs s) = (globs s') \<and>
-         (elems s)@(zip t_rs v_rss) = (elems s') \<and>
+         (elems s)@(zip (map e_type m_els) v_rss) = (elems s') \<and>
          (datas s) = (datas s')"
   using assms
-proof (induction t_rs arbitrary: s i_es v_rss)
+proof (induction m_els arbitrary: s i_es v_rss)
   case Nil
   thus ?case
     by simp
 next
-  case (Cons t_r' t_rs')
+  case (Cons m_el' m_els')
   note outer_Cons = Cons
   show ?case
   proof (cases v_rss)
@@ -273,8 +273,8 @@ next
       by simp
   next
     case (Cons v_rs' v_rss')
-    then obtain s'' i_e' i_es' where s''_is:"alloc_elem s (t_r', v_rs') = (s'', i_e')"
-                                       "alloc_elems s'' t_rs' v_rss' = (s', i_es')"
+    then obtain s'' i_e' i_es' where s''_is:"alloc_elem s (m_el', v_rs') = (s'', i_e')"
+                                       "alloc_elems s'' m_els' v_rss' = (s', i_es')"
                                   
                                        "i_e' # i_es' = i_es"
       using outer_Cons(2)
@@ -288,31 +288,31 @@ next
 qed
 
 lemma alloc_datas_range:
-  assumes "alloc_datas s bs = (s', i_ds)"
-  shows "i_ds = [length (datas s) ..< (length (datas s) + length bs)] \<and>
+  assumes "alloc_datas s m_ds = (s', i_ds)"
+  shows "i_ds = [length (datas s) ..< (length (datas s) + length m_ds)] \<and>
          (funcs s) = (funcs s') \<and>
          (tabs s) = (tabs s') \<and>
          (mems s) = (mems s') \<and>
          (globs s) = (globs s') \<and>
          (elems s) = (elems s') \<and>
-         (\<exists>darb. (datas s)@darb = (datas s'))"
+         ((datas s)@(map d_init m_ds) = (datas s'))"
   using assms
-proof (induction bs arbitrary: s i_ds)
+proof (induction m_ds arbitrary: s i_ds )
   case Nil
   thus ?case
-    by simp
+    by auto
 next
-  case (Cons b bs)
-  obtain s'' i_d' i_ds' where s''_is:"alloc_data s b = (s'', i_d')"
-                                     "alloc_datas s'' bs = (s', i_ds')"
+  case (Cons m_d' m_ds')
+  obtain s'' i_d' i_ds' where s''_is:"alloc_data s m_d' = (s'', i_d')"
+                                     "alloc_datas s'' m_ds' = (s', i_ds')"
                                      "i_d' # i_ds' = i_ds"
     using Cons(2)
     by (simp split: prod.splits)
-  thus ?case
-    using Cons(1)[OF s''_is(2)] using alloc_data_length[OF s''_is(1)] upt_rec
-    apply (simp split: prod.splits)
-    apply (metis append_assoc)
-    done
+  show ?case
+    using Cons(1)[OF s''_is(2)] alloc_data_length[OF s''_is(1)] s''_is(3)
+    apply (auto simp add: le_def split: if_splits)
+    using upt_rec
+    by (simp, metis append_Cons append_Nil2 append_assoc same_append_eq)
 qed
 
 lemma length_alloc_Xs:
@@ -389,8 +389,8 @@ inductive alloc_module :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<Rightarr
     alloc_tabs s1 (m_tabs m) = (s2,i_ts);
     alloc_mems s2 (m_mems m) = (s3,i_ms);
     alloc_globs s3 (m_globs m) gvs = (s4,i_gs);
-    alloc_elems s4 (map module_elem.e_type (m_elems m)) el_inits = (s5,i_es);
-    alloc_datas s5 (map d_init (m_datas m)) = (s', i_ds);
+    alloc_elems s4 (m_elems m) el_inits = (s5,i_es);
+    alloc_datas s5 (m_datas m) = (s', i_ds);
     exps = map (\<lambda>m_exp. \<lparr>E_name=(E_name m_exp), E_desc=(export_get_v_ext inst (E_desc m_exp))\<rparr>) (m_exports m)
      \<rbrakk> \<Longrightarrow> alloc_module s m imps gvs el_inits (s',inst,exps)"
 
@@ -413,8 +413,8 @@ definition interp_alloc_module :: "s \<Rightarrow> m \<Rightarrow> v_ext list \<
     let (s2,_) = alloc_tabs s1 (m_tabs m) in
     let (s3,_) = alloc_mems s2 (m_mems m) in
     let (s4,_) = alloc_globs s3 (m_globs m) gvs in
-    let (s5,_) = alloc_elems s4 (map e_type (m_elems m)) el_inits in
-    let (s',_) = alloc_datas s5 (map d_init (m_datas m)) in
+    let (s5,_) = alloc_elems s4 (m_elems m) el_inits in
+    let (s',_) = alloc_datas s5 (m_datas m) in
     let exps = map (\<lambda>m_exp. \<lparr>E_name=(E_name m_exp), E_desc=(export_get_v_ext inst (E_desc m_exp))\<rparr>) (m_exports m) in
     (s', inst, exps))"
 
@@ -434,8 +434,8 @@ proof -
     "alloc_tabs s1 (m_tabs m) = (s2,i_ts)"
     "alloc_mems s2 (m_mems m) = (s3,i_ms)"
     "alloc_globs s3 (m_globs m) gvs = (s4,i_gs)"
-    "alloc_elems s4 (map e_type (m_elems m)) el_inits = (s5, i_es)"
-    "alloc_datas s5 (map d_init (m_datas m)) = (s', i_ds)"
+    "alloc_elems s4 (m_elems m) el_inits = (s5, i_es)"
+    "alloc_datas s5 (m_datas m) = (s', i_ds)"
     "exps = map (\<lambda>m_exp. \<lparr>E_name=(E_name m_exp), E_desc=(export_get_v_ext inst (E_desc m_exp))\<rparr>) (m_exports m)"
     using assms
     unfolding alloc_module.simps
@@ -481,8 +481,8 @@ proof -
     "(s2,i_ts') = alloc_tabs s1 (m_tabs m)"
     "(s3,i_ms') = alloc_mems s2 (m_mems m)"
     "(s4,i_gs') = alloc_globs s3 (m_globs m) gvs"
-    "(s5,i_es') = alloc_elems s4 (map e_type (m_elems m)) el_inits"
-    "(s',i_ds') = alloc_datas s5 (map d_init (m_datas m))"
+    "(s5,i_es') = alloc_elems s4 (m_elems m) el_inits"
+    "(s',i_ds') = alloc_datas s5 (m_datas m)"
     "exps = map (\<lambda>m_exp. \<lparr>E_name=(E_name m_exp), E_desc=(export_get_v_ext inst (E_desc m_exp))\<rparr>) (m_exports m)"
     using assms
     unfolding interp_alloc_module_def
@@ -1162,8 +1162,8 @@ proof -
     "alloc_tabs s1 (m_tabs m) = (s2,i_ts)"
     "alloc_mems s2 (m_mems m) = (s3,i_ms)"
     "alloc_globs s3 (m_globs m) gvs = (s4,i_gs)"
-    "alloc_elems s4 (map module_elem.e_type (m_elems m)) els = (s5,i_es)"
-    "alloc_datas s5 (map module_data.d_init (m_datas m)) = (s',i_ds)"
+    "alloc_elems s4 (m_elems m) els = (s5,i_es)"
+    "alloc_datas s5 (m_datas m) = (s',i_ds)"
     "exps = map (\<lambda>m_exp. \<lparr>E_name=(E_name m_exp), E_desc=(export_get_v_ext inst (E_desc m_exp))\<rparr>) (m_exports m)"
     using assms(1)
     unfolding alloc_module.simps
@@ -1362,8 +1362,8 @@ proof -
     "alloc_tabs s1 (m_tabs m) = (s2,i_ts)"
     "alloc_mems s2 (m_mems m) = (s3,i_ms)"
     "alloc_globs s3 (m_globs m) g_inits = (s4,i_gs)"
-    "alloc_elems s4 (map module_elem.e_type (m_elems m)) el_inits = (s5, i_es)"
-    "alloc_datas s5 (map module_data.d_init (m_datas m)) = (s', i_ds)"
+    "alloc_elems s4 (m_elems m) el_inits = (s5, i_es)"
+    "alloc_datas s5 (m_datas m) = (s', i_ds)"
     "v_exps = map (\<lambda>m_exp. \<lparr>E_name=(E_name m_exp), E_desc=(export_get_v_ext inst (E_desc m_exp))\<rparr>) (m_exports m)"
     using 2
     unfolding alloc_module.simps
@@ -1603,8 +1603,8 @@ proof -
     "alloc_tabs s1 ts = (s2,i_ts)"
     "alloc_mems s2 ms = (s3,i_ms)"
     "alloc_globs s3 gs g_inits = (s4,i_gs)"
-    "alloc_elems s4 (map module_elem.e_type (m_elems m)) el_inits = (s5, i_es)"
-    "alloc_datas s5 (map module_data.d_init (m_datas m)) = (s', i_ds)"
+    "alloc_elems s4 (m_elems m) el_inits = (s5, i_es)"
+    "alloc_datas s5 (m_datas m) = (s', i_ds)"
     "v_exps = map (\<lambda>m_exp. \<lparr>E_name=(E_name m_exp), E_desc=(export_get_v_ext inst (E_desc m_exp))\<rparr>) (m_exports m)"
     using s_end_is(3) m_is
     unfolding alloc_module.simps

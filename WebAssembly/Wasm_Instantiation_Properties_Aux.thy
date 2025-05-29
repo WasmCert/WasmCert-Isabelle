@@ -80,6 +80,19 @@ definition alloc_glob_simple :: "(module_glob \<times> v) \<Rightarrow> global" 
 lemma alloc_glob_equiv:"fst (alloc_glob s m_g_v) = s\<lparr>globs := globs s @ [alloc_glob_simple m_g_v]\<rparr>"
   unfolding alloc_glob_def alloc_glob_simple_def by(simp split:prod.splits)
 
+definition alloc_elem_simple :: "(module_elem \<times> v_ref list) \<Rightarrow> eleminst" where
+  "alloc_elem_simple m_el_v_rs =
+    (case m_el_v_rs of (m_el, v_rs) \<Rightarrow> (e_type m_el, v_rs))"
+
+lemma alloc_elem_equiv:"fst (alloc_elem s (m_el_v_rs)) = s\<lparr>elems := elems s @ [alloc_elem_simple m_el_v_rs]\<rparr>"
+  unfolding alloc_elem_def alloc_elem_simple_def by (simp split: prod.splits)
+
+definition alloc_data_simple :: "(module_data) \<Rightarrow> datainst" where
+  "alloc_data_simple m_d = (d_init m_d)"
+
+lemma alloc_data_equiv:"fst (alloc_data s m_d) = s\<lparr>datas := datas s @ [alloc_data_simple m_d]\<rparr>"
+  unfolding alloc_data_def alloc_data_simple_def by simp
+
 abbreviation "alloc_funcs_simple m_fs i \<equiv> map (\<lambda>m_f. alloc_func_simple m_f i) m_fs"
 
 lemma alloc_funcs_equiv:"fst (alloc_funcs s m_fs i) = s\<lparr>funcs := funcs s @ alloc_funcs_simple m_fs i\<rparr>"
@@ -138,6 +151,46 @@ next
   finally show ?case by(simp add: zip_map_fst_snd Cons(2)) 
 qed
 
+abbreviation "alloc_elems_simple m_els v_rss \<equiv> map (\<lambda>m_el_v_rs. alloc_elem_simple m_el_v_rs) (zip m_els v_rss)"
+
+lemma alloc_elems_equiv:
+  "fst (alloc_elems s m_els v_rss) = s\<lparr>elems := elems s @ alloc_elems_simple m_els v_rss\<rparr>"
+proof(induct "zip m_els v_rss" arbitrary:s m_els v_rss)
+  case Nil
+  then show ?case by auto
+next
+  case (Cons m_el_v_rs' m_els_v_rss')
+  have 1:"m_els_v_rss' = zip (map fst m_els_v_rss') (map snd m_els_v_rss')"
+    by (simp add: zip_map_fst_snd) 
+  have "fst (alloc_elems s (map fst (m_el_v_rs'#m_els_v_rss')) (map snd (m_el_v_rs'#m_els_v_rss'))) 
+      = fst (alloc_elems (fst (alloc_elem s m_el_v_rs')) (map fst m_els_v_rss') (map snd m_els_v_rss'))"
+    by(simp split:prod.splits)
+  also have "... = s\<lparr>elems := elems s @ alloc_elems_simple (map fst (m_el_v_rs'#m_els_v_rss')) (map snd (m_el_v_rs'#m_els_v_rss'))\<rparr>"
+    unfolding alloc_elem_equiv Cons(1)[OF 1] by(simp)
+  finally show ?case by(simp add: zip_map_fst_snd Cons(2)) 
+qed
+
+
+abbreviation "alloc_datas_simple m_ds \<equiv> map alloc_data_simple m_ds"
+
+lemma alloc_datas_equiv:
+  "fst (alloc_datas s m_ds) = s\<lparr>datas := datas s @ alloc_datas_simple m_ds\<rparr>"
+proof(induct "m_ds" arbitrary: s)
+  case Nil
+  then show ?case by auto
+next
+  case (Cons m_d' m_ds')
+  then have "fst (alloc_datas s (m_d'#m_ds')) = fst (alloc_datas (fst (alloc_data s m_d')) m_ds')"
+    apply (simp split: prod.splits)
+    by (metis fst_conv)
+  also have "... = s\<lparr>datas := datas s @ alloc_datas_simple (m_d'#m_ds')\<rparr>"
+    unfolding alloc_data_equiv Cons(1) by simp
+
+  then show ?case using alloc_data_equiv
+    apply (simp split: prod.splits) 
+    by (metis fst_conv) 
+qed
+
 lemma alloc_tabs_store_agnostic: 
   assumes "tabs s1 = tabs s2"
          "(s1', i1) = alloc_tabs s1 (m_tabs m)"
@@ -162,6 +215,21 @@ lemma alloc_globs_store_agnostic:
   using alloc_globs_range(1) assms alloc_globs_equiv
   by (metis (no_types, lifting))
 
+lemma alloc_elems_store_agnostic: 
+  assumes "elems s1 = elems s2"
+         "(s1', i1) = alloc_elems s1 (m_elems m) v_rss"
+         "(s2', i2) = alloc_elems s2 (m_elems m) v_rss"
+  shows "elems s1' = elems s2' \<and> i1 = i2"
+  using alloc_elems_range(1) assms alloc_elems_equiv
+  by (metis (no_types, lifting))
+
+lemma alloc_datas_store_agnostic: 
+  assumes "datas s1 = datas s2"
+         "(s1', i1) = alloc_datas s1 (m_datas m)"
+         "(s2', i2) = alloc_datas s2 (m_datas m)"
+  shows "datas s1' = datas s2' \<and> i1 = i2"
+  using alloc_datas_range(1) assms alloc_datas_equiv
+  by (metis (no_types, lifting))
 
 lemma alloc_module_allocated_form: 
   assumes "alloc_module s m imps gvs elvs (s',inst,exps)"
@@ -173,6 +241,10 @@ lemma alloc_module_allocated_form:
 \<Longrightarrow> mems s' = mems ss \<and> inst.mems inst = (ext_mems imps)@i_ms"
   "alloc_globs s (m_globs m) gvs = (ss,i_gs) 
 \<Longrightarrow> globs s' = globs ss \<and> inst.globs inst = (ext_globs imps)@i_gs"
+  "alloc_elems s (m_elems m) elvs = (ss,i_es) 
+\<Longrightarrow> elems s' = elems ss \<and> inst.elems inst = i_es"
+  "alloc_datas s (m_datas m) = (ss,i_ds) 
+\<Longrightarrow> datas s' = datas ss \<and> inst.datas inst = i_ds"
 proof -
   obtain s1 s2 s3 s4 s5 i_fs' i_ts' i_ms' i_gs' i_es' i_ds' where
     inst:"inst = \<lparr>types=(m_types m), 
@@ -186,8 +258,8 @@ proof -
     and tabs:"alloc_tabs s1 (m_tabs m) = (s2,i_ts')" 
     and mems:"alloc_mems s2 (m_mems m) = (s3,i_ms')" 
     and globs:"alloc_globs s3 (m_globs m) gvs = (s4,i_gs')" 
-    and elems:"alloc_elems s4 (map module_elem.e_type (m_elems m)) elvs = (s5, i_es')"
-    and datas:"alloc_datas s5 (map d_init (m_datas m)) = (s', i_ds')"
+    and elems:"alloc_elems s4 (m_elems m) elvs = (s5, i_es')"
+    and datas:"alloc_datas s5 (m_datas m) = (s', i_ds')"
     using assms unfolding alloc_module.simps by auto
 
   show "alloc_funcs s (m_funcs m) inst = (ss,i_fs) 
@@ -216,9 +288,20 @@ proof -
     alloc_elems_range[OF elems] alloc_datas_range[OF datas]
       alloc_globs_store_agnostic globs inst
     by (metis inst.select_convs(5))
+
+  show "alloc_elems s (m_elems m) elvs = (ss,i_es) 
+  \<Longrightarrow> elems s' = elems ss \<and> inst.elems inst = i_es"
+    using alloc_funcs_range[OF funcs] alloc_tabs_range[OF tabs] alloc_mems_range[OF mems]
+    alloc_elems_range elems alloc_globs_range[OF globs] alloc_datas_range[OF datas] inst
+    by (metis (mono_tags, lifting) inst.select_convs(6))
+  
+  show "alloc_datas s (m_datas m) = (ss,i_ds)
+  \<Longrightarrow> datas s' = datas ss \<and> inst.datas inst = i_ds"
+    using alloc_funcs_range[OF funcs] alloc_tabs_range[OF tabs] alloc_mems_range[OF mems]
+          alloc_globs_range[OF globs] alloc_elems_range[OF elems] alloc_datas_range[OF datas]
+          datas inst inst.select_convs(7) alloc_datas_range
+    by (metis (mono_tags, lifting) inst.select_convs(7))
 qed
-
-
 
 lemma alloc_module_funcs_form:
   assumes "alloc_module s m v_imps g_inits el_inits (s', inst, v_exps)" 
@@ -264,6 +347,28 @@ proof -
     using alloc_module_allocated_form(4)[OF assms(1)]
     by (metis eq_fst_iff) 
   then show ?thesis using alloc_globs_equiv assms(2) by auto
+qed
+
+lemma alloc_module_elems_form: 
+  assumes "alloc_module s m v_imps g_inits el_inits (s', inst, v_exps)" 
+          "elems s' = elems s @ els" 
+  shows "els = alloc_elems_simple (m_elems m) el_inits"
+proof - 
+  have "elems s' = elems (fst (alloc_elems s (m_elems m) el_inits))" 
+    using alloc_module_allocated_form(5)[OF assms(1)]
+    by (metis eq_fst_iff) 
+  then show ?thesis using alloc_elems_equiv assms(2) by auto
+qed
+
+lemma alloc_module_datas_form: 
+  assumes "alloc_module s m v_imps g_inits el_inits (s', inst, v_exps)" 
+          "datas s' = datas s @ ds" 
+  shows "ds = alloc_datas_simple (m_datas m)"
+proof - 
+  have "datas s' = datas (fst (alloc_datas s (m_datas m)))" 
+    using alloc_module_allocated_form(6)[OF assms(1)]
+    by (metis eq_fst_iff) 
+  then show ?thesis using alloc_datas_equiv assms(2) by auto
 qed
 
 lemma ext_typing_imp_helper:
@@ -338,6 +443,5 @@ lemma ext_typing_imp_memi_agree:
    apply auto
   apply(simp split:v_ext.splits extern_t.splits add: external_typing.simps memi_agree_def) 
   done 
-
 
 end

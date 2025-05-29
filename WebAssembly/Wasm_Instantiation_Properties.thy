@@ -673,7 +673,123 @@ proof -
     qed 
     ultimately show ?thesis using c_is by (simp add: list_all2_appendI) 
   qed
-  moreover have elemi_agree_s': "list_all2 (elemi_agree s' (s.elems s')) (inst.elems inst) (elem \<C>)" sorry
+  moreover have elemi_agree_s': "list_all2 (elemi_agree s' (s.elems s')) (inst.elems inst) (elem \<C>)"
+  proof -
+    obtain allocd_els where allocd_els_def: "allocd_els = snd (alloc_elems s (m_elems m) el_inits)"
+      using el_inits_def
+      by blast
+    have "(length (m_elems m)) = (length el_inits)"
+      using el_inits_def list_all2_conv_all_nth by blast
+    then have allocd_els_is: "allocd_els = [length (elems s)..<length (elems s)+length (m_elems m)]"
+      using alloc_elems_range[of s "m_elems m" el_inits _ allocd_els] allocd_els_def
+      by (simp, metis prod.collapse)
+    have "allocd_els = (inst.elems inst)"
+      using allocd_els_def alloc_module_allocated_form(5)[OF s_alloc_module]
+      by (metis eq_snd_iff)
+    have "list_all2 (module_elem_typing \<C>') (m_elems m) rts"
+      using c_is(3) by fastforce
+    have "list_all2 (\<lambda> m_el rt. e_type m_el = rt) (m_elems m) rts"
+      using list_all2_mono[OF c_is(3)]
+      by (metis (mono_tags, lifting) module_elem.select_convs(1) module_elem_typing.simps)
+    then have 1: "map e_type (m_elems m) = rts"
+    proof(induction rts)
+    qed auto
+    have "elems s' = elems s @ els"
+      using s'_is(5) by blast
+    have "elems s' = elems (fst (alloc_elems s (m_elems m) el_inits))"
+      by (metis alloc_module_allocated_form(5)[OF s_alloc_module] prod.collapse)
+    then have "elems s' = elems s @ alloc_elems_simple (m_elems m) el_inits"
+      using alloc_module_elems_form s'_is(5) s_alloc_module by blast
+    then have "els = alloc_elems_simple (m_elems m) el_inits"
+      by (simp add: s'_is(5))
+    
+    then have "length els = length allocd_els"
+      by (metis allocd_els_def length_alloc_Xs length_map snd_conv surj_pair)
+
+    { fix i j
+      assume local_assms: "i < length (el_inits)" "j < length (el_inits!i)"
+      then have i_rts: "i < length rts"
+        using "1" \<open>length (m_elems m) = length el_inits\<close> by fastforce
+      have "length (el_inits!i) = length (e_init ((m_elems m)!i))"
+        by (metis (no_types, lifting) el_inits_def list_all2_conv_all_nth local_assms(1))
+
+      have "list_all2 (module_elem_typing \<C>') (m_elems m) rts"
+        using c_is(3) el_inits_def by fastforce
+      then have "list_all (\<lambda>e. \<C>' \<turnstile> e : ([] _> [T_ref (rts!i)]) \<and> const_exprs \<C>' e) (e_init ((m_elems m)!i))"
+        by (metis (no_types, lifting) \<open>length (m_elems m) = length el_inits\<close> list_all2_nthD list_all_length local_assms(1) module_elem.select_convs(2) module_elem_typing.simps) 
+
+      then have e_init1: "\<C>' \<turnstile> (e_init ((m_elems m)!i))!j : ([] _> [T_ref (rts!i)])" "const_exprs \<C>' ((e_init ((m_elems m)!i))!j)"
+       
+         apply (metis (no_types, lifting) \<open>length (el_inits ! i) = length (e_init (m_elems m ! i))\<close> list_all_length local_assms(2))
+        by (metis (no_types, lifting) \<open>length (el_inits ! i) = length (e_init (m_elems m ! i))\<close> \<open>list_all (\<lambda>e. \<C>' \<turnstile> e : [] _> [T_ref (rts ! i)] \<and> const_exprs \<C>' e) (e_init (m_elems m ! i))\<close> list_all_length local_assms(2))
+      
+      have e_init2: "reduce_trans (s',f,$*((e_init ((m_elems m)!i))!j)) (s',f,[$C (V_ref (el_inits!i!j))])"
+        using el_inits_def
+        by (meson list_all2_nthD2 local_assms(1) local_assms(2))
+
+      have "ref_typing s' (el_inits!i!j) (rts!i)"
+      proof -
+        show ?thesis using const_exprs_is[OF e_init1(2,1)] sorry
+      qed
+
+      then have "\<C>' \<turnstile> (e_init ((m_elems m)!i))!j : [] _> [T_ref (rts!i)]"
+        using local_assms i_rts const_exprs_is unfolding module_elem_typing.simps
+        sorry
+    
+      have "list_all (\<lambda> el. ref_typing s' el (rts!i)) (el_inits!i)"
+        
+        sorry
+      
+    }
+    have helper: "\<And> es t v. const_exprs \<C>' es \<Longrightarrow> \<C>' \<turnstile> es : [] _> [t] \<Longrightarrow> reduce_trans (s',f,$*es) (s',f,[$C v]) \<Longrightarrow> v_typing s' v (typeof v)"
+    proof -
+      fix es t v
+      assume local_assms: "const_exprs \<C>' es" " \<C>' \<turnstile> es : [] _> [t]" "reduce_trans (s',f,$*es) (s',f,[$C v])"
+      consider
+        (a)  v' where "$* es = [$C v'] \<and> typeof v' = t"
+      | (b) j t' where "t' <t: t" "es = [Get_global j]" "j < length (global \<C>')" "tg_mut (global \<C>' ! j) = T_immut" "tg_t (global \<C>' ! j) = t'"
+      | (c) j where "es = [Ref_func j]" "j < length (func_t \<C>')" "t = T_ref T_func_ref"
+      | (d) t_r where "es = [Ref_null t_r]" "t = T_ref t_r"
+        using const_exprs_is[OF local_assms(1,2)] by auto
+      then show "v_typing s' v (typeof v)"
+      proof(cases)
+        case a
+        then show ?thesis using local_assms  sorry
+      next
+        case b
+        then show ?thesis sorry
+      next
+        case c
+        then show ?thesis sorry
+      next
+        case d
+        then show ?thesis sorry
+      qed
+
+    qed
+
+
+    have el_inits_typing: "list_all2 (\<lambda> els tr. list_all (\<lambda> el. ref_typing s el tr) els) el_inits rts" sorry
+
+
+    have elems_inst_length: "length (inst.elems inst) = length (elem \<C>)"
+      sorry
+    { fix i
+      assume "i < length (inst.elems inst)"
+      have "list_all2 (module_elem_typing \<C>') (m_elems m) rts"
+        using c_is(3) el_inits_def by fastforce
+      then have "list_all2 (\<lambda> m_el rt. module_elem_typing \<C>' m_el rt) (m_elems m) rts"
+        using el_inits_def
+        by simp
+      
+      have "el_inits!i = e_init (m_elems m)!i"
+
+      have "elemi_agree s' (s.elems s') (inst.elems inst!i) (elem \<C>!i)" sorry
+    }
+    
+    then show ?thesis using elems_inst_length
+      using list_all2_all_nthI by blast
+  qed
   moreover have datai_agree_s': "list_all2 (datai_agree (s.datas s')) (inst.datas inst) (data \<C>)" sorry
 
   moreover have "local \<C> = [] \<and> label \<C> = [] \<and> return \<C> = None" using c_is(8) by auto
