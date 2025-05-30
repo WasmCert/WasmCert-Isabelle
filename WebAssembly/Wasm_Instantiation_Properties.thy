@@ -581,7 +581,7 @@ proof -
     by blast
 
 
-  moreover have globi_agree_s':"list_all2 (globi_agree (globs s')) (inst.globs inst) (global \<C>)"
+  moreover have globi_agree_s':"list_all2 (globi_agree (globs s')) (inst.globs inst) (global \<C>)" "list_all (glob_agree s') (s.globs s')"
   proof - 
     define allocd_globs where "allocd_globs = snd (alloc_globs s (m_globs m) g_inits)" 
     then have "inst.globs inst = (ext_globs v_imps)@allocd_globs" 
@@ -595,7 +595,7 @@ proof -
       then show ?thesis unfolding globi_agree_def \<open>globs s' = globs s @ gs\<close>
         by (simp add: list_all2_mono nth_append) 
     qed 
-    moreover have "list_all2 (globi_agree (globs s')) allocd_globs gts" 
+    moreover have "list_all2 (globi_agree (globs s')) allocd_globs gts" "map g_val gs = g_inits" "list_all (glob_agree s') (globs s')"
     proof - 
       have zip_agree:"length (m_globs m) = length g_inits" 
         using g_inits_def unfolding list_all2_conv_all_nth by simp
@@ -616,7 +616,7 @@ proof -
         unfolding list_all2_conv_all_nth 
         by (metis map_intro_length) 
 
-      have "map tg_t gts = map typeof g_inits" (*from typing preservation*)
+      have g_inits_props2: "map tg_t gts = map typeof g_inits" "list_all (\<lambda> g_v. v_typing s' g_v (typeof g_v)) g_inits"  (*from typing preservation*)
       proof - 
         {
           fix g v
@@ -635,18 +635,126 @@ proof -
           have 5: "length (inst.funcs inst) =length (func_t \<C>')"
             using funci_agree_s' c_is(9)
             by (simp add: list_all2_lengthD)
-          have "tg_t (g_type g) = typeof v"
+
+          have "v_typing s' v (typeof v)"
+          proof -
+            consider
+              (a) v' where "$* g_init g = [$C v'] \<and> typeof v' = tg_t (g_type g)"
+            | (b) j t' where "t' <t: tg_t (g_type g) \<and>
+      g_init g = [Get_global j] \<and> j < length (global \<C>') \<and> tg_mut (global \<C>' ! j) = T_immut \<and> tg_t (global \<C>' ! j) = t'"
+            | (c) j where "g_init g = [Ref_func j] \<and> j < length (func_t \<C>') \<and> tg_t (g_type g) = T_ref T_func_ref"
+            | (d) t_r where "g_init g = [Ref_null t_r] \<and> tg_t (g_type g) = T_ref t_r"
+              using const_exprs_is[OF 1 2] by auto
+            thus ?thesis
+            proof(cases)
+              case a
+              have v_v'_eq: "v =v'" using  3 a reduce_trans_consts[of s' f "[v']" s' f "[v]"] by auto
+              consider (1) v_n where "g_init g = [EConstNum v_n]" "v' = V_num v_n" | (2)  v_v where "g_init g = [EConstVec v_v]" "v' = V_vec v_v"
+                using 1 2 typeof_def v_to_e_def a
+                by (auto split: v_num.splits v.splits)
+              then show ?thesis using v_v'_eq v_typing.simps typeof_def
+              proof(cases)
+              qed (simp_all split: v.splits)
+            next
+              case b
+              then have b1: "reduce_trans (s', f, $* g_init g) (s', f, [$C ((sglob_val s' (f_inst f) j))])"
+                using 3 reduce.get_global[of s' f j] reduce_trans_def
+                apply auto
+                by (metis (no_types, lifting) reduce_trans_app_end rtranclp.rtrancl_refl)
+              then have "sglob_val s' (f_inst f) j = v" using 3 const_exprs_reduce_trans[OF 1 2 3 4
+                list_all2_external_typing_glob_alloc[OF s_ext_typing] s'_is(4) s'_is(4) _ \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close> _ 5,
+                of _ "[]" "[]" "[]"]
+                \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close>
+                f_def
+                const_exprs_reduce_trans[OF 1 2 b1 4
+                list_all2_external_typing_glob_alloc[OF s_ext_typing] s'_is(4) s'_is(4) _ \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close> _ 5,
+                of _ "[]" "[]" "[]"] by auto
+
+              then have "v = g_val ((globs s')!((inst.globs inst)!j))"
+                
+                by (simp add: f_def sglob_def sglob_ind_def sglob_val_def)
+              have "j < length (global \<C>')" "j < length (ext_globs v_imps)"
+                using b apply blast
+                by (metis "4" b calculation(2) list_all2_lengthD)
+              
+              have "list_all2 (globi_agree (globs s)) (ext_globs v_imps) (ext_t_globs t_imps)"
+                using ext_typing_imp_globi_agree s_ext_typing by force
+              then have "(((ext_globs v_imps))!j) < length (globs s)"
+                unfolding globi_agree_def
+                using "4" b list_all2_nthD2 by auto
+            
+              then have "((inst.globs inst)!j) < length (globs s)"
+                by (simp add: \<open>j < length (ext_globs v_imps)\<close> calculation(1) nth_append)
+              then have "glob_agree s (globs s! (((inst.globs inst)!j)))"
+                
+                by (meson assms(1) list_all_length store_typing.simps)
+              then have "glob_agree s (globs s'! (((inst.globs inst)!j)))"
+                using s'_is(4)
+                by (simp add: \<open>inst.globs inst ! j < length (s.globs s)\<close> nth_append)
+              then have "glob_agree s' (globs s'! (((inst.globs inst)!j)))"
+                using s'_is(4)
+                using \<open>store_extension s s'\<close> glob_agree_store_extension_inv by blast
+              
+              then show ?thesis unfolding glob_agree_def
+                using \<open>v = g_val (s.globs s' ! (inst.globs inst ! j))\<close> v_typing_typeof by blast
+            next
+              case c
+              then have c1: "reduce_trans (s', f, $* g_init g) (s', f, [$C (V_ref (ConstRefFunc (inst.funcs (f_inst f)! j)))])"
+                using 3 reduce.ref_func reduce_trans_def v_to_e_def
+                apply auto
+                by (metis (no_types, lifting) reduce_trans_app_end rtranclp.rtrancl_refl)
+              then have v_is: "V_ref (ConstRefFunc (inst.funcs (f_inst f)! j)) = v" using 3 
+                \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close>
+                f_def
+                const_exprs_reduce_trans[OF 1 2 3 4
+                list_all2_external_typing_glob_alloc[OF s_ext_typing] s'_is(4) s'_is(4) _ \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close> _ 5,
+                of allocd_globs "[]" "[]" "[]"]
+                const_exprs_reduce_trans[OF 1 2 c1 4
+                list_all2_external_typing_glob_alloc[OF s_ext_typing] s'_is(4) s'_is(4) _ \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close> _ 5,
+                of _ "[]" "[]" "[]"]
+                by auto
+
+              have "list_all2 (funci_agree (funcs s')) (inst.funcs inst) (func_t \<C>')"
+                using c_is(9) funci_agree_s' by auto
+
+              then have "(inst.funcs (f_inst f)! j) < length (funcs s')" using c
+                unfolding funci_agree_def
+                using "5" f_def list_all2_nthD by fastforce
+              then show ?thesis using typeof_def typeof_ref_def v_is ref_typing.simps unfolding v_typing.simps by (auto split: v.splits)
+            next
+              case d
+              then have d1: "reduce_trans (s', f, $* g_init g) (s', f, [$C (V_ref (ConstNull t_r))])"
+                using 3 reduce.basic[OF reduce_simple.null] reduce_trans_def v_to_e_def
+                apply auto
+                by (metis (no_types, lifting) reduce_trans_app_end rtranclp.rtrancl_refl)
+              then have v_is: "(V_ref (ConstNull t_r)) = v" using 3 
+                \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close>
+                f_def
+                const_exprs_reduce_trans[OF 1 2 3 4
+                list_all2_external_typing_glob_alloc[OF s_ext_typing] s'_is(4) s'_is(4) _ \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close> _ 5,
+                of allocd_globs "[]" "[]" "[]"]
+                const_exprs_reduce_trans[OF 1 2 d1 4
+                list_all2_external_typing_glob_alloc[OF s_ext_typing] s'_is(4) s'_is(4) _ \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close> _ 5,
+                of _ "[]" "[]" "[]"]
+                by auto
+              then show ?thesis using typeof_def typeof_ref_def ref_typing.simps unfolding v_typing.simps by (auto split: v.splits)
+            qed
+          qed
+
+          then have "tg_t (g_type g) = typeof v" "v_typing s' v (typeof v)"
             using const_exprs_reduce_trans[OF 1 2 3 4
                 list_all2_external_typing_glob_alloc[OF s_ext_typing] s'_is(4) _ _ \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close> _ 5]
                 \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close>
-                f_def by force
+                f_def by force+
         }
-        then have "list_all2 (\<lambda>g g_init. tg_t (g_type g) = typeof g_init) (m_globs m) g_inits"
+        then have "list_all2 (\<lambda>g g_init. tg_t (g_type g) = typeof g_init) (m_globs m) g_inits" "list_all (\<lambda> g_v. v_typing s' g_v (typeof g_v)) g_inits"
           using \<open>length (m_globs m) = length g_inits\<close> unfolding list_all2_conv_all_nth 
           (*todo: I have no idea why gs gets involved but whatever*)
-          by (metis \<open>length gs = length (m_globs m)\<close> gs_alloc length_map nth_mem nth_zip) 
-  
-        then show ?thesis unfolding \<open>gts = map g_type (m_globs m)\<close> list_all2_conv_all_nth
+           apply (metis \<open>length gs = length (m_globs m)\<close> gs_alloc length_map nth_mem nth_zip)
+          by (metis \<open>\<And>v ga. (ga, v) \<in> set (zip (m_globs m) g_inits) \<Longrightarrow> v_typing s' v (typeof v)\<close> in_set_impl_in_set_zip2 list.pred_True list.pred_mono_strong zip_agree)
+        moreover show "list_all (\<lambda> g_v. v_typing s' g_v (typeof g_v)) g_inits" using calculation by simp
+        
+        ultimately show "map tg_t gts = map typeof g_inits" unfolding \<open>gts = map g_type (m_globs m)\<close> list_all2_conv_all_nth
           by (simp add: map_intro_length)
       qed
 
@@ -669,9 +777,22 @@ proof -
       then have "list_all2 (globi_agree (globs s@gs)) allocd_globs gts" 
         unfolding globi_agree_def allocd_interval
         by (simp add: list_all2_conv_all_nth) 
-      then show ?thesis using \<open>globs s' = globs s @ gs\<close> by auto
+      then show  "list_all2 (globi_agree (globs s')) allocd_globs gts" using \<open>globs s' = globs s @ gs\<close> by auto
+      then show "map g_val gs = g_inits"
+        using \<open>map g_val gs = g_inits\<close> by blast
+
+      have globs_s1: "list_all (glob_agree s) (globs s)" using assms(1) unfolding store_typing.simps by auto
+      then have globs_s2: "list_all (glob_agree s') (globs s)"
+        by (metis \<open>store_extension s s'\<close> glob_agree_store_extension_inv list_all_length)
+      
+      have "list_all (glob_agree s') gs"
+        using \<open>map g_val gs = g_inits\<close> g_inits_props2(2)
+        by (metis (mono_tags, lifting) \<open>length gs = length (m_globs m)\<close> glob_agree_def list_all_length nth_map zip_agree)
+
+      then show "list_all (glob_agree s') (globs s')"
+        by (simp add: globs_s2 s'_is(4))
     qed 
-    ultimately show ?thesis using c_is by (simp add: list_all2_appendI) 
+    ultimately show "list_all2 (globi_agree (globs s')) (inst.globs inst) (global \<C>)" "list_all (glob_agree s') (s.globs s')" using c_is(8) by (simp_all add: list_all2_appendI) 
   qed
   moreover have elemi_agree_s': "list_all2 (elemi_agree s' (s.elems s')) (inst.elems inst) (elem \<C>)"
   proof -
@@ -706,6 +827,9 @@ proof -
     then have "length els = length allocd_els"
       by (metis allocd_els_def length_alloc_Xs length_map snd_conv surj_pair)
 
+    have len_el_inits_rts: "length el_inits = length rts"
+      using "1" \<open>length (m_elems m) = length el_inits\<close> by fastforce
+
     { fix i j
       assume local_assms: "i < length (el_inits)" "j < length (el_inits!i)"
       then have i_rts: "i < length rts"
@@ -726,54 +850,81 @@ proof -
       have e_init2: "reduce_trans (s',f,$*((e_init ((m_elems m)!i))!j)) (s',f,[$C (V_ref (el_inits!i!j))])"
         using el_inits_def
         by (meson list_all2_nthD2 local_assms(1) local_assms(2))
-
+      define allocd_globs where "allocd_globs = snd (alloc_globs s (m_globs m) g_inits)" 
+      then have "inst.globs inst = (ext_globs v_imps)@allocd_globs" 
+        using alloc_module_allocated_form(4)[OF s_alloc_module]
+        by (metis prod.collapse)
+      have func_len: "length (inst.funcs inst) =length (func_t \<C>')"
+            using funci_agree_s' c_is(9)
+            by (simp add: list_all2_lengthD)
+      have global_\<C>': "global \<C>' = ext_t_globs t_imps"
+        by (simp add: c_is(9))
       have "ref_typing s' (el_inits!i!j) (rts!i)"
       proof -
-        show ?thesis using const_exprs_is[OF e_init1(2,1)] sorry
-      qed
+        consider
+          (a) v' where "$* e_init (m_elems m ! i) ! j = [$C v'] \<and> typeof v' = T_ref (rts ! i)"
+        | (b) j' t' where "t' <t: T_ref (rts ! i) \<and>
+              e_init (m_elems m ! i) ! j = [Get_global j'] \<and> j' < length (global \<C>') \<and> tg_mut (global \<C>' ! j') = T_immut \<and> tg_t (global \<C>' ! j') = t'"
+        | (c) j' where "e_init (m_elems m ! i) ! j = [Ref_func j'] \<and> j' < length (func_t \<C>') \<and> T_ref (rts ! i) = T_ref T_func_ref"
+        | (d) t_r where "e_init (m_elems m ! i) ! j = [Ref_null t_r] \<and> T_ref (rts ! i) = T_ref t_r"
+          using const_exprs_is[OF e_init1(2,1)] by auto
+        thus ?thesis
+        proof(cases)
+          case a
+          then show ?thesis sorry
+        next
+          case b
+          then have  b1: "reduce_trans (s',f,$*((e_init ((m_elems m)!i))!j)) (s',f,[$C(sglob_val s' (f_inst f) j')])"
+            using reduce.get_global
+            by (metis reduce_trans_app_end reduce_trans_def rtranclp.rtrancl_refl to_e_list_1)
+          
+          then have v_is: "(sglob_val s' (f_inst f) j') = V_ref (el_inits !i !j)" "typeof_ref ((el_inits !i !j)) = (rts ! i)"
+            using e_init2 
+            e_init1
+            f_def global_\<C>'
+            const_exprs_reduce_trans[OF e_init1(2,1) e_init2 _
+            list_all2_external_typing_glob_alloc[OF s_ext_typing] s'_is(4) s'_is(4) _ \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close> _ func_len,
+            of allocd_globs "[]" "[]" "[]"]
+            const_exprs_reduce_trans[OF e_init1(2,1) b1 _
+            list_all2_external_typing_glob_alloc[OF s_ext_typing] s'_is(4) s'_is(4) _ \<open>inst.globs inst = (ext_globs v_imps)@allocd_globs\<close> _ func_len,
+            of allocd_globs "[]" "[]" "[]"] \<open>inst.globs inst = ext_globs v_imps @ allocd_globs\<close>
+            typeof_def
+            by auto
+          
+          have el_inits_i_j: "V_ref (el_inits !i !j) = g_val ((globs s')! (inst.globs inst ! j'))" using b v_is
+            by (simp add: f_def sglob_def sglob_ind_def sglob_val_def)
+          have "j' < length (global \<C>')"
+            using b by fastforce
+          then have "j' < length (global \<C>)" using c_is(8,9) by auto
+          then have "(inst.globs inst ! j') < length (globs s')" using globi_agree_s'(1) unfolding globi_agree_def
+            using list_all2_nthD2 by blast
+          then have "glob_agree s' (s.globs s'! (inst.globs inst ! j'))" using globi_agree_s'(2)
+            by (simp add: list_all_length)
+          then have "v_typing s' (V_ref (el_inits ! i ! j)) (T_ref (rts ! i))"
+            using v_is el_inits_i_j
+            by (metis (no_types, lifting) glob_agree_def typeof_def v.simps(12) v_typing_typeof)
+          then show ?thesis unfolding v_typing.simps by auto
+        next
+          case c
+          then show ?thesis sorry
+        next
+          case d
+          then show ?thesis sorry
+        qed
 
+      qed
+(*
       then have "\<C>' \<turnstile> (e_init ((m_elems m)!i))!j : [] _> [T_ref (rts!i)]"
         using local_assms i_rts const_exprs_is unfolding module_elem_typing.simps
-        sorry
-    
-      have "list_all (\<lambda> el. ref_typing s' el (rts!i)) (el_inits!i)"
-        
-        sorry
+        using e_init1(1) by force *)
       
-    }
-    have helper: "\<And> es t v. const_exprs \<C>' es \<Longrightarrow> \<C>' \<turnstile> es : [] _> [t] \<Longrightarrow> reduce_trans (s',f,$*es) (s',f,[$C v]) \<Longrightarrow> v_typing s' v (typeof v)"
-    proof -
-      fix es t v
-      assume local_assms: "const_exprs \<C>' es" " \<C>' \<turnstile> es : [] _> [t]" "reduce_trans (s',f,$*es) (s',f,[$C v])"
-      consider
-        (a)  v' where "$* es = [$C v'] \<and> typeof v' = t"
-      | (b) j t' where "t' <t: t" "es = [Get_global j]" "j < length (global \<C>')" "tg_mut (global \<C>' ! j) = T_immut" "tg_t (global \<C>' ! j) = t'"
-      | (c) j where "es = [Ref_func j]" "j < length (func_t \<C>')" "t = T_ref T_func_ref"
-      | (d) t_r where "es = [Ref_null t_r]" "t = T_ref t_r"
-        using const_exprs_is[OF local_assms(1,2)] by auto
-      then show "v_typing s' v (typeof v)"
-      proof(cases)
-        case a
-        then show ?thesis using local_assms  sorry
-      next
-        case b
-        then show ?thesis sorry
-      next
-        case c
-        then show ?thesis sorry
-      next
-        case d
-        then show ?thesis sorry
-      qed
-
-    qed
-
-
-    have el_inits_typing: "list_all2 (\<lambda> els tr. list_all (\<lambda> el. ref_typing s el tr) els) el_inits rts" sorry
+    } then have el_inits_typing: "list_all2 (\<lambda> els tr. list_all (\<lambda> el. ref_typing s' el tr) els) el_inits rts"
+      using len_el_inits_rts
+      by (simp add: list_all2_conv_all_nth list_all_length)
 
 
     have elems_inst_length: "length (inst.elems inst) = length (elem \<C>)"
-      sorry
+      by (metis \<open>allocd_els = inst.elems inst\<close> \<open>length (m_elems m) = length el_inits\<close> allocd_els_is c_is(8) diff_add_inverse len_el_inits_rts length_upt t_context.select_convs(4))
     { fix i
       assume "i < length (inst.elems inst)"
       have "list_all2 (module_elem_typing \<C>') (m_elems m) rts"
@@ -782,9 +933,8 @@ proof -
         using el_inits_def
         by simp
       
-      have "el_inits!i = e_init (m_elems m)!i"
-
-      have "elemi_agree s' (s.elems s') (inst.elems inst!i) (elem \<C>!i)" sorry
+      have "elemi_agree s' (s.elems s') (inst.elems inst!i) (rts!i)" using el_inits_typing sorry
+      have "elemi_agree s' (s.elems s') (inst.elems inst!i) (elem \<C>!i)" using el_inits_typing sorry
     }
     
     then show ?thesis using elems_inst_length
