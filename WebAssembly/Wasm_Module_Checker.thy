@@ -2,6 +2,8 @@ theory Wasm_Module_Checker imports Wasm_Module Wasm_Checker_Properties begin
 
 code_pred (modes: i \<Rightarrow> i \<Rightarrow> bool as limit_type_checker_p) limit_typing .
 
+code_pred (modes: i \<Rightarrow> bool as module_tab_type_checker_p) module_tab_typing .
+
 fun module_func_type_checker :: "t_context \<Rightarrow> module_func \<Rightarrow> bool" where
 "module_func_type_checker \<C> (i, t_locs, b_es) =
   ((i < length (types_t \<C>)) \<and>

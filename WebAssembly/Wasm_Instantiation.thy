@@ -972,60 +972,6 @@ proof -
   qed
 qed
 
-(*
-lemma const_exprs_reduce_trans_v_typing:
-  assumes "const_exprs \<C> b_es"
-          "\<C> \<turnstile> b_es : ([] _> [t])"
-          "reduce_trans (s,f,$*b_es) (s',f',[$C v])"
-          "global \<C> = tgs"
-          "list_all2 (\<lambda>ig tg. external_typing s (Ext_glob ig) (Te_glob tg)) igs tgs"
-          "globs s = (globs s)@arbg1"
-          "inst.globs (f_inst f) = igs@arbgi"
-          "list_all2 (funci_agree (funcs s)) (inst.funcs inst) (func_t \<C>)"
-  shows "v_typing s v t"
-proof -
-  consider
-      (1) v' where "$* b_es = [$C v'] \<and> typeof v' = t"
-    | (2) j t' where "t' <t: t"
-                     "b_es = [Get_global j]"
-                     "j < length (global \<C>)"
-                     "tg_mut (global \<C> ! j) = T_immut"
-                     "tg_t (global \<C> ! j) = t'"
-   | (3) j where "b_es = [Ref_func j] \<and> j < length (func_t \<C>) \<and> t = T_ref T_func_ref"
-   | (4) t_r where "b_es = [Ref_null t_r] \<and> t = T_ref t_r"
-    using const_exprs_is[OF assms(1,2)]
-    by auto
-  thus ?thesis
-  proof (cases)
-    case 1
-    consider (a) v_n where "b_es = [EConstNum v_n]" "v' = V_num v_n" | (b)  v_v where "b_es = [EConstVec v_v]" "v' = V_vec v_v"
-      using 1 typeof_def v_to_e_def
-      by (auto split: v_num.splits v.splits)
-    thus ?thesis
-    proof(cases)
-      case a
-      then show ?thesis
-        using 1 assms(3)  reduce_trans_consts[of s f "[v']" s' f' "[v]"] v_to_e_def typeof_def typeof_num_def v_typing.simps
-        by (simp add: Let_def const_list_def is_const_def Suc_1[symmetric] split: v.splits v_num.splits)
-        
-    next
-      case b
-      then show ?thesis
-        using 1 assms(3)  reduce_trans_consts[of s f "[v']" s' f' "[v]"] v_to_e_def typeof_def typeof_num_def v_typing.simps
-        by (simp add: Let_def const_list_def is_const_def Suc_1[symmetric] split: v.splits v_num.splits)
-    qed
-  next
-    case 2
-    then show ?thesis sorry
-  next
-    case 3
-    then show ?thesis sorry
-  next
-    case 4
-    then show ?thesis sorry
-  qed
-qed *)
-
 lemma ext_globs_ind:
   assumes "i<length (ext_globs v_imps)"
   shows "\<exists>j. j < length v_imps \<and> Ext_glob ((ext_globs v_imps) ! i) = v_imps!j"
