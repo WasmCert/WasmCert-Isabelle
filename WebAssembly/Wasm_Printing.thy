@@ -1,4 +1,14 @@
-theory Wasm_Printing imports OCaml_Printing Wasm_Instantiation_Printing Wasm_Checker_Printing Wasm_Interpreter_Printing Wasm_Type_Printing "HOL-Library.Code_Target_Nat"  "Native_Word.Code_Target_Integer_Bit" begin
+theory Wasm_Printing
+  imports
+    "HOL-Library.Code_Target_Nat" 
+    "Native_Word.Code_Int_Integer_Conversion"
+    "Native_Word.Code_Target_Int_Bit"
+    OCaml_Printing
+    Wasm_Instantiation_Printing
+    Wasm_Checker_Printing
+    Wasm_Interpreter_Printing
+    Wasm_Type_Printing
+  begin
 
 lemma[code]: "mem_rep_append (Abs_mem_rep m) n b = Abs_mem_rep (app_rev_tr (rev m) (replicate n b))"
   using mem_rep_append.abs_eq
