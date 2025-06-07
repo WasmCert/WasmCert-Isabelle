@@ -4533,7 +4533,7 @@ next
     next
       case (Suc nn_pred)
       then have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
-        $Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat (ndest + 1))),
+        $Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat (ndest))),
                          $EConstNum (ConstInt32 (int_of_nat (nat_of_uint8 (dat ! nsrc)))),
                          $Store T_i32 (Some Tp_i8) 0 0,
                          $EConstNum (ConstInt32 (int_of_nat (ndest + 1))),
@@ -4541,7 +4541,7 @@ next
                          $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Memory_init x]\<rparr>"
         using reduce.memory_init[OF m_defs dat_defs n_defs h_bounds _, of nn_pred "nat_of_uint8 (dat ! nsrc)"] Suc memory_init.hyps(2) memory_init.prems(11)
         by fastforce
-      then have "\<lparr>s;f;($C* vs) @ [$Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat (ndest + 1))),
+      then have "\<lparr>s;f;($C* vs) @ [$Memory_init x]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat (ndest))),
                          $EConstNum (ConstInt32 (int_of_nat (nat_of_uint8 (dat ! nsrc)))),
                          $Store T_i32 (Some Tp_i8) 0 0,
                          $EConstNum (ConstInt32 (int_of_nat (ndest + 1))),

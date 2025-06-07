@@ -378,7 +378,7 @@ definition app_s_f_v_s_memory_init :: "i \<Rightarrow>  mem list \<Rightarrow> d
                   0 \<Rightarrow> (v_s', [], Step_normal)
                 | Suc nn_pred \<Rightarrow>
                   let b = nat_of_uint8 (dat!nsrc) in
-                   (v_s', [$EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat b)), $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 (int_of_nat (nn_pred))) ,$Memory_init x],
+                   (v_s', [$EConstNum (ConstInt32 (int_of_nat (ndest))), $EConstNum (ConstInt32 (int_of_nat b)), $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 (int_of_nat (nn_pred))) ,$Memory_init x],
                    Step_normal))
         | None \<Rightarrow> (v_s, [], crash_invalid))
     |  _ \<Rightarrow> (v_s, [], crash_invalid))"
