@@ -644,8 +644,8 @@ next
   then show ?case using b_e_typing.ref_func instr_subtyping_refl const_expr.cases by blast
 next
   case (get_global i \<C> t)
-  then show ?case using b_e_typing.get_global b_e_type_get_global const_expr.cases instr_subtyping_refl
-    by (metis b_e.distinct(1529) b_e.distinct(1531) b_e.distinct(1547))
+  then show ?case using b_e_type_get_global[OF b_e_typing.get_global[OF get_global(1,2)]]
+    by (metis b_e.distinct(1529) b_e.distinct(1531) b_e.distinct(1543) b_e.distinct(1547) b_e_typing.get_global const_expr.cases)
 next
   case (composition \<C> es t1s t2s e t3s)
   then obtain t where t_defs: "\<C> \<turnstile> [b_e] : [] _> [t]"
@@ -966,9 +966,37 @@ proof -
     qed
   next
     case 4
-    thus ?thesis
-      using assms
-      by (auto simp add: const_expr.simps const_expr.cases Let_def const_list_def is_const_def Suc_1[symmetric] app_v_s_ref_null_def)
+    show ?thesis
+      using assms(3) 
+      unfolding reduce_trans_def
+    proof (cases rule: converse_rtranclpE)
+      case base
+      then show ?thesis
+        using typeof_def typeof_ref_def v_to_e_def 4
+        by (auto simp add: const_expr.simps const_expr.cases Let_def const_list_def is_const_def Suc_1[symmetric] app_v_s_ref_null_def split: v.splits t.splits t_ref.splits)
+    next
+      case (step y)
+      then obtain s_y f_y es_y where y_is:"\<lparr>s_r;f;[$Ref_null t_r]\<rparr> \<leadsto> \<lparr>s_y;f_y;es_y\<rparr>" "y = (s_y, f_y, es_y)"
+        using 4
+        by fastforce
+      hence s_y_is:"s_y = s_r \<and> f_y = f \<and> es_y = [$C (V_ref (ConstNull t_r))]"
+        using assms(6,8)
+      proof (induction s_r f "[$Ref_null t_r]" s_y f_y es_y arbitrary: y rule: reduce.induct)
+        case (basic e' s f)
+        then show ?case
+          using lfilled_single v_to_e_def
+          apply cases
+          by auto
+      next
+        case (label s f es s' f' es' k lholed les')
+        then show ?case
+          by (metis Lfilled.L0 Nil_is_map_conv append_Nil2 e.distinct(5) eq_Nil_appendI lfilled_deterministic lfilled_single reduce_not_nil)
+      qed auto
+      moreover have "s_r = s' \<and> f = f' \<and> v = V_ref (ConstNull t_r)"
+        by (metis (no_types, lifting) s_y_is append1_eq_conv list.simps(8) list.simps(9) local.step(2) reduce_trans_consts reduce_trans_def y_is(2))
+      ultimately show ?thesis using 4 typeof_def typeof_ref_def
+        by (auto simp add: Let_def app_v_s_ref_null_def Suc_1[symmetric])
+    qed
   qed
 qed
 

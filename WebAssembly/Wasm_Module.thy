@@ -77,6 +77,7 @@ inductive const_expr :: "t_context \<Rightarrow> b_e \<Rightarrow> bool" where \
   "const_expr \<C> (EConstNum v_n)"
 | "const_expr \<C> (EConstVec v_v)"
 | "const_expr \<C> (Ref_func x)"
+| "const_expr \<C> (Ref_null t_r)"
 | "\<lbrakk>k < length (global \<C>); tg_mut ((global \<C>)!k) = T_immut \<rbrakk> \<Longrightarrow> const_expr \<C> (Get_global k)"
 
 code_pred (modes: i \<Rightarrow> i \<Rightarrow> bool as const_expr_p) const_expr .
