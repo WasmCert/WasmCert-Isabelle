@@ -4865,7 +4865,7 @@ next
       next
         case False
         let ?es = "[$EConstNum (ConstInt32 (int_of_nat (ndest + nn_pred))),
-                         $EConstNum (ConstInt32 (int_of_nat (nsrc + nn))), $Table_get y,
+                         $EConstNum (ConstInt32 (int_of_nat (nsrc + nn_pred))), $Table_get y,
                          $Table_set x, $EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src),
                          $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Table_copy x y]"
         have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n),
