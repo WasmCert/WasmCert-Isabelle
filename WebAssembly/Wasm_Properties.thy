@@ -4617,7 +4617,7 @@ next
                                   $Store T_i32 (Some Tp_i8) 0 0,
                                   $EConstNum (ConstInt32 (int_of_nat (ndest + 1))),
                                   $EConstNum (ConstInt32 (int_of_nat (nsrc + 1))),
-                                  $EConstNum (ConstInt32 n), $Memory_copy]"
+                                  $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Memory_copy]"
         have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 n), $Memory_copy ]\<rparr> \<leadsto> \<lparr>s;f;?es\<rparr>"
           using memory_copy_1[OF m_defs n_defs h_bounds _ True] Suc Suc_eq_plus1 by blast
         then have "\<lparr>s;f;($C* vs) @ [$Memory_copy]\<rparr> \<leadsto> \<lparr>s;f;?es\<rparr>"
@@ -4699,7 +4699,7 @@ next
     next
       case (Suc nn_pred)
       let ?es = "[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val),
-                                  $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 dest),
+                                  $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 (int_of_nat (ndest+1))),
                                   $EConstNum (ConstInt32 val),
                                   $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Memory_fill]"
       have "\<lparr>s;f;[$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $EConstNum (ConstInt32 n),

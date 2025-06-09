@@ -740,7 +740,8 @@ next
         then show ?thesis
           using progress_L0_left[OF reduce.memory_copy_1[OF defs(1) _ defs(2,3,4)]] Suc assms h_n defs v_s''_def v_to_e_def
           unfolding app_s_f_v_s_memory_copy_def
-          by (auto simp add: Let_def split: v_num.splits nat.splits list.splits cvtop.splits if_splits option.splits v.splits)
+          apply (auto simp add: Let_def split: v_num.splits nat.splits list.splits cvtop.splits if_splits option.splits v.splits)
+          by (metis old.prod.exhaust)
       next
         case False
         then show ?thesis

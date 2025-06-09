@@ -401,7 +401,7 @@ definition app_s_f_v_s_memory_fill :: "mem list  \<Rightarrow> f \<Rightarrow> v
                   0 \<Rightarrow> (v_s', [], Step_normal)
                 | Suc nn_pred \<Rightarrow>
                   
-                   (v_s', [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $EConstNum (ConstInt32 (int_of_nat nn_pred)) ,$Memory_fill],
+                   (v_s', [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 val), $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 val), $EConstNum (ConstInt32 (int_of_nat nn_pred)) ,$Memory_fill],
                    Step_normal))
         | None \<Rightarrow> (v_s, [], crash_invalid))
     |  _ \<Rightarrow> (v_s, [], crash_invalid))"
@@ -424,7 +424,7 @@ definition app_s_f_v_s_memory_copy :: "mem list  \<Rightarrow> f \<Rightarrow> v
                   0 \<Rightarrow> (v_s', [], Step_normal)
                 | Suc nn_pred \<Rightarrow>
                   (if ndest \<le> nsrc then
-                    (v_s', [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $Load T_i32 (Some (Tp_i8, U)) 0 0, $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 n), $Memory_copy], Step_normal)
+                    (v_s', [$EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $Load T_i32 (Some (Tp_i8, U)) 0 0, $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 (int_of_nat (ndest+1))), $EConstNum (ConstInt32 (int_of_nat (nsrc+1))), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Memory_copy], Step_normal)
                   else
                     (v_s', [$EConstNum (ConstInt32 (int_of_nat (ndest+nn_pred))), $EConstNum (ConstInt32 (int_of_nat (nsrc+nn_pred))), $Load T_i32 (Some (Tp_i8, U)) 0 0, $Store T_i32 (Some Tp_i8) 0 0, $EConstNum (ConstInt32 dest), $EConstNum (ConstInt32 src), $EConstNum (ConstInt32 (int_of_nat nn_pred)), $Memory_copy], Step_normal)))
         | None \<Rightarrow> (v_s, [], crash_invalid))
