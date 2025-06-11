@@ -6,58 +6,130 @@ fun convert_cond :: "t_num \<Rightarrow> t_num \<Rightarrow> (sat \<times> sx) o
   "convert_cond t1 t2 sat_sx = ((t1 \<noteq> t2) \<and> (sat_sx = None) = ((is_float_t_num t1 \<and> is_float_t_num t2)
                                                                  \<or> (is_int_t_num t1 \<and> is_int_t_num t2 \<and> (t_num_length t1 < t_num_length t2))))"
 
-fun same_lab_h :: "nat list \<Rightarrow> (t list) list \<Rightarrow> t list \<Rightarrow> (t list) option" where
-  "same_lab_h [] _ ts = Some ts"
-| "same_lab_h (i#is) lab_c ts = (if i \<ge> length lab_c
+definition min_t :: "t \<Rightarrow> t \<Rightarrow> t" where
+  "min_t t1 t2 = (if t1 = t2 then t1 else T_bot)"
+
+definition min_ts :: "t list \<Rightarrow> t list \<Rightarrow> (t list) option" where
+  "min_ts ts1 ts2 = (if length ts1 = length ts2 then Some (map2 (min_t) ts1 ts2) else None)"
+
+fun min_lab_h :: "nat list \<Rightarrow> (t list) list \<Rightarrow> t list \<Rightarrow> (t list) option" where
+  "min_lab_h [] _ ts = Some ts"
+| "min_lab_h (i#is) lab_c ts = (if i \<ge> length lab_c
                                  then None
-                                 else (if lab_c!i = ts
-                                       then same_lab_h is lab_c (lab_c!i)
-                                       else None))" 
+                                 else (case (min_ts (lab_c!i) ts) of
+                                       None \<Rightarrow> None
+                                      | Some ts' \<Rightarrow> min_lab_h is lab_c ts'
+                                       ))"
 
-fun same_lab :: "nat list \<Rightarrow> (t list) list \<Rightarrow> (t list) option" where
-  "same_lab [] lab_c = None"
-| "same_lab (i#is) lab_c = (if i \<ge> length lab_c
+fun min_lab :: "nat list \<Rightarrow> (t list) list \<Rightarrow> (t list) option" where
+  "min_lab [] lab_c = None"
+| "min_lab (i#is) lab_c = (if i \<ge> length lab_c
                             then None
-                            else same_lab_h is lab_c (lab_c!i))"
+                            else min_lab_h is lab_c (lab_c!i))"
 
-lemma same_lab_h_conv_list_all:
-  assumes "same_lab_h ils ls ts' = Some ts"
-  shows "list_all (\<lambda>i. i < length ls \<and> ls!i = ts) ils \<and> ts' = ts"
-  using assms
-proof(induction ils)
-  case (Cons a ils)
-  thus ?case
-    apply (simp,safe)
-       apply (metis not_less option.distinct(1))+
-    done
-qed simp
 
-lemma same_lab_conv_list_all:
-  assumes "same_lab ils ls = Some ts"
-  shows "list_all (\<lambda>i. i < length ls \<and> ls!i = ts) ils"
+lemma min_ts_length:
+  assumes "min_ts ts1 ts2 = Some ts"
+  shows "length ts1 = length ts" "length ts2 = length ts"
+  using assms by (auto simp add: min_ts_def split: if_splits)
+
+lemma min_ts_subtyping:
+  assumes "min_ts ts1 ts2 = Some ts"
+  shows "ts <ts: ts1 \<and> ts <ts: ts2"
+proof -
+  have h_len: "length ts1 = length ts2"
+    using assms  min_ts_length by metis
+  show ?thesis
+    using h_len assms
+  proof(induction ts1 arbitrary: ts2 ts)
+    case Nil
+    then show ?case using min_ts_def t_list_subtyping_def by auto
+  next
+    case (Cons t1 ts1')
+    then obtain t2 ts2' where ts2'_def: "ts2 = t2#ts2'"
+      by (metis length_greater_0_conv neq_Nil_conv)
+    then obtain t ts' where ts'_def: "ts = t#ts'" "t = min_t t1 t2" "min_ts ts1' ts2' = Some ts'"
+      using Cons(2,3) min_ts_def by auto
+    
+    show ?case using Cons(1)[OF _ ts'_def(3)] ts'_def(1,2) ts2'_def Cons(2,3) min_t_def t_list_subtyping_def t_subtyping_def
+      by auto
+  qed
+qed
+
+lemma min_lab_h_conv_list_all:
+  assumes "min_lab_h ils ls ts' = Some ts"
+  shows "list_all (\<lambda>i. i < length ls \<and> ts <ts: ls!i) ils \<and> ts <ts: ts'"
   using assms
-proof (induction rule: same_lab.induct)
+proof(induction ils arbitrary: ts ts')
+  case Nil
+  then show ?case using t_list_subtyping_refl by auto
+next
+  case (Cons il ils)
+  obtain ts'' where ts''_def: "(min_ts (ls!il) ts') = Some ts''" "min_lab_h ils ls ts'' = Some ts" "il < length ls"
+    using Cons(2) by (auto split: if_splits option.splits)
+  then show ?case using Cons(1)[OF ts''_def(2)] min_ts_subtyping[OF ts''_def(1)]
+    using t_list_subtyping_trans by auto
+qed
+
+
+lemma min_lab_conv_list_all:
+  assumes "min_lab ils ls = Some ts"
+  shows "list_all (\<lambda>i. i < length ls \<and> ts <ts: ls!i) ils"
+  using assms
+proof (induction rule: min_lab.induct)
 case (2 i "is" lab_c)
-  thus ?case
-    using same_lab_h_conv_list_all
-    by (metis (mono_tags, lifting) list_all_simps(1) not_less option.distinct(1) same_lab.simps(2))
+  thus ?case using min_lab_h_conv_list_all
+    by (metis (no_types, lifting) le_def list_all_simps(1) min_lab.simps(2) option.simps(3))
 qed simp
 
-lemma list_all_conv_same_lab_h:
-  assumes "list_all (\<lambda>i. i < length ls \<and> ls!i = ts) ils"
-  shows "same_lab_h ils ls ts = Some ts"
+lemma subtyping_min_ts:
+  assumes "ts <ts: ts1" "ts <ts: ts2"
+  shows "\<exists> ts'. min_ts ts1 ts2 = Some ts' \<and> ts <ts: ts'"
   using assms
-  by (induction ils, simp_all)
+proof(induction ts arbitrary: ts1 ts2)
+  case Nil
+  then show ?case using t_list_subtyping_def min_ts_def by simp
+next
+  case (Cons t ts)
+  obtain t1 ts1' where ts1'_def: "ts1 = t1#ts1'"
+    using Cons
+    by (meson list_all2_Cons1 t_list_subtyping_def)
+  obtain t2 ts2' where ts2'_def: "ts2 = t2#ts2'"
+    using Cons
+    by (meson list_all2_Cons1 t_list_subtyping_def)
+  have 1: "ts <ts: ts1'" "t <t: t1" "ts <ts: ts2'" "t <t: t2"
+    using Cons.prems t_list_subtyping_def ts1'_def ts2'_def by auto
+  then have 2: "t <t: min_t t1 t2"
+    using t_subtyping_def min_t_def by auto
+  show ?case
+    using Cons(1)[OF 1(1,3)] 2 min_ts_def ts1'_def ts2'_def t_list_subtyping_def
+    by (auto split: if_splits)
+qed
 
-lemma list_all_conv_same_lab:
-  assumes "list_all (\<lambda>i. i < length ls \<and>ls!i = ts) (is@[i])"
-  shows "same_lab (is@[i]) ls = Some ts"                      
+lemma list_all_conv_min_lab_h:
+  assumes "list_all (\<lambda>i. i < length ls \<and> ts <ts: ls!i) ils" "ts <ts: ts''"
+  shows "\<exists> ts'. min_lab_h ils ls ts'' = Some ts' \<and> ts <ts: ts'"
+  using assms
+proof(induction ils arbitrary: ts ts'')
+  case Nil
+  then show ?case
+    using t_list_subtyping_refl by fastforce
+next
+  case (Cons il ils)
+  then obtain ts''' where ts'''_def: "min_ts (ls!il) ts'' = Some ts'''" "ts <ts: ts'''"
+    by (metis list.pred_inject(2)  subtyping_min_ts) 
+  moreover have 1: "list_all (\<lambda>i. i < length ls \<and> ts <ts: ls ! i) (ils)" using Cons(2) by simp
+  ultimately show ?case using Cons ts'''_def Cons(1)[OF 1] by auto
+qed
+
+lemma list_all_conv_min_lab:
+  assumes "list_all (\<lambda>i. i < length ls \<and> ts <ts: ls!i) (is@[i])"
+  shows "\<exists> ts'. min_lab (is@[i]) ls = Some ts' \<and> ts <ts: ts'"                      
   using assms
 proof (induction "(is@[i])")
   case (Cons a x)
   thus ?case
-    using list_all_conv_same_lab_h[OF Cons(3)]
-    by (metis option.distinct(1) same_lab.simps(2) same_lab_h.simps(2))
+    by (metis (mono_tags, lifting) assms list_all_conv_min_lab_h list_all_simps(1) min_lab.simps(2) min_lab_h.simps(2))
 qed auto
 
 fun b_e_type_checker :: "t_context \<Rightarrow>  b_e list \<Rightarrow> tf \<Rightarrow> bool"
@@ -149,7 +221,7 @@ and check_single :: "t_context \<Rightarrow>  b_e \<Rightarrow> c_t \<Rightarrow
                                                 then type_update ts (((label \<C>)!i @ [T_num T_i32])) (((label \<C>)!i))
                                                 else None)"
   (* br_table *)
-| check_br_table:"check_single \<C> (Br_table is i) ts = (case (same_lab (is@[i]) (label \<C>)) of
+| check_br_table:"check_single \<C> (Br_table is i) ts = (case (min_lab (is@[i]) (label \<C>)) of
                                                         None \<Rightarrow> None
                                                       | Some tls \<Rightarrow>  (if ((consume ts (tls @ [T_num T_i32])) \<noteq> None) then Some ([], Unreach) else None))"
   (* return *)

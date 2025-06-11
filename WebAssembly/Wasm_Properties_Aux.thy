@@ -944,7 +944,7 @@ lemma b_e_type_br_if:
 lemma b_e_type_br_table:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
           "e = Br_table is i"
-  shows "\<exists>ts'' t1s t2s. list_all (\<lambda>i. i < length(label \<C>) \<and> (label \<C>)!i = ts'') (is@[i]) \<and> instr_subtyping (t1s@ts''@[T_num T_i32] _> t2s) (ts _> ts')"
+  shows "\<exists>ts'' t1s t2s. list_all (\<lambda>i. i < length(label \<C>) \<and> ts'' <ts: (label \<C>)!i) (is@[i]) \<and> instr_subtyping (t1s@ts''@[T_num T_i32] _> t2s) (ts _> ts')"
   using assms
   apply (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
   apply (auto simp add: instr_subtyping_refl b_e_type_composition_aux_lemma)

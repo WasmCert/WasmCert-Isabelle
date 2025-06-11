@@ -42,7 +42,7 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
   \<comment> \<open>\<open>br_if\<close>\<close>
 | br_if:"\<lbrakk>i < length(label \<C>); (label \<C>)!i = ts\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Br_if i] : (ts @ [T_num T_i32] _> ts)"
   \<comment> \<open>\<open>br_table\<close>\<close>
-| br_table:"\<lbrakk>list_all (\<lambda>i. i < length(label \<C>) \<and> (label \<C>)!i = ts) (is@[i])\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Br_table is i] : (t1s @ ts @ [T_num T_i32] _> t2s)"
+| br_table:"\<lbrakk>list_all (\<lambda>i. i < length(label \<C>) \<and> ts <ts: (label \<C>)!i) (is@[i])\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Br_table is i] : (t1s @ ts @ [T_num T_i32] _> t2s)"
   \<comment> \<open>\<open>return\<close>\<close>
 | return:"\<lbrakk>(return \<C>) = Some ts\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Return] : (t1s @ ts _> t2s)"
   \<comment> \<open>\<open>call\<close>\<close>

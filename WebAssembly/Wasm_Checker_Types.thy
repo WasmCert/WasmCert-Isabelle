@@ -35,7 +35,6 @@ fun push_rev_list :: "c_t \<Rightarrow> t list \<Rightarrow> c_t" where
 fun produce :: "c_t \<Rightarrow> t list \<Rightarrow> c_t" where
   "produce ct ts' = push_rev_list ct (rev ts')"
 
-
 fun c_types_agree :: "c_t \<Rightarrow> t list \<Rightarrow> bool" where
   "c_types_agree ct ts =
     (case consume ct ts of

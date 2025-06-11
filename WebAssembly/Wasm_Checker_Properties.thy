@@ -396,13 +396,13 @@ proof -
       by (metis (no_types, lifting) Wasm_Checker.check_br_if br_if option.simps(3) subsumption type_update_type)
   next
     case (31 \<C> "is" i ct)
-    then obtain ct'' cts'' r'' tls where ct''_def: "ct' = ([], Unreach)" "same_lab (is @ [i]) (label \<C>) = Some tls" "consume ct (tls @ [T_num T_i32]) = Some ct''" "ct'' = (cts'', r'')"
+    then obtain ct'' cts'' r'' tls where ct''_def: "ct' = ([], Unreach)" "min_lab (is @ [i]) (label \<C>) = Some tls" "consume ct (tls @ [T_num T_i32]) = Some ct''" "ct'' = (cts'', r'')"
       apply (simp del: consume.simps split: option.splits)
       by (metis option.inject option.simps(3))
     have "c_types_agree ct ((rev cts'') @(tls @ [T_num T_i32]))" using ct''_def(3,4) consume_some_unsplit[OF ct''_def(3), of "rev cts''"]
       by (metis (no_types, lifting) c_types_agree.simps option.case_eq_if option.exhaust types_eq_c_types_agree)
     moreover have "\<C> \<turnstile> [Br_table is i] : ((rev cts'') @(tls@[T_num T_i32])) _> ts'"
-      using b_e_typing.br_table ct''_def(2) same_lab_conv_list_all by blast
+      using b_e_typing.br_table ct''_def(2) min_lab_conv_list_all by blast
     ultimately show ?case by blast
   next
     case (32 \<C> ct)
@@ -412,7 +412,7 @@ proof -
     have "c_types_agree ct ((rev cts'') @tls)" using ct''_def(3,4) consume_some_unsplit[OF ct''_def(3), of "rev cts''"]
       by (metis (no_types, lifting) c_types_agree.simps option.case_eq_if option.exhaust types_eq_c_types_agree)
     moreover have "\<C> \<turnstile> [Return] : ((rev cts'') @(tls)) _> ts'"
-      using b_e_typing.return ct''_def same_lab_conv_list_all by blast
+      using b_e_typing.return ct''_def  by blast
     ultimately show ?case by blast
   next
     case (33 \<C> i ct)
@@ -1485,9 +1485,13 @@ lemma b_e_type_checker_complete:
        t_list_subtyping_refl
        pop_expect_list_reach_subtypes
        pop_expect_list_unreach_empty
-       list_all_conv_same_lab
        is_ref_type_def
 proof(induction \<C> es "ts _> ts'" arbitrary: ts ts' rule: b_e_typing.induct)
+  case (br_table \<C> ts "is" i t1s t2s)
+  then show ?case using  list_all_conv_min_lab[OF br_table(1)]
+    apply auto
+    by (metis (no_types, opaque_lifting) consume.simps consume_t_list_subtyping)
+next
   case (composition \<C> es t1s t2s e t3s)
   then show ?case using b_e_type_checker_composition_complete by blast
 next

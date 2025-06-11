@@ -1011,16 +1011,21 @@ proof -
     by fastforce
   then have 1: "([] _> [T_num T_i32]) <ti: (ts _> ts'')"
     by (metis b_e_type_cnum typeof_num_def v_num.case(1))
-  obtain t1s ts_l t2s where ts_c_def:"list_all (\<lambda>i. i < length(label \<C>) \<and> (label \<C>)!i = ts_l) (is@[i])"
+  obtain t1s ts_l t2s where ts_c_def:"list_all (\<lambda>i. i < length(label \<C>) \<and> ts_l <ts: (label \<C>)!i) (is@[i])"
                                         "(t1s @ ts_l @ [T_num T_i32] _> t2s) <ti: (ts'' _> ts')"
+                                        "ts_l <ts: label \<C>!i"
     using b_e_type_br_table[of \<C> "Br_table is i" ts'' ts'] ts''_def
     by fastforce
-  have "(t1s @ ts_l _> t2s) <ti: (ts _> ts')"
+  have 2: "(t1s @ ts_l _> t2s) <ti: (ts _> ts')"
     using ts_c_def(2) 
     instr_subtyping_drop_append[OF 1, of "t1s @ ts_l" t2s ts']
     by simp
+  then have "ts_l <ts: label \<C> ! i'"
+    by (metis assms(3) list_all_append list_all_length ts_c_def(1) ts_c_def(3))
+  then have "t1s @ label \<C> ! i' _> t2s <ti: t1s@ts_l _> t2s"
+    using instr_subtyping_refl instr_subtyping_replace3 t_list_subtyping_prepend by blast
   then have "\<C> \<turnstile> [Br i'] : (ts _> ts')"
-    using assms(3) ts_c_def(1,2) b_e_typing.br[of i' \<C> ts_l t1s t2s] 1
+    using assms(3) ts_c_def(1,2,3) b_e_typing.br[of i' \<C> "label \<C> ! i'" t1s t2s] 1 2
     unfolding list_all_length
     by (metis (mono_tags, lifting) list_all_append list_all_length list_all_simps(1) subsumption ts_c_def(1))
   thus ?thesis
