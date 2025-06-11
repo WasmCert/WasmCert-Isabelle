@@ -179,15 +179,31 @@ fun collect_funcidxs_module_data :: "module_data \<Rightarrow> i list" where
       Dm_active x es \<Rightarrow> collect_funcidxs_b_e_list es
     | _ \<Rightarrow> [])"
 
+fun collect_funcidxs_module_glob :: "module_glob \<Rightarrow> i list" where
+  "collect_funcidxs_module_glob glob = List.map_filter extract_funcidx_b_e (g_init glob)"
+
+fun collect_funcidxs_module_import :: "module_import \<Rightarrow> i list" where
+  "collect_funcidxs_module_import me = (case I_desc me of
+    Imp_func i \<Rightarrow> [i]
+  | _ \<Rightarrow> [])"
+
+fun collect_funcidxs_module_export :: "module_export \<Rightarrow> i list" where
+  "collect_funcidxs_module_export me = (case E_desc me of
+    Ext_func i \<Rightarrow> [i]
+  | _ \<Rightarrow> [])"
+
 fun collect_funcidxs_module :: "m \<Rightarrow> i list" where
   "collect_funcidxs_module module = (let
       from_funcs = concat (map collect_funcidxs_module_func (m_funcs module));
+      from_globs = concat (map collect_funcidxs_module_glob (m_globs module));
       from_start = (case (m_start module) of
           Some x \<Rightarrow> [x]
         | None \<Rightarrow> []);
       from_elems = concat (map collect_funcidxs_module_elem (m_elems module));
-      from_datas = concat (map collect_funcidxs_module_data (m_datas module))
-    in remdups (concat [from_funcs, from_start, from_elems, from_datas]))"
+      from_datas = concat (map collect_funcidxs_module_data (m_datas module));
+      from_imports = concat (map collect_funcidxs_module_import (m_imports module));
+      from_exports = concat (map collect_funcidxs_module_export (m_exports module))
+    in remdups (concat [from_funcs, from_globs, from_start, from_elems, from_datas, from_imports, from_exports]))"
 
 inductive module_typing :: "m \<Rightarrow> extern_t list \<Rightarrow> extern_t list \<Rightarrow> bool" where
 "\<lbrakk>list_all2 (module_func_typing \<C>) fs fts;
