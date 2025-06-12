@@ -26,7 +26,7 @@ lemma reduce_store_extension:
 proof (induction arbitrary: \<C>i \<C> ts ts' arb_label arb_return rule: reduce.induct)
   case (invoke_host_Some s i_cl t1s t2s h ves vcs n m hs s' vcs' f)
   thus ?case
-    using host_apply_preserve_store[OF invoke_host_Some(6)] invoke_host_Some(2,7)
+    using host_func_apply_preserve_store[OF invoke_host_Some(6)] invoke_host_Some(2,7)
     by blast
 next
   case (set_global s f j v s')
@@ -1211,12 +1211,12 @@ qed
 
 lemma types_preserved_invoke_host_some:
   assumes "s\<bullet>\<C> \<turnstile> ves @ [Invoke i_cl] : (ts _> ts')"
-          "(funcs s!i_cl) = Func_host (t1s _> t2s) f"
+          "(funcs s!i_cl) = Func_host (t1s _> t2s) (Host_func f)"
           "ves = $C* vcs"
           "length vcs = n"
           "length t1s = n"
           "length t2s = m"
-          "host_apply s (t1s _> t2s) f vcs hs (Some (s', vcs'))"
+          "host_func_apply s (t1s _> t2s) f vcs hs (Some (s', vcs'))"
           "store_typing s"
   shows "s'\<bullet>\<C> \<turnstile> $C* vcs' : (ts _> ts')"
 proof -
@@ -1253,8 +1253,8 @@ proof -
     by (metis (no_types, lifting) c(2) assms(4) assms(5) list_all2_all_nthI list_all_length nth_map tvs_def(2) tvs_def(3) typing_map_typeof)
   hence "list_all2 (\<lambda>t v. v_typing s v t) t1s vcs" using  b by simp
   hence "s'\<bullet>\<C> \<turnstile> $C* vcs' : ([] _> t2s)"
-    using list_types_agree_imp_e_typing host_apply_respect_type[OF _ assms(7)]
-    by (meson assms(7) e_typing_l_typing_store_extension_inv(1) host_apply_preserve_store1)
+    using list_types_agree_imp_e_typing host_func_apply_respect_type[OF _ assms(7)]
+    by (meson assms(7) e_typing_l_typing_store_extension_inv(1) host_func_apply_preserve_store1)
   then show ?thesis
     using e_typing_l_typing.intros(3)
     using a b instr_subtyping_comp tvs_def(1) by blast
@@ -2348,7 +2348,7 @@ lemma reduce_locs_type_preserved:
 proof(induction arbitrary: \<C>i \<C> ts ts' arb_label arb_return rule: reduce.induct)
   case (invoke_host_Some s i_cl t1s t2s h ves vcs n m hs s' vcs' f)
   then show ?case
-    using host_apply_preserve_store1 v_typing_list_store_extension_inv by blast 
+    using host_func_apply_preserve_store1 v_typing_list_store_extension_inv by blast 
 next
   case (set_local vi j s v vs i v')
   thm types_preserved_set_local[OF set_local(4,1)]
@@ -2485,10 +2485,10 @@ next
     using types_preserved_invoke_native
     by fastforce
 next
-  case (invoke_host_Some cl t1s t2s f ves vcs n m s hs s' vcs' vs i)
+  case (invoke_host_Some s i_cl t1s t2s hf ves vcs n m h hs s' vcs' f)
   thus ?case
-    using types_preserved_invoke_host_some
-    by (simp add: host_apply_preserve_store1 v_typing_list_store_extension_inv)
+    using types_preserved_invoke_host_some[OF invoke_host_Some(11,1,2,3,4,5)] host_func_apply_preserve_store1 v_typing_list_store_extension_inv
+    by auto
 next
   case (invoke_host_None cl t1s t2s f ves vcs n m s hs vs i)
   thus ?case
@@ -5229,28 +5229,40 @@ proof -
       case (Func_host x21 x22)
       hence func_host_def:"(funcs s!i_cl) = Func_host (t1s _> t2s) x22"
         using cl_def(2) cl_type_def by fastforce
-      fix hs res
-      have "\<exists>s' a a'. \<lparr>s;f;($C*vs2) @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f;a\<rparr>"
-      proof (cases "host_apply s (t1s _> t2s) x22 vs2 hs (Some res)")
-        case False
+      then show ?thesis
+      proof(cases x22)
+        case (Host_func x1)
+        fix hs res
+        have "\<exists>s' a a'. \<lparr>s;f;($C*vs2) @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f;a\<rparr>"
+        proof (cases "host_func_apply s (t1s _> t2s) x1 vs2 hs (Some res)")
+          case False
+          thus ?thesis
+            using reduce.intros(7)[OF func_host_def] l
+            by blast
+        next
+          case True
+          then obtain s' vcs' where ha_def:"host_func_apply s (t1s _> t2s) x1 vs2 hs (Some (s', vcs'))"
+            by (metis surj_pair)
+          have "list_all2 (\<lambda>t v. typeof v = t) t1s vs2"
+            using e_typing_imp_list_types_agree vs_def(2)
+            by simp
+          thus ?thesis
+            using reduce.intros(6)[OF _ _ _ _ _ ha_def] l func_host_def True Host_func
+                  host_func_apply_respect_type[OF _ ha_def]
+            by blast     
+        qed
         thus ?thesis
-          using reduce.intros(7)[OF func_host_def] l
-          by blast
-      next
-        case True
-        then obtain s' vcs' where ha_def:"host_apply s (t1s _> t2s) x22 vs2 hs (Some (s', vcs'))"
-          by (metis surj_pair)
-        have "list_all2 (\<lambda>t v. typeof v = t) t1s vs2"
-          using e_typing_imp_list_types_agree vs_def(2)
-          by simp
-        thus ?thesis
-          using reduce.intros(6)[OF func_host_def _ _ _ _ ha_def] l
-                host_apply_respect_type[OF _ ha_def]
+          using vs_def(3) 7(4) progress_L0
           by fastforce
+        
+      next
+        case (Host_ref x2)
+        then have "\<exists>s' a a'. \<lparr>s;f;($C*vs2) @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f;a\<rparr>"
+          using func_host_def invoke_host_None l by blast
+        then show ?thesis using reduce.intros(7)[OF func_host_def]
+          using "7.prems"(2) progress_L0_left vs_def(3) by fastforce
       qed
-      thus ?thesis
-        using vs_def(3) 7(4) progress_L0
-        by fastforce
+      
     qed
   next
     case (8 s \<C> e0s ts t2s es n)

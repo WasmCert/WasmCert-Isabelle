@@ -3044,40 +3044,64 @@ proof -
         have v_s_rev_is:"v_stack_to_es v_s = v_stack_to_es v_s' @ v_stack_to_es v_fs"
           by (metis map_append rev_append split_n_conv_app tf_is(2))
         show ?thesis
-        proof (cases "host_apply_impl s (t1s _> t2s) host (rev v_fs)")
-          case None
-          have a_is:
-            "s' = s"
-            "fcs' = fcs"
-            "fc' = (Frame_context (Redex v_s' es b_es) lcs nf f)"
-            "\<exists>str. res = Res_trap str"
-            "length v_s \<ge> length t1s"
-            using assms Invoke Func_host fc_is tf_is False None
-            apply (simp_all add: Let_def split: prod.splits if_splits option.splits tf.splits)
-            apply blast+
-            done
-          have red_is:"(\<lparr>s;f;(v_stack_to_es v_s)@[Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f; (v_stack_to_es v_s')@[Trap]\<rparr>)"
-            using fc_is tf_is Func_host None progress_L0_left[OF reduce.invoke_host_None, of s i_cl t1s t2s host "v_stack_to_es v_fs" "rev v_fs" _ _ f "rev v_s'"]
-            by (simp add: a_is(1) v_s_rev_is) (metis a_is(5) split_n_length)
-          show ?thesis
-            using es_frame_contexts_to_config_trap_ctx[OF red_is] a_is(2,3,4) fc_is(1,2) 0 Invoke
-            by simp blast
+        proof (cases host)
+          case (Host_func x1)
+          then show ?thesis
+          proof (cases "host_func_apply_impl s (t1s _> t2s) x1 (rev v_fs)")
+            case None
+            have a_is:
+              "s' = s"
+              "fcs' = fcs"
+              "fc' = (Frame_context (Redex v_s' es b_es) lcs nf f)"
+              "\<exists>str. res = Res_trap str"
+              "length v_s \<ge> length t1s"
+              using assms Invoke Func_host fc_is tf_is False None Host_func
+              apply (simp_all add: Let_def split: prod.splits if_splits option.splits tf.splits host.splits)
+              apply blast+
+              done
+            have red_is:"(\<lparr>s;f;(v_stack_to_es v_s)@[Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f; (v_stack_to_es v_s')@[Trap]\<rparr>)"
+              using fc_is tf_is Func_host None progress_L0_left[OF reduce.invoke_host_None, of s i_cl t1s t2s host "v_stack_to_es v_fs" "rev v_fs" _ _ f "rev v_s'"]
+              by (simp add: a_is(1) v_s_rev_is) (metis a_is(5) split_n_length)
+            show ?thesis
+              using es_frame_contexts_to_config_trap_ctx[OF red_is] a_is(2,3,4) fc_is(1,2) 0 Invoke
+              by simp blast
+          next
+            case (Some a)
+            obtain rvs where a_is:
+              "a = (s', rvs)"
+              "fcs' = fcs"
+              "fc' = (Frame_context (Redex ((rev rvs)@v_s') es b_es) lcs nf f)"
+              "res = Step_normal"
+              "length v_s \<ge> length t1s"
+              using assms Invoke Func_host fc_is tf_is False Some Host_func
+              by (fastforce simp add: Let_def split: prod.splits if_splits option.splits tf.splits)
+            have red_is:"(\<lparr>s;f;(v_stack_to_es v_s)@[Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f; v_stack_to_es ((rev rvs)@v_s')\<rparr>)"
+              using Host_func fc_is tf_is Func_host Some a_is(1,5) progress_L0_left[OF reduce.invoke_host_Some, of s i_cl t1s t2s x1 "v_stack_to_es v_fs" "rev v_fs" _ _ _ s' rvs f "rev v_s'"]
+              by (simp add: v_s_rev_is) (metis host_func_apply_impl_correct split_n_length)
+            show ?thesis
+              using es_frame_contexts_to_config_ctx2[OF red_is] a_is(2,3,4) fc_is(1,2) 0 Invoke
+              by simp blast
+          qed
+          
         next
-          case (Some a)
-          obtain rvs where a_is:
-            "a = (s', rvs)"
-            "fcs' = fcs"
-            "fc' = (Frame_context (Redex ((rev rvs)@v_s') es b_es) lcs nf f)"
-            "res = Step_normal"
-            "length v_s \<ge> length t1s"
-            using assms Invoke Func_host fc_is tf_is False Some
-            by (fastforce simp add: Let_def split: prod.splits if_splits option.splits tf.splits)
-          have red_is:"(\<lparr>s;f;(v_stack_to_es v_s)@[Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f; v_stack_to_es ((rev rvs)@v_s')\<rparr>)"
-            using fc_is tf_is Func_host Some a_is(1,5) progress_L0_left[OF reduce.invoke_host_Some, of s i_cl t1s t2s host "v_stack_to_es v_fs" "rev v_fs" _ _ _ s' rvs f "rev v_s'"]
-            by (simp add: v_s_rev_is) (metis host_apply_impl_correct split_n_length)
-          show ?thesis
-            using es_frame_contexts_to_config_ctx2[OF red_is] a_is(2,3,4) fc_is(1,2) 0 Invoke
-            by simp blast
+          case (Host_ref x2)
+          have a_is:
+              "s' = s"
+              "fcs' = fcs"
+              "fc' = (Frame_context (Redex v_s' es b_es) lcs nf f)"
+              "\<exists>str. res = Res_trap str"
+              "length v_s \<ge> length t1s" 
+              using assms Invoke Func_host fc_is tf_is False Host_ref
+              apply (simp_all add: Let_def split: prod.splits if_splits option.splits tf.splits host.splits)
+              apply blast+
+              done
+            have red_is:"(\<lparr>s;f;(v_stack_to_es v_s)@[Invoke i_cl]\<rparr> \<leadsto> \<lparr>s';f; (v_stack_to_es v_s')@[Trap]\<rparr>)"
+              using fc_is tf_is Invoke Func_host Host_ref progress_L0_left[OF reduce.invoke_host_None, of s i_cl t1s t2s host "v_stack_to_es v_fs" "rev v_fs" _ _ f "rev v_s'"]
+              apply (simp add: a_is(1) v_s_rev_is)
+              by (metis a_is(5) split_n_length)
+            show ?thesis
+              using es_frame_contexts_to_config_trap_ctx[OF red_is] a_is(2,3,4) fc_is(1,2) 0 Invoke
+              by simp blast
         qed
       qed
     qed  

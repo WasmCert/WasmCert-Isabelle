@@ -770,8 +770,8 @@ next
 qed
 
 axiomatization 
-  host_apply_impl:: "s \<Rightarrow> tf \<Rightarrow> host \<Rightarrow> v list \<Rightarrow> (s \<times> v list) option" where
-  host_apply_impl_correct:"(host_apply_impl s tf h vs = Some m') \<Longrightarrow> (\<exists>hs. host_apply s tf h vs hs (Some m'))"
+  host_func_apply_impl:: "s \<Rightarrow> tf \<Rightarrow> host_func \<Rightarrow> v list \<Rightarrow> (s \<times> v list) option" where
+  host_func_apply_impl_correct:"(host_func_apply_impl s tf h vs = Some m') \<Longrightarrow> (\<exists>hs. host_func_apply s tf h vs hs (Some m'))"
 
 fun update_redex_step :: "redex \<Rightarrow> v_stack \<Rightarrow> e list \<Rightarrow> redex" where
   "update_redex_step (Redex v_s es b_es) v_s' es_cont = (Redex v_s' (es_cont@es) b_es)"
@@ -1070,13 +1070,13 @@ fun run_step_e :: "e \<Rightarrow> config \<Rightarrow> res_step_tuple" where
                   else
                     (Config d s fc fcs, crash_invalid))
              | 0 \<Rightarrow> (Config d s fc fcs, crash_exhaustion)))
-           | Func_host (t1s _> t2s) h \<Rightarrow>
+           | Func_host (t1s _> t2s) (Host_func hf) \<Rightarrow>
              let n = length t1s in
              let m = length t2s in
              if length v_s \<ge> n
                then
                  let (v_fs, v_s') = split_n v_s n in
-                 case host_apply_impl s (t1s _> t2s) h (rev v_fs) of
+                 case host_func_apply_impl s (t1s _> t2s) hf (rev v_fs) of
                    Some (s',rvs) \<Rightarrow> 
                      if list_all2 (\<lambda>t v. typeof v = t) t2s rvs
                        then
@@ -1086,7 +1086,8 @@ fun run_step_e :: "e \<Rightarrow> config \<Rightarrow> res_step_tuple" where
                          (Config d s' fc fcs, crash_invalid)
                  | None \<Rightarrow> (Config d s (Frame_context (Redex v_s' es b_es) lcs nf f) fcs, Res_trap (STR ''host_apply''))
                else
-                  (Config d s fc fcs, crash_invalid))
+                  (Config d s fc fcs, crash_invalid)
+            | Func_host (t1s _> t2s) (Host_ref hr) \<Rightarrow> (Config d s fc fcs, crash_invariant))
             | _ \<Rightarrow> (Config d s fc fcs, crash_invariant)))"
          (* | Ref v_r \<Rightarrow>
               let fc' = Frame_context (Redex (V_ref v_r#v_s) es b_es) lcs nf f in

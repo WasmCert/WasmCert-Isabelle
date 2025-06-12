@@ -275,7 +275,7 @@ definition grow_tab :: "tabinst \<Rightarrow> nat \<Rightarrow> v_ref \<Rightarr
 
 consts
   (* host *)
-  host_apply :: "s \<Rightarrow> tf \<Rightarrow> host \<Rightarrow> v list \<Rightarrow> host_state \<Rightarrow> (s \<times> v list) option \<Rightarrow> bool"
+  host_func_apply :: "s \<Rightarrow> tf \<Rightarrow> host_func \<Rightarrow> v list \<Rightarrow> host_state \<Rightarrow> (s \<times> v list) option \<Rightarrow> bool"
 
 definition wasm_deserialise_num :: "bytes \<Rightarrow> t_num \<Rightarrow> v_num" where
   "wasm_deserialise_num bs t = (case t of
@@ -977,37 +977,6 @@ lemma to_e_list_2:"[$ a, $ b] = $* [a, b]"
 
 lemma to_e_list_3:"[$ a, $ b, $ c] = $* [a, b, c]"
   by simp
-
-(*This is now wrong*)
-(*It is also not used?*)
-(*
-lemma v_exists_b_e:"\<exists>ves. ($C*vs) = ($*ves)"
-proof (induction vs)
-  case (Cons a vs)
-  obtain ves where "$C* vs = $* ves" by (metis Cons.IH)
-  have h1: "$C* a # vs = v_to_e a # ($C* vs)" by simp
-  have h2: "\<exists>be. (Basic be) =  v_to_e a"
-  proof(cases a)
-    case (V_num x1)
-    then show ?thesis
-      using v_to_e_def by force
-  next
-    case (V_vec x2)
-    then show ?thesis
-      using v_to_e_def by fastforce+
-  next
-    case (V_ref x3)
-    then show ?thesis
-      sledgehammer
-  qed
-  obtain ve where "v_to_e a = ve" by simp
-  have h2: "$C* [] = $* []" by simp
-  thus ?case
-    apply (auto simp add: list.simps(9))
-    by (metis list.simps(9) )
-
-qed auto
-*)
 
 lemma Lfilled_exact_imp_Lfilled:
   assumes "Lfilled_exact n lholed es LI"

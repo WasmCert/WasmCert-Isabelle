@@ -121,8 +121,10 @@ lemma read_bytes_map:
             byte_at_def mem_length_def mem_rep_length_def
   by (simp add: take_drop_map split: prod.splits)
 
+typedecl host_func
+typedecl host_ref
 \<comment> \<open>host\<close>
-typedecl host
+datatype host = Host_func host_func | Host_ref host_ref
 typedecl host_state
 
 datatype \<comment> \<open>numeric types\<close>
