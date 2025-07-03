@@ -75,14 +75,8 @@ type_synonym mem_t = \<comment> \<open>memory type\<close>
 
 type_synonym mem = "(mem_t \<times> mem_rep)"
 
+lift_definition mem_rep_mk :: "nat \<Rightarrow> mem_rep" is "(\<lambda>n. (bytes_replicate (n * Ki64) zero_byte))" .
 
-
-lift_definition mem_rep_mk_with_default_value :: "nat \<Rightarrow> uint8 \<Rightarrow> mem_rep" is "(\<lambda>n default. (bytes_replicate (n * Ki64) default))" .
-
-definition mem_rep_mk :: "nat \<Rightarrow> mem_rep" where
-  "mem_rep_mk n = mem_rep_mk_with_default_value n zero_byte"
-
-(* lift_definition mem_rep_mk :: "nat \<Rightarrow> mem_rep" is "(\<lambda>n. (bytes_replicate (n * Ki64) zero_byte))" . *)
 definition mem_mk :: "limit_t \<Rightarrow> mem" where
   "mem_mk lim = (lim, mem_rep_mk (l_min lim))"
 

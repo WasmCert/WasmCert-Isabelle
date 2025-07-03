@@ -8,24 +8,8 @@ theory Wasm_Printing
     Wasm_Instantiation_Printing
     Wasm_Checker_Printing
     Wasm_Interpreter_Printing
-  begin
-
-(*
-lemma[code]: "mem_rep_append (Abs_mem_rep m) n b = Abs_mem_rep (app_rev_tr (rev m) (replicate n b))"
-  using mem_rep_append.abs_eq
-  by (simp add: append_app_rev_tr) *)
-
-code_printing
-  type_constructor mem_rep \<rightharpoonup> (OCaml) "uint8 Parray.t"
-  | constant mem_rep_length \<rightharpoonup> (OCaml) "nat'_of'_integer (LibAux.z'_of'_uint32 (Int32.of'_int (Parray.length _)))"
-  | constant mem_rep_mk_with_default_value \<rightharpoonup> (OCaml) "Parray.make (65536*(Int32.to'_int (LibAux.uint32'_of'_z (integer'_of'_nat _)))) _"
-  | constant mem_rep_byte_at \<rightharpoonup> (OCaml) "MemRepWrapper.memRepByteAt _ (Int32.to'_int (LibAux.uint32'_of'_z (integer'_of'_nat _)))"
-  | constant mem_rep_read_bytes \<rightharpoonup> (OCaml) "MemRepWrapper.memRepReadBytes _ (Int32.to'_int (LibAux.uint32'_of'_z (integer'_of'_nat _))) (Int32.to'_int (LibAux.uint32'_of'_z (integer'_of'_nat _)))"
-  | constant mem_rep_write_bytes \<rightharpoonup> (OCaml) "MemRepWrapper.memRepWriteBytes _ (Int32.to'_int (LibAux.uint32'_of'_z (integer'_of'_nat _))) _"
-  | constant mem_rep_append \<rightharpoonup> (OCaml) "MemRepWrapper.memRepAppend _ (Int32.to'_int (LibAux.uint32'_of'_z (integer'_of'_nat _))) _"
-
-(*
-(nat_of_integer (LibAux.z_of_uint32 ( (Int32.of_int (mem_length m)))))*)
+    Wasm_Memory_Printing
+begin
 
 (* avoid name-mangling *)
 code_identifier constant Neg \<rightharpoonup> (OCaml) "WasmRef_Isa.Neg"
