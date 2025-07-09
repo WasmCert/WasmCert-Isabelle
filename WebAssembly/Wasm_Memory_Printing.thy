@@ -5,20 +5,19 @@ theory Wasm_Memory_Printing imports Wasm_Base_Defs Wasm_Type_Printing begin
 typedecl ocaml_int
 
 consts
-  ocaml_i32_to_ocaml_int :: "ocaml_i32 \<Rightarrow> ocaml_int"
-  ocaml_int_to_ocaml_i32 :: "ocaml_int \<Rightarrow> ocaml_i32"
+  ocaml_int_to_integer :: "ocaml_int \<Rightarrow> integer"
+  integer_to_ocaml_int :: "integer \<Rightarrow> ocaml_int"
 
 code_printing
   type_constructor ocaml_int \<rightharpoonup> (OCaml) "Int.t"
-| constant ocaml_i32_to_ocaml_int \<rightharpoonup> (OCaml) "Int32.to'_int"
-| constant ocaml_int_to_ocaml_i32 \<rightharpoonup> (OCaml) "Int32.of'_int"
-
+| constant ocaml_int_to_integer \<rightharpoonup> (OCaml) "Z.of'_int"
+| constant integer_to_ocaml_int \<rightharpoonup> (OCaml) "Z.to'_int"
 
 definition ocaml_int_to_nat :: "ocaml_int \<Rightarrow> nat" where
-  "ocaml_int_to_nat x = nat_of_integer (ocaml_i32_to_integer (ocaml_int_to_ocaml_i32 x))"
+  "ocaml_int_to_nat x = nat_of_integer (ocaml_int_to_integer x)"
 
 definition nat_to_ocaml_int :: "nat \<Rightarrow> ocaml_int" where
-  "nat_to_ocaml_int x = (ocaml_i32_to_ocaml_int (integer_to_ocaml_i32 (integer_of_nat x)))"
+  "nat_to_ocaml_int x = integer_to_ocaml_int (integer_of_nat x)"
 
 consts
   ocaml_mem_rep_length :: "mem_rep \<Rightarrow> ocaml_int"
@@ -30,20 +29,19 @@ consts
 
 code_printing
   type_constructor mem_rep \<rightharpoonup> (OCaml) "uint8 Parray.t"
-| constant ocaml_mem_rep_mk \<rightharpoonup> (OCaml) "MemWrapper.Pa"
+| constant ocaml_mem_rep_mk \<rightharpoonup> (OCaml) "Parray.make"
 | constant ocaml_mem_rep_length  \<rightharpoonup> (OCaml) "Parray.length"
 | constant ocaml_mem_rep_byte_at \<rightharpoonup> (OCaml) "MemRepWrapper.memRepByteAt"
 | constant ocaml_mem_rep_read_bytes \<rightharpoonup> (OCaml) "MemRepWrapper.memRepReadBytes"
 | constant ocaml_mem_rep_write_bytes \<rightharpoonup> (OCaml) "MemRepWrapper.memRepWriteBytes"
 | constant ocaml_mem_rep_append \<rightharpoonup> (OCaml) "MemRepWrapper.memRepAppend"
-| constant ocaml_mem_rep_mk \<rightharpoonup> (OCaml) "Parray.make"
 
 axiomatization where
   mem_rep_length_is[code]: "mem_rep_length m \<equiv> ocaml_int_to_nat (ocaml_mem_rep_length m)" and
   mem_rep_byte_at_is[code]: "mem_rep_byte_at m x \<equiv> (ocaml_mem_rep_byte_at m (nat_to_ocaml_int x))" and
   mem_rep_read_bytes_is[code]: "mem_rep_read_bytes m x y \<equiv> ocaml_mem_rep_read_bytes m (nat_to_ocaml_int x) (nat_to_ocaml_int y)" and
   mem_rep_write_bytes_is[code]: "mem_rep_write_bytes m x bs \<equiv> ocaml_mem_rep_write_bytes m (nat_to_ocaml_int x) bs" and
-  mem_rep_append_is[code]: "mem_rep_append m x b\<equiv> ocaml_mem_rep_append m (nat_to_ocaml_int x) b" and
+  mem_rep_append_is[code]: "mem_rep_append m x b \<equiv> ocaml_mem_rep_append m (nat_to_ocaml_int x) b" and
   mem_rep_mk_is[code]: "mem_rep_mk x = ocaml_mem_rep_mk (nat_to_ocaml_int (x * Ki64)) zero_byte"
 
 end
