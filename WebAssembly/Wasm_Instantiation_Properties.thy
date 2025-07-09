@@ -888,7 +888,21 @@ proof -
             using func_len funci_agree_def funci_agree_s' list_all2_nthD by fastforce
         next
           case d
-          then show ?thesis using const_expr.cases e_init1(2) ref_typing.simps by auto
+          then have  d1: "reduce_trans (s',f,$*((e_init ((m_elems m)!i))!j)) (s',f,[$C (V_ref (ConstNull t_r))])"
+            using reduce.basic[OF reduce_simple.null] v_to_e_def
+            
+            by (simp, metis reduce_trans_app reduce_trans_def rtranclp.rtrancl_refl)
+           
+          then have "(el_inits ! i ! j) = (ConstNull t_r)"
+            using f_def global_\<C>'
+            const_exprs_reduce_trans[OF e_init1(2,1) e_init2 _
+            list_all2_external_typing_glob_alloc[OF s_ext_typing] s'_is(4) s'_is(4) _ globs_inst_split _ func_len,
+            of allocd_globs "[]" "[]" "[]"]
+            const_exprs_reduce_trans[OF e_init1(2,1) d1 _
+            list_all2_external_typing_glob_alloc[OF s_ext_typing] s'_is(4) s'_is(4) _ globs_inst_split _ func_len,
+            of allocd_globs "[]" "[]" "[]"] \<open>inst.globs inst = ext_globs v_imps @ allocd_globs\<close> by auto
+          then show ?thesis using d ref_typing.simps
+            using func_len funci_agree_def funci_agree_s' list_all2_nthD by fastforce
         qed
       qed
     }
