@@ -281,12 +281,12 @@ and check_single :: "t_context \<Rightarrow>  b_e \<Rightarrow> c_t \<Rightarrow
 | check_store_vec:"check_single \<C> (Store_vec sv a off) ts = (if length (memory \<C>) \<ge> 1 \<and> store_vec_t_bounds sv a
                                                                then type_update ts [T_num T_i32, T_vec T_v128]  []
                                                                else None)"
-  (* current_memory *)
-| check_current_memory:"check_single \<C> Current_memory ts = (if length (memory \<C>) \<ge> 1
+  (* memory_size *)
+| check_memory_size:"check_single \<C> Memory_size ts = (if length (memory \<C>) \<ge> 1
                                                              then type_update ts []  [T_num T_i32]
                                                              else None)"
-  (* grow_memory *)
-| check_grow_memory:"check_single \<C> Grow_memory ts = (if length (memory \<C>) \<ge> 1
+  (* memory_grow *)
+| check_memory_grow:"check_single \<C> Memory_grow ts = (if length (memory \<C>) \<ge> 1
                                                         then type_update ts [T_num T_i32] [T_num T_i32]
                                                         else None)"
   (* memory_init *)

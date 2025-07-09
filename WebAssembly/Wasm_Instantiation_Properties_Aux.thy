@@ -265,8 +265,12 @@ proof -
   show "alloc_funcs s (m_funcs m) inst = (ss,i_fs) 
   \<Longrightarrow> funcs s' = funcs ss \<and> inst.funcs inst = (ext_funcs imps)@i_fs" 
     using funcs alloc_tabs_range[OF tabs] 
-      alloc_mems_range[OF mems] alloc_globs_range[OF globs] alloc_elems_range[OF elems] alloc_datas_range[OF datas] inst
-    by force
+      alloc_mems_range[OF mems]
+      alloc_globs_range[OF globs]
+      alloc_elems_range[OF elems]
+      alloc_datas_range[OF datas]
+      inst
+    by simp
 
   show "alloc_tabs s (m_tabs m) = (ss,i_ts) 
   \<Longrightarrow> tabs s' = tabs ss \<and> inst.tabs inst = (ext_tabs imps)@i_ts" 

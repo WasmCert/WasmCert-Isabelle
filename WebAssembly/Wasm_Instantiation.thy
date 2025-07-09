@@ -748,7 +748,7 @@ proof -
       proof(cases)
         case a
         then show ?thesis using subsumption(1)
-          by (metis const_typeof e_typing_l_typing.intros(1) e_typing_l_typing.intros(3) subsumption.hyps(3) subsumption.prems(2))
+          by (metis const_typeof e_typing_thread_typing.intros(1) e_typing_thread_typing.intros(3) subsumption.hyps(3) subsumption.prems(2))
       next
         case b
         then show ?thesis

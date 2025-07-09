@@ -479,11 +479,11 @@ proof -
   next
     case (45 \<C> ct)
     then show ?case
-      by (metis Wasm_Checker.check_current_memory b_e_typing.current_memory option.simps(3) subsumption type_update_type)
+      by (metis Wasm_Checker.check_memory_size b_e_typing.memory_size option.simps(3) subsumption type_update_type)
   next
     case (46 \<C> ct)
     then show ?case
-      by (metis Wasm_Checker.check_grow_memory b_e_typing.grow_memory option.simps(3) subsumption type_update_type)
+      by (metis Wasm_Checker.check_memory_grow b_e_typing.memory_grow option.simps(3) subsumption type_update_type)
   next
     case (47 \<C> i ct)
     then show ?case
@@ -580,9 +580,15 @@ proof(cases e)
     by (metis Wasm_Checker.check_select assms not_None_eq type_update_select.simps(2))
 qed (fastforce simp add: assms)+
 
-lemma check_single_imp':
+lemma check_single_imp:
   assumes "check_single \<C> e ct = Some ct'"
-  shows " check_single \<C> e = (\<lambda> ct''. Some ct'')
+  shows   "(check_single \<C> e = (\<lambda> ct''. type_update_select ct'' None ) \<and> e = Select None)
+         \<or> (check_single \<C> e = type_update_ref_is_null \<and> e = Ref_is_null)
+         \<or> (check_single \<C> e = type_update_drop \<and> e = Drop)
+         \<or> (\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))
+         \<or> (\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
+proof -
+  have "check_single \<C> e = (\<lambda> ct''. Some ct'')
          \<or> (\<exists> t_tag. check_single \<C> e = (\<lambda> ct''. type_update_select ct'' t_tag) \<and> e = Select t_tag)
          \<or> (check_single \<C> e = type_update_ref_is_null \<and> e = Ref_is_null)
          \<or> (check_single \<C> e = type_update_drop \<and> e = Drop)
@@ -594,22 +600,14 @@ lemma check_single_imp':
   apply (simp_all add: check_single_imp_unreach  del: convert_cond.simps b_e_type_checker.simps c_types_agree.simps type_update.simps type_update_select.simps type_update_ref_is_null.simps consume.simps)
   by(fastforce simp del: convert_cond.simps b_e_type_checker.simps c_types_agree.simps type_update.simps type_update_select.simps type_update_ref_is_null.simps split: option.splits if_splits tf.splits t_ref.splits tab_t.splits)+
 
-lemma check_single_imp:
-  assumes "check_single \<C> e ct = Some ct'"
-  shows   "(check_single \<C> e = (\<lambda> ct''. type_update_select ct'' None ) \<and> e = Select None)
-         \<or> (check_single \<C> e = type_update_ref_is_null \<and> e = Ref_is_null)
-         \<or> (check_single \<C> e = type_update_drop \<and> e = Drop)
-         \<or> (\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))
-         \<or> (\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
-proof -
-  consider
+  then consider
     (1) "check_single \<C> e = Some" 
   | (2) " (\<exists> t_tag. check_single \<C> e = (\<lambda> ct''. type_update_select ct'' t_tag) \<and> e = Select t_tag)"
   | (3) "(check_single \<C> e = type_update_ref_is_null) \<and> e = Ref_is_null"
   | (4) "(check_single \<C> e = type_update_drop) \<and> e = Drop"
   | (5) "(\<exists>cons prods. (check_single \<C> e = (\<lambda> ct''. type_update ct'' cons prods)))"
   | (6) "(\<exists> tls. check_single \<C> e = (\<lambda> ct''. (if (consume ct'' tls \<noteq> None) then Some ([], Unreach) else None)))"
-    using assms check_single_imp' by blast
+    using assms  by blast
   then show ?thesis
     apply(cases)
     using check_single_id_impl check_single_select_impl by blast+

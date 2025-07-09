@@ -59,7 +59,7 @@ proof -
 qed
 
 lemma trap_not_value:"[Trap] \<noteq> $C*es"
-  by (metis (full_types) e_typing_l_typing.intros(5) list.distinct(1) typing_map_typeof)
+  by (metis (full_types) e_typing_thread_typing.intros(5) list.distinct(1) typing_map_typeof)
 
 thm Lfilled.simps[of _ _ _ "[e]", simplified]
 
@@ -545,9 +545,9 @@ lemma app_s_f_v_s_store_maybe_packed_is:
 
 lemma app_s_f_v_s_mem_size_is:
   assumes "app_s_f_v_s_mem_size ms f v_s = (v_s', res)"
-  shows "(res = Step_normal \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$ Current_memory]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+  shows "(res = Step_normal \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$ Memory_size]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
          (res = crash_invalid)"
-  using progress_L0_left[OF reduce.current_memory] assms v_to_e_def
+  using progress_L0_left[OF reduce.memory_size] assms v_to_e_def
   unfolding app_s_f_v_s_mem_size_def
   apply (auto split: list.splits cvtop.splits if_splits option.splits v.splits)
   by (metis old.prod.exhaust)
@@ -590,7 +590,7 @@ lemma app_s_f_v_s_store_vec_is:
 
 lemma app_s_f_v_s_mem_grow_is:
   assumes "app_s_f_v_s_mem_grow ms f v_s = (ms', v_s', res)"
-  shows "(res = Step_normal \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Grow_memory]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:=ms'\<rparr>;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+  shows "(res = Step_normal \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Memory_grow]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:=ms'\<rparr>;f;(v_stack_to_es v_s')\<rparr>)) \<or>
          (res = crash_invalid)"
 proof (cases res)
   case (Res_crash x1)
@@ -623,13 +623,13 @@ next
     proof (rule disjE)
       assume assms: "((mem_grow (ms!j) (nat_of_int c)) = Some m' \<and> ms' = ms[j:=m'] \<and> c' = (int_of_nat (mem_size (ms!j))))"
       thus ?thesis
-        using Step_normal progress_L0_left[OF reduce.grow_memory, OF 0(3), of s]
+        using Step_normal progress_L0_left[OF reduce.memory_grow, OF 0(3), of s]
           0(1,2) Step_normal True v_to_e_def
         by auto
     next
       assume "((mem_grow (ms!j) (nat_of_int c)) = None \<and> ms' = ms \<and> c' = int32_minus_one)"
       thus ?thesis
-        using progress_L0_left[OF reduce.grow_memory_fail, OF 0(3), of s] 0(1,2) True Step_normal v_to_e_def
+        using progress_L0_left[OF reduce.memory_grow_fail, OF 0(3), of s] 0(1,2) True Step_normal v_to_e_def
         apply auto
         by (meson old.prod.exhaust)
     qed
@@ -2355,26 +2355,26 @@ proof -
         by simp blast
     qed auto
   next
-    case Current_memory
+    case Memory_size
     consider
         (a) v_s' where
               "s' = s"
               "fcs' = fcs"
               "fc' = (update_fc_step fc v_s' [])"
               "res = Step_normal"
-              "(\<lparr>s;f;(v_stack_to_es v_s)@[$ Current_memory]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$ Memory_size]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
       | (b) "(res = crash_invalid)"
-      using app_s_f_v_s_mem_size_is[of "mems s"] assms Current_memory fc_is
+      using app_s_f_v_s_mem_size_is[of "mems s"] assms Memory_size fc_is
       by (simp split: prod.splits) blast
     thus ?thesis
     proof (cases)
       case a
       thus ?thesis
-        using es_frame_contexts_to_config_ctx2[OF a(5)] Current_memory fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Memory_size fc_is 0
         by simp blast
     qed auto
   next
-    case Grow_memory
+    case Memory_grow
     consider
         (a) ms' v_s' where
               "app_s_f_v_s_mem_grow (s.mems s) f v_s = (ms', v_s', res)"
@@ -2382,15 +2382,15 @@ proof -
               "fc' = (update_fc_step fc v_s' [])"
               "s' = s\<lparr>mems := ms'\<rparr>"
               "res = Step_normal"
-              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Grow_memory]\<rparr> \<leadsto> \<lparr>s';f;(v_stack_to_es v_s')\<rparr>)"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Memory_grow]\<rparr> \<leadsto> \<lparr>s';f;(v_stack_to_es v_s')\<rparr>)"
       | (b) "(res = crash_invalid)"
-      using app_s_f_v_s_mem_grow_is[of "mems s"] assms Grow_memory fc_is
+      using app_s_f_v_s_mem_grow_is[of "mems s"] assms Memory_grow fc_is
       by (fastforce split: prod.splits)
     thus ?thesis
     proof (cases)
       case a
       thus ?thesis
-        using es_frame_contexts_to_config_ctx2[OF a(6)] Grow_memory fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(6)] Memory_grow fc_is 0
         by simp blast
     qed auto
   next

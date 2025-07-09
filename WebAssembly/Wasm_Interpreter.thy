@@ -975,11 +975,11 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
         let (ms', v_s', res) = (app_s_f_v_s_store_vec sv off (mems s) f v_s) in
         (Config d (s\<lparr>mems:=ms'\<rparr>) (update_fc_step fc v_s' []) fcs, res)
 
-    | (Current_memory) \<Rightarrow>
+    | (Memory_size) \<Rightarrow>
         let (v_s', res) = (app_s_f_v_s_mem_size (mems s) f v_s) in
         (Config d s (update_fc_step fc v_s' []) fcs, res)
 
-    | (Grow_memory) \<Rightarrow>
+    | (Memory_grow) \<Rightarrow>
         let (ms', v_s', res) = (app_s_f_v_s_mem_grow (mems s) f v_s) in
         (Config d (s\<lparr>mems:=ms'\<rparr>) (update_fc_step fc v_s' []) fcs, res)
     

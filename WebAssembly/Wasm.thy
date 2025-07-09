@@ -69,10 +69,10 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | load_lane_vec:"\<lbrakk>length (memory \<C>) \<ge> 1; i < vec_i_num svi \<and> 2^a \<le> (vec_i_length svi)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Load_lane_vec svi i a off] : ([T_num T_i32, T_vec T_v128] _> [T_vec T_v128])"
   \<comment> \<open>\<open>store_vec\<close>\<close>
 | store_vec:"\<lbrakk>length (memory \<C>) \<ge> 1; store_vec_t_bounds svop a\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Store_vec svop a off] : ([T_num T_i32,T_vec T_v128] _> [])"
-  \<comment> \<open>\<open>current_memory\<close>\<close>
-| current_memory:"length (memory \<C>) \<ge> 1 \<Longrightarrow> \<C> \<turnstile> [Current_memory] : ([] _> [T_num T_i32])"
+  \<comment> \<open>\<open>memory_size\<close>\<close>
+| memory_size:"length (memory \<C>) \<ge> 1 \<Longrightarrow> \<C> \<turnstile> [Memory_size] : ([] _> [T_num T_i32])"
   \<comment> \<open>\<open>Grow_memory\<close>\<close>
-| grow_memory:"length (memory \<C>) \<ge> 1 \<Longrightarrow> \<C> \<turnstile> [Grow_memory] : ([T_num T_i32] _> [T_num T_i32])"
+| memory_grow:"length (memory \<C>) \<ge> 1 \<Longrightarrow> \<C> \<turnstile> [Memory_grow] : ([T_num T_i32] _> [T_num T_i32])"
 \<comment> \<open>\<open>table_set\<close>\<close>
 | table_set: "\<lbrakk>ti < length (table \<C>); tab_t_reftype ((table \<C>)!ti) = tr\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Table_set ti] : ([T_num T_i32, T_ref tr] _> [])"
 \<comment> \<open>\<open>table_get\<close>\<close>
@@ -159,7 +159,7 @@ inductive cl_typing :: "[s, cl, tf] \<Rightarrow> bool" where
 
 (* lifting the b_e_typing relation to the administrative operators *)
 inductive e_typing :: "[s, t_context, e list, tf] \<Rightarrow> bool" ("_\<bullet>_ \<turnstile> _ : _" 60)
-and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> bool" ("_\<bullet>_ \<tturnstile>' _;_ : _" 60) where
+and       thread_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> bool" ("_\<bullet>_ \<tturnstile>' _;_ : _" 60) where
 (* section: e_typing *)
   (* lifting *)
   "\<C> \<turnstile> b_es : tf \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> $*b_es : tf"
@@ -177,7 +177,7 @@ and       l_typing :: "[s, (t list) option, f, e list, t list] \<Rightarrow> boo
 | "\<lbrakk>i < length (funcs \<S>); cl_type ((funcs \<S>)!i) = tf\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C>  \<turnstile> [Invoke i] : tf"
   (* label *)
 | "\<lbrakk>\<S>\<bullet>\<C> \<turnstile> e0s : (ts _> t2s); \<S>\<bullet>\<C>\<lparr>label := ([ts] @ (label \<C>))\<rparr> \<turnstile> es : ([] _> t2s); length ts = n\<rbrakk> \<Longrightarrow> \<S>\<bullet>\<C> \<turnstile> [Label n e0s es] : ([] _> t2s)"
-(* section: l_typing *)
+(* section: thread_typing *)
 | "\<lbrakk>frame_typing \<S> f \<C>; \<S>\<bullet>\<C>\<lparr>return := rs\<rparr> \<turnstile> es : ([] _> ts)\<rbrakk> \<Longrightarrow> \<S>\<bullet>rs \<tturnstile> f;es : ts"
 
 definition "glob_agree" :: "s \<Rightarrow> global \<Rightarrow> bool" where
@@ -325,12 +325,12 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
   \<comment> \<open>\<open>store vector\<close>\<close>
 | store_vec_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; (store_serialise_vec sv v) = bs; store m (nat_of_int k) off bs (length bs) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $EConstVec (ConstVec128 v), $(Store_vec sv a off)]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[]\<rparr>"
 | store_vec_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; (store_serialise_vec sv v) = bs; store m (nat_of_int k) off bs (length bs) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $EConstVec (ConstVec128 v), $(Store_vec sv a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
-  \<comment> \<open>\<open>current_memory\<close>\<close>
-| current_memory:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;f;[ $(Current_memory)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat n))]\<rparr>"
-  \<comment> \<open>\<open>grow_memory\<close>\<close>
-| grow_memory:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Grow_memory)]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[$EConstNum (ConstInt32 (int_of_nat n))]\<rparr>"
-  \<comment> \<open>\<open>grow_memory fail\<close>\<close>
-| grow_memory_fail:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c),$(Grow_memory)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 int32_minus_one)]\<rparr>"
+  \<comment> \<open>\<open>memory_size\<close>\<close>
+| memory_size:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$Memory_size]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 (int_of_nat n))]\<rparr>"
+  \<comment> \<open>\<open>memory_grow\<close>\<close>
+| memory_grow:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n; mem_grow m (nat_of_int c) = Some mem'\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c), $(Memory_grow)]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:= ((mems s)[j := mem'])\<rparr>;f;[$EConstNum (ConstInt32 (int_of_nat n))]\<rparr>"
+  \<comment> \<open>\<open>memory grow_fail\<close>\<close>
+| memory_grow_fail:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; mem_size m = n\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 c),$(Memory_grow)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (ConstInt32 int32_minus_one)]\<rparr>"
   \<comment> \<open>\<open>table get\<close>\<close>
 | table_get: "\<lbrakk>stab_ind (f_inst f) ti = Some a; load_tabs1 (tabs s) a (nat_of_int n) = Some val \<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(EConstNum (ConstInt32 n)), $(Table_get ti)]\<rparr> \<leadsto> \<lparr>s;f;[Ref val]\<rparr>"
   \<comment> \<open>\<open>table get fail\<close>\<close>

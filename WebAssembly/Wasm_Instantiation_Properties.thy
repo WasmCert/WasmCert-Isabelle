@@ -291,11 +291,11 @@ proof -
     case (store_vec \<C> svop a off)
     then show ?case using b_e_typing.store_vec by simp
   next
-    case (current_memory \<C>)
-    then show ?case using b_e_typing.current_memory by simp
+    case (memory_size \<C>)
+    then show ?case using b_e_typing.memory_size by simp
   next
-    case (grow_memory \<C>)
-    then show ?case using b_e_typing.grow_memory by simp
+    case (memory_grow \<C>)
+    then show ?case using b_e_typing.memory_grow by simp
   next
     case (table_set ti \<C> tr)
     then show ?case using b_e_typing.table_set by simp
@@ -1117,7 +1117,7 @@ proof -
         unfolding module_start_typing.simps
         by (simp add: list_all2_conv_all_nth)
       ultimately show ?thesis
-        using e_typing_l_typing.intros(7) Some
+        using e_typing_thread_typing.intros(7) Some
         by simp
     qed
     moreover have "s'\<bullet>\<C>'' \<turnstile> run_elems (m_elems m) : ([] _> [])"
@@ -1209,7 +1209,7 @@ proof -
           then show ?thesis using run_elem_def i_elem_length b_e_typing.elem_drop context_def by auto
         qed
         then have "s'\<bullet>\<C>'' \<turnstile> $* run_elem ((m_elems m)!i) i : [] _> []"
-          using e_typing_l_typing.intros(1) by auto 
+          using e_typing_thread_typing.intros(1) by auto 
       }
       then have run_elem_t_type: "\<And> i. i < length (m_elems m) \<Longrightarrow> s'\<bullet>\<C>'' \<turnstile> $* run_elem ((m_elems m)!i) i : [] _> []"
         by simp
@@ -1326,7 +1326,7 @@ proof -
             by simp
         qed
         then have "s'\<bullet>\<C>'' \<turnstile> $* run_data ((m_datas m)!i) i : [] _> []"
-          using e_typing_l_typing.intros(1) by auto 
+          using e_typing_thread_typing.intros(1) by auto 
       }
       then have run_data_t_type: "\<And> i. i < length (m_datas m) \<Longrightarrow> s'\<bullet>\<C>'' \<turnstile> $* run_data ((m_datas m)!i) i : [] _> []"
         by simp

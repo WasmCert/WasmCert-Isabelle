@@ -406,8 +406,8 @@ datatype \<comment> \<open>basic instructions\<close>
     | Load_vec loadop_vec a off
     | Load_lane_vec shape_vec_i i a off
     | Store_vec storeop_vec a off
-    | Current_memory
-    | Grow_memory
+    | Memory_size
+    | Memory_grow
     | Memory_init i
     | Memory_fill
     | Memory_copy
