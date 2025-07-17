@@ -1,26 +1,5 @@
 theory Wasm_Instantiation_Properties_Aux imports Wasm_Instantiation Wasm_Properties begin
 
-(*
-definition element_in_bounds where 
-"element_in_bounds s inst e_ind e \<equiv>
-   let i = inst.tabs inst ! e_tab e 
-   in i < length (tabs s) \<and>  e_ind + length (e_init e) \<le> length (fst (tabs s ! i))"
-
-definition data_in_bounds where 
-"data_in_bounds s inst d_ind d \<equiv> 
-  let i = inst.mems inst ! d_data d
-  in i < length (mems s) \<and> d_ind + length (d_init d) \<le> mem_length (mems s ! i)"
-
-abbreviation "element_funcs_in_bounds s inst e 
-\<equiv>list_all (\<lambda>i. (inst.funcs inst)!i < length (s.funcs s)) (e_init e)" 
-*)
-
-(*
-lemma tab_extension_trans:"tab_extension a b \<Longrightarrow> tab_extension b c \<Longrightarrow> tab_extension a c" 
-  unfolding tab_extension_def by auto
-lemma mem_extension_trans:"mem_extension a b \<Longrightarrow> mem_extension b c \<Longrightarrow> mem_extension a c" 
-  unfolding mem_extension_def by auto *)
-
 (* while mathematically superfluous, this form makes the following lemmas easier to prove *)
 lemma store_extension_intros_with_refl: 
   assumes "funcs s = funcs s' \<or> (\<exists> fs. funcs s @ fs = funcs s')" 

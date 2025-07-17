@@ -6,6 +6,9 @@ instance t_num :: countable
 instance t_vec :: countable
   by countable_datatype
 
+instance t_ref :: countable
+  by countable_datatype
+
 instance t :: countable
   by countable_datatype
 
@@ -16,7 +19,7 @@ instance tb :: countable
   by countable_datatype
 
 instance inst_ext :: (countable) countable
-proof(rule countable_classI[of "\<lambda>i. to_nat (types i, inst.funcs i, inst.tabs i, inst.mems i, inst.globs i, inst.more i)"])
+proof(rule countable_classI[of "\<lambda>i. to_nat (types i, inst.funcs i, inst.tabs i, inst.mems i, inst.globs i, inst.elems i, inst.datas i, inst.more i)"])
 qed auto
 
 instance tp_num :: countable
@@ -51,15 +54,6 @@ instance v128 :: countable
 proof(rule countable_classI[of "unat o Rep_v128"])
 qed (simp add: Rep_v128_inject)
   
-instance v_num :: countable
-  by countable_datatype
-
-instance v_vec :: countable
-  by countable_datatype
-
-instance v :: countable
-  by countable_datatype
-
 instance unop_i :: countable
   by countable_datatype
 
@@ -118,16 +112,37 @@ instance loadop_vec :: countable
 instance storeop_vec :: countable
   by countable_datatype
 
-instance b_e :: countable
+instance v_num :: countable
+  by countable_datatype
+
+instance v_vec :: countable
   by countable_datatype
 
 axiomatization where
-  host_countable: "OFCLASS(host, countable_class)"
+  host_func_countable: "OFCLASS(host_func, countable_class)"
+
+axiomatization where
+  host_ref_countable: "OFCLASS(host_ref, countable_class)"
+
+instance host_func :: countable
+  by (rule host_func_countable)
+
+instance host_ref :: countable
+  by (rule host_ref_countable)
 
 instance host :: countable
-  by (rule host_countable)
+  by countable_datatype
+
+instance b_e :: countable
+  by countable_datatype
 
 instance cl :: countable
+  by countable_datatype
+
+instance v_ref :: countable
+  by countable_datatype
+
+instance v :: countable
   by countable_datatype
 
 instance uint8 :: countable
@@ -145,12 +160,15 @@ instance global_ext :: (countable) countable
 proof(rule countable_classI[of "\<lambda>g. to_nat (g_mut g, g_val g, global.more g)"])
 qed simp
 
-instance s_ext :: (countable) countable
-proof (rule countable_classI[of "\<lambda>s. to_nat (funcs s, tabs s, mems s, globs s, s.more s)"])
-qed simp
-
 instance limit_t_ext :: (countable) countable
 proof (rule countable_classI[of "\<lambda>i. to_nat (l_min i, l_max i, limit_t.more i)"])
+qed simp
+
+instance tab_t :: countable
+  by countable_datatype
+
+instance s_ext :: (countable) countable
+proof (rule countable_classI[of "\<lambda>s. to_nat (funcs s, tabs s, mems s, globs s, elems s, datas s, s.more s)"])
 qed simp
 
 instance tg_ext :: (countable) countable
