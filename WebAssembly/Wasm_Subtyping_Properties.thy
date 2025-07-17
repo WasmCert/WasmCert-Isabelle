@@ -115,7 +115,8 @@ lemma t_list_subtyping_snoc_right2:
   assumes "t_list_subtyping ts' (ts@[t1,t2])"
         shows "\<exists> ts'' t1' t2'. t_list_subtyping ts'' ts \<and> t_list_subtyping [t1', t2'] [t1, t2] \<and> ts' = ts''@[t1', t2'] "
   using assms t_list_subtyping_split2[OF assms(1)] t_list_subtyping_def t_subtyping_def
-  by (smt (verit, del_insts) list_all2_Cons2 list_all2_Nil2)
+        t_list_subtyping_snoc_right1[of ts' "ts@[t1]" t2] t_list_subtyping_snoc_right1[of _ _ t1]
+  by fastforce
 
 lemma t_list_subtyping_snoc_left3:
   assumes "t_list_subtyping (ts@[t1,t2,t3]) ts'"
