@@ -1,0 +1,3 @@
+# Executable verified interpreter
+
+The [WasmRef_Isa.ocaml](./WasmRef_Isa.ocaml) file contains the extracted OCaml code of the WasmCert-Isabelle verified interpreter. This interpreter relies on parsing and numeric operations being implemented externally. [Here](https://github.com/conrad-watt/spec/tree/1cc92918313d03e58b95d725c8f7c6287ba45269/interpreter) is a commit of a fork of the WebAssembly Reference Interpreter with the extracted code of the verified interpreter embedded in it so that this verified interpreter can be optionally used via `-isa` CLI flag, with parsing and numerics being delegated to the WebAssembly Reference Interpreter.
