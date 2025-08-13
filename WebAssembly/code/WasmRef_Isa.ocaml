@@ -1,7 +1,6 @@
 module Uint32 : sig
   val less : int32 -> int32 -> bool
   val less_eq : int32 -> int32 -> bool
-  val set_bit : int32 -> Z.t -> bool -> int32
   val shiftl : int32 -> Z.t -> int32
   val shiftr : int32 -> Z.t -> int32
   val shiftr_signed : int32 -> Z.t -> int32
@@ -20,11 +19,6 @@ let less_eq x y =
     Int32.compare y Int32.zero < 0 && Int32.compare x y <= 0
   else Int32.compare y Int32.zero < 0 || Int32.compare x y <= 0;;
 
-let set_bit x n b =
-  let mask = Int32.shift_left Int32.one (Z.to_int n)
-  in if b then Int32.logor x mask
-     else Int32.logand x (Int32.lognot mask);;
-
 let shiftl x n = Int32.shift_left x (Z.to_int n);;
 
 let shiftr x n = Int32.shift_right_logical x (Z.to_int n);;
@@ -42,7 +36,6 @@ end;; (*struct Uint32*)
 module Uint64 : sig
   val less : int64 -> int64 -> bool
   val less_eq : int64 -> int64 -> bool
-  val set_bit : int64 -> Z.t -> bool -> int64
   val shiftl : int64 -> Z.t -> int64
   val shiftr : int64 -> Z.t -> int64
   val shiftr_signed : int64 -> Z.t -> int64
@@ -61,11 +54,6 @@ let less_eq x y =
     Int64.compare y Int64.zero < 0 && Int64.compare x y <= 0
   else Int64.compare y Int64.zero < 0 || Int64.compare x y <= 0;;
 
-let set_bit x n b =
-  let mask = Int64.shift_left Int64.one (Z.to_int n)
-  in if b then Int64.logor x mask
-     else Int64.logand x (Int64.lognot mask);;
-
 let shiftl x n = Int64.shift_left x (Z.to_int n);;
 
 let shiftr x n = Int64.shift_right_logical x (Z.to_int n);;
@@ -80,22 +68,35 @@ let test_bit x n =
 
 end;; (*struct Uint64*)
 
-module Integer_Bit : sig
-  val test_bit : Z.t -> Z.t -> bool
-  val shiftl : Z.t -> Z.t -> Z.t
-  val shiftr : Z.t -> Z.t -> Z.t
+
+module Bit_Shifts : sig
+  val push : Z.t -> Z.t -> Z.t
+  val drop : Z.t -> Z.t -> Z.t
 end = struct
 
-(* We do not need an explicit range checks here,
-   because Big_int.int_of_big_int raises Failure
-   if the argument does not fit into an int. *)
-let test_bit x n =  Z.testbit x (Z.to_int n);;
+let rec fold f xs y = match xs with
+  [] -> y
+  | (x :: xs) -> fold f xs (f x y);;
 
-let shiftl x n = Z.shift_left x (Z.to_int n);;
+let rec replicate n x = (if Z.leq n Z.zero then [] else x :: replicate (Z.pred n) x);;
 
-let shiftr x n = Z.shift_right x (Z.to_int n);;
+let max_index = Z.of_int max_int;;
 
-end;; (*struct Integer_Bit*)
+let splitIndex i = let (b, s) = Z.div_rem i max_index
+  in Z.to_int s :: (replicate b max_int);;
+
+let push' i k = Z.shift_left k i;;
+
+let drop' i k = Z.shift_right k i;;
+
+(* The implementations are formally total, though indices >~ max_index will produce heavy computation load *)
+
+let push i = fold push' (splitIndex (Z.abs i));;
+
+let drop i = fold drop' (splitIndex (Z.abs i));;
+
+end;;
+
 
 module WasmRef_Isa : sig
   type int = Int_of_integer of Z.t
@@ -322,6 +323,7 @@ module WasmRef_Isa : sig
   val semidom_modulo_int : int semidom_modulo
   type nat = Nat of Z.t
   val integer_of_nat : nat -> Z.t
+  val push_bit_integer : nat -> Z.t -> Z.t
   val bit_integer : Z.t -> nat -> bool
   val bit_int : int -> nat -> bool
   type 'a semiring_bits =
@@ -330,23 +332,9 @@ module WasmRef_Isa : sig
       bit : 'a -> nat -> bool}
   val bit : 'a semiring_bits -> 'a -> nat -> bool
   val semiring_bits_int : int semiring_bits
-  val push_bit_integer : nat -> Z.t -> Z.t
   val unset_bit_integer : nat -> Z.t -> Z.t
   val unset_bit_int : nat -> int -> int
-  type 'a ord = {less_eq : 'a -> 'a -> bool; less : 'a -> 'a -> bool}
-  val less_eq : 'a ord -> 'a -> 'a -> bool
-  val less : 'a ord -> 'a -> 'a -> bool
-  val max : 'a ord -> 'a -> 'a -> 'a
-  val ord_integer : Z.t ord
-  val minus_nat : nat -> nat -> nat
-  val equal_nata : nat -> nat -> bool
-  val zero_nat : nat
-  val one_nata : nat
-  val power : 'a power -> 'a -> nat -> 'a
-  val one_integera : Z.t
-  val times_integer : Z.t times
-  val one_integer : Z.t one
-  val power_integer : Z.t power
+  val mask_integer : nat -> Z.t
   val take_bit_integer : nat -> Z.t -> Z.t
   val take_bit_int : nat -> int -> int
   val push_bit_int : nat -> int -> int
@@ -356,7 +344,6 @@ module WasmRef_Isa : sig
   val drop_bit_int : nat -> int -> int
   val set_bit_integer : nat -> Z.t -> Z.t
   val set_bit_int : nat -> int -> int
-  val mask_integer : nat -> Z.t
   val mask_int : nat -> int
   val xor_int : int -> int -> int
   val and_int : int -> int -> int
@@ -384,12 +371,17 @@ module WasmRef_Isa : sig
   val nota : 'a ring_bit_operations -> 'a -> 'a
   val semiring_bit_operations_int : int semiring_bit_operations
   val ring_bit_operations_int : int ring_bit_operations
+  val equal_nata : nat -> nat -> bool
   val equal_nat : nat equal
+  val one_nata : nat
   val one_nat : nat one
   val times_nata : nat -> nat -> nat
   val times_nat : nat times
   val power_nat : nat power
   val less_eq_nat : nat -> nat -> bool
+  type 'a ord = {less_eq : 'a -> 'a -> bool; less : 'a -> 'a -> bool}
+  val less_eq : 'a ord -> 'a -> 'a -> bool
+  val less : 'a ord -> 'a -> 'a -> bool
   val less_nat : nat -> nat -> bool
   val ord_nat : nat ord
   type 'a itself = Type
@@ -472,6 +464,8 @@ module WasmRef_Isa : sig
   type i32 = I32_impl_abs of int32
   val zero_i32a : i32
   val zero_i32 : i32 zero
+  val max : 'a ord -> 'a -> 'a -> 'a
+  val ord_integer : Z.t ord
   val nat_of_integer : Z.t -> nat
   val len_of_i32 : i32 itself -> nat
   val len0_i32 : i32 len0
@@ -483,6 +477,7 @@ module WasmRef_Isa : sig
   val nat_of_int_i32 : i32 -> nat
   val plus_nat : nat -> nat -> nat
   val fold_atLeastAtMost_nat : (nat -> 'a -> 'a) -> nat -> nat -> 'a -> 'a
+  val zero_nat : nat
   val int_of_nat : nat -> int
   val uint32_of_int : int -> int32
   val comp : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
@@ -502,6 +497,7 @@ module WasmRef_Isa : sig
   val uint32_div : int32 -> int32 -> int32
   val int_div_u_i32 : i32 -> i32 -> i32 option
   val int_div_s_i32 : i32 -> i32 -> i32 option
+  val minus_nat : nat -> nat -> nat
   val mask_uint32 : nat -> int32
   val take_bit_uint32 : nat -> int32 -> int32
   val modulo_uint32 : int32 -> int32 -> int32
@@ -833,6 +829,8 @@ module WasmRef_Isa : sig
   val list_update : 'a list -> nat -> 'a -> 'a list
   val bot_pred : 'a pred
   val single : 'a -> 'a pred
+  val dvd : 'a equal * 'a semidom_modulo -> 'a -> 'a -> bool
+  val bin_split : nat -> int -> int * int
   val abs_uint8 : num1 bit0 bit0 bit0 word -> uint8
   val rep_uint8a : uint8 -> num1 bit0 bit0 bit0 word
   val bit_uint8 : uint8 -> nat -> bool
@@ -865,8 +863,6 @@ module WasmRef_Isa : sig
   val f_locs : 'a f_ext -> v list
   val msb_uint8 : uint8 -> bool
   val msb_byte : uint8 -> bool
-  val dvd : 'a equal * 'a semidom_modulo -> 'a -> 'a -> bool
-  val bin_split : nat -> int -> int * int
   val list_all : ('a -> bool) -> 'a list -> bool
   val and_uint8 : uint8 -> uint8 -> uint8
   val integer_of_uint8 : uint8 -> Z.t
@@ -958,6 +954,7 @@ module WasmRef_Isa : sig
   val tp_num_length : tp_num -> nat
   val t_num_length : t_num -> nat
   val is_int_t_num : t_num -> bool
+  val power : 'a power -> 'a -> nat -> 'a
   val load_store_t_bounds : nat -> tp_num option -> t_num -> bool
   val vec_i_length : shape_vec_i -> nat
   val t_vec_length : t_vec -> nat
@@ -1975,7 +1972,10 @@ type nat = Nat of Z.t;;
 
 let rec integer_of_nat (Nat x) = x;;
 
-let rec bit_integer x n = Integer_Bit.test_bit x (integer_of_nat n);;
+let rec push_bit_integer n k = Bit_Shifts.push (integer_of_nat n) k;;
+
+let rec bit_integer
+  k n = not (Z.equal (Z.logand k (push_bit_integer n (Z.of_int 1))) Z.zero);;
 
 let rec bit_int (Int_of_integer k) n = bit_integer k n;;
 
@@ -1991,47 +1991,15 @@ let semiring_bits_int =
      bit = bit_int}
     : int semiring_bits);;
 
-let rec push_bit_integer n x = Integer_Bit.shiftl x (integer_of_nat n);;
-
 let rec unset_bit_integer
   n k = Z.logand k (Z.lognot (push_bit_integer n (Z.of_int 1)));;
 
 let rec unset_bit_int
   n (Int_of_integer k) = Int_of_integer (unset_bit_integer n k);;
 
-type 'a ord = {less_eq : 'a -> 'a -> bool; less : 'a -> 'a -> bool};;
-let less_eq _A = _A.less_eq;;
-let less _A = _A.less;;
+let rec mask_integer n = Z.sub (push_bit_integer n (Z.of_int 1)) (Z.of_int 1);;
 
-let rec max _A a b = (if less_eq _A a b then b else a);;
-
-let ord_integer = ({less_eq = Z.leq; less = Z.lt} : Z.t ord);;
-
-let rec minus_nat
-  m n = Nat (max ord_integer Z.zero
-              (Z.sub (integer_of_nat m) (integer_of_nat n)));;
-
-let rec equal_nata m n = Z.equal (integer_of_nat m) (integer_of_nat n);;
-
-let zero_nat : nat = Nat Z.zero;;
-
-let one_nata : nat = Nat (Z.of_int 1);;
-
-let rec power _A
-  a n = (if equal_nata n zero_nat then one _A.one_power
-          else times _A.times_power a (power _A a (minus_nat n one_nata)));;
-
-let one_integera : Z.t = (Z.of_int 1);;
-
-let times_integer = ({times = Z.mul} : Z.t times);;
-
-let one_integer = ({one = one_integera} : Z.t one);;
-
-let power_integer =
-  ({one_power = one_integer; times_power = times_integer} : Z.t power);;
-
-let rec take_bit_integer
-  n k = modulo_integer k (power power_integer (Z.of_int 2) n);;
+let rec take_bit_integer n k = Z.logand k (mask_integer n);;
 
 let rec take_bit_int
   n (Int_of_integer k) = Int_of_integer (take_bit_integer n k);;
@@ -2044,7 +2012,7 @@ let rec flip_bit_integer n k = Z.logxor k (push_bit_integer n (Z.of_int 1));;
 let rec flip_bit_int
   n (Int_of_integer k) = Int_of_integer (flip_bit_integer n k);;
 
-let rec drop_bit_integer n x = Integer_Bit.shiftr x (integer_of_nat n);;
+let rec drop_bit_integer n k = Bit_Shifts.drop (integer_of_nat n) k;;
 
 let rec drop_bit_int
   n (Int_of_integer k) = Int_of_integer (drop_bit_integer n k);;
@@ -2053,9 +2021,6 @@ let rec set_bit_integer n k = Z.logor k (push_bit_integer n (Z.of_int 1));;
 
 let rec set_bit_int
   n (Int_of_integer k) = Int_of_integer (set_bit_integer n k);;
-
-let rec mask_integer
-  n = Z.sub (power power_integer (Z.of_int 2) n) (Z.of_int 1);;
 
 let rec mask_int n = Int_of_integer (mask_integer n);;
 
@@ -2104,7 +2069,11 @@ let ring_bit_operations_int =
      ring_parity_ring_bit_operations = ring_parity_int; nota = not_int}
     : int ring_bit_operations);;
 
+let rec equal_nata m n = Z.equal (integer_of_nat m) (integer_of_nat n);;
+
 let equal_nat = ({equal = equal_nata} : nat equal);;
+
+let one_nata : nat = Nat (Z.of_int 1);;
 
 let one_nat = ({one = one_nata} : nat one);;
 
@@ -2115,6 +2084,10 @@ let times_nat = ({times = times_nata} : nat times);;
 let power_nat = ({one_power = one_nat; times_power = times_nat} : nat power);;
 
 let rec less_eq_nat m n = Z.leq (integer_of_nat m) (integer_of_nat n);;
+
+type 'a ord = {less_eq : 'a -> 'a -> bool; less : 'a -> 'a -> bool};;
+let less_eq _A = _A.less_eq;;
+let less _A = _A.less;;
 
 let rec less_nat m n = Z.lt (integer_of_nat m) (integer_of_nat n);;
 
@@ -2343,6 +2316,10 @@ let zero_i32a : i32 = I32_impl_abs Int32.zero;;
 
 let zero_i32 = ({zero = zero_i32a} : i32 zero);;
 
+let rec max _A a b = (if less_eq _A a b then b else a);;
+
+let ord_integer = ({less_eq = Z.leq; less = Z.lt} : Z.t ord);;
+
 let rec nat_of_integer k = Nat (max ord_integer Z.zero k);;
 
 let rec len_of_i32 uu = nat_of_integer (Z.of_int 32);;
@@ -2352,8 +2329,8 @@ let len0_i32 = ({len_of = len_of_i32} : i32 len0);;
 let len_i32 = ({len0_len = len0_i32} : i32 len);;
 
 let rec bit_uint32
-  x n = less_nat n (nat_of_integer (Z.of_int 32)) &&
-          Uint32.test_bit x (integer_of_nat n);;
+  w n = less_nat n (nat_of_integer (Z.of_int 32)) &&
+          Uint32.test_bit w (integer_of_nat n);;
 
 let rec uint32
   i = (let ia = Z.logand i (Z.of_string "4294967295") in
@@ -2378,6 +2355,8 @@ let rec fold_atLeastAtMost_nat
   f a b acc =
     (if less_nat b a then acc
       else fold_atLeastAtMost_nat f (plus_nat a one_nata) b (f a acc));;
+
+let zero_nat : nat = Nat Z.zero;;
 
 let rec int_of_nat n = Int_of_integer (integer_of_nat n);;
 
@@ -2409,12 +2388,12 @@ let rec int_shr_s_i32
         (modulo_integer (integer_of_uint32 y) (Z.of_int 32)));;
 
 let rec push_bit_uint32
-  n x = (if less_nat n (nat_of_integer (Z.of_int 32))
-          then Uint32.shiftl x (integer_of_nat n) else Int32.zero);;
+  k w = (if less_nat k (nat_of_integer (Z.of_int 32))
+          then Uint32.shiftl w (integer_of_nat k) else Int32.zero);;
 
 let rec drop_bit_uint32
-  n x = (if less_nat n (nat_of_integer (Z.of_int 32))
-          then Uint32.shiftr x (integer_of_nat n) else Int32.zero);;
+  k w = (if less_nat k (nat_of_integer (Z.of_int 32))
+          then Uint32.shiftr w (integer_of_nat k) else Int32.zero);;
 
 let mod0_uint32 _ = failwith "Uint32.mod0_uint32";;
 
@@ -2461,6 +2440,10 @@ let rec int_div_s_i32
                              (uint32 (Z.of_string "2147483648"))) = 0) &&
             (Int32.compare y (Int32.neg Int32.one) = 0)
       then None else Some (I32_impl_abs (Int32.div x y)));;
+
+let rec minus_nat
+  m n = Nat (max ord_integer Z.zero
+              (Z.sub (integer_of_nat m) (integer_of_nat n)));;
 
 let rec mask_uint32
   n = (if equal_nata n zero_nat then Int32.zero
@@ -2740,8 +2723,8 @@ let len0_i64 = ({len_of = len_of_i64} : i64 len0);;
 let len_i64 = ({len0_len = len0_i64} : i64 len);;
 
 let rec bit_uint64
-  x n = less_nat n (nat_of_integer (Z.of_int 64)) &&
-          Uint64.test_bit x (integer_of_nat n);;
+  w n = less_nat n (nat_of_integer (Z.of_int 64)) &&
+          Uint64.test_bit w (integer_of_nat n);;
 
 let rec uint64
   i = (let ia = Z.logand i (Z.of_string "18446744073709551615") in
@@ -2787,12 +2770,12 @@ let rec int_shr_s_i64
         (modulo_integer (integer_of_uint64 y) (Z.of_int 64)));;
 
 let rec push_bit_uint64
-  n x = (if less_nat n (nat_of_integer (Z.of_int 64))
-          then Uint64.shiftl x (integer_of_nat n) else Int64.zero);;
+  k w = (if less_nat k (nat_of_integer (Z.of_int 64))
+          then Uint64.shiftl w (integer_of_nat k) else Int64.zero);;
 
 let rec drop_bit_uint64
-  n x = (if less_nat n (nat_of_integer (Z.of_int 64))
-          then Uint64.shiftr x (integer_of_nat n) else Int64.zero);;
+  k w = (if less_nat k (nat_of_integer (Z.of_int 64))
+          then Uint64.shiftr w (integer_of_nat k) else Int64.zero);;
 
 let mod0_uint64 _ = failwith "Uint64.mod0_uint64";;
 
@@ -3298,6 +3281,25 @@ let bot_pred : 'a pred = Seq (fun _ -> Empty);;
 
 let rec single x = Seq (fun _ -> Insert (x, bot_pred));;
 
+let rec dvd (_A1, _A2)
+  a b = eq _A1
+          (modulo
+            _A2.semiring_modulo_trivial_semidom_modulo.semiring_modulo_semiring_modulo_trivial.modulo_semiring_modulo
+            b a)
+          (zero _A2.algebraic_semidom_semidom_modulo.semidom_divide_algebraic_semidom.semidom_semidom_divide.comm_semiring_1_cancel_semidom.comm_semiring_1_comm_semiring_1_cancel.semiring_1_comm_semiring_1.semiring_0_semiring_1.mult_zero_semiring_0.zero_mult_zero);;
+
+let rec bin_split
+  n w = (if equal_nata n zero_nat then (w, zero_inta)
+          else (let (w1, w2) =
+                  bin_split (minus_nat n one_nata)
+                    (divide_inta w (Int_of_integer (Z.of_int 2)))
+                  in
+                 (w1, plus_inta
+                        (of_bool zero_neq_one_int
+                          (not (dvd (equal_int, semidom_modulo_int)
+                                 (Int_of_integer (Z.of_int 2)) w)))
+                        (times_inta (Int_of_integer (Z.of_int 2)) w2))));;
+
 let rec abs_uint8
   x = uint8 (integer_of_int
               (the_int (len_bit0 (len_bit0 (len_bit0 len_num1))) x));;
@@ -3305,13 +3307,13 @@ let rec abs_uint8
 let rec rep_uint8a (Abs_uint8 x) = x;;
 
 let rec bit_uint8
-  x n = less_nat n (nat_of_integer (Z.of_int 8)) &&
-          uint8_test_bit x (integer_of_nat n)
+  w n = less_nat n (nat_of_integer (Z.of_int 8)) &&
+          uint8_test_bit w (integer_of_nat n)
 and uint8_test_bit
-  w n = (if Z.lt n Z.zero || Z.lt (Z.of_int 7) n
-          then failwith "undefined" bit_uint8 w n
+  w k = (if Z.lt k Z.zero || Z.leq (Z.of_int 8) k
+          then failwith "undefined" bit_uint8 w k
           else bit_word (len_bit0 (len_bit0 (len_bit0 len_num1))) (rep_uint8a w)
-                 (nat_of_integer n));;
+                 (nat_of_integer k));;
 
 let rec rep_uint8
   x = set_bits_word (len_bit0 (len_bit0 (len_bit0 len_num1))) (bit_uint8 x);;
@@ -3399,25 +3401,6 @@ let rec f_locs (F_ext (f_locs, f_inst, more)) = f_locs;;
 let rec msb_uint8 x = uint8_test_bit x (Z.of_int 7);;
 
 let rec msb_byte x = msb_uint8 x;;
-
-let rec dvd (_A1, _A2)
-  a b = eq _A1
-          (modulo
-            _A2.semiring_modulo_trivial_semidom_modulo.semiring_modulo_semiring_modulo_trivial.modulo_semiring_modulo
-            b a)
-          (zero _A2.algebraic_semidom_semidom_modulo.semidom_divide_algebraic_semidom.semidom_semidom_divide.comm_semiring_1_cancel_semidom.comm_semiring_1_comm_semiring_1_cancel.semiring_1_comm_semiring_1.semiring_0_semiring_1.mult_zero_semiring_0.zero_mult_zero);;
-
-let rec bin_split
-  n w = (if equal_nata n zero_nat then (w, zero_inta)
-          else (let (w1, w2) =
-                  bin_split (minus_nat n one_nata)
-                    (divide_inta w (Int_of_integer (Z.of_int 2)))
-                  in
-                 (w1, plus_inta
-                        (of_bool zero_neq_one_int
-                          (not (dvd (equal_int, semidom_modulo_int)
-                                 (Int_of_integer (Z.of_int 2)) w)))
-                        (times_inta (Int_of_integer (Z.of_int 2)) w2))));;
 
 let rec list_all p x1 = match p, x1 with p, [] -> true
                    | p, x :: xs -> p x && list_all p xs;;
@@ -3780,6 +3763,10 @@ let rec t_num_length
 let rec is_int_t_num
   t = (match t with T_i32 -> true | T_i64 -> true | T_f32 -> false
         | T_f64 -> false);;
+
+let rec power _A
+  a n = (if equal_nata n zero_nat then one _A.one_power
+          else times _A.times_power a (power _A a (minus_nat n one_nata)));;
 
 let rec load_store_t_bounds
   a tp t =

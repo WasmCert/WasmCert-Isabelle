@@ -157,7 +157,7 @@ proof -
   have 0: "integer_of_uint32 y mod 32 \<ge> 0"
     by (simp add: integer_of_uint32.rep_eq less_eq_integer.rep_eq)
   have 1:"\<not>(((integer_of_uint32 y) mod 32) < 0 \<or> 32 \<le> (integer_of_uint32 y) mod 32)"
-    apply (meson 0 unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1 zero_less_numeral)
+    apply (meson 0 verit_comp_simplify1 zero_less_numeral)
     using less_eq_integer.rep_eq by fastforce
   have 2:"(Rep_uint32 (x << (nat_of_integer (integer_of_uint32 y mod 32)))) =
             ((Rep_uint32 x) << (unat (Rep_uint32 y) mod 32))" 
@@ -167,10 +167,9 @@ proof -
     apply (simp add: take_bit_eq_mod nat_mod_distrib)
     done
   thus ?thesis
-    using 1
+    using 1 uint32.shiftl_def uint32_shiftl_def
     unfolding i32_impl_abs_def uint32_shiftl_def
-    by (simp add: I32.int_shl_def int_shl_i32.abs_eq shiftl_def) 
-    
+    by (simp add: I32.int_shl_def int_shl_i32.abs_eq shiftl_def)
 qed
 
 lemma[code]: "int_shr_u (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (uint32_shiftr x ((integer_of_uint32 y) mod 32))"
@@ -178,7 +177,7 @@ proof -
   have 0: "integer_of_uint32 y mod 32 \<ge> 0"
     by (simp add: integer_of_uint32.rep_eq less_eq_integer.rep_eq)
   have 1:"\<not>(integer_of_uint32 y mod 32 < 0 \<or> 32 \<le> integer_of_uint32 y mod 32)"
-    apply (meson 0 unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
+    apply (meson 0  verit_comp_simplify1(3) zero_less_numeral)
     using less_eq_integer.rep_eq by force
   have 2:"(Rep_uint32 (shiftr x (nat_of_integer ((integer_of_uint32 y) mod 32)))) =
             (shiftr (Rep_uint32 x) ((unat (Rep_uint32 y)) mod 32))"
@@ -188,9 +187,9 @@ proof -
     apply (simp add: take_bit_eq_mod nat_mod_distrib)
     done
   thus ?thesis
-    using 1
+    using 1 uint32.shiftr_def uint32_shiftr_def
     unfolding i32_impl_abs_def uint32_shiftr_def
-    by (simp add: shiftr_def I32.int_shr_u_def int_shr_u_i32.abs_eq)
+    by (simp add:  shiftr_def I32.int_shr_u_def int_shr_u_i32.abs_eq)
 qed
 
 lemma[code]: "int_shr_s (i32_impl_abs x) (i32_impl_abs y) = i32_impl_abs (uint32_sshiftr x ((integer_of_uint32 y) mod 32))"
@@ -198,7 +197,7 @@ proof -
   have 0: "integer_of_uint32 y mod 32 \<ge> 0"
     by (simp add: integer_of_uint32.rep_eq less_eq_integer.rep_eq)
   have 1:"\<not>(integer_of_uint32 y mod 32 < 0 \<or> 32 \<le> integer_of_uint32 y mod 32)"
-    apply (meson 0 unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
+    apply (meson 0 verit_comp_simplify1(3) zero_less_numeral)
     using less_eq_integer.rep_eq by fastforce
   have 2:"(Rep_uint32 (signed_drop_bit_uint32 (nat_of_integer ((integer_of_uint32 y) mod 32)) x)) =
             (sshiftr (Rep_uint32 x) ((unat (Rep_uint32 y)) mod 32))"
@@ -209,7 +208,7 @@ proof -
     done
   
   thus ?thesis
-    using 1
+    using 1 uint32.sshiftr_def uint32_sshiftr_def
     unfolding i32_impl_abs_def uint32_sshiftr_def
     by (simp add: I32.int_shr_s_def int_shr_s_i32.abs_eq)
 qed
@@ -393,7 +392,7 @@ proof -
   have 0: "integer_of_uint64 y mod 64 \<ge> 0"
     by (simp add: integer_of_uint32.rep_eq less_eq_integer.rep_eq)
   have 1:"\<not>(integer_of_uint64 y mod 64 < 0 \<or> 64 \<le> integer_of_uint64 y mod 64)"
-    apply (meson 0 unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
+    apply (meson 0 verit_comp_simplify1(3) zero_less_numeral)
     using less_eq_integer.rep_eq by fastforce
   have 2:"(Rep_uint64 (x << (nat_of_integer (integer_of_uint64 y mod 64)))) =
             ((Rep_uint64 x) << (unat (Rep_uint64 y) mod 64))"
@@ -403,7 +402,7 @@ proof -
     apply (simp add: take_bit_eq_mod nat_mod_distrib)
     done
   thus ?thesis
-    using 1
+    using 1 uint64.shiftl_def uint64_shiftl_def
     unfolding i64_impl_abs_def uint64_shiftl_def
     by (simp add: shiftl_def I64.int_shl_def int_shl_i64.abs_eq)
 qed
@@ -412,7 +411,7 @@ lemma[code]: "int_shr_u (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (uint64
 proof -
   have 1:"\<not>(integer_of_uint64 y mod 64 < 0 \<or> 64 \<le> integer_of_uint64 y mod 64)"
     apply
-      (meson unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
+      (meson verit_comp_simplify1(3) zero_less_numeral)
     using less_eq_integer.rep_eq linorder_not_less by fastforce+
   have 2:"(Rep_uint64 (shiftr x (nat_of_integer ((integer_of_uint64 y) mod 64)))) =
             (shiftr (Rep_uint64 x) ((unat (Rep_uint64 y)) mod 64))"
@@ -422,7 +421,7 @@ proof -
     apply (simp add: take_bit_eq_mod nat_mod_distrib)
     done
   thus ?thesis
-    using 1
+    using 1 uint64.shiftr_def uint64_shiftr_def
     unfolding i64_impl_abs_def uint64_shiftr_def
     by (simp add: shiftr_def I64.int_shr_u_def int_shr_u_i64.abs_eq)
 qed
@@ -430,7 +429,7 @@ qed
 lemma[code]: "int_shr_s (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (uint64_sshiftr x ((integer_of_uint64 y) mod 64))"
 proof -
   have 1:"\<not>(integer_of_uint64 y mod 64 < 0 \<or> 64 \<le> integer_of_uint64 y mod 64)"
-    apply (meson unique_euclidean_semiring_numeral_class.pos_mod_bound unique_euclidean_semiring_numeral_class.pos_mod_sign verit_comp_simplify1(3) zero_less_numeral)
+    apply (meson verit_comp_simplify1(3) zero_less_numeral)
     using less_eq_integer.rep_eq linorder_not_less by fastforce+
   have 2:"(Rep_uint64 (signed_drop_bit_uint64 (nat_of_integer ((integer_of_uint64 y) mod 64)) x)) =
             (sshiftr (Rep_uint64 x) ((unat (Rep_uint64 y)) mod 64))"
@@ -440,7 +439,7 @@ proof -
     apply (simp add: take_bit_eq_mod nat_mod_distrib)
     done
   thus ?thesis
-    using 1
+    using 1 uint64.sshiftr_def uint64_sshiftr_def
     unfolding i64_impl_abs_def uint64_sshiftr_def
     by (simp add: I64.int_shr_s_def int_shr_s_i64.abs_eq)
 qed
