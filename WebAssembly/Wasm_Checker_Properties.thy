@@ -439,23 +439,23 @@ proof -
   next
     case (35 \<C> i ct)
     then show ?case
-      by (metis Wasm_Checker.check_get_local b_e_typing.get_local option.simps(3) subsumption type_update_type)
+      by (metis Wasm_Checker.check_local_get b_e_typing.local_get option.simps(3) subsumption type_update_type)
   next
     case (36 \<C> i ct)
     then show ?case
-      by (metis Wasm_Checker.check_set_local b_e_typing.set_local option.simps(3) subsumption type_update_type)
+      by (metis Wasm_Checker.check_local_set b_e_typing.local_set option.simps(3) subsumption type_update_type)
   next
     case (37 \<C> i ct)
     then show ?case
-      by (metis (mono_tags, lifting) Wasm_Checker.check_tee_local b_e_typing.tee_local option.simps(3) subsumption type_update_type)
+      by (metis (mono_tags, lifting) Wasm_Checker.check_local_tee b_e_typing.local_tee option.simps(3) subsumption type_update_type)
   next
     case (38 \<C> i ct)
     then show ?case
-      by (metis Wasm_Checker.check_get_global b_e_typing.get_global option.simps(3) subsumption type_update_type)
+      by (metis Wasm_Checker.check_global_get b_e_typing.global_get option.simps(3) subsumption type_update_type)
   next
     case (39 \<C> i ct)
     then show ?case
-      by (metis (no_types, lifting) Wasm_Checker.check_set_global b_e_typing.set_global option.simps(3) subsumption type_update_type)
+      by (metis (no_types, lifting) Wasm_Checker.check_global_set b_e_typing.global_set option.simps(3) subsumption type_update_type)
   next
     case (40 \<C> t tp_sx a off ct)
     then show ?case

@@ -84,7 +84,7 @@ lemma exists_v_typeof_num: "\<exists>v v. typeof_num v = t"
   unfolding typeof_num_def
   by (metis t_num.exhaust v_num.simps(17,18,19,20))
 
-lemma set_local_access: 
+lemma local_set_access: 
   assumes "j < Suc (length vi + length vs)"
           "j \<noteq> length vi"
   shows "(vi @ [v] @ vs) ! j = (vi @ [v'] @ vs) ! j"
@@ -845,44 +845,44 @@ lemma b_e_type_call_indirect:
 proof (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
 qed (auto simp add: instr_subtyping_refl b_e_type_composition_aux_lemma, metis instr_subtyping_trans)
 
-lemma b_e_type_get_local:
+lemma b_e_type_local_get:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = Get_local i"
+          "e = Local_get i"
   shows "\<exists>t.  instr_subtyping ([] _> [t]) (ts _> ts') \<and> (local \<C>)!i = t" "i < length(local \<C>)"
   using assms
 proof (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
 qed (auto simp add: instr_subtyping_refl b_e_type_composition_aux_lemma, metis instr_subtyping_trans)
 
-lemma b_e_type_set_local:
+lemma b_e_type_local_set:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = Set_local i"
+          "e = Local_set i"
   shows "\<exists>t. instr_subtyping ([t] _> []) (ts _> ts') \<and> (local \<C>)!i = t" "i < length(local \<C>)"
   using assms
   apply (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
   apply (auto simp add: instr_subtyping_refl b_e_type_composition_aux_lemma)
   using instr_subtyping_refl instr_subtyping_trans b_e_type_composition_aux_lemma by blast+
 
-lemma b_e_type_tee_local:
+lemma b_e_type_local_tee:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = Tee_local i"
+          "e = Local_tee i"
   shows "\<exists>t. instr_subtyping ([t] _> [t]) (ts _> ts') \<and> (local \<C>)!i = t" "i < length(local \<C>)"
   using assms
   apply (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
   apply (auto simp add: instr_subtyping_refl b_e_type_composition_aux_lemma)
   using instr_subtyping_refl instr_subtyping_trans b_e_type_composition_aux_lemma by blast+
 
-lemma b_e_type_get_global:
+lemma b_e_type_global_get:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = Get_global i"
+          "e = Global_get i"
   shows "\<exists>t. instr_subtyping ([] _> [t]) (ts _> ts') \<and> tg_t((global \<C>)!i) = t" "i < length(global \<C>)"
   using assms
   apply (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
   apply (auto simp add: instr_subtyping_refl b_e_type_composition_aux_lemma)
   using instr_subtyping_refl instr_subtyping_trans b_e_type_composition_aux_lemma by blast+
 
-lemma b_e_type_set_global:
+lemma b_e_type_global_set:
   assumes "\<C> \<turnstile> [e] : (ts _> ts')"
-          "e = Set_global i"
+          "e = Global_set i"
   shows "\<exists>t. instr_subtyping ([t] _> []) (ts _> ts') \<and> (global \<C>)!i = \<lparr>tg_mut = T_mut, tg_t = t\<rparr> \<and> i < length(global \<C>)"
   using assms is_mut_def
   apply (induction "[e]" "(ts _> ts')" arbitrary: ts ts' rule: b_e_typing.induct)
@@ -3643,22 +3643,22 @@ next
     by fastforce
 qed
 
-lemma types_preserved_set_global_aux:
-  assumes "s\<bullet>\<C> \<turnstile> [$C v, $Set_global j] : (ts _> ts')"
+lemma types_preserved_global_set_aux:
+  assumes "s\<bullet>\<C> \<turnstile> [$C v, $Global_set j] : (ts _> ts')"
   shows "s'\<bullet>\<C> \<turnstile> [] : (ts _> ts')"
         "tg_t (global \<C> ! j) = typeof v"
         "tg_mut (global \<C> ! j) = T_mut"
         "j < length(global \<C>)"
 proof -
   obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts'')" 
-                             "s\<bullet>\<C> \<turnstile> [$Set_global j] : (ts'' _> ts')"
-                             "\<C> \<turnstile> [Set_global j] : (ts'' _> ts')"
+                             "s\<bullet>\<C> \<turnstile> [$Global_set j] : (ts'' _> ts')"
+                             "\<C> \<turnstile> [Global_set j] : (ts'' _> ts')"
     using e_type_comp assms unlift_b_e
     by (metis append_Cons append_Nil to_e_list_1)
   hence 1: "([] _> [typeof v]) <ti: (ts _> ts'')"
     using e_type_const_new store_extension_refl by blast
   obtain t where t_def: "([t] _> []) <ti: (ts'' _> ts')" "global \<C> ! j = \<lparr>tg_mut = T_mut, tg_t = t\<rparr>" "j < length (global \<C>)"
-    using b_e_type_set_global ts''_def(3) by blast
+    using b_e_type_global_set ts''_def(3) by blast
   have 2: "t = typeof v" "([typeof v] _> []) <ti: (ts'' _> ts')"
   proof -
     obtain ts''' where ts'''_def: "ts'' = ts'''@[typeof v]"

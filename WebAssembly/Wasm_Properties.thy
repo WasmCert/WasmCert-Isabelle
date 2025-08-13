@@ -29,17 +29,17 @@ proof (induction arbitrary: \<C>i \<C> ts ts' arb_label arb_return rule: reduce.
     using host_func_apply_preserve_store[OF invoke_host_Some(6)] invoke_host_Some(2,7)
     by blast
 next
-  case (set_global s f j v s')
+  case (global_set s f j v s')
   have 1: "v_typing s v (typeof v)"
-    by (metis append_eq_Cons_conv e_type_comp_conc1 set_global.prems(3) type_const_v_typing(2))
+    by (metis append_eq_Cons_conv e_type_comp_conc1 global_set.prems(3) type_const_v_typing(2))
   have "tg_t (global \<C>i ! j) = typeof v"
        "tg_mut (global \<C>i ! j) = T_mut"
        "j < length (global \<C>i)"
-    using types_preserved_set_global_aux(2,3,4)[OF set_global(4)] set_global(5)
+    using types_preserved_global_set_aux(2,3,4)[OF global_set(4)] global_set(5)
     by simp_all
   thus ?case
-    using update_glob_store_extension[OF set_global(2,1)]
-    by (metis "1" glob_typing_def set_global.prems(2) sglob_def store_typing_imp_glob_agree(2))
+    using update_glob_store_extension[OF global_set(2,1)]
+    by (metis "1" glob_typing_def global_set.prems(2) sglob_def store_typing_imp_glob_agree(2))
 next
   case (store_Some t v s i j m k off mem' vs a)
   have "mem_subtyping (fst mem') (fst m)"
@@ -858,28 +858,28 @@ proof -
     using "1" e_typing_thread_typing.intros(3) by blast
 qed
 
-lemma types_preserved_tee_local:
-  assumes "\<lparr>[$C v, $Tee_local i]\<rparr> \<leadsto> \<lparr>[$C v, $C v, $Set_local i]\<rparr>"
-          "s\<bullet>\<C> \<turnstile> [$C v, $Tee_local i] : (ts _> ts')"
-  shows   "s\<bullet>\<C> \<turnstile> [$C v, $C v, $Set_local i] : (ts _> ts')"
+lemma types_preserved_local_tee:
+  assumes "\<lparr>[$C v, $Local_tee i]\<rparr> \<leadsto> \<lparr>[$C v, $C v, $Local_set i]\<rparr>"
+          "s\<bullet>\<C> \<turnstile> [$C v, $Local_tee i] : (ts _> ts')"
+  shows   "s\<bullet>\<C> \<turnstile> [$C v, $C v, $Local_set i] : (ts _> ts')"
 proof -
-  have "s\<bullet>\<C> \<turnstile> [$C v, $Tee_local i] : (ts _> ts')"
+  have "s\<bullet>\<C> \<turnstile> [$C v, $Local_tee i] : (ts _> ts')"
     using unlift_b_e assms
     by fastforce
-  then obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts'')" "s\<bullet>\<C> \<turnstile> [$Tee_local i] : (ts'' _> ts')"
+  then obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> [$C v] : (ts _> ts'')" "s\<bullet>\<C> \<turnstile> [$Local_tee i] : (ts'' _> ts')"
     by (metis append_Cons append_Nil e_type_comp)
   then have 1: "([] _> [typeof v]) <ti: (ts _> ts'')"
     using type_const_v_typing(1) by blast
   obtain t where t_def:"([t] _> [t]) <ti: (ts'' _> ts')" "(local \<C>)!i = t" "i < length(local \<C>)"
-    using b_e_type_tee_local[of \<C> "Tee_local i" ts'' ts' i] ts''_def
+    using b_e_type_local_tee[of \<C> "Local_tee i" ts'' ts' i] ts''_def
     by (metis to_e_list_1 unlift_b_e)
   have t_bv:"t = typeof v" using t_def(1) 1 instr_subtyping_append1_type_eq
     by (metis append_self_conv2 typeof_not_bot) 
-  have "\<C> \<turnstile> [Set_local i] : ([t,t] _> [t])"
-    using t_def b_e_typing.set_local[of i \<C> t]
-          b_e_weakening[of \<C> "[Set_local i]" "[t]" "[]" "[t]"]
+  have "\<C> \<turnstile> [Local_set i] : ([t,t] _> [t])"
+    using t_def b_e_typing.local_set[of i \<C> t]
+          b_e_weakening[of \<C> "[Local_set i]" "[t]" "[]" "[t]"]
     by fastforce
-  then have 2: "s\<bullet>\<C> \<turnstile> [$Set_local i] : [t, t] _> [t]"
+  then have 2: "s\<bullet>\<C> \<turnstile> [$Local_set i] : [t, t] _> [t]"
     using e_typing_thread_typing.intros(1) to_e_list_1 by metis
   have "s\<bullet>\<C> \<turnstile> [$C v] : ([t] _> [t,t])"
     using t_bv e_weakening type_const_v_typing(2) types_agree_imp_e_typing
@@ -887,7 +887,7 @@ proof -
   then have 3: "s\<bullet>\<C> \<turnstile> [$C v, $C v] : ([] _> [t,t])"
     using t_bv e_type_comp_conc type_const_v_typing(2) types_agree_imp_e_typing
     by fastforce
-  have "s\<bullet>\<C> \<turnstile> [$C v, $C v, $Set_local i] : (ts _> ts@[t])"
+  have "s\<bullet>\<C> \<turnstile> [$C v, $C v, $Local_set i] : (ts _> ts@[t])"
     using 2 3
     by (metis Cons_eq_appendI append_Nil2 append_self_conv2 e_type_comp_conc e_weakening)
   moreover have "(ts _> ts@[t]) <ti: (ts _> ts')"
@@ -1620,9 +1620,9 @@ next
     using assms(1, 3) types_preserved_return
     by fastforce
 next
-  case (tee_local v i)
+  case (local_tee v i)
   then show ?thesis
-    using assms(1, 3) types_preserved_tee_local
+    using assms(1, 3) types_preserved_local_tee
     by simp
 next
   case (trap lholed)
@@ -1758,7 +1758,7 @@ proof -
     by (metis const_num e_typing_thread_typing.intros(1) e_typing_thread_typing.intros(3) instr_subtyping_comp to_e_list_1 typeof_num_def v_num.case(1))
 qed
 
-lemmas types_preserved_set_global = types_preserved_set_global_aux
+lemmas types_preserved_global_set = types_preserved_global_set_aux
 
 lemma types_preserved_load:
   assumes "s\<bullet>\<C> \<turnstile> [$EConstNum (ConstInt32 k), $Load t tp a off] : (ts _> ts')"
@@ -1828,8 +1828,8 @@ proof -
     by (metis (full_types) const_vec e_typing_thread_typing.intros(1) e_typing_thread_typing.intros(3) t_vec.exhaust to_e_list_1)
 qed
 
-lemma types_preserved_get_local:
-  assumes "s\<bullet>\<C> \<turnstile> [$Get_local i] : (ts _> ts')"
+lemma types_preserved_local_get:
+  assumes "s\<bullet>\<C> \<turnstile> [$Local_get i] : (ts _> ts')"
           "length vi = i"
           "(local \<C>) = map typeof (vi @ [v] @ vs)"
           "v_typing s v (typeof v)"
@@ -1840,7 +1840,7 @@ proof -
     using assms(2,3)
     by (metis (no_types) append_Cons length_map list.simps(9) map_append nth_append_length)
   hence a: "([] _> [typeof v]) <ti: (ts _> ts')"
-    using assms(1) unlift_b_e[of s \<C> "[Get_local i]"] b_e_type_get_local
+    using assms(1) unlift_b_e[of s \<C> "[Local_get i]"] b_e_type_local_get
     by fastforce
   then have "v_typing s v (typeof v)"
     using assms(4) by blast
@@ -1848,8 +1848,8 @@ proof -
     using a assms(5) e_typing_thread_typing.intros(3) e_typing_thread_typing_store_extension_inv(1) types_agree_imp_e_typing by fastforce
 qed
 
-lemma types_preserved_set_local:
-  assumes "s\<bullet>\<C> \<turnstile> [$C v', $Set_local i] : (ts _> ts')"
+lemma types_preserved_local_set:
+  assumes "s\<bullet>\<C> \<turnstile> [$C v', $Local_set i] : (ts _> ts')"
           "length vi = i"
           "(local \<C>) = map typeof (vi @ [v] @ vs)"
   shows "(s'\<bullet>\<C> \<turnstile> [] : (ts _> ts')) \<and> map typeof (vi @ [v] @ vs) = map typeof (vi @ [v'] @ vs)"
@@ -1858,23 +1858,23 @@ proof -
     using assms(2,3)
     by (metis (no_types) append_Cons length_map list.simps(9) map_append nth_append_length)
   obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> [$C v'] : (ts _> ts'')" 
-                             "s\<bullet>\<C> \<turnstile> [$Set_local i] : (ts'' _> ts')"
+                             "s\<bullet>\<C> \<turnstile> [$Local_set i] : (ts'' _> ts')"
     using e_type_comp assms
     by (metis append_butlast_last_id butlast.simps(2) last.simps list.distinct(1))
   hence 1: "([] _> [typeof v']) <ti: (ts _> ts'')"
     using e_type_const_new store_extension_refl by blast
   hence "typeof v = typeof v'"
-    using v_type b_e_type_set_local[of \<C> "Set_local i" ts'' ts'] ts''_def(2) unlift_b_e[of s \<C> "[Set_local i]"]
+    using v_type b_e_type_local_set[of \<C> "Local_set i" ts'' ts'] ts''_def(2) unlift_b_e[of s \<C> "[Local_set i]"]
     by (metis append_self_conv2 instr_subtyping_append1_type_eq to_e_list_1 typeof_not_bot)
   moreover have "([] _> []) <ti: (ts _> ts')" using 1
-    by (metis b_e_type_set_local(1) calculation instr_subtyping_comp to_e_list_1 ts''_def(2) unlift_b_e v_type)
+    by (metis b_e_type_local_set(1) calculation instr_subtyping_comp to_e_list_1 ts''_def(2) unlift_b_e v_type)
   ultimately show ?thesis
     using b_e_type_empty[of \<C> "ts" "ts'"] e_typing_thread_typing.intros(1)
     by fastforce
 qed
 
-lemma types_preserved_set_local':
-  assumes "s\<bullet>\<C> \<turnstile> [$C v', $Set_local i] : (ts _> ts')"
+lemma types_preserved_local_set':
+  assumes "s\<bullet>\<C> \<turnstile> [$C v', $Local_set i] : (ts _> ts')"
           "length vi = i"
           "(local \<C>) = map typeof (vi @ [v] @ vs)"
           "list_all2 (v_typing s) (vi @ [v] @ vs) (local \<C>)"
@@ -1884,16 +1884,16 @@ proof -
     using assms(2,3)
     by (metis (no_types) append_Cons length_map list.simps(9) map_append nth_append_length)
   obtain ts'' where ts''_def:"s\<bullet>\<C> \<turnstile> [$C v'] : (ts _> ts'')" 
-                             "s\<bullet>\<C> \<turnstile> [$Set_local i] : (ts'' _> ts')"
+                             "s\<bullet>\<C> \<turnstile> [$Local_set i] : (ts'' _> ts')"
     using e_type_comp assms
     by (metis append_butlast_last_id butlast.simps(2) last.simps list.distinct(1))
   hence 1: "([] _> [typeof v']) <ti: (ts _> ts'')"
     using e_type_const_new store_extension_refl by blast
   hence 2: "typeof v = typeof v'"
-    using v_type b_e_type_set_local[of \<C> "Set_local i" ts'' ts'] ts''_def(2) unlift_b_e[of s \<C> "[Set_local i]"]
+    using v_type b_e_type_local_set[of \<C> "Local_set i" ts'' ts'] ts''_def(2) unlift_b_e[of s \<C> "[Local_set i]"]
     by (metis append_self_conv2 instr_subtyping_append1_type_eq to_e_list_1 typeof_not_bot)
   have 3: "([] _> []) <ti: (ts _> ts')" using 1
-    by (metis b_e_type_set_local(1) 2 instr_subtyping_comp to_e_list_1 ts''_def(2) unlift_b_e v_type)
+    by (metis b_e_type_local_set(1) 2 instr_subtyping_comp to_e_list_1 ts''_def(2) unlift_b_e v_type)
   have "v_typing s v' (typeof v')"
     using ts''_def(1) type_const_v_typing(2) by fastforce
   then have "v_typing s v' (local \<C>!i)"
@@ -1930,15 +1930,15 @@ proof -
     by (simp add: e_type_empty 1 2 3)
 qed
 
-lemma types_preserved_get_global:
+lemma types_preserved_global_get:
   assumes "typeof (sglob_val s i j) = tg_t (global \<C> ! j)"
-          "s\<bullet>\<C> \<turnstile> [$Get_global j] : (ts _> ts')"
+          "s\<bullet>\<C> \<turnstile> [$Global_get j] : (ts _> ts')"
           "v_typing s (sglob_val s i j) (typeof (sglob_val s i j))"
           "store_extension s s'"
   shows "s'\<bullet>\<C> \<turnstile> [$C sglob_val s i j] : (ts _> ts')"
 proof -
   have "([] _> [tg_t (global \<C> ! j)]) <ti: (ts _> ts')"
-    using b_e_type_get_global assms(2) unlift_b_e[of _ _ "[Get_global j]"]
+    using b_e_type_global_get assms(2) unlift_b_e[of _ _ "[Global_get j]"]
     by fastforce
   thus ?thesis
     using assms e_typing_thread_typing.intros(3) e_typing_thread_typing_store_extension_inv(1) types_agree_imp_e_typing by fastforce
@@ -2350,19 +2350,19 @@ proof(induction arbitrary: \<C>i \<C> ts ts' arb_label arb_return rule: reduce.i
   then show ?case
     using host_func_apply_preserve_store1 v_typing_list_store_extension_inv by blast 
 next
-  case (set_local vi j s v vs i v')
-  thm types_preserved_set_local[OF set_local(4,1)]
+  case (local_set vi j s v vs i v')
+  thm types_preserved_local_set[OF local_set(4,1)]
   have local_\<C>: "local \<C> = map typeof (vi @ [v] @ vs)"
-    using set_local(5) by simp  
+    using local_set(5) by simp  
   then have v_typing_\<C>: "list_all2 (v_typing s) (vi @ [v] @ vs) (local \<C>)"
-    using set_local(6) by simp
+    using local_set(6) by simp
   show ?case
-    using types_preserved_set_local'[OF set_local(4,1) local_\<C> v_typing_\<C>] local_\<C> by fastforce
+    using types_preserved_local_set'[OF local_set(4,1) local_\<C> v_typing_\<C>] local_\<C> by fastforce
 next
-  case (set_global s f j v s')
+  case (global_set s f j v s')
   then have "store_extension s s'"
-    using reduce.set_global reduce_store_extension by blast
-  then show ?case using set_global(6)
+    using reduce.global_set reduce_store_extension by blast
+  then show ?case using global_set(6)
     using v_typing_list_store_extension_inv by blast 
 next
   case (store_Some v t f j s m k off mem' a)
@@ -2512,30 +2512,30 @@ next
       reduce.ref_func[OF ref_func(1), of s] ref_func.prems
       by fastforce
 next
-  case (get_local vi j i v vs s)
+  case (local_get vi j i v vs s)
   have 1: "local \<C> = tvs"
-    using store_local_label_empty assms(2) get_local
+    using store_local_label_empty assms(2) local_get
     by fastforce
   have 2: "v_typing s v (typeof v)"
-    by (metis get_local.hyps(2) get_local.prems(6) list_all2_Cons1 list_all2_append1 type_const_v_typing(2) types_agree_imp_e_typing)
+    by (metis local_get.hyps(2) local_get.prems(6) list_all2_Cons1 list_all2_append1 type_const_v_typing(2) types_agree_imp_e_typing)
   then show ?case
-    using types_preserved_get_local[OF get_local(7) get_local(1) _ 2 store_extension_refl ] get_local
+    using types_preserved_local_get[OF local_get(7) local_get(1) _ 2 store_extension_refl ] local_get
     by fastforce
 next
-  case (set_local vi j s v vs v' i)
+  case (local_set vi j s v vs v' i)
   have "local \<C> = tvs"
-    using store_local_label_empty assms(2) set_local
+    using store_local_label_empty assms(2) local_set
     by fastforce
   thus ?case
-    using set_local types_preserved_set_local
-    by (metis f.select_convs(1) types_preserved_set_local')
+    using local_set types_preserved_local_set
+    by (metis f.select_convs(1) types_preserved_local_set')
 next
-  case (get_global s f j)
+  case (global_get s f j)
   have 0: "length (global \<C>) > j"
-    using b_e_type_get_global get_global(5) unlift_b_e[of _ _ "[Get_global j]" "(ts _> ts')"]
+    using b_e_type_global_get global_get(5) unlift_b_e[of _ _ "[Global_get j]" "(ts _> ts')"]
     by fastforce
   hence "glob_typing (sglob s (f_inst f) j) ((global \<C>)!j)"
-    using get_global(3,4) store_typing_imp_glob_agree[OF get_global(2)]
+    using global_get(3,4) store_typing_imp_glob_agree[OF global_get(2)]
     by fastforce
   hence "typeof (g_val (sglob s (f_inst f) j)) = tg_t (global \<C> ! j)"
     unfolding glob_typing_def
@@ -2547,29 +2547,29 @@ next
   proof -
     have j_length: "((inst.globs(f_inst f)) ! j) < length (globs s)"
     proof -
-      have j_\<C>i: "j < length (global \<C>i)" using 0 get_global(4) by simp
-      have "inst_typing s (f_inst f) \<C>i" using get_global by simp
+      have j_\<C>i: "j < length (global \<C>i)" using 0 global_get(4) by simp
+      have "inst_typing s (f_inst f) \<C>i" using global_get by simp
       then have "list_all2 (globi_agree (globs s)) (inst.globs (f_inst f)) (global \<C>i)"
         using inst_typing.simps by auto
       then show ?thesis using j_\<C>i
-        using get_global.prems(2) sglob_ind_def store_typing_imp_glob_agree(1) by auto
+        using global_get.prems(2) sglob_ind_def store_typing_imp_glob_agree(1) by auto
     qed
-    have "list_all (glob_agree s) (globs s)" using get_global(1) store_typing.simps by simp
+    have "list_all (glob_agree s) (globs s)" using global_get(1) store_typing.simps by simp
     then have "glob_agree s ((globs s)!((inst.globs(f_inst f)) ! j))" using j_length
       by (simp add: list_all_length)
     then show ?thesis unfolding glob_agree_def sglob_val_def
       using sglob_def sglob_ind_def v_typing_typeof by fastforce
   qed
   thus ?case
-    using get_global(3,5) types_preserved_get_global[OF 1 _ 2 store_extension_refl]
-      get_global.prems(6) by blast
+    using global_get(3,5) types_preserved_global_get[OF 1 _ 2 store_extension_refl]
+      global_get.prems(6) by blast
 next
-  case (set_global s i j v s' vs)
+  case (global_set s i j v s' vs)
   have "funcs s = funcs s'"
-    using set_global.hyps supdate_glob_def by fastforce
+    using global_set.hyps supdate_glob_def by fastforce
   then show ?case
-    using set_global
-    using types_preserved_set_global
+    using global_set
+    using types_preserved_global_set
     using v_typing_funcs_inv
     by (simp add: list_all2_mono)
 next
@@ -4025,11 +4025,11 @@ next
     using c_def cs_def progress_L0 v_to_e_def
     by fastforce
 next
-  case (get_local j \<C> t)
+  case (local_get j \<C> t)
   obtain v vj vj' where v_def:"v = (f_locs f) ! j" "vj = (take j (f_locs f))" "vj' = (drop (j+1) (f_locs f))"
     by blast
   have j_def:"j < length (f_locs f)"
-    using get_local(1,7)
+    using local_get(1,7)
     by simp
   hence vj_len:"length vj = j"
     using v_def(2)
@@ -4038,17 +4038,17 @@ next
     using v_def id_take_nth_drop j_def
     by fastforce
   thus ?case
-    using progress_L0[OF reduce.intros(9), OF vj_len] vj_len get_local(6)
+    using progress_L0[OF reduce.intros(9), OF vj_len] vj_len local_get(6)
     by fastforce
 next
-  case (set_local j \<C> t)
+  case (local_set j \<C> t)
   obtain v vj vj' where v_def:"v = (f_locs f) ! j" "vj = (take j (f_locs f))" "vj' = (drop (j+1) (f_locs f))"
     by blast
   obtain v' where cs_def: "vs = [v']"
-    using set_local(3) const_of_typed_const_1
+    using local_set(3) const_of_typed_const_1
     by blast
   have j_def:"j < length (f_locs f)"
-    using set_local(1,7)
+    using local_set(1,7)
     by simp
   hence vj_len:"length vj = j"
     using v_def(2)
@@ -4062,23 +4062,23 @@ next
     apply (metis (full_types) f.surjective unit.exhaust)
     done
 next
-  case (tee_local i \<C> t)
+  case (local_tee i \<C> t)
   obtain v where "vs = [v]"
-    using tee_local(3) const_of_typed_const_1
+    using local_tee(3) const_of_typed_const_1
     by blast
   thus ?case
-    using reduce.intros(1)[OF reduce_simple.tee_local] tee_local(6)
+    using reduce.intros(1)[OF reduce_simple.local_tee] local_tee(6)
     unfolding const_list_def
     by fastforce
 next
-  case (get_global j \<C> t)
+  case (global_get j \<C> t)
   thus ?case
     using reduce.intros(11)[of s _ j] progress_L0
     by fastforce
 next
-  case (set_global j \<C> t)
+  case (global_set j \<C> t)
   obtain v where "vs = [v]"
-    using set_global(4) const_of_typed_const_1
+    using global_set(4) const_of_typed_const_1
     by blast
   thus ?case
     using reduce.intros(12)[of s _ j v _]
@@ -5543,25 +5543,25 @@ next
     using const_list_no_progress consts_const_list
     by (metis reduce.call_indirect_None)
 next
-  case (get_local vi j f v vs s)
+  case (local_get vi j f v vs s)
   then show ?case
     using const_list_no_progress consts_const_list
-    by (metis reduce.get_local)
+    by (metis reduce.local_get)
 next
-  case (set_local vi j s v vs i v')
+  case (local_set vi j s v vs i v')
   then show ?case
     using const_list_no_progress consts_const_list
-    by (metis reduce.set_local)
+    by (metis reduce.local_set)
 next
-  case (get_global s f j)
+  case (global_get s f j)
   then show ?case
   using const_list_no_progress consts_const_list
-  by (metis reduce.get_global)
+  by (metis reduce.global_get)
 next
-  case (set_global s f j v s')
+  case (global_set s f j v s')
   then show ?case
   using const_list_no_progress consts_const_list
-  by (metis reduce.set_global)
+  by (metis reduce.global_set)
 next
   case (load_Some f j s m k off t bs a)
   then show ?case

@@ -123,13 +123,13 @@ next
     using lfilled_eq
     by fastforce
 next
-  case (get_local vi j f v vs s)
+  case (local_get vi j f v vs s)
   then show ?case using v_to_e_def
-    by (metis append.right_neutral const_list_def const_list_no_progress consts_app_ex(2) is_const1 is_const_list_vs_to_es_list list_all_simps(1) reduce.get_local)
+    by (metis append.right_neutral const_list_def const_list_no_progress consts_app_ex(2) is_const1 is_const_list_vs_to_es_list list_all_simps(1) reduce.local_get)
 next
-  case (get_global s f j)
+  case (global_get s f j)
   then show ?case
-    by (metis append_Nil consts_app_ex(1) list.simps(9) reduce.get_global reduce_not_value)
+    by (metis append_Nil consts_app_ex(1) list.simps(9) reduce.global_get reduce_not_value)
 qed auto
 
 lemma reduce_simple_call: "\<not>\<lparr>[$ Call j]\<rparr> \<leadsto> \<lparr>es'\<rparr>"
@@ -311,9 +311,9 @@ lemma app_v_s_select_is:
   apply (auto simp add: v_to_e_def split: if_splits list.splits v.splits v_num.splits)
   using v.simps by metis+ 
 
-lemma app_f_v_s_get_local_is:
-  assumes "app_f_v_s_get_local k f v_s = (v_s',res)"
-  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Get_local k]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+lemma app_f_v_s_local_get_is:
+  assumes "app_f_v_s_local_get k f v_s = (v_s',res)"
+  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Local_get k]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
          (res = crash_invalid)"
 proof (cases "k < length (f_locs f)")
   case True
@@ -321,27 +321,27 @@ proof (cases "k < length (f_locs f)")
     using id_take_nth_drop[OF True] length_take[of k "f_locs f"]
     by simp
   thus ?thesis
-    using progress_L0_left[OF reduce.get_local] assms
-    unfolding app_f_v_s_get_local_def
+    using progress_L0_left[OF reduce.local_get] assms
+    unfolding app_f_v_s_local_get_def
     by (auto simp add: Let_def split: list.splits v.splits if_splits)
 next
   case False
   thus ?thesis
     using assms
-    unfolding app_f_v_s_get_local_def
+    unfolding app_f_v_s_local_get_def
     by (auto simp add: Let_def split: list.splits v.splits if_splits)
 qed
 
-lemma app_f_v_s_set_local_is:
-  assumes "app_f_v_s_set_local k f v_s = (f', v_s', res)"
-  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Set_local k]\<rparr> \<leadsto> \<lparr>s;f';(v_stack_to_es v_s')\<rparr>)) \<or>
+lemma app_f_v_s_local_set_is:
+  assumes "app_f_v_s_local_set k f v_s = (f', v_s', res)"
+  shows "(res = Step_normal \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Local_set k]\<rparr> \<leadsto> \<lparr>s;f';(v_stack_to_es v_s')\<rparr>)) \<or>
          (res = crash_invalid)"
 proof (cases "res = Step_normal")
   case True
   obtain va where 0:"v_s = va#v_s'"
                          "k < length (f_locs f)"
     using assms True
-    unfolding app_f_v_s_set_local_def
+    unfolding app_f_v_s_local_set_def
     by (simp add: Let_def split: list.splits if_splits)
   obtain v1s v v2s where 1:"(f_locs f) = v1s@[v]@v2s" "length v1s = k"
     using id_take_nth_drop[OF 0(2)] length_take[of k "f_locs f"]
@@ -349,25 +349,25 @@ proof (cases "res = Step_normal")
   have 2:"f = \<lparr> f_locs = v1s@[v]@v2s, f_inst = (f_inst f)\<rparr>"
          "f' = \<lparr> f_locs = v1s@[va]@v2s, f_inst = (f_inst f)\<rparr>"
     using assms 1 0
-    unfolding app_f_v_s_set_local_def
+    unfolding app_f_v_s_local_set_def
     by (fastforce simp add: Let_def split: list.splits if_splits)+
   show ?thesis
-    using 0(1) True 2 progress_L0_left[OF reduce.set_local, OF 1(2), of _ v v2s "f_inst f" "rev v_s'" va]
+    using 0(1) True 2 progress_L0_left[OF reduce.local_set, OF 1(2), of _ v v2s "f_inst f" "rev v_s'" va]
     by (simp add: Let_def split: list.splits v.splits if_splits)
 next
   case False
   thus ?thesis
     using assms
-    unfolding app_f_v_s_set_local_def
+    unfolding app_f_v_s_local_set_def
     by (fastforce simp add: Let_def split: list.splits if_splits)
 qed
 
-lemma app_v_s_tee_local_is:
-  assumes "app_v_s_tee_local k v_s = (v_s', es_cont, res)"
-  shows "(res = Step_normal \<and> es_cont = [$Set_local k] \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Tee_local k]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@[$Set_local k]\<rparr>)) \<or>
+lemma app_v_s_local_tee_is:
+  assumes "app_v_s_local_tee k v_s = (v_s', es_cont, res)"
+  shows "(res = Step_normal \<and> es_cont = [$Local_set k] \<and> (\<lparr>s;f;(v_stack_to_es v_s)@[$Local_tee k]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@[$Local_set k]\<rparr>)) \<or>
          (res = crash_invalid)"
-  using progress_L0_left[OF reduce.basic[OF reduce_simple.tee_local]] assms
-  unfolding app_v_s_tee_local_def
+  using progress_L0_left[OF reduce.basic[OF reduce_simple.local_tee]] assms
+  unfolding app_v_s_local_tee_def
   by (fastforce split: list.splits cvtop.splits if_splits option.splits)
 
 lemma app_v_s_if_is:
@@ -457,19 +457,19 @@ next
     by (auto simp add: Let_def split: if_splits option.splits v_ref.splits)
 qed
 
-lemma app_s_f_v_s_get_global_is:
-  assumes "app_s_f_v_s_get_global k gs f v_s = (v_s',res)"
-  shows "(res = Step_normal \<and> ((globs s = gs) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Get_global k]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>))"
-  using progress_L0_left[OF reduce.get_global] assms
-  unfolding sglob_val_def sglob_def app_s_f_v_s_get_global_def
+lemma app_s_f_v_s_global_get_is:
+  assumes "app_s_f_v_s_global_get k gs f v_s = (v_s',res)"
+  shows "(res = Step_normal \<and> ((globs s = gs) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Global_get k]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>))"
+  using progress_L0_left[OF reduce.global_get] assms
+  unfolding sglob_val_def sglob_def app_s_f_v_s_global_get_def
   by fastforce
 
-lemma app_s_f_v_s_set_global_is:
-  assumes "app_s_f_v_s_set_global k gs f v_s = (gs', v_s', res)"
-  shows "(res = Step_normal \<and> ((globs s = gs) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Set_global k]\<rparr> \<leadsto> \<lparr>s\<lparr>globs:=gs'\<rparr>;f;(v_stack_to_es v_s')\<rparr>)) \<or>
+lemma app_s_f_v_s_global_set_is:
+  assumes "app_s_f_v_s_global_set k gs f v_s = (gs', v_s', res)"
+  shows "(res = Step_normal \<and> ((globs s = gs) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Global_set k]\<rparr> \<leadsto> \<lparr>s\<lparr>globs:=gs'\<rparr>;f;(v_stack_to_es v_s')\<rparr>)) \<or>
          (res = crash_invalid)"
-  using progress_L0_left[OF reduce.set_global] assms
-  unfolding supdate_glob_def app_s_f_v_s_set_global_def
+  using progress_L0_left[OF reduce.global_set] assms
+  unfolding supdate_glob_def app_s_f_v_s_global_set_def
   by (fastforce split: list.splits)
 
 lemma app_s_f_v_s_load_is:
@@ -2004,93 +2004,93 @@ proof -
         by simp blast
     qed auto
   next
-    case (Get_local k)
+    case (Local_get k)
     consider
         (a) v_s' where
               "s' = s"
               "fcs' = fcs"
               "fc' = (update_fc_step fc v_s' [])"
               "res = Step_normal"
-              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Get_local k]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Local_get k]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
       | (b) "(res = crash_invalid)"
-      using app_f_v_s_get_local_is assms Get_local fc_is
+      using app_f_v_s_local_get_is assms Local_get fc_is
       by (fastforce split: prod.splits)
     thus ?thesis
     proof (cases)
       case a
       thus ?thesis
-        using es_frame_contexts_to_config_ctx2[OF a(5)] Get_local fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Local_get fc_is 0
         by simp blast
     qed auto
   next
-    case (Set_local k)
+    case (Local_set k)
     consider
         (a) f' v_s' where
               "s' = s"
               "fcs' = fcs"
               "fc' = (Frame_context (Redex v_s' es b_es) lcs nf f')"
               "res = Step_normal"
-              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Set_local k]\<rparr> \<leadsto> \<lparr>s;f';(v_stack_to_es v_s')\<rparr>)"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Local_set k]\<rparr> \<leadsto> \<lparr>s;f';(v_stack_to_es v_s')\<rparr>)"
       | (b) "(res = crash_invalid)"
-      using app_f_v_s_set_local_is assms Set_local fc_is
+      using app_f_v_s_local_set_is assms Local_set fc_is
       by (fastforce split: prod.splits)
     thus ?thesis
     proof (cases)
       case a
       thus ?thesis
-        using es_frame_contexts_to_config_ctx2[OF a(5)] Set_local fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(5)] Local_set fc_is 0
         by simp blast
     qed auto
   next
-    case (Tee_local k)
+    case (Local_tee k)
     consider
         (a) v_s' esc where
               "s' = s"
               "fcs' = fcs"
               "fc' = (update_fc_step fc v_s' esc)"
               "res = Step_normal"
-              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Tee_local k]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@esc\<rparr>)"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Local_tee k]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@esc\<rparr>)"
       | (b) "(res = crash_invalid)"
-      using app_v_s_tee_local_is assms Tee_local fc_is
+      using app_v_s_local_tee_is assms Local_tee fc_is
       by (fastforce split: prod.splits)
     thus ?thesis
     proof (cases)
       case a
       thus ?thesis
-        using es_frame_contexts_to_config_ctx1[OF a(5)] Tee_local fc_is 0
+        using es_frame_contexts_to_config_ctx1[OF a(5)] Local_tee fc_is 0
         by simp blast
     qed auto
   next
-    case (Get_global k)
+    case (Global_get k)
     obtain v_s' where a:
       "s' = s"
       "fcs' = fcs"
       "fc' = (update_fc_step fc v_s' [])"
       "res = Step_normal"
-      "(\<lparr>s;f;(v_stack_to_es v_s)@[$Get_global k]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
-      using app_s_f_v_s_get_global_is[of _ "globs s"] assms Get_global fc_is
+      "(\<lparr>s;f;(v_stack_to_es v_s)@[$Global_get k]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)"
+      using app_s_f_v_s_global_get_is[of _ "globs s"] assms Global_get fc_is
       by (fastforce split: prod.splits)
     thus ?thesis
-      using es_frame_contexts_to_config_ctx2[OF a(5)] Get_global fc_is Cons 0
+      using es_frame_contexts_to_config_ctx2[OF a(5)] Global_get fc_is Cons 0
       by simp blast
   next
-    case (Set_global k)
+    case (Global_set k)
     consider
         (a) v_s' gs' where
               "fcs' = fcs"
               "fc' = (update_fc_step fc v_s' [])"
               "res = Step_normal"
-              "app_s_f_v_s_set_global k (s.globs s) f v_s = (gs', v_s', res)"
+              "app_s_f_v_s_global_set k (s.globs s) f v_s = (gs', v_s', res)"
               "s' = s\<lparr>globs := gs'\<rparr>"
-              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Set_global k]\<rparr> \<leadsto> \<lparr>s';f;(v_stack_to_es v_s')\<rparr>)"
+              "(\<lparr>s;f;(v_stack_to_es v_s)@[$Global_set k]\<rparr> \<leadsto> \<lparr>s';f;(v_stack_to_es v_s')\<rparr>)"
       | (b) "(res = crash_invalid)"
-      using app_s_f_v_s_set_global_is assms Set_global fc_is
+      using app_s_f_v_s_global_set_is assms Global_set fc_is
       by (fastforce split: prod.splits)
     thus ?thesis
     proof (cases)
       case a
       thus ?thesis
-        using es_frame_contexts_to_config_ctx2[OF a(6)] Set_global fc_is 0
+        using es_frame_contexts_to_config_ctx2[OF a(6)] Global_set fc_is 0
         by simp blast
     qed auto
   next

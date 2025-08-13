@@ -620,7 +620,7 @@ lemma const_expr_is:
           "\<C> \<turnstile> [b_e] : (ts _> ts')"
         shows "\<exists>t. (\<C> \<turnstile> [b_e] : ([] _> [t])) \<and> ([] _> [t] <ti: ts _> ts') \<and> 
          ((\<exists>v. $b_e = ($C v) \<and> typeof v = t) \<or>
-         (\<exists>j. b_e = (Get_global j) \<and> j < length (global \<C>) \<and>
+         (\<exists>j. b_e = (Global_get j) \<and> j < length (global \<C>) \<and>
               tg_mut ((global \<C>)!j) = T_immut \<and>
               tg_t ((global \<C>)!j) = t) \<or>
          (\<exists> j. b_e = (Ref_func j) \<and> (j < length (func_t \<C>)) \<and> t = T_ref T_func_ref) \<or>
@@ -643,9 +643,9 @@ next
   case (ref_func j \<C>)
   then show ?case using b_e_typing.ref_func instr_subtyping_refl const_expr.cases by blast
 next
-  case (get_global i \<C> t)
-  then show ?case using b_e_type_get_global[OF b_e_typing.get_global[OF get_global(1,2)]]
-    by (metis b_e.distinct(1529) b_e.distinct(1531) b_e.distinct(1543) b_e.distinct(1547) b_e_typing.get_global const_expr.cases)
+  case (global_get i \<C> t)
+  then show ?case using b_e_type_global_get[OF b_e_typing.global_get[OF global_get(1,2)]]
+    by (metis b_e.distinct(1529) b_e.distinct(1531) b_e.distinct(1543) b_e.distinct(1547) b_e_typing.global_get const_expr.cases)
 next
   case (composition \<C> es t1s t2s e t3s)
   then obtain t where t_defs: "\<C> \<turnstile> [b_e] : [] _> [t]"
@@ -686,14 +686,14 @@ lemma const_exprs_is:
   assumes "const_exprs \<C> b_es"
           "\<C> \<turnstile> b_es : ([] _> [t])"
   shows "((\<exists>v. $* b_es = [$C v] \<and> typeof v = t) \<or>
-         (\<exists>j t'. t' <t: t \<and> b_es = [Get_global j] \<and> j < length (global \<C>) \<and>
+         (\<exists>j t'. t' <t: t \<and> b_es = [Global_get j] \<and> j < length (global \<C>) \<and>
               tg_mut ((global \<C>)!j) = T_immut \<and>
               tg_t ((global \<C>)!j) = t')  \<or>
          (\<exists> j. b_es = [Ref_func j] \<and> (j < length (func_t \<C>)) \<and> t = T_ref T_func_ref) \<or>
          (\<exists> t_r. b_es = [Ref_null t_r] \<and> t = T_ref t_r))"
 proof -
   let ?goal = "((\<exists>v. $* b_es = [$C v] \<and> typeof v = t) \<or>
-         (\<exists>j t'. t' <t: t \<and> b_es = [Get_global j] \<and> j < length (global \<C>) \<and>
+         (\<exists>j t'. t' <t: t \<and> b_es = [Global_get j] \<and> j < length (global \<C>) \<and>
               tg_mut ((global \<C>)!j) = T_immut \<and>
               tg_t ((global \<C>)!j) = t')  \<or>
          (\<exists> j. b_es = [Ref_func j] \<and> (j < length (func_t \<C>)) \<and> t = T_ref T_func_ref) \<or>
@@ -716,7 +716,7 @@ proof -
       case (ref_func j \<C>)
       then show ?case by blast
     next
-      case (get_global i \<C> t t')
+      case (global_get i \<C> t t')
       then show ?case
         using const_expr.cases t_subtyping_refl by auto
     next
@@ -740,7 +740,7 @@ proof -
       consider
           (a) v where "$* es = [$C v] \<and> typeof v = t''"
         | (b) j t' where "t' <t: t'' \<and>
-        es = [Get_global j] \<and> j < length (global \<C>) \<and> tg_mut (global \<C> ! j) = T_immut \<and> tg_t (global \<C> ! j) = t'"
+        es = [Global_get j] \<and> j < length (global \<C>) \<and> tg_mut (global \<C> ! j) = T_immut \<and> tg_t (global \<C> ! j) = t'"
         | (c) j where "es = [Ref_func j] \<and> j < length (func_t \<C>) \<and> t'' = T_ref T_func_ref"
         | (d) t_r where "es = [Ref_null t_r] \<and> t'' = T_ref t_r"
         using subsumption(2)[OF subsumption(4) t''_def(3)] by auto
@@ -779,7 +779,7 @@ proof -
   consider
       (1) v where "$* b_es = [$C v] \<and> typeof v = t"
     | (2) j t' where "t' <t: t"
-                     "b_es = [Get_global j]"
+                     "b_es = [Global_get j]"
                      "j < length (global \<C>)"
                      "tg_mut (global \<C> ! j) = T_immut"
                      "tg_t (global \<C> ! j) = t'"
@@ -811,7 +811,7 @@ proof -
     thus ?thesis
       using 2 assms
       unfolding list_all2_conv_all_nth external_typing.simps
-      by (auto simp add: Let_def const_list_def is_const_def Suc_1[symmetric] glob_typing_def nth_append sglob_def sglob_ind_def sglob_val_def app_s_f_v_s_get_global_def)
+      by (auto simp add: Let_def const_list_def is_const_def Suc_1[symmetric] glob_typing_def nth_append sglob_def sglob_ind_def sglob_val_def app_s_f_v_s_global_get_def)
   next
     case 3
     then obtain v where "v = V_ref (ConstRefFunc (inst.funcs inst ! j))" "run_v 2 0 (s, \<lparr>f_locs = [], f_inst = inst\<rparr>, b_es) = (s, RValue [v])" "typeof v = T_ref T_func_ref"
@@ -846,7 +846,7 @@ proof -
   consider
       (1) v' where "$* b_es = [$C v'] \<and> typeof v' = t"
     | (2) j t' where "t' <t: t"
-                     "b_es = [Get_global j]"
+                     "b_es = [Global_get j]"
                      "j < length (global \<C>)"
                      "tg_mut (global \<C> ! j) = T_immut"
                      "tg_t (global \<C> ! j) = t'"
@@ -888,12 +888,12 @@ proof -
         by (auto split: v.splits)
     next
       case (step y)
-      then obtain s_y f_y es_y where y_is:"\<lparr>s_r;f;[$Get_global j]\<rparr> \<leadsto> \<lparr>s_y;f_y;es_y\<rparr>" "y = (s_y, f_y, es_y)"
+      then obtain s_y f_y es_y where y_is:"\<lparr>s_r;f;[$Global_get j]\<rparr> \<leadsto> \<lparr>s_y;f_y;es_y\<rparr>" "y = (s_y, f_y, es_y)"
         using 2
         by fastforce
       hence s_y_is:"s_y = s_r \<and> f_y = f \<and> es_y = [$C sglob_val s (f_inst f) j]"
         using assms(6,8)
-      proof (induction s_r f "[$Get_global j]" s_y f_y es_y arbitrary: y rule: reduce.induct)
+      proof (induction s_r f "[$Global_get j]" s_y f_y es_y arbitrary: y rule: reduce.induct)
         case (basic e' s vs i)
         thus ?case
           using lfilled_single
@@ -901,7 +901,7 @@ proof -
           apply auto
           done
       next
-        case (get_global s vs i)
+        case (global_get s vs i)
         thus ?case
           using type_is(2,3)
           by (simp_all add: sglob_def sglob_ind_def sglob_val_def nth_append)
@@ -913,7 +913,7 @@ proof -
       qed auto
       thus ?thesis
         using step(2) y_is reduce_trans_consts[of s_y f_y "[sglob_val s (f_inst f) j]" s' f' "[v]"] 2 type_is s_y_is v_to_e_def assms(8)
-        by (simp add: Let_def assms nth_append sglob_def sglob_ind_def sglob_val_def reduce_trans_def const_list_def is_const_def Suc_1[symmetric] app_s_f_v_s_get_global_def split: prod.splits v.splits)
+        by (simp add: Let_def assms nth_append sglob_def sglob_ind_def sglob_val_def reduce_trans_def const_list_def is_const_def Suc_1[symmetric] app_s_f_v_s_global_get_def split: prod.splits v.splits)
     qed
   next
     case 3

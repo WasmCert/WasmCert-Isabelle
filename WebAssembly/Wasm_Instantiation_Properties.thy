@@ -261,20 +261,20 @@ proof -
     case (call_indirect i \<C> t1s ti uv)
     then show ?case using b_e_typing.call_indirect by metis
   next
-    case (get_local i \<C> t)
-    then show ?case using b_e_typing.get_local by metis
+    case (local_get i \<C> t)
+    then show ?case using b_e_typing.local_get by metis
   next
-    case (set_local i \<C> t)
+    case (local_set i \<C> t)
     then show ?case using b_e_typing.intros by metis
   next
-    case (tee_local i \<C> t)
+    case (local_tee i \<C> t)
     then show ?case using b_e_typing.intros by metis
   next
-    case (get_global i \<C> t)
-    then show ?case using b_e_typing.get_global by auto
+    case (global_get i \<C> t)
+    then show ?case using b_e_typing.global_get by auto
   next
-    case (set_global i \<C> t)
-    then show ?case using b_e_typing.set_global by auto
+    case (global_set i \<C> t)
+    then show ?case using b_e_typing.global_set by auto
   next
     case (load \<C> a tp_sx t off)
     then show ?case using b_e_typing.load by simp
@@ -609,7 +609,7 @@ proof -
             consider
               (a) v' where "$* g_init g = [$C v'] \<and> typeof v' = tg_t (g_type g)"
             | (b) j t' where "t' <t: tg_t (g_type g) \<and>
-      g_init g = [Get_global j] \<and> j < length (global \<C>') \<and> tg_mut (global \<C>' ! j) = T_immut \<and> tg_t (global \<C>' ! j) = t'"
+      g_init g = [Global_get j] \<and> j < length (global \<C>') \<and> tg_mut (global \<C>' ! j) = T_immut \<and> tg_t (global \<C>' ! j) = t'"
             | (c) j where "g_init g = [Ref_func j] \<and> j < length (func_t \<C>') \<and> tg_t (g_type g) = T_ref T_func_ref"
             | (d) t_r where "g_init g = [Ref_null t_r] \<and> tg_t (g_type g) = T_ref t_r"
               using const_exprs_is[OF 1 2] by auto
@@ -626,7 +626,7 @@ proof -
             next
               case b
               then have b1: "reduce_trans (s', f, $* g_init g) (s', f, [$C ((sglob_val s' (f_inst f) j))])"
-                using 3 reduce.get_global[of s' f j] reduce_trans_def
+                using 3 reduce.global_get[of s' f j] reduce_trans_def
                 apply auto
                 by (metis (no_types, lifting) reduce_trans_app_end rtranclp.rtrancl_refl)
               then have "sglob_val s' (f_inst f) j = v" using 3 const_exprs_reduce_trans[OF 1 2 3 4
@@ -829,7 +829,7 @@ proof -
         consider
           (a) v' where "$* e_init (m_elems m ! i) ! j = [$C v'] \<and> typeof v' = T_ref (rts ! i)"
         | (b) j' t' where "t' <t: T_ref (rts ! i) \<and>
-              e_init (m_elems m ! i) ! j = [Get_global j'] \<and> j' < length (global \<C>') \<and> tg_mut (global \<C>' ! j') = T_immut \<and> tg_t (global \<C>' ! j') = t'"
+              e_init (m_elems m ! i) ! j = [Global_get j'] \<and> j' < length (global \<C>') \<and> tg_mut (global \<C>' ! j') = T_immut \<and> tg_t (global \<C>' ! j') = t'"
         | (c) j' where "e_init (m_elems m ! i) ! j = [Ref_func j'] \<and> j' < length (func_t \<C>') \<and> T_ref (rts ! i) = T_ref T_func_ref"
         | (d) t_r where "e_init (m_elems m ! i) ! j = [Ref_null t_r] \<and> T_ref (rts ! i) = T_ref t_r"
           using const_exprs_is[OF e_init1(2,1)] by auto
@@ -841,7 +841,7 @@ proof -
         next
           case b
           then have  b1: "reduce_trans (s',f,$*((e_init ((m_elems m)!i))!j)) (s',f,[$C(sglob_val s' (f_inst f) j')])"
-            using reduce.get_global
+            using reduce.global_get
             by (metis reduce_trans_app_end reduce_trans_def rtranclp.rtrancl_refl to_e_list_1)
           
           then have v_is: "(sglob_val s' (f_inst f) j') = V_ref (el_inits !i !j)" "typeof_ref ((el_inits !i !j)) = (rts ! i)"
@@ -1151,7 +1151,7 @@ proof -
               (a) v where "$* offset = [$C v]"
                           "typeof v = T_num T_i32"
             | (b) j t' where "t' <t: T_num T_i32"
-                             "offset = [Get_global j]"
+                             "offset = [Global_get j]"
                              "j < length (global \<C>')"
                              "tg_mut (global \<C>' ! j) = T_immut"
                              "tg_t (global \<C>' ! j) = t'"
@@ -1166,10 +1166,10 @@ proof -
               by (metis v_num.simps(17))
           next
             case b
-            then have "\<C> \<turnstile> [Get_global j] : [] _> [t']"
-              using b_e_typing.get_global[of j \<C> t'] c_is(8) c_is(9)
+            then have "\<C> \<turnstile> [Global_get j] : [] _> [t']"
+              using b_e_typing.global_get[of j \<C> t'] c_is(8) c_is(9)
               by (auto simp add: nth_append)
-            then have "\<C>'' \<turnstile> [Get_global j] : [] _> [t']"
+            then have "\<C>'' \<turnstile> [Global_get j] : [] _> [t']"
               using context_def b_e_type_preserved_refs funcs_inst_context_length by simp
             then show ?thesis
               using b(1,2) t_subtyping_def t_list_subtyping_def
@@ -1272,7 +1272,7 @@ proof -
               (a) v where "$* offset = [$C v]"
                           "typeof v = T_num T_i32"
             | (b) j t' where "t' <t: T_num T_i32"
-                             "offset = [Get_global j]"
+                             "offset = [Global_get j]"
                              "j < length (global \<C>')"
                              "tg_mut (global \<C>' ! j) = T_immut"
                              "tg_t (global \<C>' ! j) = t'"
@@ -1286,10 +1286,10 @@ proof -
               by (metis v_num.simps(17))
           next
             case b
-            then have "\<C> \<turnstile> [Get_global j] : [] _> [t']"
-              using b_e_typing.get_global[of j \<C> t'] c_is(8) c_is(9)
+            then have "\<C> \<turnstile> [Global_get j] : [] _> [t']"
+              using b_e_typing.global_get[of j \<C> t'] c_is(8) c_is(9)
               by (auto simp add: nth_append)
-            then have "\<C>'' \<turnstile> [Get_global j] : [] _> [t']"
+            then have "\<C>'' \<turnstile> [Global_get j] : [] _> [t']"
               using context_def b_e_type_preserved_refs funcs_inst_context_length by simp
             then show ?thesis
               using b(1,2) t_subtyping_def t_list_subtyping_def

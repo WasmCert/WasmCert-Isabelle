@@ -49,16 +49,16 @@ inductive b_e_typing :: "[t_context, b_e list, tf] \<Rightarrow> bool" ("_ \<tur
 | call:"\<lbrakk>i < length(func_t \<C>); (func_t \<C>)!i = tf\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call i] : tf"
   \<comment> \<open>\<open>call_indirect\<close>\<close>
 | call_indirect:"\<lbrakk>i < length(types_t \<C>); (types_t \<C>)!i = (t1s _> t2s); ti < length (table \<C>); (table \<C>)!ti = T_tab _  T_func_ref\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Call_indirect ti i] : (t1s @ [T_num T_i32] _> t2s)"
-  \<comment> \<open>\<open>get_local\<close>\<close>
-| get_local:"\<lbrakk>i < length(local \<C>); (local \<C>)!i = t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Get_local i] : ([] _> [t])"
-  \<comment> \<open>\<open>set_local\<close>\<close>
-| set_local:"\<lbrakk>i < length(local \<C>); (local \<C>)!i = t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Set_local i] : ([t] _> [])"
-  \<comment> \<open>\<open>tee_local\<close>\<close>
-| tee_local:"\<lbrakk>i < length(local \<C>); (local \<C>)!i = t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Tee_local i] : ([t] _> [t])"
-  \<comment> \<open>\<open>get_global\<close>\<close>
-| get_global:"\<lbrakk>i < length(global \<C>); tg_t ((global \<C>)!i) = t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Get_global i] : ([] _> [t])"
-  \<comment> \<open>\<open>set_global\<close>\<close>
-| set_global:"\<lbrakk>i < length(global \<C>); tg_t ((global \<C>)!i) = t; is_mut ((global \<C>)!i)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Set_global i] : ([t] _> [])"
+  \<comment> \<open>\<open>local_get\<close>\<close>
+| local_get:"\<lbrakk>i < length(local \<C>); (local \<C>)!i = t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Local_get i] : ([] _> [t])"
+  \<comment> \<open>\<open>local_set\<close>\<close>
+| local_set:"\<lbrakk>i < length(local \<C>); (local \<C>)!i = t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Local_set i] : ([t] _> [])"
+  \<comment> \<open>\<open>local_tee\<close>\<close>
+| local_tee:"\<lbrakk>i < length(local \<C>); (local \<C>)!i = t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Local_tee i] : ([t] _> [t])"
+  \<comment> \<open>\<open>global_get\<close>\<close>
+| global_get:"\<lbrakk>i < length(global \<C>); tg_t ((global \<C>)!i) = t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Global_get i] : ([] _> [t])"
+  \<comment> \<open>\<open>global_set\<close>\<close>
+| global_set:"\<lbrakk>i < length(global \<C>); tg_t ((global \<C>)!i) = t; is_mut ((global \<C>)!i)\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Global_set i] : ([t] _> [])"
   \<comment> \<open>\<open>load\<close>\<close>
 | load:"\<lbrakk>length (memory \<C>) \<ge> 1; load_store_t_bounds a (option_projl tp_sx) t\<rbrakk> \<Longrightarrow> \<C> \<turnstile> [Load t tp_sx a off] : ([T_num T_i32] _> [T_num t])"
   \<comment> \<open>\<open>store\<close>\<close>
@@ -277,8 +277,8 @@ inductive reduce_simple :: "[e list, e list] \<Rightarrow> bool" ("\<lparr>_\<rp
 | local_trap:"\<lparr>[Frame n f [Trap]]\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
   \<comment> \<open>\<open>return\<close>\<close>
 | return:"\<lbrakk>length vs = n; Lfilled j lholed (($C* vs) @ [$Return]) es\<rbrakk>  \<Longrightarrow> \<lparr>[Frame n f es]\<rparr> \<leadsto> \<lparr>($C* vs)\<rparr>"
-  \<comment> \<open>\<open>tee_local\<close>\<close>
-| tee_local:"\<lparr>[$C v, $(Tee_local i)]\<rparr> \<leadsto> \<lparr>[$C v, $C v, $(Set_local i)]\<rparr>"
+  \<comment> \<open>\<open>local_tee\<close>\<close>
+| local_tee:"\<lparr>[$C v, $(Local_tee i)]\<rparr> \<leadsto> \<lparr>[$C v, $C v, $(Local_set i)]\<rparr>"
 | trap:"\<lbrakk>es \<noteq> [Trap]; Lfilled 0 lholed [Trap] es\<rbrakk> \<Longrightarrow> \<lparr>es\<rparr> \<leadsto> \<lparr>[Trap]\<rparr>"
 
 (* full reduction rule *)
@@ -296,14 +296,14 @@ inductive reduce :: "[s, f, e list, s, f, e list] \<Rightarrow> bool" ("\<lparr>
 | invoke_host_None:"\<lbrakk>(funcs s!i_cl) = Func_host (t1s _> t2s) h; ves = ($C* vcs); length vcs = n; length t1s = n; length t2s = m\<rbrakk> \<Longrightarrow> \<lparr>s;f;ves @ [Invoke i_cl]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"
   \<comment> \<open>\<open>references\<close>\<close>
 | ref_func: "fa = (inst.funcs (f_inst f))!j \<Longrightarrow> \<lparr>s;f;[$(Ref_func j)]\<rparr> \<leadsto> \<lparr>s;f;[Ref (ConstRefFunc (fa))]\<rparr>"
-  \<comment> \<open>\<open>get_local\<close>\<close>
-| get_local:"\<lbrakk>length vi = j; f_locs f = (vi @ [v] @ vs)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(Get_local j)]\<rparr> \<leadsto> \<lparr>s;f;[$C v]\<rparr>"
-  \<comment> \<open>\<open>set_local\<close>\<close>
-| set_local:"\<lbrakk>length vi = j\<rbrakk> \<Longrightarrow> \<lparr>s;\<lparr> f_locs = (vi @ [v] @ vs), f_inst = i \<rparr>;[$C v', $(Set_local j)]\<rparr> \<leadsto> \<lparr>s;\<lparr> f_locs = (vi @ [v'] @ vs), f_inst = i \<rparr>;[]\<rparr>"
-  \<comment> \<open>\<open>get_global\<close>\<close>
-| get_global:"\<lparr>s;f;[$(Get_global j)]\<rparr> \<leadsto> \<lparr>s;f;[$C(sglob_val s (f_inst f) j)]\<rparr>"
-  \<comment> \<open>\<open>set_global\<close>\<close>
-| set_global:"supdate_glob s (f_inst f) j v = s' \<Longrightarrow> \<lparr>s;f;[$C v, $(Set_global j)]\<rparr> \<leadsto> \<lparr>s';f;[]\<rparr>"
+  \<comment> \<open>\<open>local_get\<close>\<close>
+| local_get:"\<lbrakk>length vi = j; f_locs f = (vi @ [v] @ vs)\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$(Local_get j)]\<rparr> \<leadsto> \<lparr>s;f;[$C v]\<rparr>"
+  \<comment> \<open>\<open>local_set\<close>\<close>
+| local_set:"\<lbrakk>length vi = j\<rbrakk> \<Longrightarrow> \<lparr>s;\<lparr> f_locs = (vi @ [v] @ vs), f_inst = i \<rparr>;[$C v', $(Local_set j)]\<rparr> \<leadsto> \<lparr>s;\<lparr> f_locs = (vi @ [v'] @ vs), f_inst = i \<rparr>;[]\<rparr>"
+  \<comment> \<open>\<open>global_get\<close>\<close>
+| global_get:"\<lparr>s;f;[$(Global_get j)]\<rparr> \<leadsto> \<lparr>s;f;[$C(sglob_val s (f_inst f) j)]\<rparr>"
+  \<comment> \<open>\<open>global_set\<close>\<close>
+| global_set:"supdate_glob s (f_inst f) j v = s' \<Longrightarrow> \<lparr>s;f;[$C v, $(Global_set j)]\<rparr> \<leadsto> \<lparr>s';f;[]\<rparr>"
   \<comment> \<open>\<open>load\<close>\<close>
 | load_Some:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load m (nat_of_int k) off (t_num_length t) = Some bs\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $(Load t None a off)]\<rparr> \<leadsto> \<lparr>s;f;[$EConstNum (wasm_deserialise_num bs t)]\<rparr>"
 | load_None:"\<lbrakk>smem_ind (f_inst f) = Some j; ((mems s)!j) = m; load m (nat_of_int k) off (t_num_length t) = None\<rbrakk> \<Longrightarrow> \<lparr>s;f;[$EConstNum (ConstInt32 k), $(Load t None a off)]\<rparr> \<leadsto> \<lparr>s;f;[Trap]\<rparr>"

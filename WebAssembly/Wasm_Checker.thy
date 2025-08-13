@@ -241,24 +241,24 @@ and check_single :: "t_context \<Rightarrow>  b_e \<Rightarrow> c_t \<Rightarrow
                                                                     ((tn _> tm), T_tab _  T_func_ref) \<Rightarrow> type_update ts ((tn@[T_num T_i32])) (tm)
                                                                   | _ \<Rightarrow> None)
                                                                 else None)"
-  (* get_local *)
-| check_get_local:"check_single \<C> (Get_local i) ts = (if i < length (local \<C>)
+  (* local_get *)
+| check_local_get:"check_single \<C> (Local_get i) ts = (if i < length (local \<C>)
                                                         then type_update ts [] [(local \<C>)!i]
                                                         else None)"
-  (* set_local *)
-| check_set_local:"check_single \<C> (Set_local i) ts = (if i < length (local \<C>)
+  (* local_set *)
+| check_local_set:"check_single \<C> (Local_set i) ts = (if i < length (local \<C>)
                                                         then type_update ts [(local \<C>)!i] []
                                                         else None)"
-  (* tee_local *)
-| check_tee_local:"check_single \<C> (Tee_local i) ts = (if i < length (local \<C>)
+  (* local_tee *)
+| check_local_tee:"check_single \<C> (Local_tee i) ts = (if i < length (local \<C>)
                                                        then type_update ts [(local \<C>)!i] [(local \<C>)!i]
                                                        else None)"
-  (* get_global *)
-| check_get_global:"check_single \<C> (Get_global i) ts = (if i < length (global \<C>)
+  (* global_get *)
+| check_global_get:"check_single \<C> (Global_get i) ts = (if i < length (global \<C>)
                                                          then type_update ts [] [tg_t ((global \<C>)!i)]
                                                          else None)"
-  (* set_global *)
-| check_set_global:"check_single \<C> (Set_global i) ts = (if i < length (global \<C>) \<and> is_mut (global \<C> ! i)
+  (* global_set *)
+| check_global_set:"check_single \<C> (Global_set i) ts = (if i < length (global \<C>) \<and> is_mut (global \<C> ! i)
                                                          then type_update ts [tg_t ((global \<C>)!i)] []
                                                          else None)"
   (* load *)

@@ -150,15 +150,15 @@ definition app_v_s_select :: "t option \<Rightarrow> v_stack \<Rightarrow> (v_st
           (v_s, crash_invalid))
      | _ \<Rightarrow> (v_s, crash_invalid))"
 
-definition app_f_v_s_get_local :: "nat \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
-  "app_f_v_s_get_local k f v_s =
+definition app_f_v_s_local_get :: "nat \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_f_v_s_local_get k f v_s =
      (let locs = (f_locs f) in
      (if k < length locs
         then ((locs!k)#v_s, Step_normal)
         else (v_s, crash_invalid)))"
 
-definition app_f_v_s_set_local :: "nat \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (f \<times> v_stack \<times> res_step)" where
-  "app_f_v_s_set_local k f v_s =
+definition app_f_v_s_local_set :: "nat \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (f \<times> v_stack \<times> res_step)" where
+  "app_f_v_s_local_set k f v_s =
      (let locs = (f_locs f) in
      (case v_s of
        v1#v_s' \<Rightarrow> if k < length locs
@@ -166,10 +166,10 @@ definition app_f_v_s_set_local :: "nat \<Rightarrow> f \<Rightarrow> v_stack \<R
                   else (f, v_s, crash_invalid)
      | _ \<Rightarrow> (f, v_s, crash_invalid)))"
 
-definition app_v_s_tee_local :: "nat \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
-  "app_v_s_tee_local k v_s =
+definition app_v_s_local_tee :: "nat \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
+  "app_v_s_local_tee k v_s =
      (case v_s of
-       v1#v_s' \<Rightarrow> (v1#v1#v_s', [$Set_local k], Step_normal)
+       v1#v_s' \<Rightarrow> (v1#v1#v_s', [$Local_set k], Step_normal)
      | _ \<Rightarrow> (v_s, [], crash_invalid))"
 
 definition app_v_s_if :: "tb \<Rightarrow> b_e list \<Rightarrow> b_e list \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> e list \<times> res_step)" where
@@ -218,11 +218,11 @@ definition app_s_f_v_s_call_indirect :: "nat \<Rightarrow> nat \<Rightarrow> tab
             (v_s, [], crash_invalid))
         | _ \<Rightarrow> (v_s, [], crash_invalid))"
 
-definition app_s_f_v_s_get_global :: "nat \<Rightarrow> global list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
-  "app_s_f_v_s_get_global k gs f v_s =  ((g_val (gs!(sglob_ind (f_inst f) k)))#v_s, Step_normal)"
+definition app_s_f_v_s_global_get :: "nat \<Rightarrow> global list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (v_stack \<times> res_step)" where
+  "app_s_f_v_s_global_get k gs f v_s =  ((g_val (gs!(sglob_ind (f_inst f) k)))#v_s, Step_normal)"
 
-definition app_s_f_v_s_set_global :: "nat \<Rightarrow> global list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (global list \<times>  v_stack \<times> res_step)" where
-  "app_s_f_v_s_set_global k gs f v_s =
+definition app_s_f_v_s_global_set :: "nat \<Rightarrow> global list \<Rightarrow> f \<Rightarrow> v_stack \<Rightarrow> (global list \<times>  v_stack \<times> res_step)" where
+  "app_s_f_v_s_global_set k gs f v_s =
      (case v_s of
         v1#v_s' \<Rightarrow> (update_glob gs (f_inst f) k v1, v_s', Step_normal)
       | _ \<Rightarrow> (gs, v_s, crash_invalid))"
@@ -934,25 +934,25 @@ fun run_step_b_e :: "b_e \<Rightarrow> config \<Rightarrow> res_step_tuple" wher
                          (Config (Suc d) s (update_fc_return fc' (take nf v_s)) fcs', Step_normal)
                        else (Config d s fc fcs, crash_invalid))
 
-    | (Get_local k) \<Rightarrow>
-        let (v_s', res) = (app_f_v_s_get_local k f v_s) in
+    | (Local_get k) \<Rightarrow>
+        let (v_s', res) = (app_f_v_s_local_get k f v_s) in
         (Config d s (update_fc_step fc v_s' []) fcs, res)
 
-    | (Set_local k) \<Rightarrow>
-        let (f', v_s', res) = (app_f_v_s_set_local k f v_s) in
+    | (Local_set k) \<Rightarrow>
+        let (f', v_s', res) = (app_f_v_s_local_set k f v_s) in
         let fc' = Frame_context (Redex v_s' es b_es) lcs nf f' in
         (Config d s fc' fcs, res)
 
-    | (Tee_local k) \<Rightarrow>
-        let (v_s', es_cont, res) = (app_v_s_tee_local k v_s) in
+    | (Local_tee k) \<Rightarrow>
+        let (v_s', es_cont, res) = (app_v_s_local_tee k v_s) in
         (Config d s (update_fc_step fc v_s' es_cont) fcs, res)
 
-    | (Get_global k) \<Rightarrow>
-        let (v_s', res) = (app_s_f_v_s_get_global k (globs s) f v_s) in
+    | (Global_get k) \<Rightarrow>
+        let (v_s', res) = (app_s_f_v_s_global_get k (globs s) f v_s) in
         (Config d s (update_fc_step fc v_s' []) fcs, res)
 
-    | (Set_global k) \<Rightarrow>
-        let (gs', v_s', res) = (app_s_f_v_s_set_global k (globs s) f v_s) in
+    | (Global_set k) \<Rightarrow>
+        let (gs', v_s', res) = (app_s_f_v_s_global_set k (globs s) f v_s) in
         (Config d (s\<lparr>globs:=gs'\<rparr>) (update_fc_step fc v_s' []) fcs, res)
 
     | (Load t tp_sx a off) \<Rightarrow>

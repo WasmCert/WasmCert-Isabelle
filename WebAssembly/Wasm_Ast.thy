@@ -392,11 +392,11 @@ datatype \<comment> \<open>basic instructions\<close>
     | Return
     | Call i
     | Call_indirect i i
-    | Get_local i
-    | Set_local i
-    | Tee_local i
-    | Get_global i
-    | Set_global i
+    | Local_get i
+    | Local_set i
+    | Local_tee i
+    | Global_get i
+    | Global_set i
     | Table_get i
     | Table_set i
     | Table_size i
@@ -416,7 +416,6 @@ datatype \<comment> \<open>basic instructions\<close>
     | Table_fill i
     | Elem_drop i
     | Data_drop i
-    (*| EConst v ("C _" 60) *)
     | EConstNum v_num
     | EConstVec v_vec
     | Unop t_num unop
