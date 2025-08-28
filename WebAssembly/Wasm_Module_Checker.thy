@@ -2,19 +2,23 @@ theory Wasm_Module_Checker imports Wasm_Module Wasm_Checker_Properties begin
 
 code_pred (modes: i \<Rightarrow> i \<Rightarrow> bool as limit_type_checker_p) limit_typing .
 
+code_pred (modes: i \<Rightarrow> bool as module_tab_type_checker_p) module_tab_typing .
+
 fun module_func_type_checker :: "t_context \<Rightarrow> module_func \<Rightarrow> bool" where
 "module_func_type_checker \<C> (i, t_locs, b_es) =
   ((i < length (types_t \<C>)) \<and>
      (case (types_t \<C>)!i of
        (tn _> tm) \<Rightarrow>
-         b_e_type_checker (\<C>\<lparr>local := tn @ t_locs, label := ([tm] @ (label \<C>)), return := Some tm\<rparr>) b_es ([] _> tm)))"
+          if n_zeros t_locs = None then
+            False
+          else
+            b_e_type_checker (\<C>\<lparr>local := tn @ t_locs, label := ([tm] @ (label \<C>)), return := Some tm\<rparr>) b_es ([] _> tm)))"
 
 lemma module_func_typing_equiv_module_func_type_checker:
   "module_func_typing \<C> m_f tf = (module_func_type_checker \<C> m_f \<and>
                                    ((types_t \<C>)!(fst m_f) = tf))"
   apply (cases m_f)
-  apply (auto simp add: module_func_typing.simps b_e_typing_equiv_b_e_type_checker split: tf.splits)
-  done
+  by (auto simp add: module_func_typing.simps b_e_typing_equiv_b_e_type_checker split: if_splits tf.splits)
 
 abbreviation "module_tab_type_checker \<equiv> module_tab_typing"
 abbreviation "module_mem_type_checker \<equiv> module_mem_typing"
@@ -30,24 +34,43 @@ lemma module_glob_typing_equiv_module_glob_type_checker:
   apply (auto simp add: module_glob_typing.simps b_e_typing_equiv_b_e_type_checker)
   done
 
-fun module_elem_type_checker :: "t_context \<Rightarrow> module_elem \<Rightarrow> bool" where
-  "module_elem_type_checker \<C> \<lparr>e_tab=t, e_off=es, e_init=is\<rparr> =
-     (t = 0 \<and> const_exprs \<C> es \<and> b_e_type_checker \<C> es ([] _> [T_num T_i32]) \<and> t < length (table \<C>) \<and> list_all (\<lambda>i. i < length (func_t \<C>)) is)"
+fun elem_mode_type_checker :: "t_context \<Rightarrow> elem_mode \<Rightarrow> t_ref \<Rightarrow> bool" where
+  "elem_mode_type_checker \<C> (Em_active x es) tr =
+    (x < length (table \<C>) \<and> tab_t_reftype (table \<C>!x) = tr \<and> b_e_type_checker \<C> es ([] _> [T_num T_i32]) \<and> const_exprs \<C> es)"
+| "elem_mode_type_checker _ _ _ = True"
+
+lemma elem_mode_typing_equiv_elem_mode_type_checker:
+  "elem_mode_typing \<C> em tr = elem_mode_type_checker \<C> em tr"
+  apply(cases em)
+  using tab_t_reftype_def
+  by(auto simp add: elem_mode_typing.simps b_e_typing_equiv_b_e_type_checker split: tab_t.splits)
+
+fun module_elem_type_checker :: "t_context \<Rightarrow> module_elem \<Rightarrow> t_ref \<Rightarrow> bool" where
+  "module_elem_type_checker \<C> \<lparr>e_type=tr, e_init=ess, e_mode=em\<rparr> tr' =
+     (tr = tr' \<and> list_all (const_exprs \<C>) ess \<and> list_all (\<lambda>es. b_e_type_checker \<C> es ([] _> [T_ref tr])) ess \<and> elem_mode_type_checker \<C> em tr)"
 
 lemma module_elem_typing_equiv_module_elem_type_checker:
   "module_elem_typing \<C> m_e = module_elem_type_checker \<C> m_e"
   apply (cases m_e)
-  apply (auto simp add: module_elem_typing.simps b_e_typing_equiv_b_e_type_checker)
+  apply (auto simp add: module_elem_typing.simps b_e_typing_equiv_b_e_type_checker elem_mode_typing_equiv_elem_mode_type_checker)
   done
 
+fun data_mode_type_checker :: "t_context \<Rightarrow> data_mode \<Rightarrow> bool" where
+  "data_mode_type_checker \<C> (Dm_active x es) = (x < length (memory \<C>) \<and> b_e_type_checker \<C> es ([] _> [T_num T_i32]) \<and> const_exprs \<C> es)"
+| "data_mode_type_checker _ Dm_passive = True"
+
+lemma data_mode_typing_equiv_data_mode_type_checker:
+  "data_mode_typing \<C> dm = data_mode_type_checker \<C> dm"
+  apply(cases dm)
+  by(auto simp add: data_mode_typing.simps b_e_typing_equiv_b_e_type_checker)
+
 fun module_data_type_checker :: "t_context \<Rightarrow> module_data \<Rightarrow> bool" where
-  "module_data_type_checker \<C> \<lparr>d_data=d, d_off=es, d_init=bs\<rparr> =
-     (d = 0 \<and> const_exprs \<C> es \<and> b_e_type_checker \<C> es ([] _> [T_num T_i32]) \<and> d < length (memory \<C>))"
+  "module_data_type_checker \<C> \<lparr>d_init=bs, d_mode=dm\<rparr> = data_mode_type_checker \<C> dm"
 
 lemma module_data_typing_equiv_module_data_type_checker:
   "module_data_typing \<C> m_e = module_data_type_checker \<C> m_e"
   apply (cases m_e)
-  apply (auto simp add: module_data_typing.simps b_e_typing_equiv_b_e_type_checker)
+  apply (auto simp add: module_data_typing.simps data_mode_typing_equiv_data_mode_type_checker b_e_typing_equiv_b_e_type_checker)
   done
 
 code_pred (modes: i \<Rightarrow> i \<Rightarrow> bool as module_start_type_checker_p) module_start_typing .
@@ -211,30 +234,42 @@ fun module_type_checker :: "m \<Rightarrow> (extern_t list \<times> extern_t lis
                         m_tabs = ts,
                         m_mems = ms,
                         m_globs = gs,
-                        m_elem = els,
-                        m_data = ds,
+                        m_elems = els,
+                        m_datas = ds,
                         m_start = i_opt,
                         m_imports = imps,
                         m_exports = exps\<rparr> =
   (case (gather_m_f_types tfs fs, module_imports_typer tfs imps) of
      (Some fts, Some impts) \<Rightarrow>
+       let module = \<lparr>m_types = tfs,
+                        m_funcs = fs,
+                        m_tabs = ts,
+                        m_mems = ms,
+                        m_globs = gs,
+                        m_elems = els,
+                        m_datas = ds,
+                        m_start = i_opt,
+                        m_imports = imps,
+                        m_exports = exps\<rparr> in
        let ifts = ext_t_funcs impts in
        let its = ext_t_tabs impts in
        let ims = ext_t_mems impts in
        let igs = ext_t_globs impts in
        let gts = gather_m_g_types gs in
-       let \<C> = \<lparr>types_t=tfs, func_t=ifts@fts, global=igs@gts, table=its@ts, memory=ims@ms, local=[], label=[], return=None\<rparr> in
-       let \<C>' = \<lparr>types_t=[], func_t=[], global=igs, table=[], memory=[], local=[], label=[], return=None\<rparr> in
+       let rts = map e_type els in
+       let dts = replicate (length ds) () in
+       let rfs = collect_funcidxs_module (module\<lparr>m_funcs := [], m_start := None\<rparr>) in
+       let \<C> = \<lparr>types_t=tfs, func_t=ifts@fts, global=igs@gts, elem=rts, data=dts, table=its@ts, memory=ims@ms, local=[], label=[], return=None, refs = rfs\<rparr> in
+       let \<C>' = \<C>\<lparr>global:=igs\<rparr> in
        if (list_all (module_func_type_checker \<C>) fs \<and>
            list_all (module_tab_type_checker) ts \<and>
            list_all (module_mem_type_checker) ms \<and>
            list_all (module_glob_type_checker \<C>') gs \<and>
-           list_all (module_elem_type_checker \<C>) els \<and>
-           list_all (module_data_type_checker \<C>) ds \<and>
+           list_all2 (module_elem_type_checker \<C>') els rts \<and>
+           list_all (module_data_type_checker \<C>') ds \<and>
            pred_option (module_start_type_checker \<C>) i_opt \<and>
            module_exports_distinct exps \<and>
-         length (its@ts) \<le> 1 \<and> \<comment> \<open>\<open>MVP restriction\<close>\<close>
-         length (ims@ms) \<le> 1   \<comment> \<open>\<open>MVP restriction\<close>\<close>) then
+         length (ims@ms) \<le> 1) then
          case (module_exports_typer \<C> exps) of
            Some expts \<Rightarrow> Some (impts, expts)
          | _ \<Rightarrow> None
@@ -252,40 +287,55 @@ proof -
          m_tabs = ts,
          m_mems = ms,
          m_globs = gs,
-         m_elem = els,
-         m_data = ds,
+         m_elems = els,
+         m_datas = ds,
          m_start = i_opt,
          m_imports = imps,
          m_exports = exps\<rparr>"
     using module_type_checker.cases
     by blast
-  obtain \<C> \<C>' fts gts ifts its ims igs where module_typing_is:
+  obtain \<C> \<C>' fts gts ifts its ims dts rts igs rfs where module_typing_is:
     "list_all2 (module_func_typing \<C>) fs fts"
-    "list_all (module_tab_typing) ts"
     "list_all (module_mem_typing) ms"
+    "list_all (module_tab_typing) ts"
     "list_all2 (module_glob_typing \<C>') gs gts"
-    "list_all (module_elem_typing \<C>) els"
-    "list_all (module_data_typing \<C>) ds"
+    "list_all2 (module_elem_typing \<C>') els rts"
+    "list_all (module_data_typing \<C>') ds"
+    "length dts = length ds"
     "pred_option (module_start_typing \<C>) i_opt"
+    "module_exports_distinct exps"
     "list_all2 (\<lambda>imp. module_import_typing \<C> (I_desc imp)) imps impts"
     "list_all2 (\<lambda>exp. module_export_typing \<C> (E_desc exp)) exps expts"
     "ifts = ext_t_funcs impts"
     "its = ext_t_tabs impts"
     "ims = ext_t_mems impts"
     "igs = ext_t_globs impts"
-    "module_exports_distinct exps"
-    "length (its@ts) \<le> 1"
     "length (ims@ms) \<le> 1"
-    "\<C> = \<lparr>types_t=tfs, func_t=ifts@fts, global=igs@gts, table=its@ts, memory=ims@ms, local=[], label=[], return=None\<rparr>"
-    "\<C>' = \<lparr>types_t=[], func_t=[], global=igs, table=[], memory=[], local=[], label=[], return=None\<rparr>"
+    "rfs = collect_funcidxs_module (m\<lparr>m_funcs := [], m_start := None\<rparr>)"
+    "\<C> = \<lparr>types_t=tfs,
+       func_t=ifts@fts,
+       global=igs@gts,
+       elem=rts,
+       data=dts,
+       table=its@ts,
+       memory=ims@ms,
+       local=[],
+       label=[],
+       return=None,
+       refs=rfs\<rparr>"
+    "\<C>' = \<C>\<lparr>global := igs\<rparr>"
     using assms
     unfolding m_def
     apply (simp only: module_typing.simps)
     apply blast
     done
-
-  have "gather_m_f_types tfs fs = Some fts"
-    using module_typing_is(1,17) module_func_typing_imp_gather_m_f_types
+  have "list_all2 (\<lambda> el rt.  e_type el = rt) els rts"
+    using module_typing_is(5)
+    by (metis (mono_tags, lifting) list_all2_mono module_elem.select_convs(1) module_elem_typing.simps)
+  then have "map e_type els = rts"
+    by (metis (mono_tags) list.rel_eq list_all2_map1)
+  moreover have "gather_m_f_types tfs fs = Some fts"
+    using module_typing_is(1,18) module_func_typing_imp_gather_m_f_types
     by fastforce
   moreover
   have "gather_m_g_types gs = gts"
@@ -294,32 +344,33 @@ proof -
     by (metis length_map module_glob.select_convs(1) nth_equalityI nth_map)
   moreover
   have "module_imports_typer tfs imps = Some impts"
-    using module_typing_is(8)
-    by (simp add: list_all2_module_imports_typer module_typing_is(17))
+    using module_typing_is
+    by (simp add: list_all2_module_imports_typer module_typing_is)
   moreover
   have "module_exports_typer \<C> exps = Some expts"
-    using module_typing_is(9)
+    using module_typing_is
     by (simp add: list_all2_module_exports_typer)
   moreover
   have "list_all (module_func_type_checker \<C>) fs"
        "list_all (module_tab_type_checker) ts"
        "list_all (module_mem_type_checker) ms"
        "list_all (module_glob_type_checker \<C>') gs"
-       "list_all (module_elem_type_checker \<C>) els"
-       "list_all (module_data_type_checker \<C>) ds"
+       "list_all2 (module_elem_type_checker \<C>') els rts"
+       "list_all (module_data_type_checker \<C>') ds"
        "pred_option (module_start_type_checker \<C>) i_opt"
        "module_exports_distinct exps"
-    using module_typing_is(1-7,14)
+       "dts = replicate (length ds) ()"
+    using module_typing_is(1-9,14)
           module_func_typing_equiv_module_func_type_checker
           module_glob_typing_equiv_module_glob_type_checker
           module_elem_typing_equiv_module_elem_type_checker
           module_data_typing_equiv_module_data_type_checker
-    by (simp_all add: list_all2_conv_all_nth list_all_length)
+    by(simp_all add: list_all2_conv_all_nth list_all_length replicate_eqI)
   ultimately
   show ?thesis
     using module_typing_is
-    unfolding m_def
-    by simp
+    using m_def
+    by (simp del: collect_funcidxs_module.simps)
 qed
 
 lemma module_type_checker_imp_module_typing:
@@ -332,14 +383,14 @@ proof -
          m_tabs = ts,
          m_mems = ms,
          m_globs = gs,
-         m_elem = els,
-         m_data = ds,
+         m_elems = els,
+         m_datas = ds,
          m_start = i_opt,
          m_imports = imps,
          m_exports = exps\<rparr>"
     using module_type_checker.cases
     by blast
-  obtain fts ifts its ims igs gts \<C> \<C>' where module_type_checker_is:
+  obtain fts ifts its ims igs gts rts dts rfs \<C> \<C>' where module_type_checker_is:
     "gather_m_f_types tfs fs = Some fts"
     "module_imports_typer tfs imps = Some impts"
     "ifts = ext_t_funcs impts"
@@ -347,17 +398,18 @@ proof -
     "ims = ext_t_mems impts"
     "igs = ext_t_globs impts"
     "gts = gather_m_g_types gs"
-    "\<C> = \<lparr>types_t=tfs, func_t=ifts@fts, global=igs@gts, table=its@ts, memory=ims@ms, local=[], label=[], return=None\<rparr>"
-    "\<C>' = \<lparr>types_t=[], func_t=[], global=igs, table=[], memory=[], local=[], label=[], return=None\<rparr>"
+    "rfs = collect_funcidxs_module (m\<lparr>m_funcs := [], m_start := None\<rparr>)"
+    "dts = replicate (length ds) ()"
+    "\<C> = \<lparr>types_t=tfs, func_t=ifts@fts, global=igs@gts, elem=rts, data=dts, table=its@ts, memory=ims@ms, local=[], label=[], return=None, refs = rfs\<rparr>"
+    "\<C>' = \<C>\<lparr>global:=igs\<rparr>"
     "list_all (module_func_type_checker \<C>) fs"
     "list_all (module_tab_type_checker) ts"
     "list_all (module_mem_type_checker) ms"
     "list_all (module_glob_type_checker \<C>') gs"
-    "list_all (module_elem_type_checker \<C>) els"
-    "list_all (module_data_type_checker \<C>) ds"
+    "list_all2 (module_elem_type_checker \<C>') els rts"
+    "list_all (module_data_type_checker \<C>') ds"
     "pred_option (module_start_type_checker \<C>) i_opt"
     "module_exports_distinct exps"
-    "length (its@ts) \<le> 1"
     "length (ims@ms) \<le> 1"
     "module_exports_typer \<C> exps = Some expts"
     using assms m_def
@@ -370,8 +422,8 @@ proof -
   have "list_all (module_tab_typing) ts"
        "list_all (module_mem_typing) ms"
        "list_all2 (module_glob_typing \<C>') gs gts"
-       "list_all (module_elem_typing \<C>) els"
-       "list_all (module_data_typing \<C>) ds"
+       "list_all2 (module_elem_typing \<C>') els rts"
+       "list_all (module_data_typing \<C>') ds"
        "pred_option (module_start_typing \<C>) i_opt"
     using module_type_checker_is
           module_glob_typing_equiv_module_glob_type_checker
@@ -381,17 +433,21 @@ proof -
   moreover
   have "list_all2 (\<lambda>imp. module_import_typing \<C> (I_desc imp)) imps impts"
     using list_all2_module_imports_typer[symmetric]
-          module_type_checker_is(2,8)
+          module_type_checker_is(2,10)
     by fastforce
   moreover
   have "list_all2 (\<lambda>exp. module_export_typing \<C> (E_desc exp)) exps expts"
     using list_all2_module_exports_typer[symmetric]
-          module_type_checker_is(20)
+          module_type_checker_is
     by fastforce
+  moreover
+  have "length dts = length ds"
+    using module_type_checker_is(9) by fastforce
   ultimately
   show ?thesis
     using m_def module_type_checker_is
-    by (fastforce simp add: module_typing.simps)
+    using module_typing.intros
+    by (simp del: collect_funcidxs_module.simps)
 qed
 
 theorem module_typing_equiv_module_type_checker:
