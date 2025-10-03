@@ -478,7 +478,7 @@ lemma app_s_f_v_s_load_is:
          (\<exists>str. res = Res_trap str \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Load t None a off]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@[Trap]\<rparr>)) \<or>
          (res = crash_invalid)"
   using progress_L0_left[OF reduce.load_Some] progress_L0_left[OF reduce.load_None] assms v_to_e_def
-  unfolding app_s_f_v_s_load_def
+  unfolding app_s_f_v_s_load_def load_v_num_def
   apply (simp split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
   apply metis
   apply fastforce
@@ -489,12 +489,11 @@ lemma app_s_f_v_s_load_packed_is:
   shows "(res = Step_normal \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Load t (Some (tp, sx)) a off]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')\<rparr>)) \<or>
          (\<exists>str. res = Res_trap str \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Load t (Some (tp, sx)) a off]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@[Trap]\<rparr>)) \<or>
          (res = crash_invalid)"
-  using progress_L0_left[OF reduce.load_packed_Some] progress_L0_left[OF reduce.load_packed_None] assms v_to_e_def
-  unfolding app_s_f_v_s_load_packed_def
-  apply (simp split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
-  apply metis
-  apply fastforce
-  done
+  using progress_L0_left[OF reduce.load_packed_Some, of f _ s _ sx _ off tp t] progress_L0_left[OF reduce.load_packed_None, of f _ s _ sx _ off tp t] assms v_to_e_def
+  unfolding app_s_f_v_s_load_packed_def load_packed_v_num_def is_int_t_num_def
+  using load_packed_size load_size load_packed_def
+  apply (auto split: list.splits cvtop.splits if_splits prod.splits option.splits v.splits tp_num.splits v_num.splits t_num.splits)
+  by (metis old.prod.exhaust)
 
 lemma app_s_f_v_s_load_maybe_packed_is:
   assumes "app_s_f_v_s_load_maybe_packed t tp_sx off ms f v_s = (v_s',res)"
@@ -514,7 +513,7 @@ lemma app_s_f_v_s_store_is:
          (\<exists>str. res = Res_trap str \<and> ms = ms' \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Store t None a off]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@[Trap]\<rparr>)) \<or>
          (res = crash_invalid)"
   using progress_L0_left[OF reduce.store_Some] progress_L0_left[OF reduce.store_None] assms v_to_e_def
-  unfolding app_s_f_v_s_store_def
+  unfolding app_s_f_v_s_store_def store_v_num_def
   apply (simp split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
   apply metis
   apply fastforce
@@ -525,12 +524,11 @@ lemma app_s_f_v_s_store_packed_is:
   shows "(res = Step_normal \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Store t (Some tp) a off]\<rparr> \<leadsto> \<lparr>s\<lparr>mems:=ms'\<rparr>;f;(v_stack_to_es v_s')\<rparr>)) \<or>
          (\<exists>str. res = Res_trap str \<and> ms = ms' \<and> ((mems s = ms) \<longrightarrow> \<lparr>s;f;(v_stack_to_es v_s)@[$Store t (Some tp) a off]\<rparr> \<leadsto> \<lparr>s;f;(v_stack_to_es v_s')@[Trap]\<rparr>)) \<or>
          (res = crash_invalid)"
-  using progress_L0_left[OF reduce.store_packed_Some] progress_L0_left[OF reduce.store_packed_None] assms v_to_e_def
-  unfolding app_s_f_v_s_store_packed_def
-  apply (simp split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits)
-  apply metis
-  apply fastforce
-  done
+  using progress_L0_left[OF reduce.store_packed_Some, of _ t f _ s] progress_L0_left[OF reduce.store_packed_None] assms v_to_e_def
+  unfolding app_s_f_v_s_store_packed_def store_packed_v_num_def
+  using store_packed_def
+  apply (auto split: list.splits cvtop.splits if_splits option.splits v.splits v_num.splits tp_num.splits)
+  using store_packed_def progress_L0_left[OF reduce.store_packed_Some] by auto
 
 lemma app_s_f_v_s_store_maybe_packed_is:
   assumes "app_s_f_v_s_store_maybe_packed t tp off ms f v_s = (ms', v_s', res)"
