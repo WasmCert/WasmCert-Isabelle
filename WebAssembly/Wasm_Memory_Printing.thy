@@ -229,6 +229,8 @@ consts
   integer_to_ocaml_int :: "integer \<Rightarrow> ocaml_int"
   ocaml_int_to_ocaml_i32_s :: "ocaml_int \<Rightarrow> ocaml_i32"
   ocaml_int_to_ocaml_i64_s :: "ocaml_int \<Rightarrow> ocaml_i64"
+  ocaml_extend_u_i32 :: "ocaml_i32 \<Rightarrow> ocaml_i64"
+  ocaml_extend_s_i32 :: "ocaml_i32 \<Rightarrow> ocaml_i64"
 
 code_printing
   type_constructor ocaml_int \<rightharpoonup> (OCaml) "Int.t"
@@ -236,6 +238,8 @@ code_printing
 | constant integer_to_ocaml_int \<rightharpoonup> (OCaml) "Z.to'_int"
 | constant ocaml_int_to_ocaml_i32_s \<rightharpoonup> (OCaml) "I32Wrapper'_convert.of'_int'_s"
 | constant ocaml_int_to_ocaml_i64_s \<rightharpoonup> (OCaml) "I64Wrapper'_convert.of'_int'_s"
+| constant ocaml_extend_u_i32 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.extend'_u'_i32"
+| constant ocaml_extend_s_i32 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.extend'_s'_i32"
 
 definition ocaml_int_to_nat :: "ocaml_int \<Rightarrow> nat" where
   "ocaml_int_to_nat x = nat_of_integer (ocaml_int_to_integer x)"
@@ -312,7 +316,9 @@ axiomatization where
   mem_rep_write_u8_of_i64_is[code]: "mem_rep_read_i64_of_u8 m n = ocaml_int64_to_isabelle_int64 (ocaml_int_to_ocaml_i64_s (ocaml_mem_rep_pbytes_get_uint8 m (nat_to_ocaml_int n)))" and  
   mem_rep_write_i16_of_i64_is[code]: "mem_rep_read_i64_of_i16 m n = ocaml_int64_to_isabelle_int64 (ocaml_int_to_ocaml_i64_s (ocaml_mem_rep_pbytes_get_int16 m (nat_to_ocaml_int n)))" and  
   mem_rep_write_u16_of_i64_is[code]: "mem_rep_read_i64_of_u16 m n = ocaml_int64_to_isabelle_int64 (ocaml_int_to_ocaml_i64_s (ocaml_mem_rep_pbytes_get_uint16 m (nat_to_ocaml_int n)))" and  
-
+  mem_rep_write_i32_of_i64_is[code]: "mem_rep_read_i64_of_i32 m n = ocaml_int64_to_isabelle_int64 (ocaml_extend_s_i32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n)))" and  
+  mem_rep_write_u32_of_i64_is[code]: "mem_rep_read_i64_of_u32 m n = ocaml_int64_to_isabelle_int64 (ocaml_extend_u_i32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n)))"
+(*
   mem_rep_write_i32_of_i64_is[code]: "mem_rep_read_i64_of_i32 m n = wasm_extend_s (ocaml_int32_to_isabelle_int32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n)))" and  
-  mem_rep_write_u32_of_i64_is[code]: "mem_rep_read_i64_of_u32 m n = wasm_extend_u (ocaml_int32_to_isabelle_int32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n)))"
+  mem_rep_write_u32_of_i64_is[code]: "mem_rep_read_i64_of_u32 m n = wasm_extend_u (ocaml_int32_to_isabelle_int32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n)))" *)
 end
