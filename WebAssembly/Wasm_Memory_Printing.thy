@@ -318,7 +318,4 @@ axiomatization where
   mem_rep_write_u16_of_i64_is[code]: "mem_rep_read_i64_of_u16 m n = ocaml_int64_to_isabelle_int64 (ocaml_int_to_ocaml_i64_s (ocaml_mem_rep_pbytes_get_uint16 m (nat_to_ocaml_int n)))" and  
   mem_rep_write_i32_of_i64_is[code]: "mem_rep_read_i64_of_i32 m n = ocaml_int64_to_isabelle_int64 (ocaml_extend_s_i32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n)))" and  
   mem_rep_write_u32_of_i64_is[code]: "mem_rep_read_i64_of_u32 m n = ocaml_int64_to_isabelle_int64 (ocaml_extend_u_i32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n)))"
-(*
-  mem_rep_write_i32_of_i64_is[code]: "mem_rep_read_i64_of_i32 m n = wasm_extend_s (ocaml_int32_to_isabelle_int32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n)))" and  
-  mem_rep_write_u32_of_i64_is[code]: "mem_rep_read_i64_of_u32 m n = wasm_extend_u (ocaml_int32_to_isabelle_int32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n)))" *)
 end
