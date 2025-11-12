@@ -227,14 +227,27 @@ definition app_s_f_v_s_global_set :: "nat \<Rightarrow> global list \<Rightarrow
         v1#v_s' \<Rightarrow> (update_glob gs (f_inst f) k v1, v_s', Step_normal)
       | _ \<Rightarrow> (gs, v_s, crash_invalid))"
 
+definition load_v_num :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> t_num \<Rightarrow> v_num option" where
+  "load_v_num m n off t = map_option (\<lambda> bs. wasm_deserialise_num bs t) ((load m n off (t_num_length t)))"
+
+definition store_v_num :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> v_num \<Rightarrow> mem option" where
+  "store_v_num m n off v = store m n off (bits_num v) (t_num_length (typeof_num v))"
+
+definition load_packed_v_num :: "sx \<Rightarrow> mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> t_num \<Rightarrow> tp_num \<Rightarrow> v_num option" where
+  "load_packed_v_num sx m n off t tp =
+    map_option (\<lambda> bs. wasm_deserialise_num bs t) (map_option (sign_extend sx (t_num_length t)) (load m n off (tp_num_length tp)))"
+
+definition store_packed_v_num :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rightarrow> v_num \<Rightarrow> tp_num \<Rightarrow> mem option" where
+  "store_packed_v_num m n off v tp = store m n off (bits_num v) (tp_num_length tp)"
+
 definition app_s_f_v_s_load :: "t_num \<Rightarrow> nat \<Rightarrow> mem list \<Rightarrow> f \<Rightarrow>  v_stack \<Rightarrow> (v_stack \<times> res_step)" where
   "app_s_f_v_s_load t off ms f v_s = 
           (let i = (f_inst f) in
            case v_s of
              (V_num (ConstInt32 c))#v_s' \<Rightarrow>
                (case smem_ind i of
-                  Some j => expect (load (ms!j) (nat_of_int c) off (t_num_length t))
-                                  (\<lambda>bs. ((V_num (wasm_deserialise_num bs t))#v_s', Step_normal))
+                  Some j => expect (load_v_num (ms!j) (nat_of_int c) off t)
+                                  (\<lambda>vn. (V_num vn#v_s', Step_normal))
                                   (v_s', (Res_trap (STR ''load'')))
                 | None => (v_s, crash_invalid))
            | _ \<Rightarrow> (v_s, crash_invalid))"
@@ -245,8 +258,8 @@ definition app_s_f_v_s_load_packed :: "t_num \<Rightarrow> tp_num \<Rightarrow> 
            case v_s of
              (V_num (ConstInt32 c))#v_s' \<Rightarrow>
                (case smem_ind i of
-                  Some j => expect (load_packed sx (ms!j) (nat_of_int c) off (tp_num_length tp) (t_num_length t))
-                                  (\<lambda>bs. ((V_num (wasm_deserialise_num bs t))#v_s', Step_normal))
+                  Some j => expect (load_packed_v_num sx (ms!j) (nat_of_int c) off t tp)
+                                  (\<lambda>vn. ((V_num vn)#v_s', Step_normal))
                                   (v_s', (Res_trap (STR ''load'')))
                 | None => (v_s, crash_invalid))
            | _ \<Rightarrow> (v_s, crash_invalid))"
@@ -264,7 +277,7 @@ definition app_s_f_v_s_store :: "t_num \<Rightarrow> nat \<Rightarrow> mem list 
              (V_num v)#(V_num (ConstInt32 c))#v_s' \<Rightarrow>
                (if typeof_num v = t then
                  (case smem_ind i of
-                    Some j => expect (store (ms!j) (nat_of_int c) off (bits_num v) (t_num_length t))
+                    Some j => expect (store_v_num (ms!j) (nat_of_int c) off v)
                                     (\<lambda>mem'. ((ms[j := mem']), v_s', Step_normal))
                                     (ms, v_s', Res_trap (STR ''store''))
                   | None => (ms, v_s, crash_invalid))
@@ -278,7 +291,7 @@ definition app_s_f_v_s_store_packed :: "t_num \<Rightarrow> tp_num \<Rightarrow>
              (V_num v)#(V_num (ConstInt32 c))#v_s' \<Rightarrow>
                (if typeof_num v = t then
                  (case smem_ind i of
-                    Some j => expect (store_packed (ms!j) (nat_of_int c) off (bits_num v) (tp_num_length tp))
+                    Some j => expect (store_packed_v_num (ms!j) (nat_of_int c) off v tp)
                                     (\<lambda>mem'. ((ms[j := mem']), v_s', Step_normal))
                                     (ms, v_s', Res_trap (STR ''store''))
                   | None => (ms, v_s, crash_invalid))
