@@ -738,7 +738,7 @@ module WasmRef_Isa : sig
   and 'a s_ext =
     S_ext of
       cl list * (tab_t * v_ref list) list *
-        (unit limit_t_ext * uint8 Parray.t) list * unit global_ext list *
+        (unit limit_t_ext * Pbytes.pbt) list * unit global_ext list *
         (t_ref * v_ref list) list * (uint8 list) list * 'a
   and host_func =
     Abs_host_func of (unit s_ext * v list -> (unit s_ext * v list) option)
@@ -818,13 +818,21 @@ module WasmRef_Isa : sig
   val membera : 'a equal -> 'a seq -> 'a -> bool
   val holds : unit pred -> bool
   val l_min : 'a limit_t_ext -> nat
+  val rep_uint8a : uint8 -> num1 bit0 bit0 bit0 word
+  val and_uint8 : uint8 -> uint8 -> uint8
+  val bit_uint8 : uint8 -> nat -> bool
+  val uint8_test_bit : uint8 -> Z.t -> bool
+  val rep_uint8 : uint8 -> num1 bit0 bit0 bit0 word
+  val integer_of_uint8 : uint8 -> Z.t
+  val integer_of_uint8_signed : uint8 -> Z.t
+  val isabelle_byte_to_ocaml_char : uint8 -> Char.t
   val nat_to_ocaml_int : nat -> Int.t
   val zero_uint8 : uint8
   val zero_byte : uint8
-  val mem_rep_mk : nat -> uint8 Parray.t
-  val mem_mk : unit limit_t_ext -> unit limit_t_ext * uint8 Parray.t
+  val mem_rep_mk : nat -> Pbytes.pbt
+  val mem_mk : unit limit_t_ext -> unit limit_t_ext * Pbytes.pbt
   val msbyte : uint8 list -> uint8
-  val mems : 'a s_ext -> (unit limit_t_ext * uint8 Parray.t) list
+  val mems : 'a s_ext -> (unit limit_t_ext * Pbytes.pbt) list
   val tabs : 'a s_ext -> (tab_t * v_ref list) list
   val list_update : 'a list -> nat -> 'a -> 'a list
   val bot_pred : 'a pred
@@ -832,10 +840,6 @@ module WasmRef_Isa : sig
   val dvd : 'a equal * 'a semidom_modulo -> 'a -> 'a -> bool
   val bin_split : nat -> int -> int * int
   val abs_uint8 : num1 bit0 bit0 bit0 word -> uint8
-  val rep_uint8a : uint8 -> num1 bit0 bit0 bit0 word
-  val bit_uint8 : uint8 -> nat -> bool
-  val uint8_test_bit : uint8 -> Z.t -> bool
-  val rep_uint8 : uint8 -> num1 bit0 bit0 bit0 word
   val empty_frame : unit f_ext
   val typeof_vec : v_vec -> t_vec
   val typeof_ref : v_ref -> t_ref
@@ -847,7 +851,7 @@ module WasmRef_Isa : sig
   val tg_t : 'a tg_ext -> t
   val glob_typing : 'a global_ext -> 'b tg_ext -> bool
   val l_max : 'a limit_t_ext -> nat option
-  val mem_max : unit limit_t_ext * uint8 Parray.t -> nat option
+  val mem_max : unit limit_t_ext * Pbytes.pbt -> nat option
   val datas : 'a s_ext -> (uint8 list) list
   val elems : 'a s_ext -> (t_ref * v_ref list) list
   val funcs : 'a s_ext -> cl list
@@ -864,9 +868,6 @@ module WasmRef_Isa : sig
   val msb_uint8 : uint8 -> bool
   val msb_byte : uint8 -> bool
   val list_all : ('a -> bool) -> 'a list -> bool
-  val and_uint8 : uint8 -> uint8 -> uint8
-  val integer_of_uint8 : uint8 -> Z.t
-  val integer_of_uint8_signed : uint8 -> Z.t
   val nat_of_uint8 : uint8 -> nat
   val uint8_of_int : int -> uint8
   val uint8_of_nat : nat -> uint8
@@ -1011,35 +1012,33 @@ module WasmRef_Isa : sig
   val types : 'a inst_ext -> tf list
   val divide_nat : nat -> nat -> nat
   val l_min_update : (nat -> nat) -> 'a limit_t_ext -> 'a limit_t_ext
-  val mem_rep_append : uint8 Parray.t -> nat -> uint8 -> uint8 Parray.t
+  val mem_rep_append : Pbytes.pbt -> nat -> uint8 -> Pbytes.pbt
   val mem_append :
-    unit limit_t_ext * uint8 Parray.t ->
-      nat -> uint8 -> unit limit_t_ext * uint8 Parray.t
+    unit limit_t_ext * Pbytes.pbt ->
+      nat -> uint8 -> unit limit_t_ext * Pbytes.pbt
   val ocaml_int_to_nat : Int.t -> nat
-  val mem_rep_length : uint8 Parray.t -> nat
-  val mem_length : unit limit_t_ext * uint8 Parray.t -> nat
-  val mem_rep_read_bytes : uint8 Parray.t -> nat -> nat -> uint8 list
-  val read_bytes : unit limit_t_ext * uint8 Parray.t -> nat -> nat -> uint8 list
+  val mem_rep_length : Pbytes.pbt -> nat
+  val mem_length : unit limit_t_ext * Pbytes.pbt -> nat
+  val ocaml_char_to_isabelle_byte : Char.t -> uint8
+  val mem_rep_read_bytes : Pbytes.pbt -> nat -> nat -> uint8 list
+  val read_bytes : unit limit_t_ext * Pbytes.pbt -> nat -> nat -> uint8 list
   val load :
-    unit limit_t_ext * uint8 Parray.t ->
-      nat -> nat -> nat -> (uint8 list) option
+    unit limit_t_ext * Pbytes.pbt -> nat -> nat -> nat -> (uint8 list) option
   val byte_of_nat : nat -> uint8
   val nat_of_byte : uint8 -> nat
   val uminus_word : 'a len -> 'a word -> 'a word
   val uminus_uint8 : uint8 -> uint8
   val one_uint8 : uint8
   val negone_byte : uint8
-  val mem_rep_write_bytes :
-    uint8 Parray.t -> nat -> uint8 list -> uint8 Parray.t
+  val mem_rep_write_bytes : Pbytes.pbt -> nat -> uint8 list -> Pbytes.pbt
   val write_bytes :
-    unit limit_t_ext * uint8 Parray.t ->
-      nat -> uint8 list -> unit limit_t_ext * uint8 Parray.t
+    unit limit_t_ext * Pbytes.pbt ->
+      nat -> uint8 list -> unit limit_t_ext * Pbytes.pbt
   val takefill : 'a -> nat -> 'a list -> 'a list
   val bytes_takefill : uint8 -> nat -> uint8 list -> uint8 list
   val store :
-    unit limit_t_ext * uint8 Parray.t ->
-      nat ->
-        nat -> uint8 list -> nat -> (unit limit_t_ext * uint8 Parray.t) option
+    unit limit_t_ext * Pbytes.pbt ->
+      nat -> nat -> uint8 list -> nat -> (unit limit_t_ext * Pbytes.pbt) option
   val tb_tf : unit inst_ext -> tb -> tf
   val m_mems : 'a m_ext -> unit limit_t_ext list
   val m_tabs : 'a m_ext -> tab_t list
@@ -1054,8 +1053,8 @@ module WasmRef_Isa : sig
   val m_start : 'a m_ext -> nat option
   val m_types : 'a m_ext -> tf list
   val mems_update :
-    ((unit limit_t_ext * uint8 Parray.t) list ->
-      (unit limit_t_ext * uint8 Parray.t) list) ->
+    ((unit limit_t_ext * Pbytes.pbt) list ->
+      (unit limit_t_ext * Pbytes.pbt) list) ->
       'a s_ext -> 'a s_ext
   val tabs_update :
     ((tab_t * v_ref list) list -> (tab_t * v_ref list) list) ->
@@ -1073,74 +1072,105 @@ module WasmRef_Isa : sig
   val split_v_s_b_s : b_e list -> v list * b_e list
   val split_v_s_es_aux : v list -> e list -> v list * e list
   val split_v_s_es : e list -> v list * e list
-  val crash_invalid : res_step
-  val store_packed :
-    unit limit_t_ext * uint8 Parray.t ->
-      nat ->
-        nat -> uint8 list -> nat -> (unit limit_t_ext * uint8 Parray.t) option
-  val smem_ind : unit inst_ext -> nat option
-  val bin_rsplit_rev : nat -> nat -> int -> int list
-  val word_rsplit_rev : 'a len -> 'b len -> 'a word -> 'b word list
-  val serialise_i64 : i64 -> uint8 list
-  val serialise_i32 : i32 -> uint8 list
-  val ocaml_char_to_isabelle_byte : Char.t -> uint8
+  val mem_rep_write_i32_of_i64 : Pbytes.pbt -> nat -> i64 -> Pbytes.pbt
+  val mem_rep_write_i32 : Pbytes.pbt -> nat -> i32 -> Pbytes.pbt
+  val mem_rep_write_i32_of_i32 : Pbytes.pbt -> nat -> i32 -> Pbytes.pbt
+  val mem_rep_write_i16_of_i64 : Pbytes.pbt -> nat -> i64 -> Pbytes.pbt
+  val mem_rep_write_i16_of_i32 : Pbytes.pbt -> nat -> i32 -> Pbytes.pbt
+  val mem_rep_write_i8_of_i64 : Pbytes.pbt -> nat -> i64 -> Pbytes.pbt
+  val mem_rep_write_i8_of_i32 : Pbytes.pbt -> nat -> i32 -> Pbytes.pbt
   val f64_serialise_isabelle_bytes : F64Wrapper.t -> uint8 list
   val serialise_f64 : F64Wrapper.t -> uint8 list
   val f32_serialise_isabelle_bytes : F32Wrapper.t -> uint8 list
   val serialise_f32 : F32Wrapper.t -> uint8 list
-  val bits_num : v_num -> uint8 list
+  val store_packed_v_numa :
+    unit limit_t_ext * Pbytes.pbt ->
+      nat -> nat -> v_num -> tp_num -> (unit limit_t_ext * Pbytes.pbt) option
+  val store_packed_v_num :
+    unit limit_t_ext * Pbytes.pbt ->
+      nat -> nat -> v_num -> tp_num -> (unit limit_t_ext * Pbytes.pbt) option
+  val crash_invalid : res_step
+  val smem_ind : unit inst_ext -> nat option
   val app_s_f_v_s_store_packed :
     t_num ->
       tp_num ->
         nat ->
-          (unit limit_t_ext * uint8 Parray.t) list ->
+          (unit limit_t_ext * Pbytes.pbt) list ->
             unit f_ext ->
               v list ->
-                (unit limit_t_ext * uint8 Parray.t) list * (v list * res_step)
+                (unit limit_t_ext * Pbytes.pbt) list * (v list * res_step)
+  val mem_rep_write_i64 : Pbytes.pbt -> nat -> i64 -> Pbytes.pbt
+  val mem_rep_write_f64 : Pbytes.pbt -> nat -> F64Wrapper.t -> Pbytes.pbt
+  val mem_rep_write_f32 : Pbytes.pbt -> nat -> F32Wrapper.t -> Pbytes.pbt
+  val store_v_numa :
+    unit limit_t_ext * Pbytes.pbt ->
+      nat -> nat -> v_num -> (unit limit_t_ext * Pbytes.pbt) option
+  val store_v_num :
+    unit limit_t_ext * Pbytes.pbt ->
+      nat -> nat -> v_num -> (unit limit_t_ext * Pbytes.pbt) option
   val app_s_f_v_s_store :
     t_num ->
       nat ->
-        (unit limit_t_ext * uint8 Parray.t) list ->
+        (unit limit_t_ext * Pbytes.pbt) list ->
           unit f_ext ->
-            v list ->
-              (unit limit_t_ext * uint8 Parray.t) list * (v list * res_step)
+            v list -> (unit limit_t_ext * Pbytes.pbt) list * (v list * res_step)
   val app_s_f_v_s_store_maybe_packed :
     t_num ->
       tp_num option ->
         nat ->
-          (unit limit_t_ext * uint8 Parray.t) list ->
+          (unit limit_t_ext * Pbytes.pbt) list ->
             unit f_ext ->
               v list ->
-                (unit limit_t_ext * uint8 Parray.t) list * (v list * res_step)
-  val word_rcat_rev : 'a len -> 'b len -> 'a word list -> 'b word
-  val deserialise_i64 : uint8 list -> i64
-  val deserialise_i32 : uint8 list -> i32
-  val isabelle_byte_to_ocaml_char : uint8 -> Char.t
+                (unit limit_t_ext * Pbytes.pbt) list * (v list * res_step)
+  val mem_rep_read_i64_of_u32 : Pbytes.pbt -> nat -> i64
+  val mem_rep_read_i64_of_u16 : Pbytes.pbt -> nat -> i64
+  val mem_rep_read_i64_of_i32 : Pbytes.pbt -> nat -> i64
+  val mem_rep_read_i64_of_i16 : Pbytes.pbt -> nat -> i64
+  val mem_rep_read_i64_of_u8 : Pbytes.pbt -> nat -> i64
+  val mem_rep_read_i64_of_i8 : Pbytes.pbt -> nat -> i64
+  val mem_rep_read_i64_packed : Pbytes.pbt -> nat -> sx -> tp_num -> i64
+  val mem_rep_read_i32_of_u32 : Pbytes.pbt -> nat -> i32
+  val mem_rep_read_i32_of_u16 : Pbytes.pbt -> nat -> i32
+  val mem_rep_read_i32_of_i32 : Pbytes.pbt -> nat -> i32
+  val mem_rep_read_i32_of_i16 : Pbytes.pbt -> nat -> i32
+  val mem_rep_read_i32_of_u8 : Pbytes.pbt -> nat -> i32
+  val mem_rep_read_i32_of_i8 : Pbytes.pbt -> nat -> i32
+  val mem_rep_read_i32_packed : Pbytes.pbt -> nat -> sx -> tp_num -> i32
   val f64_deserialise_isabelle_bytes : uint8 list -> F64Wrapper.t
   val deserialise_f64 : uint8 list -> F64Wrapper.t
   val f32_deserialise_isabelle_bytes : uint8 list -> F32Wrapper.t
   val deserialise_f32 : uint8 list -> F32Wrapper.t
-  val wasm_deserialise_num : uint8 list -> t_num -> v_num
   val sign_extend : sx -> nat -> uint8 list -> uint8 list
-  val load_packed :
-    sx -> unit limit_t_ext * uint8 Parray.t ->
-            nat -> nat -> nat -> nat -> (uint8 list) option
+  val load_packed_v_numa :
+    sx -> unit limit_t_ext * Pbytes.pbt ->
+            nat -> nat -> t_num -> tp_num -> v_num option
+  val load_packed_v_num :
+    sx -> unit limit_t_ext * Pbytes.pbt ->
+            nat -> nat -> t_num -> tp_num -> v_num option
   val app_s_f_v_s_load_packed :
     t_num ->
       tp_num ->
         sx -> nat ->
-                (unit limit_t_ext * uint8 Parray.t) list ->
+                (unit limit_t_ext * Pbytes.pbt) list ->
                   unit f_ext -> v list -> v list * res_step
+  val mem_rep_read_i64 : Pbytes.pbt -> nat -> i64
+  val mem_rep_read_i32 : Pbytes.pbt -> nat -> i32
+  val mem_rep_read_f64 : Pbytes.pbt -> nat -> F64Wrapper.t
+  val mem_rep_read_f32 : Pbytes.pbt -> nat -> F32Wrapper.t
+  val load_v_numa :
+    unit limit_t_ext * Pbytes.pbt -> nat -> nat -> t_num -> v_num option
+  val load_v_num :
+    unit limit_t_ext * Pbytes.pbt -> nat -> nat -> t_num -> v_num option
   val app_s_f_v_s_load :
     t_num ->
       nat ->
-        (unit limit_t_ext * uint8 Parray.t) list ->
+        (unit limit_t_ext * Pbytes.pbt) list ->
           unit f_ext -> v list -> v list * res_step
   val app_s_f_v_s_load_maybe_packed :
     t_num ->
       (tp_num * sx) option ->
         nat ->
-          (unit limit_t_ext * uint8 Parray.t) list ->
+          (unit limit_t_ext * Pbytes.pbt) list ->
             unit f_ext -> v list -> v list * res_step
   val insert_lane_vec_bs : nat -> nat -> uint8 list -> uint8 list -> uint8 list
   val v128_deserialise_isabelle_bytes : uint8 list -> V128Wrapper.t
@@ -1153,7 +1183,7 @@ module WasmRef_Isa : sig
     shape_vec_i ->
       nat ->
         nat ->
-          (unit limit_t_ext * uint8 Parray.t) list ->
+          (unit limit_t_ext * Pbytes.pbt) list ->
             unit f_ext -> v list -> v list * res_step
   val tab_cl_ind : (tab_t * v_ref list) list -> nat -> nat -> v_ref option
   val app_s_f_v_s_call_indirect :
@@ -1163,14 +1193,14 @@ module WasmRef_Isa : sig
           cl list -> unit f_ext -> v list -> v list * (e list * res_step)
   val app_s_f_v_s_memory_init :
     nat ->
-      (unit limit_t_ext * uint8 Parray.t) list ->
+      (unit limit_t_ext * Pbytes.pbt) list ->
         (uint8 list) list ->
           unit f_ext -> v list -> v list * (e list * res_step)
   val app_s_f_v_s_memory_fill :
-    (unit limit_t_ext * uint8 Parray.t) list ->
+    (unit limit_t_ext * Pbytes.pbt) list ->
       unit f_ext -> v list -> v list * (e list * res_step)
   val app_s_f_v_s_memory_copy :
-    (unit limit_t_ext * uint8 Parray.t) list ->
+    (unit limit_t_ext * Pbytes.pbt) list ->
       unit f_ext -> v list -> v list * (e list * res_step)
   val stab_ind : unit inst_ext -> nat -> nat option
   val app_s_f_v_s_table_size :
@@ -1226,41 +1256,47 @@ module WasmRef_Isa : sig
   val app_s_f_v_s_store_vec :
     storeop_vec ->
       nat ->
-        (unit limit_t_ext * uint8 Parray.t) list ->
+        (unit limit_t_ext * Pbytes.pbt) list ->
           unit f_ext ->
-            v list ->
-              (unit limit_t_ext * uint8 Parray.t) list * (v list * res_step)
-  val mem_size : unit limit_t_ext * uint8 Parray.t -> nat
+            v list -> (unit limit_t_ext * Pbytes.pbt) list * (v list * res_step)
+  val mem_size : unit limit_t_ext * Pbytes.pbt -> nat
   val app_s_f_v_s_mem_size :
-    (unit limit_t_ext * uint8 Parray.t) list ->
+    (unit limit_t_ext * Pbytes.pbt) list ->
       unit f_ext -> v list -> v list * res_step
   val mem_grow :
-    unit limit_t_ext * uint8 Parray.t ->
-      nat -> (unit limit_t_ext * uint8 Parray.t) option
+    unit limit_t_ext * Pbytes.pbt ->
+      nat -> (unit limit_t_ext * Pbytes.pbt) option
   val app_s_f_v_s_mem_grow :
-    (unit limit_t_ext * uint8 Parray.t) list ->
+    (unit limit_t_ext * Pbytes.pbt) list ->
       unit f_ext ->
-        v list -> (unit limit_t_ext * uint8 Parray.t) list * (v list * res_step)
+        v list -> (unit limit_t_ext * Pbytes.pbt) list * (v list * res_step)
   val read_bytes_vec :
-    nat -> nat -> sx -> unit limit_t_ext * uint8 Parray.t -> nat -> uint8 list
+    nat -> nat -> sx -> unit limit_t_ext * Pbytes.pbt -> nat -> uint8 list
   val load_packed_vec :
     tp_vec ->
-      sx -> unit limit_t_ext * uint8 Parray.t ->
-              nat -> nat -> (uint8 list) option
+      sx -> unit limit_t_ext * Pbytes.pbt -> nat -> nat -> (uint8 list) option
   val load_vec :
     loadop_vec ->
-      unit limit_t_ext * uint8 Parray.t -> nat -> nat -> (uint8 list) option
+      unit limit_t_ext * Pbytes.pbt -> nat -> nat -> (uint8 list) option
   val app_s_f_v_s_load_vec :
     loadop_vec ->
       nat ->
-        (unit limit_t_ext * uint8 Parray.t) list ->
+        (unit limit_t_ext * Pbytes.pbt) list ->
           unit f_ext -> v list -> v list * res_step
   val bits_vec : v_vec -> uint8 list
+  val bin_rsplit_rev : nat -> nat -> int -> int list
+  val word_rsplit_rev : 'a len -> 'b len -> 'a word -> 'b word list
+  val serialise_i64 : i64 -> uint8 list
+  val serialise_i32 : i32 -> uint8 list
+  val bits_num : v_num -> uint8 list
   val app_replace_vec : shape_vec -> nat -> v_vec -> v_num -> v_vec
   val app_v_s_replace_vec : shape_vec -> nat -> v list -> v list * res_step
   val is_null_ref : v_ref -> bool
   val wasm_bool : bool -> i32
   val app_v_s_ref_is_null : v list -> v list * res_step
+  val word_rcat_rev : 'a len -> 'b len -> 'a word list -> 'b word
+  val deserialise_i64 : uint8 list -> i64
+  val deserialise_i32 : uint8 list -> i32
   val app_extract_vec : shape_vec -> sx -> nat -> v_vec -> v_num
   val app_v_s_extract_vec :
     shape_vec -> sx -> nat -> v list -> v list * res_step
@@ -1317,6 +1353,7 @@ module WasmRef_Isa : sig
   val app_relop_f_v : relop_f -> v_num -> v_num -> v_num
   val app_relop : relop -> v_num -> v_num -> v_num
   val app_v_s_relop : relop -> v list -> v list * res_step
+  val wasm_deserialise_num : uint8 list -> t_num -> v_num
   val wasm_reinterpret : t_num -> v_num -> v_num
   val app_v_s_cvtop :
     cvtop -> t_num -> t_num -> (sat * sx) option -> v list -> v list * res_step
@@ -3080,9 +3117,8 @@ type v = V_num of v_num | V_vec of v_vec | V_ref of v_ref
 and 'a global_ext = Global_ext of mut * v * 'a
 and 'a s_ext =
   S_ext of
-    cl list * (tab_t * v_ref list) list *
-      (unit limit_t_ext * uint8 Parray.t) list * unit global_ext list *
-      (t_ref * v_ref list) list * (uint8 list) list * 'a
+    cl list * (tab_t * v_ref list) list * (unit limit_t_ext * Pbytes.pbt) list *
+      unit global_ext list * (t_ref * v_ref list) list * (uint8 list) list * 'a
 and host_func =
   Abs_host_func of (unit s_ext * v list -> (unit s_ext * v list) option)
 and host = Host_func of host_func | Host_ref of int32
@@ -3253,6 +3289,40 @@ let rec holds p = eval equal_unit p ();;
 
 let rec l_min (Limit_t_ext (l_min, l_max, more)) = l_min;;
 
+let rec rep_uint8a (Abs_uint8 x) = x;;
+
+let rec and_uint8
+  p q = Abs_uint8
+          (and_word (len_bit0 (len_bit0 (len_bit0 len_num1))) (rep_uint8a p)
+            (rep_uint8a q));;
+
+let rec bit_uint8
+  w n = less_nat n (nat_of_integer (Z.of_int 8)) &&
+          uint8_test_bit w (integer_of_nat n)
+and uint8_test_bit
+  w k = (if Z.lt k Z.zero || Z.leq (Z.of_int 8) k
+          then failwith "undefined" bit_uint8 w k
+          else bit_word (len_bit0 (len_bit0 (len_bit0 len_num1))) (rep_uint8a w)
+                 (nat_of_integer k));;
+
+let rec rep_uint8
+  x = set_bits_word (len_bit0 (len_bit0 (len_bit0 len_num1))) (bit_uint8 x);;
+
+let rec integer_of_uint8
+  n = (if bit_uint8 n (nat_of_integer (Z.of_int 7))
+        then Z.logor
+               (integer_of_uint8_signed (and_uint8 n (uint8 (Z.of_int 127))))
+               (Z.of_int 128)
+        else integer_of_uint8_signed n)
+and integer_of_uint8_signed
+  n = (if bit_uint8 n (nat_of_integer (Z.of_int 7))
+        then failwith "undefined" integer_of_uint8 n
+        else integer_of_int
+               (the_int (len_bit0 (len_bit0 (len_bit0 len_num1)))
+                 (rep_uint8 n)));;
+
+let rec isabelle_byte_to_ocaml_char n = LibAux.char_of_z (integer_of_uint8 n);;
+
 let rec nat_to_ocaml_int x = Z.to_int (integer_of_nat x);;
 
 let zero_uint8 : uint8
@@ -3261,7 +3331,8 @@ let zero_uint8 : uint8
 let zero_byte : uint8 = zero_uint8;;
 
 let rec mem_rep_mk
-  x = Parray.make (nat_to_ocaml_int (times_nata x ki64)) zero_byte;;
+  x = Pbytes.make  (nat_to_ocaml_int (times_nata x ki64))
+        (isabelle_byte_to_ocaml_char zero_byte);;
 
 let rec mem_mk lim = (lim, mem_rep_mk (l_min lim));;
 
@@ -3303,20 +3374,6 @@ let rec bin_split
 let rec abs_uint8
   x = uint8 (integer_of_int
               (the_int (len_bit0 (len_bit0 (len_bit0 len_num1))) x));;
-
-let rec rep_uint8a (Abs_uint8 x) = x;;
-
-let rec bit_uint8
-  w n = less_nat n (nat_of_integer (Z.of_int 8)) &&
-          uint8_test_bit w (integer_of_nat n)
-and uint8_test_bit
-  w k = (if Z.lt k Z.zero || Z.leq (Z.of_int 8) k
-          then failwith "undefined" bit_uint8 w k
-          else bit_word (len_bit0 (len_bit0 (len_bit0 len_num1))) (rep_uint8a w)
-                 (nat_of_integer k));;
-
-let rec rep_uint8
-  x = set_bits_word (len_bit0 (len_bit0 (len_bit0 len_num1))) (bit_uint8 x);;
 
 let empty_frame : unit f_ext
   = F_ext ([], Inst_ext ([], [], [], [], [], [], [], ()), ());;
@@ -3404,24 +3461,6 @@ let rec msb_byte x = msb_uint8 x;;
 
 let rec list_all p x1 = match p, x1 with p, [] -> true
                    | p, x :: xs -> p x && list_all p xs;;
-
-let rec and_uint8
-  p q = Abs_uint8
-          (and_word (len_bit0 (len_bit0 (len_bit0 len_num1))) (rep_uint8a p)
-            (rep_uint8a q));;
-
-let rec integer_of_uint8
-  n = (if bit_uint8 n (nat_of_integer (Z.of_int 7))
-        then Z.logor
-               (integer_of_uint8_signed (and_uint8 n (uint8 (Z.of_int 127))))
-               (Z.of_int 128)
-        else integer_of_uint8_signed n)
-and integer_of_uint8_signed
-  n = (if bit_uint8 n (nat_of_integer (Z.of_int 7))
-        then failwith "undefined" integer_of_uint8 n
-        else integer_of_int
-               (the_int (len_bit0 (len_bit0 (len_bit0 len_num1)))
-                 (rep_uint8 n)));;
 
 let rec nat_of_uint8 x = nat_of_integer (integer_of_uint8 x);;
 
@@ -4251,7 +4290,9 @@ let rec l_min_update
     Limit_t_ext (l_mina l_min, l_max, more);;
 
 let rec mem_rep_append
-  m x b = MemRepWrapper.memRepAppend m (nat_to_ocaml_int x) b;;
+  m x b =
+    MemRepWrapper.memRepAppend m (nat_to_ocaml_int x)
+      (isabelle_byte_to_ocaml_char b);;
 
 let rec mem_append
   m n b =
@@ -4261,13 +4302,17 @@ let rec mem_append
 
 let rec ocaml_int_to_nat x = nat_of_integer (Z.of_int x);;
 
-let rec mem_rep_length m = ocaml_int_to_nat (Parray.length m);;
+let rec mem_rep_length m = ocaml_int_to_nat (Pbytes.length m);;
 
 let rec mem_length m = mem_rep_length (snd m);;
 
+let rec ocaml_char_to_isabelle_byte n = uint8 (LibAux.z_of_char n);;
+
 let rec mem_rep_read_bytes
   m x y =
-    MemRepWrapper.memRepReadBytes m (nat_to_ocaml_int x) (nat_to_ocaml_int y);;
+    map ocaml_char_to_isabelle_byte
+      (MemRepWrapper.memRepReadBytes m (nat_to_ocaml_int x)
+        (nat_to_ocaml_int y));;
 
 let rec read_bytes m n l = mem_rep_read_bytes (snd m) n l;;
 
@@ -4292,7 +4337,9 @@ let one_uint8 : uint8
 let negone_byte : uint8 = uminus_uint8 one_uint8;;
 
 let rec mem_rep_write_bytes
-  m x bs = MemRepWrapper.memRepWriteBytes m (nat_to_ocaml_int x) bs;;
+  m x bs =
+    MemRepWrapper.memRepWriteBytes m (nat_to_ocaml_int x)
+      (map isabelle_byte_to_ocaml_char bs);;
 
 let rec write_bytes m n bs = (fst m, mem_rep_write_bytes (snd m) n bs);;
 
@@ -4553,40 +4600,37 @@ let rec split_v_s_es_aux
 
 let rec split_v_s_es es = split_v_s_es_aux [] es;;
 
-let crash_invalid : res_step
-  = Res_crash (Error_invalid "type system violation");;
+let rec mem_rep_write_i32_of_i64
+  m n vi64 =
+    Pbytes.set_int32 m (nat_to_ocaml_int n)
+      (isabelle_int32_to_ocaml_int32 (wasm_wrap vi64));;
 
-let rec store_packed x = store x;;
+let rec mem_rep_write_i32
+  m n vala =
+    Pbytes.set_int32 m (nat_to_ocaml_int n)
+      (isabelle_int32_to_ocaml_int32 vala);;
 
-let rec smem_ind i = (match memsa i with [] -> None | n :: _ -> Some n);;
+let rec mem_rep_write_i32_of_i32 x = mem_rep_write_i32 x;;
 
-let rec bin_rsplit_rev
-  n m c =
-    (if equal_nata m zero_nat || equal_nata n zero_nat then []
-      else (let (a, b) = bin_split n c in
-             b :: bin_rsplit_rev n (minus_nat m n) a));;
+let rec mem_rep_write_i16_of_i64
+  m n vi64 =
+    Pbytes.set_int16 m (nat_to_ocaml_int n)
+      (Z.to_int (LibAux.z_of_uint64 (isabelle_int64_to_ocaml_int64 vi64)));;
 
-let rec word_rsplit_rev _A _B
-  w = map (of_int _B)
-        (bin_rsplit_rev (len_of _B.len0_len Type) (len_of _A.len0_len Type)
-          (the_int _A w));;
+let rec mem_rep_write_i16_of_i32
+  m n vala =
+    Pbytes.set_int16 m (nat_to_ocaml_int n)
+      (Z.to_int (LibAux.z_of_uint32 (isabelle_int32_to_ocaml_int32 vala)));;
 
-let rec serialise_i64
-  (I64_impl_abs x) =
-    map abs_uint8
-      (word_rsplit_rev
-        (len_bit0
-          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-        (len_bit0 (len_bit0 (len_bit0 len_num1))) (rep_uint64 x));;
+let rec mem_rep_write_i8_of_i64
+  m n vi64 =
+    Pbytes.set_int8 m (nat_to_ocaml_int n)
+      (Z.to_int (LibAux.z_of_uint64 (isabelle_int64_to_ocaml_int64 vi64)));;
 
-let rec serialise_i32
-  (I32_impl_abs x) =
-    map abs_uint8
-      (word_rsplit_rev
-        (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-        (len_bit0 (len_bit0 (len_bit0 len_num1))) (rep_uint32 x));;
-
-let rec ocaml_char_to_isabelle_byte n = uint8 (LibAux.z_of_char n);;
+let rec mem_rep_write_i8_of_i32
+  m n vala =
+    Pbytes.set_int8 m (nat_to_ocaml_int n)
+      (Z.to_int (LibAux.z_of_uint32 (isabelle_int32_to_ocaml_int32 vala)));;
 
 let rec f64_serialise_isabelle_bytes
   f = map ocaml_char_to_isabelle_byte (ImplWrapper.serialise_f64 f);;
@@ -4598,10 +4642,46 @@ let rec f32_serialise_isabelle_bytes
 
 let rec serialise_f32 x = f32_serialise_isabelle_bytes x;;
 
-let rec bits_num
-  v = (match v with ConstInt32 a -> serialise_i32 a
-        | ConstInt64 a -> serialise_i64 a | ConstFloat32 a -> serialise_f32 a
-        | ConstFloat64 a -> serialise_f64 a);;
+let rec store_packed_v_numa
+  m n off v tp =
+    (if less_eq_nat (plus_nat (plus_nat n off) (tp_num_length tp))
+          (mem_length m)
+      then Some (fst m,
+                  (match v
+                    with ConstInt32 vala ->
+                      (match tp
+                        with Tp_i8 ->
+                          mem_rep_write_i8_of_i32 (snd m) (plus_nat n off) vala
+                        | Tp_i16 ->
+                          mem_rep_write_i16_of_i32 (snd m) (plus_nat n off) vala
+                        | Tp_i32 ->
+                          mem_rep_write_i32_of_i32 (snd m) (plus_nat n off)
+                            vala)
+                    | ConstInt64 vala ->
+                      (match tp
+                        with Tp_i8 ->
+                          mem_rep_write_i8_of_i64 (snd m) (plus_nat n off) vala
+                        | Tp_i16 ->
+                          mem_rep_write_i16_of_i64 (snd m) (plus_nat n off) vala
+                        | Tp_i32 ->
+                          mem_rep_write_i32_of_i64 (snd m) (plus_nat n off)
+                            vala)
+                    | ConstFloat32 vala ->
+                      mem_rep_write_bytes (snd m) (plus_nat n off)
+                        (bytes_takefill zero_byte (tp_num_length tp)
+                          (serialise_f32 vala))
+                    | ConstFloat64 vala ->
+                      mem_rep_write_bytes (snd m) (plus_nat n off)
+                        (bytes_takefill zero_byte (tp_num_length tp)
+                          (serialise_f64 vala))))
+      else None);;
+
+let rec store_packed_v_num m n off v tp = store_packed_v_numa m n off v tp;;
+
+let crash_invalid : res_step
+  = Res_crash (Error_invalid "type system violation");;
+
+let rec smem_ind i = (match memsa i with [] -> None | n :: _ -> Some n);;
 
 let rec app_s_f_v_s_store_packed
   t tp off ms f v_s =
@@ -4613,8 +4693,7 @@ let rec app_s_f_v_s_store_packed
             then (match smem_ind i with None -> (ms, (v_s, crash_invalid))
                    | Some j ->
                      (match
-                       store_packed (nth ms j) (nat_of_int_i32 c) off
-                         (bits_num v) (tp_num_length tp)
+                       store_packed_v_num (nth ms j) (nat_of_int_i32 c) off v tp
                        with None -> (ms, (v_sa, Res_trap "store"))
                        | Some a -> (list_update ms j a, (v_sa, Step_normal))))
             else (ms, (v_s, crash_invalid)))
@@ -4626,6 +4705,38 @@ let rec app_s_f_v_s_store_packed
         | V_vec _ :: _ -> (ms, (v_s, crash_invalid))
         | V_ref _ :: _ -> (ms, (v_s, crash_invalid))));;
 
+let rec mem_rep_write_i64
+  m n vi64 =
+    Pbytes.set_int64 m (nat_to_ocaml_int n)
+      (isabelle_int64_to_ocaml_int64 vi64);;
+
+let rec mem_rep_write_f64
+  m n vf64 =
+    Pbytes.set_int64 m (nat_to_ocaml_int n)
+      (I64Wrapper_convert.reinterpret_of_f64 vf64);;
+
+let rec mem_rep_write_f32
+  m n vf32 =
+    Pbytes.set_int32 m (nat_to_ocaml_int n)
+      (I32Wrapper_convert.reinterpret_of_f32 vf32);;
+
+let rec store_v_numa
+  m n off vn =
+    (let l = t_num_length (typeof_num vn) in
+      (if less_eq_nat (plus_nat (plus_nat n off) l) (mem_length m)
+        then (match vn
+               with ConstInt32 vala ->
+                 Some (fst m, mem_rep_write_i32 (snd m) (plus_nat n off) vala)
+               | ConstInt64 vala ->
+                 Some (fst m, mem_rep_write_i64 (snd m) (plus_nat n off) vala)
+               | ConstFloat32 vala ->
+                 Some (fst m, mem_rep_write_f32 (snd m) (plus_nat n off) vala)
+               | ConstFloat64 vala ->
+                 Some (fst m, mem_rep_write_f64 (snd m) (plus_nat n off) vala))
+        else None));;
+
+let rec store_v_num m n off v = store_v_numa m n off v;;
+
 let rec app_s_f_v_s_store
   t off ms f v_s =
     (let i = f_inst f in
@@ -4635,9 +4746,7 @@ let rec app_s_f_v_s_store
           (if equal_t_num (typeof_num v) t
             then (match smem_ind i with None -> (ms, (v_s, crash_invalid))
                    | Some j ->
-                     (match
-                       store (nth ms j) (nat_of_int_i32 c) off (bits_num v)
-                         (t_num_length t)
+                     (match store_v_num (nth ms j) (nat_of_int_i32 c) off v
                        with None -> (ms, (v_sa, Res_trap "store"))
                        | Some a -> (list_update ms j a, (v_sa, Step_normal))))
             else (ms, (v_s, crash_invalid)))
@@ -4654,28 +4763,81 @@ let rec app_s_f_v_s_store_maybe_packed
     (match tp_opt with None -> app_s_f_v_s_store t off ms f v_s
       | Some tp -> app_s_f_v_s_store_packed t tp off ms f v_s);;
 
-let rec word_rcat_rev _A _B
-  = comp (of_int _B)
-      (horner_sum comm_semiring_0_int (the_int _A)
-        (power power_int (Int_of_integer (Z.of_int 2))
-          (len_of _A.len0_len Type)));;
+let rec mem_rep_read_i64_of_u32
+  m n = ocaml_int64_to_isabelle_int64
+          (I64Wrapper_convert.extend_u_i32
+            (Pbytes.get_int32 m (nat_to_ocaml_int n)));;
 
-let rec deserialise_i64
-  bs = I64_impl_abs
-         (abs_uint64
-           (word_rcat_rev (len_bit0 (len_bit0 (len_bit0 len_num1)))
-             (len_bit0
-               (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
-             (map rep_uint8 bs)));;
+let rec mem_rep_read_i64_of_u16
+  m n = ocaml_int64_to_isabelle_int64
+          (I64Wrapper_convert.of_int_s
+            (Pbytes.get_uint16 m (nat_to_ocaml_int n)));;
 
-let rec deserialise_i32
-  bs = I32_impl_abs
-         (abs_uint32
-           (word_rcat_rev (len_bit0 (len_bit0 (len_bit0 len_num1)))
-             (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
-             (map rep_uint8 bs)));;
+let rec mem_rep_read_i64_of_i32
+  m n = ocaml_int64_to_isabelle_int64
+          (I64Wrapper_convert.extend_s_i32
+            (Pbytes.get_int32 m (nat_to_ocaml_int n)));;
 
-let rec isabelle_byte_to_ocaml_char n = LibAux.char_of_z (integer_of_uint8 n);;
+let rec mem_rep_read_i64_of_i16
+  m n = ocaml_int64_to_isabelle_int64
+          (I64Wrapper_convert.of_int_s
+            (Pbytes.get_int16 m (nat_to_ocaml_int n)));;
+
+let rec mem_rep_read_i64_of_u8
+  m n = ocaml_int64_to_isabelle_int64
+          (I64Wrapper_convert.of_int_s
+            (Pbytes.get_uint8 m (nat_to_ocaml_int n)));;
+
+let rec mem_rep_read_i64_of_i8
+  m n = ocaml_int64_to_isabelle_int64
+          (I64Wrapper_convert.of_int_s
+            (Pbytes.get_int8 m (nat_to_ocaml_int n)));;
+
+let rec mem_rep_read_i64_packed
+  m n sx tp =
+    (match (sx, tp) with (S, Tp_i8) -> mem_rep_read_i64_of_i8 m n
+      | (S, Tp_i16) -> mem_rep_read_i64_of_i16 m n
+      | (S, Tp_i32) -> mem_rep_read_i64_of_i32 m n
+      | (U, Tp_i8) -> mem_rep_read_i64_of_u8 m n
+      | (U, Tp_i16) -> mem_rep_read_i64_of_u16 m n
+      | (U, Tp_i32) -> mem_rep_read_i64_of_u32 m n);;
+
+let rec mem_rep_read_i32_of_u32
+  m n = ocaml_int32_to_isabelle_int32
+          (Pbytes.get_int32 m (nat_to_ocaml_int n));;
+
+let rec mem_rep_read_i32_of_u16
+  m n = ocaml_int32_to_isabelle_int32
+          (I32Wrapper_convert.of_int_s
+            (Pbytes.get_uint16 m (nat_to_ocaml_int n)));;
+
+let rec mem_rep_read_i32_of_i32
+  m n = ocaml_int32_to_isabelle_int32
+          (Pbytes.get_int32 m (nat_to_ocaml_int n));;
+
+let rec mem_rep_read_i32_of_i16
+  m n = ocaml_int32_to_isabelle_int32
+          (I32Wrapper_convert.of_int_s
+            (Pbytes.get_int16 m (nat_to_ocaml_int n)));;
+
+let rec mem_rep_read_i32_of_u8
+  m n = ocaml_int32_to_isabelle_int32
+          (I32Wrapper_convert.of_int_s
+            (Pbytes.get_uint8 m (nat_to_ocaml_int n)));;
+
+let rec mem_rep_read_i32_of_i8
+  m n = ocaml_int32_to_isabelle_int32
+          (I32Wrapper_convert.of_int_s
+            (Pbytes.get_int8 m (nat_to_ocaml_int n)));;
+
+let rec mem_rep_read_i32_packed
+  m n sx tp =
+    (match (sx, tp) with (S, Tp_i8) -> mem_rep_read_i32_of_i8 m n
+      | (S, Tp_i16) -> mem_rep_read_i32_of_i16 m n
+      | (S, Tp_i32) -> mem_rep_read_i32_of_i32 m n
+      | (U, Tp_i8) -> mem_rep_read_i32_of_u8 m n
+      | (U, Tp_i16) -> mem_rep_read_i32_of_u16 m n
+      | (U, Tp_i32) -> mem_rep_read_i32_of_u32 m n);;
 
 let rec f64_deserialise_isabelle_bytes
   bs = ImplWrapper.deserialise_f64 (map isabelle_byte_to_ocaml_char bs);;
@@ -4687,13 +4849,6 @@ let rec f32_deserialise_isabelle_bytes
 
 let rec deserialise_f32 x = f32_deserialise_isabelle_bytes x;;
 
-let rec wasm_deserialise_num
-  bs t =
-    (match t with T_i32 -> ConstInt32 (deserialise_i32 bs)
-      | T_i64 -> ConstInt64 (deserialise_i64 bs)
-      | T_f32 -> ConstFloat32 (deserialise_f32 bs)
-      | T_f64 -> ConstFloat64 (deserialise_f64 bs));;
-
 let rec sign_extend
   sx l bytes =
     (let msb = msb_byte (msbyte bytes) in
@@ -4703,8 +4858,32 @@ let rec sign_extend
        in
       bytes_takefill byte l bytes);;
 
-let rec load_packed
-  sx m n off lp l = map_option (sign_extend sx l) (load m n off lp);;
+let rec load_packed_v_numa
+  sx m n off t tp =
+    (if less_eq_nat (plus_nat (plus_nat n off) (tp_num_length tp))
+          (mem_length m)
+      then (match t
+             with T_i32 ->
+               Some (ConstInt32
+                      (mem_rep_read_i32_packed (snd m) (plus_nat n off) sx tp))
+             | T_i64 ->
+               Some (ConstInt64
+                      (mem_rep_read_i64_packed (snd m) (plus_nat n off) sx tp))
+             | T_f32 ->
+               Some (ConstFloat32
+                      (deserialise_f32
+                        (sign_extend sx (t_num_length T_i32)
+                          (mem_rep_read_bytes (snd m) (plus_nat n off)
+                            (tp_num_length tp)))))
+             | T_f64 ->
+               Some (ConstFloat64
+                      (deserialise_f64
+                        (sign_extend sx (t_num_length T_i64)
+                          (mem_rep_read_bytes (snd m) (plus_nat n off)
+                            (tp_num_length tp))))))
+      else None);;
+
+let rec load_packed_v_num sx m n off t tp = load_packed_v_numa sx m n off t tp;;
 
 let rec app_s_f_v_s_load_packed
   t tp sx off ms f v_s =
@@ -4713,17 +4892,48 @@ let rec app_s_f_v_s_load_packed
         | V_num (ConstInt32 c) :: v_sa ->
           (match smem_ind i with None -> (v_s, crash_invalid)
             | Some j ->
-              (match
-                load_packed sx (nth ms j) (nat_of_int_i32 c) off
-                  (tp_num_length tp) (t_num_length t)
+              (match load_packed_v_num sx (nth ms j) (nat_of_int_i32 c) off t tp
                 with None -> (v_sa, Res_trap "load")
-                | Some a ->
-                  (V_num (wasm_deserialise_num a t) :: v_sa, Step_normal)))
+                | Some a -> (V_num a :: v_sa, Step_normal)))
         | V_num (ConstInt64 _) :: _ -> (v_s, crash_invalid)
         | V_num (ConstFloat32 _) :: _ -> (v_s, crash_invalid)
         | V_num (ConstFloat64 _) :: _ -> (v_s, crash_invalid)
         | V_vec _ :: _ -> (v_s, crash_invalid)
         | V_ref _ :: _ -> (v_s, crash_invalid)));;
+
+let rec mem_rep_read_i64
+  m n = ocaml_int64_to_isabelle_int64
+          (Pbytes.get_int64 m (nat_to_ocaml_int n));;
+
+let rec mem_rep_read_i32
+  m n = ocaml_int32_to_isabelle_int32
+          (Pbytes.get_int32 m (nat_to_ocaml_int n));;
+
+let rec mem_rep_read_f64
+  m n = I64Wrapper_convert.reinterpret_to_f64
+          (Pbytes.get_int64 m (nat_to_ocaml_int n));;
+
+let rec mem_rep_read_f32
+  m n = I32Wrapper_convert.reinterpret_to_f32
+          (Pbytes.get_int32 m (nat_to_ocaml_int n));;
+
+let rec load_v_numa
+  m n off t =
+    (let l = t_num_length t in
+      (if less_eq_nat (plus_nat (plus_nat n off) l) (mem_length m)
+        then (match t
+               with T_i32 ->
+                 Some (ConstInt32 (mem_rep_read_i32 (snd m) (plus_nat n off)))
+               | T_i64 ->
+                 Some (ConstInt64 (mem_rep_read_i64 (snd m) (plus_nat n off)))
+               | T_f32 ->
+                 Some (ConstFloat32 (mem_rep_read_f32 (snd m) (plus_nat n off)))
+               | T_f64 ->
+                 Some (ConstFloat64
+                        (mem_rep_read_f64 (snd m) (plus_nat n off))))
+        else None));;
+
+let rec load_v_num m n off t = load_v_numa m n off t;;
 
 let rec app_s_f_v_s_load
   t off ms f v_s =
@@ -4732,10 +4942,9 @@ let rec app_s_f_v_s_load
         | V_num (ConstInt32 c) :: v_sa ->
           (match smem_ind i with None -> (v_s, crash_invalid)
             | Some j ->
-              (match load (nth ms j) (nat_of_int_i32 c) off (t_num_length t)
+              (match load_v_num (nth ms j) (nat_of_int_i32 c) off t
                 with None -> (v_sa, Res_trap "load")
-                | Some a ->
-                  (V_num (wasm_deserialise_num a t) :: v_sa, Step_normal)))
+                | Some a -> (V_num a :: v_sa, Step_normal)))
         | V_num (ConstInt64 _) :: _ -> (v_s, crash_invalid)
         | V_num (ConstFloat32 _) :: _ -> (v_s, crash_invalid)
         | V_num (ConstFloat64 _) :: _ -> (v_s, crash_invalid)
@@ -5437,6 +5646,37 @@ let rec app_s_f_v_s_load_vec
 
 let rec bits_vec v = (let ConstVec128 a = v in serialise_v128 a);;
 
+let rec bin_rsplit_rev
+  n m c =
+    (if equal_nata m zero_nat || equal_nata n zero_nat then []
+      else (let (a, b) = bin_split n c in
+             b :: bin_rsplit_rev n (minus_nat m n) a));;
+
+let rec word_rsplit_rev _A _B
+  w = map (of_int _B)
+        (bin_rsplit_rev (len_of _B.len0_len Type) (len_of _A.len0_len Type)
+          (the_int _A w));;
+
+let rec serialise_i64
+  (I64_impl_abs x) =
+    map abs_uint8
+      (word_rsplit_rev
+        (len_bit0
+          (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
+        (len_bit0 (len_bit0 (len_bit0 len_num1))) (rep_uint64 x));;
+
+let rec serialise_i32
+  (I32_impl_abs x) =
+    map abs_uint8
+      (word_rsplit_rev
+        (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+        (len_bit0 (len_bit0 (len_bit0 len_num1))) (rep_uint32 x));;
+
+let rec bits_num
+  v = (match v with ConstInt32 a -> serialise_i32 a
+        | ConstInt64 a -> serialise_i64 a | ConstFloat32 a -> serialise_f32 a
+        | ConstFloat64 a -> serialise_f64 a);;
+
 let rec app_replace_vec
   sv i vv vn =
     (let bs_v = bits_vec vv in
@@ -5470,6 +5710,27 @@ let rec app_v_s_ref_is_null
               then (V_num (ConstInt32 (wasm_bool true)) :: v_sa, Step_normal)
               else (V_num (ConstInt32 (wasm_bool false)) :: v_sa,
                      Step_normal)));;
+
+let rec word_rcat_rev _A _B
+  = comp (of_int _B)
+      (horner_sum comm_semiring_0_int (the_int _A)
+        (power power_int (Int_of_integer (Z.of_int 2))
+          (len_of _A.len0_len Type)));;
+
+let rec deserialise_i64
+  bs = I64_impl_abs
+         (abs_uint64
+           (word_rcat_rev (len_bit0 (len_bit0 (len_bit0 len_num1)))
+             (len_bit0
+               (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1))))))
+             (map rep_uint8 bs)));;
+
+let rec deserialise_i32
+  bs = I32_impl_abs
+         (abs_uint32
+           (word_rcat_rev (len_bit0 (len_bit0 (len_bit0 len_num1)))
+             (len_bit0 (len_bit0 (len_bit0 (len_bit0 (len_bit0 len_num1)))))
+             (map rep_uint8 bs)));;
 
 let rec app_extract_vec
   sv sx i vv =
@@ -5763,6 +6024,13 @@ let rec app_v_s_relop
       | V_num _ :: V_ref _ :: _ -> (v_s, crash_invalid)
       | V_vec _ :: _ -> (v_s, crash_invalid)
       | V_ref _ :: _ -> (v_s, crash_invalid));;
+
+let rec wasm_deserialise_num
+  bs t =
+    (match t with T_i32 -> ConstInt32 (deserialise_i32 bs)
+      | T_i64 -> ConstInt64 (deserialise_i64 bs)
+      | T_f32 -> ConstFloat32 (deserialise_f32 bs)
+      | T_f64 -> ConstFloat64 (deserialise_f64 bs));;
 
 let rec wasm_reinterpret
   t v = (match (t, v)

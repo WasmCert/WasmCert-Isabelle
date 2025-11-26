@@ -179,9 +179,9 @@ definition store_packed_v_num' :: "mem \<Rightarrow> nat \<Rightarrow> off \<Rig
             Tp_i8 \<Rightarrow> mem_rep_write_i8_of_i64 (snd m) (n+off) val
           | Tp_i16 \<Rightarrow> mem_rep_write_i16_of_i64 (snd m) (n+off) val
           | Tp_i32 \<Rightarrow> mem_rep_write_i32_of_i64 (snd m) (n+off) val)
-      | ConstFloat32 val \<Rightarrow> mem_rep_write_bytes (snd m) (n + off)
+      | ConstFloat32 val \<Rightarrow> mem_rep_write_bytes (snd m) (n+off)
            (bytes_takefill zero_byte (tp_num_length tp) (serialise_f32 val))
-      | ConstFloat64 val \<Rightarrow> mem_rep_write_bytes (snd m) (n + off)
+      | ConstFloat64 val \<Rightarrow> mem_rep_write_bytes (snd m) (n+off)
            (bytes_takefill zero_byte (tp_num_length tp) (serialise_f64 val))))
    else None)"
 
@@ -305,17 +305,25 @@ axiomatization where
   mem_rep_write_f64_is[code]: "mem_rep_write_f64 m n vf64 = ocaml_mem_rep_pbytes_set_int64 m (nat_to_ocaml_int n) (ocaml_i64_reinterpret_f64 vf64)" and
   mem_rep_read_f64_is[code]: "mem_rep_read_f64 m n = ocaml_f64_reinterpret_i64 (ocaml_mem_rep_pbytes_get_int64 m (nat_to_ocaml_int n))" and
   
-  mem_rep_write_i8_of_i32_is[code]: "mem_rep_read_i32_of_i8 m n = ocaml_int32_to_isabelle_int32 (ocaml_int_to_ocaml_i32_s (ocaml_mem_rep_pbytes_get_int8 m (nat_to_ocaml_int n)))" and
-  mem_rep_write_u8_of_i32_is[code]: "mem_rep_read_i32_of_u8 m n = ocaml_int32_to_isabelle_int32 (ocaml_int_to_ocaml_i32_s (ocaml_mem_rep_pbytes_get_uint8 m (nat_to_ocaml_int n)))" and  
-  mem_rep_write_i16_of_i32_is[code]: "mem_rep_read_i32_of_i16 m n = ocaml_int32_to_isabelle_int32 (ocaml_int_to_ocaml_i32_s (ocaml_mem_rep_pbytes_get_int16 m (nat_to_ocaml_int n)))" and  
-  mem_rep_write_u16_of_i32_is[code]: "mem_rep_read_i32_of_u16 m n = ocaml_int32_to_isabelle_int32 (ocaml_int_to_ocaml_i32_s (ocaml_mem_rep_pbytes_get_uint16 m (nat_to_ocaml_int n)))" and  
-  mem_rep_write_i32_of_i32_is[code]: "mem_rep_read_i32_of_i32 m n = ocaml_int32_to_isabelle_int32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n))" and  
-  mem_rep_write_u32_of_i32_is[code]: "mem_rep_read_i32_of_u32 m n = ocaml_int32_to_isabelle_int32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n))" and
+  mem_rep_read_i32_of_i8_is[code]: "mem_rep_read_i32_of_i8 m n = ocaml_int32_to_isabelle_int32 (ocaml_int_to_ocaml_i32_s (ocaml_mem_rep_pbytes_get_int8 m (nat_to_ocaml_int n)))" and
+  mem_rep_read_i32_of_u8_is[code]: "mem_rep_read_i32_of_u8 m n = ocaml_int32_to_isabelle_int32 (ocaml_int_to_ocaml_i32_s (ocaml_mem_rep_pbytes_get_uint8 m (nat_to_ocaml_int n)))" and  
+  mem_rep_read_i32_of_i16_is[code]: "mem_rep_read_i32_of_i16 m n = ocaml_int32_to_isabelle_int32 (ocaml_int_to_ocaml_i32_s (ocaml_mem_rep_pbytes_get_int16 m (nat_to_ocaml_int n)))" and  
+  mem_rep_read_i32_of_u16_is[code]: "mem_rep_read_i32_of_u16 m n = ocaml_int32_to_isabelle_int32 (ocaml_int_to_ocaml_i32_s (ocaml_mem_rep_pbytes_get_uint16 m (nat_to_ocaml_int n)))" and  
+  mem_rep_read_i32_of_i32_is[code]: "mem_rep_read_i32_of_i32 m n = ocaml_int32_to_isabelle_int32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n))" and  
+  mem_rep_read_i32_of_u32_is[code]: "mem_rep_read_i32_of_u32 m n = ocaml_int32_to_isabelle_int32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n))" and
   
-  mem_rep_write_i8_of_i64_is[code]: "mem_rep_read_i64_of_i8 m n = ocaml_int64_to_isabelle_int64 (ocaml_int_to_ocaml_i64_s (ocaml_mem_rep_pbytes_get_int8 m (nat_to_ocaml_int n)))" and
-  mem_rep_write_u8_of_i64_is[code]: "mem_rep_read_i64_of_u8 m n = ocaml_int64_to_isabelle_int64 (ocaml_int_to_ocaml_i64_s (ocaml_mem_rep_pbytes_get_uint8 m (nat_to_ocaml_int n)))" and  
-  mem_rep_write_i16_of_i64_is[code]: "mem_rep_read_i64_of_i16 m n = ocaml_int64_to_isabelle_int64 (ocaml_int_to_ocaml_i64_s (ocaml_mem_rep_pbytes_get_int16 m (nat_to_ocaml_int n)))" and  
-  mem_rep_write_u16_of_i64_is[code]: "mem_rep_read_i64_of_u16 m n = ocaml_int64_to_isabelle_int64 (ocaml_int_to_ocaml_i64_s (ocaml_mem_rep_pbytes_get_uint16 m (nat_to_ocaml_int n)))" and  
-  mem_rep_write_i32_of_i64_is[code]: "mem_rep_read_i64_of_i32 m n = ocaml_int64_to_isabelle_int64 (ocaml_extend_s_i32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n)))" and  
-  mem_rep_write_u32_of_i64_is[code]: "mem_rep_read_i64_of_u32 m n = ocaml_int64_to_isabelle_int64 (ocaml_extend_u_i32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n)))"
+  mem_rep_read_i64_of_i8_is[code]: "mem_rep_read_i64_of_i8 m n = ocaml_int64_to_isabelle_int64 (ocaml_int_to_ocaml_i64_s (ocaml_mem_rep_pbytes_get_int8 m (nat_to_ocaml_int n)))" and
+  mem_rep_read_i64_of_u8_is[code]: "mem_rep_read_i64_of_u8 m n = ocaml_int64_to_isabelle_int64 (ocaml_int_to_ocaml_i64_s (ocaml_mem_rep_pbytes_get_uint8 m (nat_to_ocaml_int n)))" and  
+  mem_rep_read_i64_of_i16_is[code]: "mem_rep_read_i64_of_i16 m n = ocaml_int64_to_isabelle_int64 (ocaml_int_to_ocaml_i64_s (ocaml_mem_rep_pbytes_get_int16 m (nat_to_ocaml_int n)))" and  
+  mem_rep_read_i64_of_u16_is[code]: "mem_rep_read_i64_of_u16 m n = ocaml_int64_to_isabelle_int64 (ocaml_int_to_ocaml_i64_s (ocaml_mem_rep_pbytes_get_uint16 m (nat_to_ocaml_int n)))" and  
+  mem_rep_read_i64_of_i32_is[code]: "mem_rep_read_i64_of_i32 m n = ocaml_int64_to_isabelle_int64 (ocaml_extend_s_i32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n)))" and  
+  mem_rep_read_i64_of_u32_is[code]: "mem_rep_read_i64_of_u32 m n = ocaml_int64_to_isabelle_int64 (ocaml_extend_u_i32 (ocaml_mem_rep_pbytes_get_int32 m (nat_to_ocaml_int n)))" and
+
+  mem_rep_write_i8_of_i32_is[code]: "mem_rep_write_i8_of_i32 m n val = ocaml_mem_rep_pbytes_set_int8 m (nat_to_ocaml_int n) (integer_to_ocaml_int (ocaml_i32_to_integer (isabelle_int32_to_ocaml_int32 val)))" and
+  mem_rep_write_i16_of_i32_is[code]: "mem_rep_write_i16_of_i32 m n val = ocaml_mem_rep_pbytes_set_int16 m (nat_to_ocaml_int n) (integer_to_ocaml_int (ocaml_i32_to_integer (isabelle_int32_to_ocaml_int32 val)))"  and
+  mem_rep_write_i32_of_i32_is[code]: "mem_rep_write_i32_of_i32 = mem_rep_write_i32" and
+
+  mem_rep_write_i8_of_i64_is[code]: "mem_rep_write_i8_of_i64 m n vi64 = ocaml_mem_rep_pbytes_set_int8 m (nat_to_ocaml_int n) (integer_to_ocaml_int (ocaml_i64_to_integer (isabelle_int64_to_ocaml_int64 vi64)))" and
+  mem_rep_write_i16_of_i64_is[code]: "mem_rep_write_i16_of_i64 m n vi64 = ocaml_mem_rep_pbytes_set_int16 m (nat_to_ocaml_int n) (integer_to_ocaml_int (ocaml_i64_to_integer (isabelle_int64_to_ocaml_int64 vi64)))" and
+  mem_rep_write_i32_of_i64_is[code]: "mem_rep_write_i32_of_i64 m n vi64 = ocaml_mem_rep_pbytes_set_int32 m (nat_to_ocaml_int n) (isabelle_int32_to_ocaml_int32 (wasm_wrap vi64))"
 end
