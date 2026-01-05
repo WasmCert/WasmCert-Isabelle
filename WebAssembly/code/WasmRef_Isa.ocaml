@@ -4615,7 +4615,7 @@ let rec mem_rep_write_i32_of_i32 x = mem_rep_write_i32 x;;
 let rec mem_rep_write_i16_of_i64
   m n vi64 =
     Pbytes.set_int16 m (nat_to_ocaml_int n)
-      (Z.to_int (LibAux.z_of_uint64 (isabelle_int64_to_ocaml_int64 vi64)));;
+      (I64Wrapper_convert.to_int_s (isabelle_int64_to_ocaml_int64 vi64));;
 
 let rec mem_rep_write_i16_of_i32
   m n vala =
@@ -4625,7 +4625,7 @@ let rec mem_rep_write_i16_of_i32
 let rec mem_rep_write_i8_of_i64
   m n vi64 =
     Pbytes.set_int8 m (nat_to_ocaml_int n)
-      (Z.to_int (LibAux.z_of_uint64 (isabelle_int64_to_ocaml_int64 vi64)));;
+      (I64Wrapper_convert.to_int_s (isabelle_int64_to_ocaml_int64 vi64));;
 
 let rec mem_rep_write_i8_of_i32
   m n vala =
