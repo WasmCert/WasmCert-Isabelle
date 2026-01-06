@@ -10,10 +10,12 @@ lemmas[code] = Option.option.pred_inject(2)
 
 definition "failwith_nth n \<equiv> []!n"
 
+(*
 declare [[code abort: failwith_nth]]
 
 lemma nth_emp[code]: "nth [] n = failwith_nth n"
   unfolding failwith_nth_def ..
+*)
   
 (* The model uses a naive list-based memory *)
 (* The list can get very large, so relevant functions must be tail-recursive *)
