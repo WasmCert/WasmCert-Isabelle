@@ -32,7 +32,7 @@ proof -
     + (\<Sum>n\<in>Set.filter (\<lambda>n. f n = 0) A. b ^ f n)"
     apply (subst sum.union_disjoint[of "Set.filter (\<lambda>n. f n \<noteq> 0) A" "Set.filter (\<lambda>n. f n = 0) A", THEN sym])
     using assms apply auto[3]
-    apply (rule arg_cong[where f="sum (\<lambda>n. b ^ f n)"]) unfolding Set.filter_def by auto
+    apply (rule arg_cong[where f="sum (\<lambda>n. b ^ f n)"]) unfolding Set.filter_eq by auto
   hence "(\<Sum>n\<in>A. b ^ f n) div b =
     (\<Sum>n\<in>Set.filter (\<lambda>n. f n \<noteq> 0) A. b ^ f n) div b
     + (\<Sum>n\<in>Set.filter (\<lambda>n. f n = 0) A. b ^ f n) div b"
@@ -51,7 +51,7 @@ proof -
     then obtain x where x: "Set.filter (\<lambda>n. f n = 0) A = {x}" by (rule is_singletonE)
     hence 0: "f x = 0" by auto
     then show ?thesis unfolding x using \<open>b > 1\<close> by simp
-  qed simp
+  qed (metis div_0 sum.empty)
   ultimately show ?thesis by presburger
 qed
 
@@ -92,14 +92,14 @@ proof -
   have s: "{a \<in> {a \<in> {0..<length X}. X ! a}. ?f a \<noteq> 0} = {a \<in> {1..<length X}. X ! a}" by auto
   have "(\<Sum>n = 0..<length X. if X ! n then 2 ^ n else 0) div (2::int) =
     (\<Sum>n\<in>?A. ?b ^ (?f n)) div 2"
-    unfolding Set.filter_def by (subst sum.inter_filter[symmetric]) auto
+    unfolding Set.filter_eq by (subst sum.inter_filter[symmetric]) auto
   also have "\<dots> = (\<Sum>n\<in>Set.filter (\<lambda>n. ?f n \<noteq> 0) ?A. ?b ^ (?f n - 1))"
     apply (rule power_sum_div)
     apply (rule order.trans[where b="card (Set.filter (\<lambda>n. n = 0) {0..<length X})"])
     apply (rule card_mono)
     by (auto simp: card_le_Suc0_iff_eq)
   also have "\<dots> = (\<Sum>n = 1..<length X. if X ! n then 2 ^ (n-1) else 0)"
-    unfolding Set.filter_def
+    unfolding Set.filter_eq
     apply (subst sum.inter_filter[symmetric])
     unfolding s by auto
   finally show ?thesis .

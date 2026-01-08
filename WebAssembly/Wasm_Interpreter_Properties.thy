@@ -125,7 +125,7 @@ next
 next
   case (local_get vi j f v vs s)
   then show ?case using v_to_e_def
-    by (metis append.right_neutral const_list_def const_list_no_progress consts_app_ex(2) is_const1 is_const_list_vs_to_es_list list_all_simps(1) reduce.local_get)
+    by (metis append.right_neutral const_list_def const_list_no_progress consts_app_ex(2) is_const1 is_const_list_vs_to_es_list list.pred_inject(2) reduce.local_get)
 next
   case (global_get s f j)
   then show ?case

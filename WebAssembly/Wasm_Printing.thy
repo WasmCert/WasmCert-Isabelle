@@ -1,8 +1,7 @@
 theory Wasm_Printing
   imports
-    "HOL-Library.Code_Target_Nat" 
-    "Native_Word.Code_Int_Integer_Conversion"
-    "Native_Word.Code_Target_Int_Bit"
+    "HOL-Library.Code_Target_Nat"
+    "HOL-Library.Code_Target_Int"
     OCaml_Printing
     Wasm_Type_Printing
     Wasm_Instantiation_Printing
