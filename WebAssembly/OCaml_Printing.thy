@@ -8,9 +8,15 @@ lemma [code]: "pred_option P None = True"
 
 lemmas[code] = Option.option.pred_inject(2)
 
+(* The following code was used to provide a *)
+(* more helpful error message in case of an out of bounds *)
+(* access of list. Since Isabelle 2025-1 the code generation *)
+(* utilities were modifies so that newly added code lemmas *)
+(* remove the code generation lemmas from the previous theories *)
+(* and this makes the code generation for nth miss some pattern cases. *)
+(*
 definition "failwith_nth n \<equiv> []!n"
 
-(*
 declare [[code abort: failwith_nth]]
 
 lemma nth_emp[code]: "nth [] n = failwith_nth n"
