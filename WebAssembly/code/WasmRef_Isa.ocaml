@@ -83,7 +83,7 @@ let rec replicate n x = (if Z.leq n Z.zero then [] else x :: replicate (Z.pred n
 let max_index = Z.of_int max_int;;
 
 let splitIndex i = let (b, s) = Z.div_rem i max_index
-  in Z.to_int s :: (replicate b max_int);;
+  in Z.to_int s :: replicate b max_int;;
 
 let push' i k = Z.shift_left k i;;
 
@@ -116,80 +116,25 @@ module WasmRef_Isa : sig
   type 'a one = {one : 'a}
   val one : 'a one -> 'a
   val one_int : int one
-  val uminus_inta : int -> int
-  val minus_inta : int -> int -> int
-  val zero_inta : int
   val plus_inta : int -> int -> int
-  type 'a uminus = {uminus : 'a -> 'a}
-  val uminus : 'a uminus -> 'a -> 'a
-  type 'a minus = {minus : 'a -> 'a -> 'a}
-  val minus : 'a minus -> 'a -> 'a -> 'a
-  type 'a zero = {zero : 'a}
-  val zero : 'a zero -> 'a
   type 'a plus = {plus : 'a -> 'a -> 'a}
   val plus : 'a plus -> 'a -> 'a -> 'a
-  type 'a semigroup_add = {plus_semigroup_add : 'a plus}
-  type 'a cancel_semigroup_add =
-    {semigroup_add_cancel_semigroup_add : 'a semigroup_add}
-  type 'a ab_semigroup_add = {semigroup_add_ab_semigroup_add : 'a semigroup_add}
-  type 'a cancel_ab_semigroup_add =
-    {ab_semigroup_add_cancel_ab_semigroup_add : 'a ab_semigroup_add;
-      cancel_semigroup_add_cancel_ab_semigroup_add : 'a cancel_semigroup_add;
-      minus_cancel_ab_semigroup_add : 'a minus}
-  type 'a monoid_add =
-    {semigroup_add_monoid_add : 'a semigroup_add; zero_monoid_add : 'a zero}
-  type 'a comm_monoid_add =
-    {ab_semigroup_add_comm_monoid_add : 'a ab_semigroup_add;
-      monoid_add_comm_monoid_add : 'a monoid_add}
-  type 'a cancel_comm_monoid_add =
-    {cancel_ab_semigroup_add_cancel_comm_monoid_add :
-       'a cancel_ab_semigroup_add;
-      comm_monoid_add_cancel_comm_monoid_add : 'a comm_monoid_add}
-  type 'a mult_zero = {times_mult_zero : 'a times; zero_mult_zero : 'a zero}
-  type 'a semigroup_mult = {times_semigroup_mult : 'a times}
-  type 'a semiring =
-    {ab_semigroup_add_semiring : 'a ab_semigroup_add;
-      semigroup_mult_semiring : 'a semigroup_mult}
-  type 'a semiring_0 =
-    {comm_monoid_add_semiring_0 : 'a comm_monoid_add;
-      mult_zero_semiring_0 : 'a mult_zero; semiring_semiring_0 : 'a semiring}
-  type 'a semiring_0_cancel =
-    {cancel_comm_monoid_add_semiring_0_cancel : 'a cancel_comm_monoid_add;
-      semiring_0_semiring_0_cancel : 'a semiring_0}
-  type 'a group_add =
-    {cancel_semigroup_add_group_add : 'a cancel_semigroup_add;
-      minus_group_add : 'a minus; monoid_add_group_add : 'a monoid_add;
-      uminus_group_add : 'a uminus}
-  type 'a ab_group_add =
-    {cancel_comm_monoid_add_ab_group_add : 'a cancel_comm_monoid_add;
-      group_add_ab_group_add : 'a group_add}
-  type 'a ring =
-    {ab_group_add_ring : 'a ab_group_add;
-      semiring_0_cancel_ring : 'a semiring_0_cancel}
   val plus_int : int plus
-  val semigroup_add_int : int semigroup_add
-  val cancel_semigroup_add_int : int cancel_semigroup_add
-  val ab_semigroup_add_int : int ab_semigroup_add
-  val minus_int : int minus
-  val cancel_ab_semigroup_add_int : int cancel_ab_semigroup_add
+  val zero_inta : int
+  type 'a zero = {zero : 'a}
+  val zero : 'a zero -> 'a
   val zero_int : int zero
-  val monoid_add_int : int monoid_add
-  val comm_monoid_add_int : int comm_monoid_add
-  val cancel_comm_monoid_add_int : int cancel_comm_monoid_add
-  val mult_zero_int : int mult_zero
-  val semigroup_mult_int : int semigroup_mult
-  val semiring_int : int semiring
-  val semiring_0_int : int semiring_0
-  val semiring_0_cancel_int : int semiring_0_cancel
-  val uminus_int : int uminus
-  val group_add_int : int group_add
-  val ab_group_add_int : int ab_group_add
-  val ring_int : int ring
+  type 'a semigroup_add = {plus_semigroup_add : 'a plus}
   type 'a numeral =
     {one_numeral : 'a one; semigroup_add_numeral : 'a semigroup_add}
+  val semigroup_add_int : int semigroup_add
   val numeral_int : int numeral
   type 'a power = {one_power : 'a one; times_power : 'a times}
   val power_int : int power
+  val minus_inta : int -> int -> int
+  type 'a minus = {minus : 'a -> 'a -> 'a}
+  val minus : 'a minus -> 'a -> 'a -> 'a
+  val minus_int : int minus
   val apsnd : ('a -> 'b) -> 'c * 'a -> 'c * 'b
   val divmod_integer : Z.t -> Z.t -> Z.t * Z.t
   val fst : 'a * 'b -> 'a
@@ -205,6 +150,22 @@ module WasmRef_Isa : sig
     {divide_modulo : 'a divide; dvd_modulo : 'a dvd; modulo : 'a -> 'a -> 'a}
   val modulo : 'a modulo -> 'a -> 'a -> 'a
   val modulo_int : int modulo
+  type 'a ab_semigroup_add = {semigroup_add_ab_semigroup_add : 'a semigroup_add}
+  type 'a monoid_add =
+    {semigroup_add_monoid_add : 'a semigroup_add; zero_monoid_add : 'a zero}
+  type 'a comm_monoid_add =
+    {ab_semigroup_add_comm_monoid_add : 'a ab_semigroup_add;
+      monoid_add_comm_monoid_add : 'a monoid_add}
+  type 'a mult_zero = {times_mult_zero : 'a times; zero_mult_zero : 'a zero}
+  type 'a semigroup_mult = {times_semigroup_mult : 'a times}
+  type 'a semiring =
+    {ab_semigroup_add_semiring : 'a ab_semigroup_add;
+      semigroup_mult_semiring : 'a semigroup_mult}
+  type 'a semiring_0 =
+    {comm_monoid_add_semiring_0 : 'a comm_monoid_add;
+      mult_zero_semiring_0 : 'a mult_zero; semiring_semiring_0 : 'a semiring}
+  type 'a semiring_no_zero_divisors =
+    {semiring_0_semiring_no_zero_divisors : 'a semiring_0}
   type 'a monoid_mult =
     {semigroup_mult_monoid_mult : 'a semigroup_mult;
       power_monoid_mult : 'a power}
@@ -218,27 +179,23 @@ module WasmRef_Isa : sig
     {semiring_numeral_semiring_1 : 'a semiring_numeral;
       semiring_0_semiring_1 : 'a semiring_0;
       zero_neq_one_semiring_1 : 'a zero_neq_one}
-  type 'a semiring_1_cancel =
-    {semiring_0_cancel_semiring_1_cancel : 'a semiring_0_cancel;
-      semiring_1_semiring_1_cancel : 'a semiring_1}
-  type 'a neg_numeral =
-    {group_add_neg_numeral : 'a group_add; numeral_neg_numeral : 'a numeral}
-  type 'a ring_1 =
-    {neg_numeral_ring_1 : 'a neg_numeral; ring_ring_1 : 'a ring;
-      semiring_1_cancel_ring_1 : 'a semiring_1_cancel}
-  val monoid_mult_int : int monoid_mult
-  val semiring_numeral_int : int semiring_numeral
-  val zero_neq_one_int : int zero_neq_one
-  val semiring_1_int : int semiring_1
-  val semiring_1_cancel_int : int semiring_1_cancel
-  val neg_numeral_int : int neg_numeral
-  val ring_1_int : int ring_1
-  type 'a semiring_no_zero_divisors =
-    {semiring_0_semiring_no_zero_divisors : 'a semiring_0}
   type 'a semiring_1_no_zero_divisors =
     {semiring_1_semiring_1_no_zero_divisors : 'a semiring_1;
       semiring_no_zero_divisors_semiring_1_no_zero_divisors :
         'a semiring_no_zero_divisors}
+  type 'a cancel_semigroup_add =
+    {semigroup_add_cancel_semigroup_add : 'a semigroup_add}
+  type 'a cancel_ab_semigroup_add =
+    {ab_semigroup_add_cancel_ab_semigroup_add : 'a ab_semigroup_add;
+      cancel_semigroup_add_cancel_ab_semigroup_add : 'a cancel_semigroup_add;
+      minus_cancel_ab_semigroup_add : 'a minus}
+  type 'a cancel_comm_monoid_add =
+    {cancel_ab_semigroup_add_cancel_comm_monoid_add :
+       'a cancel_ab_semigroup_add;
+      comm_monoid_add_cancel_comm_monoid_add : 'a comm_monoid_add}
+  type 'a semiring_0_cancel =
+    {cancel_comm_monoid_add_semiring_0_cancel : 'a cancel_comm_monoid_add;
+      semiring_0_semiring_0_cancel : 'a semiring_0}
   type 'a ab_semigroup_mult =
     {semigroup_mult_ab_semigroup_mult : 'a semigroup_mult}
   type 'a comm_semiring =
@@ -250,6 +207,9 @@ module WasmRef_Isa : sig
   type 'a comm_semiring_0_cancel =
     {comm_semiring_0_comm_semiring_0_cancel : 'a comm_semiring_0;
       semiring_0_cancel_comm_semiring_0_cancel : 'a semiring_0_cancel}
+  type 'a semiring_1_cancel =
+    {semiring_0_cancel_semiring_1_cancel : 'a semiring_0_cancel;
+      semiring_1_semiring_1_cancel : 'a semiring_1}
   type 'a comm_monoid_mult =
     {ab_semigroup_mult_comm_monoid_mult : 'a ab_semigroup_mult;
       monoid_mult_comm_monoid_mult : 'a monoid_mult;
@@ -265,36 +225,32 @@ module WasmRef_Isa : sig
   type 'a semidom =
     {comm_semiring_1_cancel_semidom : 'a comm_semiring_1_cancel;
       semiring_1_no_zero_divisors_semidom : 'a semiring_1_no_zero_divisors}
+  val ab_semigroup_add_int : int ab_semigroup_add
+  val monoid_add_int : int monoid_add
+  val comm_monoid_add_int : int comm_monoid_add
+  val mult_zero_int : int mult_zero
+  val semigroup_mult_int : int semigroup_mult
+  val semiring_int : int semiring
+  val semiring_0_int : int semiring_0
   val semiring_no_zero_divisors_int : int semiring_no_zero_divisors
+  val monoid_mult_int : int monoid_mult
+  val semiring_numeral_int : int semiring_numeral
+  val zero_neq_one_int : int zero_neq_one
+  val semiring_1_int : int semiring_1
   val semiring_1_no_zero_divisors_int : int semiring_1_no_zero_divisors
+  val cancel_semigroup_add_int : int cancel_semigroup_add
+  val cancel_ab_semigroup_add_int : int cancel_ab_semigroup_add
+  val cancel_comm_monoid_add_int : int cancel_comm_monoid_add
+  val semiring_0_cancel_int : int semiring_0_cancel
   val ab_semigroup_mult_int : int ab_semigroup_mult
   val comm_semiring_int : int comm_semiring
   val comm_semiring_0_int : int comm_semiring_0
   val comm_semiring_0_cancel_int : int comm_semiring_0_cancel
+  val semiring_1_cancel_int : int semiring_1_cancel
   val comm_monoid_mult_int : int comm_monoid_mult
   val comm_semiring_1_int : int comm_semiring_1
   val comm_semiring_1_cancel_int : int comm_semiring_1_cancel
   val semidom_int : int semidom
-  type 'a comm_ring =
-    {comm_semiring_0_cancel_comm_ring : 'a comm_semiring_0_cancel;
-      ring_comm_ring : 'a ring}
-  val comm_ring_int : int comm_ring
-  type 'a comm_ring_1 =
-    {comm_ring_comm_ring_1 : 'a comm_ring;
-      comm_semiring_1_cancel_comm_ring_1 : 'a comm_semiring_1_cancel;
-      ring_1_comm_ring_1 : 'a ring_1}
-  val comm_ring_1_int : int comm_ring_1
-  type 'a semiring_modulo =
-    {comm_semiring_1_cancel_semiring_modulo : 'a comm_semiring_1_cancel;
-      modulo_semiring_modulo : 'a modulo}
-  type 'a semiring_parity =
-    {semiring_modulo_semiring_parity : 'a semiring_modulo}
-  type 'a ring_parity =
-    {semiring_parity_ring_parity : 'a semiring_parity;
-      comm_ring_1_ring_parity : 'a comm_ring_1}
-  val semiring_modulo_int : int semiring_modulo
-  val semiring_parity_int : int semiring_parity
-  val ring_parity_int : int ring_parity
   type 'a divide_trivial =
     {one_divide_trivial : 'a one; zero_divide_trivial : 'a zero;
       divide_divide_trivial : 'a divide}
@@ -310,6 +266,9 @@ module WasmRef_Isa : sig
   val semiring_no_zero_divisors_cancel_int :
     int semiring_no_zero_divisors_cancel
   val semidom_divide_int : int semidom_divide
+  type 'a semiring_modulo =
+    {comm_semiring_1_cancel_semiring_modulo : 'a comm_semiring_1_cancel;
+      modulo_semiring_modulo : 'a modulo}
   type 'a semiring_modulo_trivial =
     {divide_trivial_semiring_modulo_trivial : 'a divide_trivial;
       semiring_modulo_semiring_modulo_trivial : 'a semiring_modulo}
@@ -318,59 +277,12 @@ module WasmRef_Isa : sig
   type 'a semidom_modulo =
     {algebraic_semidom_semidom_modulo : 'a algebraic_semidom;
       semiring_modulo_trivial_semidom_modulo : 'a semiring_modulo_trivial}
+  val semiring_modulo_int : int semiring_modulo
   val semiring_modulo_trivial_int : int semiring_modulo_trivial
   val algebraic_semidom_int : int algebraic_semidom
   val semidom_modulo_int : int semidom_modulo
   type nat = Nat of Z.t
   val integer_of_nat : nat -> Z.t
-  val push_bit_integer : nat -> Z.t -> Z.t
-  val bit_integer : Z.t -> nat -> bool
-  val bit_int : int -> nat -> bool
-  type 'a semiring_bits =
-    {semiring_parity_semiring_bits : 'a semiring_parity;
-      semiring_modulo_trivial_semiring_bits : 'a semiring_modulo_trivial;
-      bit : 'a -> nat -> bool}
-  val bit : 'a semiring_bits -> 'a -> nat -> bool
-  val semiring_bits_int : int semiring_bits
-  val unset_bit_integer : nat -> Z.t -> Z.t
-  val unset_bit_int : nat -> int -> int
-  val mask_integer : nat -> Z.t
-  val take_bit_integer : nat -> Z.t -> Z.t
-  val take_bit_int : nat -> int -> int
-  val push_bit_int : nat -> int -> int
-  val flip_bit_integer : nat -> Z.t -> Z.t
-  val flip_bit_int : nat -> int -> int
-  val drop_bit_integer : nat -> Z.t -> Z.t
-  val drop_bit_int : nat -> int -> int
-  val set_bit_integer : nat -> Z.t -> Z.t
-  val set_bit_int : nat -> int -> int
-  val mask_int : nat -> int
-  val xor_int : int -> int -> int
-  val and_int : int -> int -> int
-  val or_int : int -> int -> int
-  type 'a semiring_bit_operations =
-    {semiring_bits_semiring_bit_operations : 'a semiring_bits;
-      anda : 'a -> 'a -> 'a; ora : 'a -> 'a -> 'a; xor : 'a -> 'a -> 'a;
-      mask : nat -> 'a; set_bit : nat -> 'a -> 'a; unset_bit : nat -> 'a -> 'a;
-      flip_bit : nat -> 'a -> 'a; push_bit : nat -> 'a -> 'a;
-      drop_bit : nat -> 'a -> 'a; take_bit : nat -> 'a -> 'a}
-  val anda : 'a semiring_bit_operations -> 'a -> 'a -> 'a
-  val ora : 'a semiring_bit_operations -> 'a -> 'a -> 'a
-  val xor : 'a semiring_bit_operations -> 'a -> 'a -> 'a
-  val mask : 'a semiring_bit_operations -> nat -> 'a
-  val set_bit : 'a semiring_bit_operations -> nat -> 'a -> 'a
-  val unset_bit : 'a semiring_bit_operations -> nat -> 'a -> 'a
-  val flip_bit : 'a semiring_bit_operations -> nat -> 'a -> 'a
-  val push_bit : 'a semiring_bit_operations -> nat -> 'a -> 'a
-  val drop_bit : 'a semiring_bit_operations -> nat -> 'a -> 'a
-  val take_bit : 'a semiring_bit_operations -> nat -> 'a -> 'a
-  val not_int : int -> int
-  type 'a ring_bit_operations =
-    {semiring_bit_operations_ring_bit_operations : 'a semiring_bit_operations;
-      ring_parity_ring_bit_operations : 'a ring_parity; nota : 'a -> 'a}
-  val nota : 'a ring_bit_operations -> 'a -> 'a
-  val semiring_bit_operations_int : int semiring_bit_operations
-  val ring_bit_operations_int : int ring_bit_operations
   val equal_nata : nat -> nat -> bool
   val equal_nat : nat equal
   val one_nata : nat
@@ -392,6 +304,10 @@ module WasmRef_Isa : sig
   val one_worda : 'a len -> 'a word
   val one_word : 'a len -> 'a word one
   val the_int : 'a len -> 'a word -> int
+  val push_bit_integer : nat -> Z.t -> Z.t
+  val mask_integer : nat -> Z.t
+  val take_bit_integer : nat -> Z.t -> Z.t
+  val take_bit_int : nat -> int -> int
   val of_int : 'a len -> int -> 'a word
   val plus_worda : 'a len -> 'a word -> 'a word -> 'a word
   val plus_word : 'a len -> 'a word plus
@@ -471,6 +387,7 @@ module WasmRef_Isa : sig
   val len0_i32 : i32 len0
   val len_i32 : i32 len
   val bit_uint32 : int32 -> nat -> bool
+  val bit_integer : Z.t -> nat -> bool
   val uint32 : Z.t -> int32
   val integer_of_uint32 : int32 -> Z.t
   val nat_of_uint32 : int32 -> nat
@@ -518,9 +435,12 @@ module WasmRef_Isa : sig
   val int_mul_i32 : i32 -> i32 -> i32
   val int_eqz_i32 : i32 -> bool
   val suc : nat -> nat
-  val gen_length : nat -> 'a list -> nat
+  val length_tailrec : 'a list -> nat -> nat
   val size_list : 'a list -> nat
+  val drop_bit_integer : nat -> Z.t -> Z.t
+  val drop_bit_int : nat -> int -> int
   val drop_bit_word : 'a len -> nat -> 'a word -> 'a word
+  val and_int : int -> int -> int
   val and_word : 'a len -> 'a word -> 'a word -> 'a word
   val equal_word : 'a len -> 'a word -> 'a word -> bool
   val bit_word : 'a len -> 'a word -> nat -> bool
@@ -790,7 +710,6 @@ module WasmRef_Isa : sig
       tf list * tf list * unit tg_ext list * t_ref list * unit list *
         tab_t list * unit limit_t_ext list * t list * (t list) list *
         (t list) option * nat list * 'a
-  val failwith_nth : nat -> 'a
   val nth : 'a list -> nat -> 'a
   val zip : 'a list -> 'b list -> ('a * 'b) list
   val drop : nat -> 'a list -> 'a list
@@ -803,7 +722,6 @@ module WasmRef_Isa : sig
   val those : ('a option) list -> ('a list) option
   val concat : ('a list) list -> 'a list
   val member : 'a equal -> 'a list -> 'a -> bool
-  val int_of_integer_symbolic : Z.t -> int
   val uint8 : Z.t -> uint8
   val remdups : 'a equal -> 'a list -> 'a list
   val distinct : 'a equal -> 'a list -> bool
@@ -857,7 +775,9 @@ module WasmRef_Isa : sig
   val funcs : 'a s_ext -> cl list
   val globs : 'a s_ext -> unit global_ext list
   val tab_max : tab_t * v_ref list -> nat option
-  val signed_take_bit : 'a ring_bit_operations -> nat -> 'a -> 'a
+  val push_bit_int : nat -> int -> int
+  val bit_int : int -> nat -> bool
+  val uminus_int : int -> int
   val the_signed_int : 'a len -> 'a word -> int
   val signed_cast : 'b len -> 'a len -> 'b word -> 'a word
   val adjunct : 'a pred -> 'a seq -> 'a seq
@@ -1527,158 +1447,27 @@ let one _A = _A.one;;
 
 let one_int = ({one = one_inta} : int one);;
 
-let rec uminus_inta k = Int_of_integer (Z.neg (integer_of_int k));;
-
-let rec minus_inta
-  k l = Int_of_integer (Z.sub (integer_of_int k) (integer_of_int l));;
-
-let zero_inta : int = Int_of_integer Z.zero;;
-
 let rec plus_inta
   k l = Int_of_integer (Z.add (integer_of_int k) (integer_of_int l));;
-
-type 'a uminus = {uminus : 'a -> 'a};;
-let uminus _A = _A.uminus;;
-
-type 'a minus = {minus : 'a -> 'a -> 'a};;
-let minus _A = _A.minus;;
-
-type 'a zero = {zero : 'a};;
-let zero _A = _A.zero;;
 
 type 'a plus = {plus : 'a -> 'a -> 'a};;
 let plus _A = _A.plus;;
 
-type 'a semigroup_add = {plus_semigroup_add : 'a plus};;
-
-type 'a cancel_semigroup_add =
-  {semigroup_add_cancel_semigroup_add : 'a semigroup_add};;
-
-type 'a ab_semigroup_add = {semigroup_add_ab_semigroup_add : 'a semigroup_add};;
-
-type 'a cancel_ab_semigroup_add =
-  {ab_semigroup_add_cancel_ab_semigroup_add : 'a ab_semigroup_add;
-    cancel_semigroup_add_cancel_ab_semigroup_add : 'a cancel_semigroup_add;
-    minus_cancel_ab_semigroup_add : 'a minus};;
-
-type 'a monoid_add =
-  {semigroup_add_monoid_add : 'a semigroup_add; zero_monoid_add : 'a zero};;
-
-type 'a comm_monoid_add =
-  {ab_semigroup_add_comm_monoid_add : 'a ab_semigroup_add;
-    monoid_add_comm_monoid_add : 'a monoid_add};;
-
-type 'a cancel_comm_monoid_add =
-  {cancel_ab_semigroup_add_cancel_comm_monoid_add : 'a cancel_ab_semigroup_add;
-    comm_monoid_add_cancel_comm_monoid_add : 'a comm_monoid_add};;
-
-type 'a mult_zero = {times_mult_zero : 'a times; zero_mult_zero : 'a zero};;
-
-type 'a semigroup_mult = {times_semigroup_mult : 'a times};;
-
-type 'a semiring =
-  {ab_semigroup_add_semiring : 'a ab_semigroup_add;
-    semigroup_mult_semiring : 'a semigroup_mult};;
-
-type 'a semiring_0 =
-  {comm_monoid_add_semiring_0 : 'a comm_monoid_add;
-    mult_zero_semiring_0 : 'a mult_zero; semiring_semiring_0 : 'a semiring};;
-
-type 'a semiring_0_cancel =
-  {cancel_comm_monoid_add_semiring_0_cancel : 'a cancel_comm_monoid_add;
-    semiring_0_semiring_0_cancel : 'a semiring_0};;
-
-type 'a group_add =
-  {cancel_semigroup_add_group_add : 'a cancel_semigroup_add;
-    minus_group_add : 'a minus; monoid_add_group_add : 'a monoid_add;
-    uminus_group_add : 'a uminus};;
-
-type 'a ab_group_add =
-  {cancel_comm_monoid_add_ab_group_add : 'a cancel_comm_monoid_add;
-    group_add_ab_group_add : 'a group_add};;
-
-type 'a ring =
-  {ab_group_add_ring : 'a ab_group_add;
-    semiring_0_cancel_ring : 'a semiring_0_cancel};;
-
 let plus_int = ({plus = plus_inta} : int plus);;
 
-let semigroup_add_int = ({plus_semigroup_add = plus_int} : int semigroup_add);;
+let zero_inta : int = Int_of_integer Z.zero;;
 
-let cancel_semigroup_add_int =
-  ({semigroup_add_cancel_semigroup_add = semigroup_add_int} :
-    int cancel_semigroup_add);;
-
-let ab_semigroup_add_int =
-  ({semigroup_add_ab_semigroup_add = semigroup_add_int} :
-    int ab_semigroup_add);;
-
-let minus_int = ({minus = minus_inta} : int minus);;
-
-let cancel_ab_semigroup_add_int =
-  ({ab_semigroup_add_cancel_ab_semigroup_add = ab_semigroup_add_int;
-     cancel_semigroup_add_cancel_ab_semigroup_add = cancel_semigroup_add_int;
-     minus_cancel_ab_semigroup_add = minus_int}
-    : int cancel_ab_semigroup_add);;
+type 'a zero = {zero : 'a};;
+let zero _A = _A.zero;;
 
 let zero_int = ({zero = zero_inta} : int zero);;
 
-let monoid_add_int =
-  ({semigroup_add_monoid_add = semigroup_add_int; zero_monoid_add = zero_int} :
-    int monoid_add);;
-
-let comm_monoid_add_int =
-  ({ab_semigroup_add_comm_monoid_add = ab_semigroup_add_int;
-     monoid_add_comm_monoid_add = monoid_add_int}
-    : int comm_monoid_add);;
-
-let cancel_comm_monoid_add_int =
-  ({cancel_ab_semigroup_add_cancel_comm_monoid_add =
-      cancel_ab_semigroup_add_int;
-     comm_monoid_add_cancel_comm_monoid_add = comm_monoid_add_int}
-    : int cancel_comm_monoid_add);;
-
-let mult_zero_int =
-  ({times_mult_zero = times_int; zero_mult_zero = zero_int} : int mult_zero);;
-
-let semigroup_mult_int =
-  ({times_semigroup_mult = times_int} : int semigroup_mult);;
-
-let semiring_int =
-  ({ab_semigroup_add_semiring = ab_semigroup_add_int;
-     semigroup_mult_semiring = semigroup_mult_int}
-    : int semiring);;
-
-let semiring_0_int =
-  ({comm_monoid_add_semiring_0 = comm_monoid_add_int;
-     mult_zero_semiring_0 = mult_zero_int; semiring_semiring_0 = semiring_int}
-    : int semiring_0);;
-
-let semiring_0_cancel_int =
-  ({cancel_comm_monoid_add_semiring_0_cancel = cancel_comm_monoid_add_int;
-     semiring_0_semiring_0_cancel = semiring_0_int}
-    : int semiring_0_cancel);;
-
-let uminus_int = ({uminus = uminus_inta} : int uminus);;
-
-let group_add_int =
-  ({cancel_semigroup_add_group_add = cancel_semigroup_add_int;
-     minus_group_add = minus_int; monoid_add_group_add = monoid_add_int;
-     uminus_group_add = uminus_int}
-    : int group_add);;
-
-let ab_group_add_int =
-  ({cancel_comm_monoid_add_ab_group_add = cancel_comm_monoid_add_int;
-     group_add_ab_group_add = group_add_int}
-    : int ab_group_add);;
-
-let ring_int =
-  ({ab_group_add_ring = ab_group_add_int;
-     semiring_0_cancel_ring = semiring_0_cancel_int}
-    : int ring);;
+type 'a semigroup_add = {plus_semigroup_add : 'a plus};;
 
 type 'a numeral =
   {one_numeral : 'a one; semigroup_add_numeral : 'a semigroup_add};;
+
+let semigroup_add_int = ({plus_semigroup_add = plus_int} : int semigroup_add);;
 
 let numeral_int =
   ({one_numeral = one_int; semigroup_add_numeral = semigroup_add_int} :
@@ -1687,6 +1476,14 @@ let numeral_int =
 type 'a power = {one_power : 'a one; times_power : 'a times};;
 
 let power_int = ({one_power = one_int; times_power = times_int} : int power);;
+
+let rec minus_inta
+  k l = Int_of_integer (Z.sub (integer_of_int k) (integer_of_int l));;
+
+type 'a minus = {minus : 'a -> 'a -> 'a};;
+let minus _A = _A.minus;;
+
+let minus_int = ({minus = minus_inta} : int minus);;
 
 let rec apsnd f (x, y) = (x, f y);;
 
@@ -1747,6 +1544,30 @@ let modulo_int =
   ({divide_modulo = divide_int; dvd_modulo = dvd_int; modulo = modulo_inta} :
     int modulo);;
 
+type 'a ab_semigroup_add = {semigroup_add_ab_semigroup_add : 'a semigroup_add};;
+
+type 'a monoid_add =
+  {semigroup_add_monoid_add : 'a semigroup_add; zero_monoid_add : 'a zero};;
+
+type 'a comm_monoid_add =
+  {ab_semigroup_add_comm_monoid_add : 'a ab_semigroup_add;
+    monoid_add_comm_monoid_add : 'a monoid_add};;
+
+type 'a mult_zero = {times_mult_zero : 'a times; zero_mult_zero : 'a zero};;
+
+type 'a semigroup_mult = {times_semigroup_mult : 'a times};;
+
+type 'a semiring =
+  {ab_semigroup_add_semiring : 'a ab_semigroup_add;
+    semigroup_mult_semiring : 'a semigroup_mult};;
+
+type 'a semiring_0 =
+  {comm_monoid_add_semiring_0 : 'a comm_monoid_add;
+    mult_zero_semiring_0 : 'a mult_zero; semiring_semiring_0 : 'a semiring};;
+
+type 'a semiring_no_zero_divisors =
+  {semiring_0_semiring_no_zero_divisors : 'a semiring_0};;
+
 type 'a monoid_mult =
   {semigroup_mult_monoid_mult : 'a semigroup_mult;
     power_monoid_mult : 'a power};;
@@ -1764,16 +1585,97 @@ type 'a semiring_1 =
     semiring_0_semiring_1 : 'a semiring_0;
     zero_neq_one_semiring_1 : 'a zero_neq_one};;
 
+type 'a semiring_1_no_zero_divisors =
+  {semiring_1_semiring_1_no_zero_divisors : 'a semiring_1;
+    semiring_no_zero_divisors_semiring_1_no_zero_divisors :
+      'a semiring_no_zero_divisors};;
+
+type 'a cancel_semigroup_add =
+  {semigroup_add_cancel_semigroup_add : 'a semigroup_add};;
+
+type 'a cancel_ab_semigroup_add =
+  {ab_semigroup_add_cancel_ab_semigroup_add : 'a ab_semigroup_add;
+    cancel_semigroup_add_cancel_ab_semigroup_add : 'a cancel_semigroup_add;
+    minus_cancel_ab_semigroup_add : 'a minus};;
+
+type 'a cancel_comm_monoid_add =
+  {cancel_ab_semigroup_add_cancel_comm_monoid_add : 'a cancel_ab_semigroup_add;
+    comm_monoid_add_cancel_comm_monoid_add : 'a comm_monoid_add};;
+
+type 'a semiring_0_cancel =
+  {cancel_comm_monoid_add_semiring_0_cancel : 'a cancel_comm_monoid_add;
+    semiring_0_semiring_0_cancel : 'a semiring_0};;
+
+type 'a ab_semigroup_mult =
+  {semigroup_mult_ab_semigroup_mult : 'a semigroup_mult};;
+
+type 'a comm_semiring =
+  {ab_semigroup_mult_comm_semiring : 'a ab_semigroup_mult;
+    semiring_comm_semiring : 'a semiring};;
+
+type 'a comm_semiring_0 =
+  {comm_semiring_comm_semiring_0 : 'a comm_semiring;
+    semiring_0_comm_semiring_0 : 'a semiring_0};;
+
+type 'a comm_semiring_0_cancel =
+  {comm_semiring_0_comm_semiring_0_cancel : 'a comm_semiring_0;
+    semiring_0_cancel_comm_semiring_0_cancel : 'a semiring_0_cancel};;
+
 type 'a semiring_1_cancel =
   {semiring_0_cancel_semiring_1_cancel : 'a semiring_0_cancel;
     semiring_1_semiring_1_cancel : 'a semiring_1};;
 
-type 'a neg_numeral =
-  {group_add_neg_numeral : 'a group_add; numeral_neg_numeral : 'a numeral};;
+type 'a comm_monoid_mult =
+  {ab_semigroup_mult_comm_monoid_mult : 'a ab_semigroup_mult;
+    monoid_mult_comm_monoid_mult : 'a monoid_mult;
+    dvd_comm_monoid_mult : 'a dvd};;
 
-type 'a ring_1 =
-  {neg_numeral_ring_1 : 'a neg_numeral; ring_ring_1 : 'a ring;
-    semiring_1_cancel_ring_1 : 'a semiring_1_cancel};;
+type 'a comm_semiring_1 =
+  {comm_monoid_mult_comm_semiring_1 : 'a comm_monoid_mult;
+    comm_semiring_0_comm_semiring_1 : 'a comm_semiring_0;
+    semiring_1_comm_semiring_1 : 'a semiring_1};;
+
+type 'a comm_semiring_1_cancel =
+  {comm_semiring_0_cancel_comm_semiring_1_cancel : 'a comm_semiring_0_cancel;
+    comm_semiring_1_comm_semiring_1_cancel : 'a comm_semiring_1;
+    semiring_1_cancel_comm_semiring_1_cancel : 'a semiring_1_cancel};;
+
+type 'a semidom =
+  {comm_semiring_1_cancel_semidom : 'a comm_semiring_1_cancel;
+    semiring_1_no_zero_divisors_semidom : 'a semiring_1_no_zero_divisors};;
+
+let ab_semigroup_add_int =
+  ({semigroup_add_ab_semigroup_add = semigroup_add_int} :
+    int ab_semigroup_add);;
+
+let monoid_add_int =
+  ({semigroup_add_monoid_add = semigroup_add_int; zero_monoid_add = zero_int} :
+    int monoid_add);;
+
+let comm_monoid_add_int =
+  ({ab_semigroup_add_comm_monoid_add = ab_semigroup_add_int;
+     monoid_add_comm_monoid_add = monoid_add_int}
+    : int comm_monoid_add);;
+
+let mult_zero_int =
+  ({times_mult_zero = times_int; zero_mult_zero = zero_int} : int mult_zero);;
+
+let semigroup_mult_int =
+  ({times_semigroup_mult = times_int} : int semigroup_mult);;
+
+let semiring_int =
+  ({ab_semigroup_add_semiring = ab_semigroup_add_int;
+     semigroup_mult_semiring = semigroup_mult_int}
+    : int semiring);;
+
+let semiring_0_int =
+  ({comm_monoid_add_semiring_0 = comm_monoid_add_int;
+     mult_zero_semiring_0 = mult_zero_int; semiring_semiring_0 = semiring_int}
+    : int semiring_0);;
+
+let semiring_no_zero_divisors_int =
+  ({semiring_0_semiring_no_zero_divisors = semiring_0_int} :
+    int semiring_no_zero_divisors);;
 
 let monoid_mult_int =
   ({semigroup_mult_monoid_mult = semigroup_mult_int;
@@ -1796,71 +1698,32 @@ let semiring_1_int =
      zero_neq_one_semiring_1 = zero_neq_one_int}
     : int semiring_1);;
 
-let semiring_1_cancel_int =
-  ({semiring_0_cancel_semiring_1_cancel = semiring_0_cancel_int;
-     semiring_1_semiring_1_cancel = semiring_1_int}
-    : int semiring_1_cancel);;
-
-let neg_numeral_int =
-  ({group_add_neg_numeral = group_add_int; numeral_neg_numeral = numeral_int} :
-    int neg_numeral);;
-
-let ring_1_int =
-  ({neg_numeral_ring_1 = neg_numeral_int; ring_ring_1 = ring_int;
-     semiring_1_cancel_ring_1 = semiring_1_cancel_int}
-    : int ring_1);;
-
-type 'a semiring_no_zero_divisors =
-  {semiring_0_semiring_no_zero_divisors : 'a semiring_0};;
-
-type 'a semiring_1_no_zero_divisors =
-  {semiring_1_semiring_1_no_zero_divisors : 'a semiring_1;
-    semiring_no_zero_divisors_semiring_1_no_zero_divisors :
-      'a semiring_no_zero_divisors};;
-
-type 'a ab_semigroup_mult =
-  {semigroup_mult_ab_semigroup_mult : 'a semigroup_mult};;
-
-type 'a comm_semiring =
-  {ab_semigroup_mult_comm_semiring : 'a ab_semigroup_mult;
-    semiring_comm_semiring : 'a semiring};;
-
-type 'a comm_semiring_0 =
-  {comm_semiring_comm_semiring_0 : 'a comm_semiring;
-    semiring_0_comm_semiring_0 : 'a semiring_0};;
-
-type 'a comm_semiring_0_cancel =
-  {comm_semiring_0_comm_semiring_0_cancel : 'a comm_semiring_0;
-    semiring_0_cancel_comm_semiring_0_cancel : 'a semiring_0_cancel};;
-
-type 'a comm_monoid_mult =
-  {ab_semigroup_mult_comm_monoid_mult : 'a ab_semigroup_mult;
-    monoid_mult_comm_monoid_mult : 'a monoid_mult;
-    dvd_comm_monoid_mult : 'a dvd};;
-
-type 'a comm_semiring_1 =
-  {comm_monoid_mult_comm_semiring_1 : 'a comm_monoid_mult;
-    comm_semiring_0_comm_semiring_1 : 'a comm_semiring_0;
-    semiring_1_comm_semiring_1 : 'a semiring_1};;
-
-type 'a comm_semiring_1_cancel =
-  {comm_semiring_0_cancel_comm_semiring_1_cancel : 'a comm_semiring_0_cancel;
-    comm_semiring_1_comm_semiring_1_cancel : 'a comm_semiring_1;
-    semiring_1_cancel_comm_semiring_1_cancel : 'a semiring_1_cancel};;
-
-type 'a semidom =
-  {comm_semiring_1_cancel_semidom : 'a comm_semiring_1_cancel;
-    semiring_1_no_zero_divisors_semidom : 'a semiring_1_no_zero_divisors};;
-
-let semiring_no_zero_divisors_int =
-  ({semiring_0_semiring_no_zero_divisors = semiring_0_int} :
-    int semiring_no_zero_divisors);;
-
 let semiring_1_no_zero_divisors_int =
   ({semiring_1_semiring_1_no_zero_divisors = semiring_1_int;
      semiring_no_zero_divisors_semiring_1_no_zero_divisors =
        semiring_no_zero_divisors_int}
     : int semiring_1_no_zero_divisors);;
+
+let cancel_semigroup_add_int =
+  ({semigroup_add_cancel_semigroup_add = semigroup_add_int} :
+    int cancel_semigroup_add);;
+
+let cancel_ab_semigroup_add_int =
+  ({ab_semigroup_add_cancel_ab_semigroup_add = ab_semigroup_add_int;
+     cancel_semigroup_add_cancel_ab_semigroup_add = cancel_semigroup_add_int;
+     minus_cancel_ab_semigroup_add = minus_int}
+    : int cancel_ab_semigroup_add);;
+
+let cancel_comm_monoid_add_int =
+  ({cancel_ab_semigroup_add_cancel_comm_monoid_add =
+      cancel_ab_semigroup_add_int;
+     comm_monoid_add_cancel_comm_monoid_add = comm_monoid_add_int}
+    : int cancel_comm_monoid_add);;
+
+let semiring_0_cancel_int =
+  ({cancel_comm_monoid_add_semiring_0_cancel = cancel_comm_monoid_add_int;
+     semiring_0_semiring_0_cancel = semiring_0_int}
+    : int semiring_0_cancel);;
 
 let ab_semigroup_mult_int =
   ({semigroup_mult_ab_semigroup_mult = semigroup_mult_int} :
@@ -1880,6 +1743,11 @@ let comm_semiring_0_cancel_int =
   ({comm_semiring_0_comm_semiring_0_cancel = comm_semiring_0_int;
      semiring_0_cancel_comm_semiring_0_cancel = semiring_0_cancel_int}
     : int comm_semiring_0_cancel);;
+
+let semiring_1_cancel_int =
+  ({semiring_0_cancel_semiring_1_cancel = semiring_0_cancel_int;
+     semiring_1_semiring_1_cancel = semiring_1_int}
+    : int semiring_1_cancel);;
 
 let comm_monoid_mult_int =
   ({ab_semigroup_mult_comm_monoid_mult = ab_semigroup_mult_int;
@@ -1903,51 +1771,6 @@ let semidom_int =
   ({comm_semiring_1_cancel_semidom = comm_semiring_1_cancel_int;
      semiring_1_no_zero_divisors_semidom = semiring_1_no_zero_divisors_int}
     : int semidom);;
-
-type 'a comm_ring =
-  {comm_semiring_0_cancel_comm_ring : 'a comm_semiring_0_cancel;
-    ring_comm_ring : 'a ring};;
-
-let comm_ring_int =
-  ({comm_semiring_0_cancel_comm_ring = comm_semiring_0_cancel_int;
-     ring_comm_ring = ring_int}
-    : int comm_ring);;
-
-type 'a comm_ring_1 =
-  {comm_ring_comm_ring_1 : 'a comm_ring;
-    comm_semiring_1_cancel_comm_ring_1 : 'a comm_semiring_1_cancel;
-    ring_1_comm_ring_1 : 'a ring_1};;
-
-let comm_ring_1_int =
-  ({comm_ring_comm_ring_1 = comm_ring_int;
-     comm_semiring_1_cancel_comm_ring_1 = comm_semiring_1_cancel_int;
-     ring_1_comm_ring_1 = ring_1_int}
-    : int comm_ring_1);;
-
-type 'a semiring_modulo =
-  {comm_semiring_1_cancel_semiring_modulo : 'a comm_semiring_1_cancel;
-    modulo_semiring_modulo : 'a modulo};;
-
-type 'a semiring_parity =
-  {semiring_modulo_semiring_parity : 'a semiring_modulo};;
-
-type 'a ring_parity =
-  {semiring_parity_ring_parity : 'a semiring_parity;
-    comm_ring_1_ring_parity : 'a comm_ring_1};;
-
-let semiring_modulo_int =
-  ({comm_semiring_1_cancel_semiring_modulo = comm_semiring_1_cancel_int;
-     modulo_semiring_modulo = modulo_int}
-    : int semiring_modulo);;
-
-let semiring_parity_int =
-  ({semiring_modulo_semiring_parity = semiring_modulo_int} :
-    int semiring_parity);;
-
-let ring_parity_int =
-  ({semiring_parity_ring_parity = semiring_parity_int;
-     comm_ring_1_ring_parity = comm_ring_1_int}
-    : int ring_parity);;
 
 type 'a divide_trivial =
   {one_divide_trivial : 'a one; zero_divide_trivial : 'a zero;
@@ -1980,6 +1803,10 @@ let semidom_divide_int =
        semiring_no_zero_divisors_cancel_int}
     : int semidom_divide);;
 
+type 'a semiring_modulo =
+  {comm_semiring_1_cancel_semiring_modulo : 'a comm_semiring_1_cancel;
+    modulo_semiring_modulo : 'a modulo};;
+
 type 'a semiring_modulo_trivial =
   {divide_trivial_semiring_modulo_trivial : 'a divide_trivial;
     semiring_modulo_semiring_modulo_trivial : 'a semiring_modulo};;
@@ -1990,6 +1817,11 @@ type 'a algebraic_semidom =
 type 'a semidom_modulo =
   {algebraic_semidom_semidom_modulo : 'a algebraic_semidom;
     semiring_modulo_trivial_semidom_modulo : 'a semiring_modulo_trivial};;
+
+let semiring_modulo_int =
+  ({comm_semiring_1_cancel_semiring_modulo = comm_semiring_1_cancel_int;
+     modulo_semiring_modulo = modulo_int}
+    : int semiring_modulo);;
 
 let semiring_modulo_trivial_int =
   ({divide_trivial_semiring_modulo_trivial = divide_trivial_int;
@@ -2008,103 +1840,6 @@ let semidom_modulo_int =
 type nat = Nat of Z.t;;
 
 let rec integer_of_nat (Nat x) = x;;
-
-let rec push_bit_integer n k = Bit_Shifts.push (integer_of_nat n) k;;
-
-let rec bit_integer
-  k n = not (Z.equal (Z.logand k (push_bit_integer n (Z.of_int 1))) Z.zero);;
-
-let rec bit_int (Int_of_integer k) n = bit_integer k n;;
-
-type 'a semiring_bits =
-  {semiring_parity_semiring_bits : 'a semiring_parity;
-    semiring_modulo_trivial_semiring_bits : 'a semiring_modulo_trivial;
-    bit : 'a -> nat -> bool};;
-let bit _A = _A.bit;;
-
-let semiring_bits_int =
-  ({semiring_parity_semiring_bits = semiring_parity_int;
-     semiring_modulo_trivial_semiring_bits = semiring_modulo_trivial_int;
-     bit = bit_int}
-    : int semiring_bits);;
-
-let rec unset_bit_integer
-  n k = Z.logand k (Z.lognot (push_bit_integer n (Z.of_int 1)));;
-
-let rec unset_bit_int
-  n (Int_of_integer k) = Int_of_integer (unset_bit_integer n k);;
-
-let rec mask_integer n = Z.sub (push_bit_integer n (Z.of_int 1)) (Z.of_int 1);;
-
-let rec take_bit_integer n k = Z.logand k (mask_integer n);;
-
-let rec take_bit_int
-  n (Int_of_integer k) = Int_of_integer (take_bit_integer n k);;
-
-let rec push_bit_int
-  n (Int_of_integer k) = Int_of_integer (push_bit_integer n k);;
-
-let rec flip_bit_integer n k = Z.logxor k (push_bit_integer n (Z.of_int 1));;
-
-let rec flip_bit_int
-  n (Int_of_integer k) = Int_of_integer (flip_bit_integer n k);;
-
-let rec drop_bit_integer n k = Bit_Shifts.drop (integer_of_nat n) k;;
-
-let rec drop_bit_int
-  n (Int_of_integer k) = Int_of_integer (drop_bit_integer n k);;
-
-let rec set_bit_integer n k = Z.logor k (push_bit_integer n (Z.of_int 1));;
-
-let rec set_bit_int
-  n (Int_of_integer k) = Int_of_integer (set_bit_integer n k);;
-
-let rec mask_int n = Int_of_integer (mask_integer n);;
-
-let rec xor_int
-  (Int_of_integer k) (Int_of_integer l) = Int_of_integer (Z.logxor k l);;
-
-let rec and_int
-  (Int_of_integer k) (Int_of_integer l) = Int_of_integer (Z.logand k l);;
-
-let rec or_int
-  (Int_of_integer k) (Int_of_integer l) = Int_of_integer (Z.logor k l);;
-
-type 'a semiring_bit_operations =
-  {semiring_bits_semiring_bit_operations : 'a semiring_bits;
-    anda : 'a -> 'a -> 'a; ora : 'a -> 'a -> 'a; xor : 'a -> 'a -> 'a;
-    mask : nat -> 'a; set_bit : nat -> 'a -> 'a; unset_bit : nat -> 'a -> 'a;
-    flip_bit : nat -> 'a -> 'a; push_bit : nat -> 'a -> 'a;
-    drop_bit : nat -> 'a -> 'a; take_bit : nat -> 'a -> 'a};;
-let anda _A = _A.anda;;
-let ora _A = _A.ora;;
-let xor _A = _A.xor;;
-let mask _A = _A.mask;;
-let set_bit _A = _A.set_bit;;
-let unset_bit _A = _A.unset_bit;;
-let flip_bit _A = _A.flip_bit;;
-let push_bit _A = _A.push_bit;;
-let drop_bit _A = _A.drop_bit;;
-let take_bit _A = _A.take_bit;;
-
-let rec not_int (Int_of_integer k) = Int_of_integer (Z.lognot k);;
-
-type 'a ring_bit_operations =
-  {semiring_bit_operations_ring_bit_operations : 'a semiring_bit_operations;
-    ring_parity_ring_bit_operations : 'a ring_parity; nota : 'a -> 'a};;
-let nota _A = _A.nota;;
-
-let semiring_bit_operations_int =
-  ({semiring_bits_semiring_bit_operations = semiring_bits_int; anda = and_int;
-     ora = or_int; xor = xor_int; mask = mask_int; set_bit = set_bit_int;
-     unset_bit = unset_bit_int; flip_bit = flip_bit_int;
-     push_bit = push_bit_int; drop_bit = drop_bit_int; take_bit = take_bit_int}
-    : int semiring_bit_operations);;
-
-let ring_bit_operations_int =
-  ({semiring_bit_operations_ring_bit_operations = semiring_bit_operations_int;
-     ring_parity_ring_bit_operations = ring_parity_int; nota = not_int}
-    : int ring_bit_operations);;
 
 let rec equal_nata m n = Z.equal (integer_of_nat m) (integer_of_nat n);;
 
@@ -2144,6 +1879,15 @@ let rec one_worda _A = Word one_inta;;
 let rec one_word _A = ({one = one_worda _A} : 'a word one);;
 
 let rec the_int _A (Word x) = x;;
+
+let rec push_bit_integer n k = Bit_Shifts.push (integer_of_nat n) k;;
+
+let rec mask_integer n = Z.sub (push_bit_integer n (Z.of_int 1)) (Z.of_int 1);;
+
+let rec take_bit_integer n k = Z.logand k (mask_integer n);;
+
+let rec take_bit_int
+  n (Int_of_integer k) = Int_of_integer (take_bit_integer n k);;
 
 let rec of_int _A k = Word (take_bit_int (len_of _A.len0_len Type) k);;
 
@@ -2369,6 +2113,9 @@ let rec bit_uint32
   w n = less_nat n (nat_of_integer (Z.of_int 32)) &&
           Uint32.test_bit w (integer_of_nat n);;
 
+let rec bit_integer
+  k n = not (Z.equal (Z.logand k (push_bit_integer n (Z.of_int 1))) Z.zero);;
+
 let rec uint32
   i = (let ia = Z.logand i (Z.of_string "4294967295") in
         (if bit_integer ia (nat_of_integer (Z.of_int 31))
@@ -2557,12 +2304,20 @@ let rec int_eqz_i32 (I32_impl_abs x) = (Int32.compare x Int32.zero = 0);;
 
 let rec suc n = plus_nat n one_nata;;
 
-let rec gen_length n x1 = match n, x1 with n, x :: xs -> gen_length (suc n) xs
-                     | n, [] -> n;;
+let rec length_tailrec x0 n = match x0, n with [], n -> n
+                         | x :: xs, n -> length_tailrec xs (suc n);;
 
-let rec size_list x = gen_length zero_nat x;;
+let rec size_list xs = length_tailrec xs zero_nat;;
+
+let rec drop_bit_integer n k = Bit_Shifts.drop (integer_of_nat n) k;;
+
+let rec drop_bit_int
+  n (Int_of_integer k) = Int_of_integer (drop_bit_integer n k);;
 
 let rec drop_bit_word _A n w = Word (drop_bit_int n (the_int _A w));;
+
+let rec and_int
+  (Int_of_integer k) (Int_of_integer l) = Int_of_integer (Z.logand k l);;
 
 let rec and_word _A v w = Word (and_int (the_int _A v) (the_int _A w));;
 
@@ -2577,8 +2332,8 @@ let rec map f x1 = match f, x1 with f, [] -> []
 
 let rec upt i j = (if less_nat i j then i :: upt (suc i) j else []);;
 
-let rec fold f x1 s = match f, x1, s with f, x :: xs, s -> fold f xs (f x s)
-               | f, [], s -> s;;
+let rec fold f x1 s = match f, x1, s with f, [], s -> s
+               | f, x :: xs, s -> fold f xs (f x s);;
 
 let rec rev xs = fold (fun a b -> a :: b) xs [];;
 
@@ -2605,8 +2360,8 @@ let rec horner_sum _B
                 a b))
       xs (zero _B.semiring_0_comm_semiring_0.mult_zero_semiring_0.zero_mult_zero);;
 
-let rec of_bool _A = function true -> one _A.one_zero_neq_one
-                     | false -> zero _A.zero_zero_neq_one;;
+let rec of_bool _A = function false -> zero _A.zero_zero_neq_one
+                     | true -> one _A.one_zero_neq_one;;
 
 let rec set_bits_word _A
   p = horner_sum (comm_semiring_0_word _A) (of_bool (zero_neq_one_word _A))
@@ -3195,16 +2950,13 @@ type 'a t_context_ext =
       unit limit_t_ext list * t list * (t list) list * (t list) option *
       nat list * 'a;;
 
-let failwith_nth _ = failwith "OCaml_Printing.failwith_nth";;
-
 let rec nth
-  x0 n = match x0, n with [], n -> failwith_nth n
-    | x :: xs, n ->
-        (if equal_nata n zero_nat then x else nth xs (minus_nat n one_nata));;
+  (x :: xs) n =
+    (if equal_nata n zero_nat then x else nth xs (minus_nat n one_nata));;
 
-let rec zip xs ys = match xs, ys with x :: xs, y :: ys -> (x, y) :: zip xs ys
+let rec zip xs ys = match xs, ys with [], ys -> []
               | xs, [] -> []
-              | [], ys -> [];;
+              | x :: xs, y :: ys -> (x, y) :: zip xs ys;;
 
 let rec drop
   n x1 = match n, x1 with n, [] -> []
@@ -3242,12 +2994,9 @@ let rec concat xss = foldr (fun a b -> a @ b) xss [];;
 let rec member _A x0 y = match x0, y with [], y -> false
                     | x :: xs, y -> eq _A x y || member _A xs y;;
 
-let rec int_of_integer_symbolic x = Int_of_integer x;;
-
 let rec uint8
   i = Abs_uint8
-        (of_int (len_bit0 (len_bit0 (len_bit0 len_num1)))
-          (int_of_integer_symbolic i));;
+        (of_int (len_bit0 (len_bit0 (len_bit0 len_num1))) (Int_of_integer i));;
 
 let rec remdups _A
   = function [] -> []
@@ -3266,8 +3015,8 @@ let rec replicate_tr
 
 let rec replicate n x = replicate_tr n x [];;
 
-let rec is_none = function Some x -> false
-                  | None -> true;;
+let rec is_none = function None -> true
+                  | Some x -> false;;
 
 let rec bind (Seq g) f = Seq (fun _ -> apply f (g ()))
 and apply f x1 = match f, x1 with f, Empty -> Empty
@@ -3419,22 +3168,19 @@ let rec globs (S_ext (funcs, tabs, mems, globs, elems, datas, more)) = globs;;
 
 let rec tab_max t = (let (T_tab (limits, _), _) = t in l_max limits);;
 
-let rec signed_take_bit _A
-  n a = (let l =
-           take_bit _A.semiring_bit_operations_ring_bit_operations (suc n) a in
-          (if bit _A.semiring_bit_operations_ring_bit_operations.semiring_bits_semiring_bit_operations
-                l n
-            then plus _A.ring_parity_ring_bit_operations.comm_ring_1_ring_parity.ring_1_comm_ring_1.neg_numeral_ring_1.numeral_neg_numeral.semigroup_add_numeral.plus_semigroup_add
-                   l (push_bit _A.semiring_bit_operations_ring_bit_operations
-                       (suc n)
-                       (uminus
-                         _A.ring_parity_ring_bit_operations.comm_ring_1_ring_parity.ring_1_comm_ring_1.neg_numeral_ring_1.group_add_neg_numeral.uminus_group_add
-                         (one _A.ring_parity_ring_bit_operations.comm_ring_1_ring_parity.ring_1_comm_ring_1.neg_numeral_ring_1.numeral_neg_numeral.one_numeral)))
-            else l));;
+let rec push_bit_int
+  n (Int_of_integer k) = Int_of_integer (push_bit_integer n k);;
+
+let rec bit_int (Int_of_integer k) n = bit_integer k n;;
+
+let rec uminus_int k = Int_of_integer (Z.neg (integer_of_int k));;
 
 let rec the_signed_int _A
-  w = signed_take_bit ring_bit_operations_int
-        (minus_nat (len_of _A.len0_len Type) (suc zero_nat)) (the_int _A w);;
+  w = (let k = the_int _A w in
+        (if bit_int k (minus_nat (len_of _A.len0_len Type) (suc zero_nat))
+          then plus_inta k
+                 (push_bit_int (len_of _A.len0_len Type) (uminus_int one_inta))
+          else k));;
 
 let rec signed_cast _B _A
   w = Word (take_bit_int (len_of _A.len0_len Type) (the_signed_int _B w));;
@@ -3916,10 +3662,10 @@ let rec types_t
       refs, more))
     = types_t;;
 
-let rec equal_bool p pa = match p, pa with p, true -> p
-                     | p, false -> not p
+let rec equal_bool p pa = match p, pa with false, p -> not p
                      | true, p -> p
-                     | false, p -> not p;;
+                     | p, false -> not p
+                     | p, true -> p;;
 
 let rec convert_cond
   t1 t2 sat_sx =
@@ -4261,11 +4007,9 @@ let rec eq_i_i _A
     bind (single (xa, xb))
       (fun (x, xaa) -> (if eq _A x xaa then single () else bot_pred));;
 
-let rec list_all2
-  p xs ys = match p, xs, ys with
-    p, x :: xs, y :: ys -> p x y && list_all2 p xs ys
-    | p, xs, [] -> null xs
-    | p, [], ys -> null ys;;
+let rec list_all2 p xs ys = match p, xs, ys with p, [], ys -> null ys
+                    | p, xs, [] -> null xs
+                    | p, x :: xs, y :: ys -> p x y && list_all2 p xs ys;;
 
 let rec datasa
   (Inst_ext (types, funcs, tabs, mems, globs, elems, datas, more)) = datas;;
@@ -4325,7 +4069,7 @@ let rec byte_of_nat x = uint8_of_nat x;;
 
 let rec nat_of_byte x = nat_of_uint8 x;;
 
-let rec uminus_word _A a = of_int _A (uminus_inta (the_int _A a));;
+let rec uminus_word _A a = of_int _A (uminus_int (the_int _A a));;
 
 let rec uminus_uint8
   p = Abs_uint8
@@ -5294,8 +5038,8 @@ let rec app_s_f_v_s_table_init
 
 let int32_minus_one : i32 = I32_impl_abs (Int32.neg Int32.one);;
 
-let rec pred_option p x1 = match p, x1 with p, Some a -> p a
-                      | p, None -> true;;
+let rec pred_option p x1 = match p, x1 with p, None -> true
+                      | p, Some a -> p a;;
 
 let rec grow_tab
   t n vr =
