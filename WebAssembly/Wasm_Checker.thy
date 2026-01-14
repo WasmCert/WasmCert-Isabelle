@@ -79,7 +79,8 @@ lemma min_lab_conv_list_all:
 proof (induction rule: min_lab.induct)
 case (2 i "is" lab_c)
   thus ?case using min_lab_h_conv_list_all
-    by (metis (no_types, lifting) le_def list_all_simps(1) min_lab.simps(2) option.simps(3))
+    by (metis (mono_tags, lifting) le_def list.pred_inject(2) min_lab.simps(2)
+        option.discI)
 qed simp
 
 lemma subtyping_min_ts:
@@ -129,7 +130,7 @@ lemma list_all_conv_min_lab:
 proof (induction "(is@[i])")
   case (Cons a x)
   thus ?case
-    by (metis (mono_tags, lifting) assms list_all_conv_min_lab_h list_all_simps(1) min_lab.simps(2) min_lab_h.simps(2))
+    by (metis (mono_tags, lifting) assms list_all_conv_min_lab_h list.pred_inject(2) min_lab.simps(2) min_lab_h.simps(2))
 qed auto
 
 fun b_e_type_checker :: "t_context \<Rightarrow>  b_e list \<Rightarrow> tf \<Rightarrow> bool"

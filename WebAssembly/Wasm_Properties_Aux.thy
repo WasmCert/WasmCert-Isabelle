@@ -1722,7 +1722,8 @@ lemma consts_cons_last2:
         "is_const e"
         "is_const e'"
   apply (metis assms const_list_def is_const_list list_all_append)
-  apply (metis (full_types) assms const_list_def is_const_list list_all_append list_all_simps(1))+
+  apply (metis assms const_list_def consts_const_list
+      list.pred_inject(2) list_all_append)+
   done
 
 lemma consts_cons_last3:
@@ -1732,7 +1733,8 @@ lemma consts_cons_last3:
         "is_const e'"
         "is_const e'"
   apply (metis assms const_list_def is_const_list list_all_append)
-  apply (metis (full_types) assms const_list_def is_const_list list_all_append list_all_simps(1))+
+  apply (metis assms const_list_def consts_const_list
+      list.pred_inject(2) list_all_append)+
   done
 
 lemma consts_cons:
@@ -1740,7 +1742,8 @@ lemma consts_cons:
   shows "\<exists>ves. es = $C* ves"
         "is_const e"
   apply (metis assms map_eq_Cons_conv)
-  apply (metis assms const_list_def is_const_list list_all_simps(1))
+  apply (metis assms const_list_def consts_const_list
+      list.pred_inject(2) list_all_append)+
   done
 
 lemma consts_app_ex:
@@ -3472,10 +3475,9 @@ proof -
     by (metis (full_types) old.unit.exhaust s.surjective)
   have "list_all (elem_agree s) (elems s)" using assms(2) unfolding store_typing.simps by simp
   then have "list_all (elem_agree s') (elems s')"
-    
     using ref_typing_store_extension_inv[OF sh1] unfolding elem_agree_def assms(3) using assms(1) snd_conv
-    nth_list_update_eq[OF assms(1)] apply simp
-    by (metis (no_types, lifting) length_list_update list_all_length list_all_simps(2) nth_list_update_eq nth_list_update_neq snd_conv)
+    nth_list_update_eq[OF assms(1)]
+    by (simp add: list_all_length nth_list_update)
   moreover
   have "list_all (\<lambda>cl. \<exists>tf. cl_typing s' cl tf) (s.funcs s')"
     using cl_typing_store_extension_inv[OF sh1] 0(1)
@@ -3755,7 +3757,7 @@ proof -
         using assms(2)
         by (metis (no_types, opaque_lifting) Suc_eq_plus1 append_Cons append_Nil assms(1) list_all2_refl list_all2_update_cong list_update_id not_None_eq store_tabs1_def tab'_def(2) tab_extension_refl upd_conv_take_nth_drop)
     qed
-    then have "store_extension s (s\<lparr>s.tabs := tabs'\<rparr>)"
+    then have s0:"store_extension s (s\<lparr>s.tabs := tabs'\<rparr>)"
     proof - 
       let ?s = "s\<lparr>s.tabs := tabs'\<rparr>"
       have s1: "funcs s = funcs ?s" by simp
@@ -3785,7 +3787,9 @@ proof -
       by (simp add: "2" case_prod_beta' tab_max_def)
     then have "tab_agree (s\<lparr>s.tabs := tabs'\<rparr>) tab'" using t1 tab_agree_update_store by auto
     then have "list_all (tab_agree (s\<lparr>s.tabs := tabs'\<rparr>)) tabs'"
-      by (metis (mono_tags, lifting) assms(3) atd_lem list.pred_inject(2) list_all_append list_all_length list_all_simps(2) s.select_convs(1) s.surjective s.update_convs(2) store_typing.cases tab'_def(2) tab_agree_update_store)
+      using s0 tab'_def
+      by simp (metis append_take_drop_id assms(3) list_all_append list_all_length
+          store_typing_in_tab_agree tab_agree_store_extension_inv)
     show "store_typing (s\<lparr>s.tabs := tabs'\<rparr>)"
          "store_extension s (s\<lparr>s.tabs := tabs'\<rparr>)"
       using store_extension_tab_leq[OF assms(3) _ t3 t1 t4 t2, of a]

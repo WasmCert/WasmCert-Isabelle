@@ -58,7 +58,7 @@ proof -
       assume "length (butlast l) = N"
       let ?h = "\<lambda>n. n - 1"
       have l: "Set.filter (\<lambda>n. Suc N - n - 1 \<noteq> 0) {x \<in> {0..<Suc N}. l ! x} = {x \<in> {0..<N}. l ! x}"
-        unfolding Set.filter_def by auto
+        unfolding Set.filter_eq by auto
       have "(\<Sum>n = 0..<Suc N. if l ! n then 2 ^ (Suc N - n - 1) else (0::int)) div 2 =
         (\<Sum>n = 0..<N. if l ! n then 2 ^ (N - n - 1) else 0)"
         apply (subst sum.inter_filter

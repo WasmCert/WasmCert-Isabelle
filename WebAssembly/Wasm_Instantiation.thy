@@ -724,7 +724,7 @@ proof -
       then have 1: "const_exprs \<C> [e]"
         by auto
       then obtain t'' where t''_def: "[] _> [t''] = t2s _> t3s" "t1s = []" "t'' <t: t"
-        by (metis t_subtyping_def composition.hyps(3) composition.prems(2) const_expr_is instr_subtyping_append1 instr_subtyping_def list_all2_Nil list_all2_Nil2 list_all_simps(1) self_append_conv2 t_list_subtyping_def tf.sel(1) tf.sel(2))
+        by (metis t_subtyping_def composition.hyps(3) composition.prems(2) const_expr_is instr_subtyping_append1 instr_subtyping_def list_all2_Nil list_all2_Nil2 list.pred_inject(2) self_append_conv2 t_list_subtyping_def tf.sel(1) tf.sel(2))
       have 2: "const_expr \<C> e"
         using 1
         by simp

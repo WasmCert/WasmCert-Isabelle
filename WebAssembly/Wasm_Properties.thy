@@ -1027,7 +1027,8 @@ proof -
   then have "\<C> \<turnstile> [Br i'] : (ts _> ts')"
     using assms(3) ts_c_def(1,2,3) b_e_typing.br[of i' \<C> "label \<C> ! i'" t1s t2s] 1 2
     unfolding list_all_length
-    by (metis (mono_tags, lifting) list_all_append list_all_length list_all_simps(1) subsumption ts_c_def(1))
+    by (metis (no_types, lifting) list.pred_inject(2) list_all_append list_all_length subsumption
+        ts_c_def(1))
   thus ?thesis
     using e_typing_thread_typing.intros(1)
     by fastforce
@@ -3833,7 +3834,7 @@ next
   case (reinterpret t1 t2 \<C>)
   obtain v where cs_def:"vs = [V_num v]" "typeof_num v = t2"
     using const_of_typed_const_1 [OF reinterpret(3)]
-    by (metis e_typing_imp_list_v_typing(1) list_all_simps(1) reinterpret.prems(1) t.inject(1) t.simps(5) t.simps(7) v_typing.simps)
+    by (metis e_typing_imp_list_v_typing(1) list.pred_inject(2) reinterpret.prems(1) t.inject(1) t.simps(5) t.simps(7) v_typing.simps)
   thus ?case
     using reduce.intros(1)[OF reduce_simple.reinterpret] v_to_e_def
     by fastforce
