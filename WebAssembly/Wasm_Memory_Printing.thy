@@ -220,37 +220,6 @@ lemma store_v_num_is[code]: "store_v_num m n off v = store_v_num' m n off v"
   using typeof_num_def t_num_length_def takefill_same serialise_f32_len serialise_f64_len
   by (auto simp add: takefill_same' split: t_num.splits)
 
-(* Perhaps a more appropriate place for ocaml_int and related conversions is in Wasm_Type_Printing *)
-(* But right now it is only used for Parray memory representation *)
-typedecl ocaml_int
-
-consts
-  ocaml_int_to_integer :: "ocaml_int \<Rightarrow> integer"
-  integer_to_ocaml_int :: "integer \<Rightarrow> ocaml_int"
-  ocaml_int_to_uint32_s :: "ocaml_int \<Rightarrow> uint32"
-  ocaml_int_to_uint64_s :: "ocaml_int \<Rightarrow> uint64"
-  uint64_to_ocaml_int_s :: "uint64 \<Rightarrow> ocaml_int"
-  uint32_to_ocaml_int_s :: "uint32 \<Rightarrow> ocaml_int"
-  ocaml_extend_u_i32 :: "uint32 \<Rightarrow> uint64"
-  ocaml_extend_s_i32 :: "uint32 \<Rightarrow> uint64"
-
-code_printing
-  type_constructor ocaml_int \<rightharpoonup> (OCaml) "Int.t"
-| constant ocaml_int_to_integer \<rightharpoonup> (OCaml) "Z.of'_int"
-| constant integer_to_ocaml_int \<rightharpoonup> (OCaml) "Z.to'_int"
-| constant ocaml_int_to_uint32_s \<rightharpoonup> (OCaml) "I32Wrapper'_convert.of'_int'_s"
-| constant ocaml_int_to_uint64_s \<rightharpoonup> (OCaml) "I64Wrapper'_convert.of'_int'_s"
-| constant ocaml_extend_u_i32 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.extend'_u'_i32"
-| constant ocaml_extend_s_i32 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.extend'_s'_i32"
-| constant uint32_to_ocaml_int_s \<rightharpoonup> (OCaml) "I32Wrapper'_convert.to'_int'_s"
-| constant uint64_to_ocaml_int_s \<rightharpoonup> (OCaml) "I64Wrapper'_convert.to'_int'_s"
-
-definition ocaml_int_to_nat :: "ocaml_int \<Rightarrow> nat" where
-  "ocaml_int_to_nat x = nat_of_integer (ocaml_int_to_integer x)"
-
-definition nat_to_ocaml_int :: "nat \<Rightarrow> ocaml_int" where
-  "nat_to_ocaml_int x = integer_to_ocaml_int (integer_of_nat x)"
-
 consts
   ocaml_mem_rep_pbytes_length :: "mem_rep \<Rightarrow> ocaml_int"
   ocaml_mem_rep_pbytes_mk :: "ocaml_int \<Rightarrow> ocaml_char \<Rightarrow> mem_rep"
@@ -270,18 +239,6 @@ consts
   ocaml_mem_rep_pbytes_get_int32 :: "mem_rep \<Rightarrow> ocaml_int \<Rightarrow> uint32"
   ocaml_mem_rep_pbytes_set_int64 :: "mem_rep \<Rightarrow> ocaml_int \<Rightarrow> uint64 \<Rightarrow> mem_rep"
   ocaml_mem_rep_pbytes_get_int64 :: "mem_rep \<Rightarrow> ocaml_int \<Rightarrow> uint64"
-
-consts
-  uint32_reinterpret_f32 :: "f32 \<Rightarrow> uint32"
-  uint64_reinterpret_f64 :: "f64 \<Rightarrow> uint64"
-  f32_reinterpret_uint32 :: "uint32 \<Rightarrow> f32"
-  f64_reinterpret_uint64 :: "uint64 \<Rightarrow> f64"
-
-code_printing
-  constant uint32_reinterpret_f32  \<rightharpoonup> (OCaml) "I32Wrapper'_convert.reinterpret'_of'_f32"
-| constant uint64_reinterpret_f64 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.reinterpret'_of'_f64"
-| constant f32_reinterpret_uint32 \<rightharpoonup> (OCaml) "I32Wrapper'_convert.reinterpret'_to'_f32"
-| constant f64_reinterpret_uint64 \<rightharpoonup> (OCaml) "I64Wrapper'_convert.reinterpret'_to'_f64"
 
 code_printing
   type_constructor mem_rep \<rightharpoonup> (OCaml) "Pbytes.pbt"
