@@ -3,6 +3,8 @@ session WebAssembly_Dev = "HOL-Library" +
   options [quick_and_dirty]
   sessions
     Native_Word
+  directories
+    "../libs"
   theories
     Wasm
     Wasm_Ast
