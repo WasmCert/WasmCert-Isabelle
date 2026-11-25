@@ -157,8 +157,8 @@ proof -
   have 0: "integer_of_uint32 y mod 32 \<ge> 0"
     by (simp add: integer_of_uint32.rep_eq less_eq_integer.rep_eq)
   have 1:"\<not>(((integer_of_uint32 y) mod 32) < 0 \<or> 32 \<le> (integer_of_uint32 y) mod 32)"
-    apply (meson 0 verit_comp_simplify1 zero_less_numeral)
-    using less_eq_integer.rep_eq by fastforce
+    using zero_less_numeral less_eq_integer.rep_eq 0
+    by fastforce
   have 2:"(Rep_uint32 (x << (nat_of_integer (integer_of_uint32 y mod 32)))) =
             ((Rep_uint32 x) << (unat (Rep_uint32 y) mod 32))" 
     unfolding integer_of_uint32_def nat_of_integer_def shiftl_def
@@ -177,8 +177,8 @@ proof -
   have 0: "integer_of_uint32 y mod 32 \<ge> 0"
     by (simp add: integer_of_uint32.rep_eq less_eq_integer.rep_eq)
   have 1:"\<not>(integer_of_uint32 y mod 32 < 0 \<or> 32 \<le> integer_of_uint32 y mod 32)"
-    apply (meson 0  verit_comp_simplify1(3) zero_less_numeral)
-    using less_eq_integer.rep_eq by force
+    using zero_less_numeral less_eq_integer.rep_eq 0
+    by fastforce
   have 2:"(Rep_uint32 (shiftr x (nat_of_integer ((integer_of_uint32 y) mod 32)))) =
             (shiftr (Rep_uint32 x) ((unat (Rep_uint32 y)) mod 32))"
     unfolding integer_of_uint32_def nat_of_integer_def shiftr_def
@@ -197,8 +197,8 @@ proof -
   have 0: "integer_of_uint32 y mod 32 \<ge> 0"
     by (simp add: integer_of_uint32.rep_eq less_eq_integer.rep_eq)
   have 1:"\<not>(integer_of_uint32 y mod 32 < 0 \<or> 32 \<le> integer_of_uint32 y mod 32)"
-    apply (meson 0 verit_comp_simplify1(3) zero_less_numeral)
-    using less_eq_integer.rep_eq by fastforce
+    using zero_less_numeral less_eq_integer.rep_eq 0
+    by fastforce
   have 2:"(Rep_uint32 (signed_drop_bit_uint32 (nat_of_integer ((integer_of_uint32 y) mod 32)) x)) =
             (sshiftr (Rep_uint32 x) ((unat (Rep_uint32 y)) mod 32))"
     unfolding integer_of_uint32_def nat_of_integer_def
@@ -392,8 +392,8 @@ proof -
   have 0: "integer_of_uint64 y mod 64 \<ge> 0"
     by (simp add: integer_of_uint32.rep_eq less_eq_integer.rep_eq)
   have 1:"\<not>(integer_of_uint64 y mod 64 < 0 \<or> 64 \<le> integer_of_uint64 y mod 64)"
-    apply (meson 0 verit_comp_simplify1(3) zero_less_numeral)
-    using less_eq_integer.rep_eq by fastforce
+    using zero_less_numeral less_eq_integer.rep_eq 0
+    by fastforce
   have 2:"(Rep_uint64 (x << (nat_of_integer (integer_of_uint64 y mod 64)))) =
             ((Rep_uint64 x) << (unat (Rep_uint64 y) mod 64))"
     unfolding integer_of_uint64_def nat_of_integer_def shiftl_def
@@ -410,9 +410,8 @@ qed
 lemma[code]: "int_shr_u (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (uint64_shiftr x ((integer_of_uint64 y) mod 64))"
 proof -
   have 1:"\<not>(integer_of_uint64 y mod 64 < 0 \<or> 64 \<le> integer_of_uint64 y mod 64)"
-    apply
-      (meson verit_comp_simplify1(3) zero_less_numeral)
-    using less_eq_integer.rep_eq linorder_not_less by fastforce+
+    using zero_less_numeral less_eq_integer.rep_eq linorder_not_less
+    by fastforce
   have 2:"(Rep_uint64 (shiftr x (nat_of_integer ((integer_of_uint64 y) mod 64)))) =
             (shiftr (Rep_uint64 x) ((unat (Rep_uint64 y)) mod 64))"
     unfolding integer_of_uint64_def nat_of_integer_def shiftr_def
@@ -429,8 +428,8 @@ qed
 lemma[code]: "int_shr_s (i64_impl_abs x) (i64_impl_abs y) = i64_impl_abs (uint64_sshiftr x ((integer_of_uint64 y) mod 64))"
 proof -
   have 1:"\<not>(integer_of_uint64 y mod 64 < 0 \<or> 64 \<le> integer_of_uint64 y mod 64)"
-    apply (meson verit_comp_simplify1(3) zero_less_numeral)
-    using less_eq_integer.rep_eq linorder_not_less by fastforce+
+    using zero_less_numeral less_eq_integer.rep_eq linorder_not_less
+    by fastforce
   have 2:"(Rep_uint64 (signed_drop_bit_uint64 (nat_of_integer ((integer_of_uint64 y) mod 64)) x)) =
             (sshiftr (Rep_uint64 x) ((unat (Rep_uint64 y)) mod 64))"
     unfolding integer_of_uint64_def nat_of_integer_def
@@ -480,6 +479,7 @@ proof -
     unfolding int_rotl_i64_def
     apply transfer'
     unfolding I64.int_rotl_def
+    apply transfer'
     apply transfer'
     apply (simp add: Let_def x y concat_bit_def take_bit_drop_bit)
     done

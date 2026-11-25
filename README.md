@@ -8,10 +8,10 @@ The type soundness statement and proof can be found in [WebAssembly/Wasm_Soundne
 
 ## Building
 
-To build, you first need Isabelle2025-2 which, as of February 2026, together with instalation instructions you can find [here](https://isabelle.in.tum.de/installation.html). If a newer version has been released since, past versions of Isabelle can be found [here](https://isabelle.in.tum.de/download_past.html).
+To build, you first need Isabelle2026 which, as of November 2026, together with instalation instructions can be found [here](https://isabelle.in.tum.de/installation.html). If a newer version has been released since, past versions of Isabelle can be found [here](https://isabelle.in.tum.de/download_past.html).
 
-You also need to link a version of Archive of Formal Proofs (AFP) with Isabelle. You may download the most recent version of AFP [here](https://www.isa-afp.org/download/) but the past versions of AFP (including the ones that should work with Isabelle 2025-2) can be found [here](https://foss.heptapod.net/isa-afp). To link the AFP version with Isabelle, follow the instructions [here](https://www.isa-afp.org/help/).
+You also need to link a version of Archive of Formal Proofs (AFP) with Isabelle. You may download the most recent version of AFP [here](https://www.isa-afp.org/download/) but the past versions of AFP (including the ones that should work with Isabelle 2026) can be found [here](https://foss.heptapod.net/isa-afp). To link the AFP version with Isabelle, follow the instructions [here](https://www.isa-afp.org/help/). This repository has been tested with the 2026-11-19 version of AFP.
 
-Once you have Isabelle2025-2 linked with AFP, you may open the theory files in the project using Isabelle, such as the [WebAssembly/Wasm_Soundness.thy](./WebAssembly/Wasm_Soundness.thy) file which will initiate the checking of the WebAssembly type soundness proof.
+Once you have Isabelle2026 linked with AFP, you may open the theory files in the project using Isabelle, such as the [WebAssembly/Wasm_Soundness.thy](./WebAssembly/Wasm_Soundness.thy) file which will initiate the checking of the WebAssembly type soundness proof.
 
 The extracted OCaml executable definitions can be found in the [WebAssembly/code](./WebAssembly/code) subdirectory. The top-level printing directives for the extracted code are in [WebAssembly/Wasm_Printing.thy](./WebAssembly/Wasm_Printing.thy). A version of the Wasm OCaml reference interpreter, modified to work with our verified extracted definitions, can be found [here](https://github.com/conrad-watt/spec/tree/a160f21a554b1b0e6a10c2d7d085658edc9477fd/interpreter).
